@@ -1,0 +1,18 @@
+{
+  "en": {
+    "translation": {
+      "Dashboard": "Dashboard",
+      "Tracking": "Tracking",
+      "Tax Reports": "Tax Reports",
+      "Settings": "Settings"
+    }
+  },
+  "de": {
+    "translation": {
+      "Dashboard": "Übersicht",
+      "Tracking": "Erfassen",
+      "Tax Reports": "Steuerreports",
+      "Settings": "Einstellungen"
+    }
+  }
+}
