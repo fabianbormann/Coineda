@@ -11,7 +11,6 @@
     "bunyan": "^1.8.15",
     "coingecko-api": "^1.0.10",
     "cors": "^2.8.5",
-    "electron-builder": "^22.11.7",
     "eslint-plugin-prettier": "^3.4.0",
     "express": "^4.17.1",
     "i18next": "^20.3.2",
@@ -56,6 +55,7 @@
     ]
   },
   "devDependencies": {
-    "electron": "^13.1.6"
+    "electron": "^13.1.6",
+    "electron-builder": "^22.11.7"
   }
 }
