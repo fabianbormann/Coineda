@@ -1,6 +1,8 @@
 {
   "name": "coineda",
-  "version": "0.1.0",
+  "version": "0.1.1",
+  "author": "Fabian Bormann <fabian.bormann@coineda.io>",
+  "license": "AGPL-3.0",
   "dependencies": {
     "@ant-design/charts": "^1.2.4",
     "@testing-library/jest-dom": "^5.14.1",
@@ -34,7 +36,9 @@
     "eject": "react-scripts eject",
     "electron": "electron .",
     "server": "node ./src/server.js",
-    "server-dev": "nodemon ./src/server.js"
+    "server-dev": "nodemon ./src/server.js",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
   },
   "eslintConfig": {
     "extends": [
@@ -57,5 +61,12 @@
   "devDependencies": {
     "electron": "^13.1.6",
     "electron-builder": "^22.11.7"
+  },
+  "build": {
+    "appId": "io.coineda.app",
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ]
   }
 }
