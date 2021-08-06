@@ -65,7 +65,7 @@
   "build": {
     "appId": "io.coineda.app",
     "files": [
-      "dist/**/*",
+      "build/**/*",
       "package.json"
     ]
   }
