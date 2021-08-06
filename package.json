@@ -4,37 +4,41 @@
   "author": "Fabian Bormann <fabian.bormann@coineda.io>",
   "license": "AGPL-3.0",
   "dependencies": {
-    "@ant-design/charts": "^1.2.4",
+    "@ant-design/charts": "^1.2.5",
     "@testing-library/jest-dom": "^5.14.1",
-    "@testing-library/react": "^11.2.7",
-    "@testing-library/user-event": "^12.8.3",
-    "antd": "^4.16.6",
+    "@testing-library/react": "^12.0.0",
+    "@testing-library/user-event": "^13.2.1",
+    "antd": "^4.16.10",
     "axios": "^0.21.1",
     "bunyan": "^1.8.15",
     "coingecko-api": "^1.0.10",
+    "concurrently": "^6.2.0",
     "cors": "^2.8.5",
+    "electron-is-dev": "^2.0.0",
     "eslint-plugin-prettier": "^3.4.0",
     "express": "^4.17.1",
-    "i18next": "^20.3.2",
+    "i18next": "^20.3.5",
     "i18next-browser-languagedetector": "^6.1.2",
     "prettier": "^2.3.2",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
-    "react-i18next": "^11.11.1",
+    "react-i18next": "^11.11.4",
     "react-jss": "^10.7.1",
     "react-router-dom": "^5.2.0",
     "react-scripts": "4.0.3",
     "sqlite3": "^5.0.2",
     "tslib": "^2.3.0",
-    "web-vitals": "^1.1.2"
+    "wait-on": "^6.0.0",
+    "web-vitals": "^2.1.0"
   },
-  "main": "src/electron.js",
+  "main": "public/electron.js",
   "scripts": {
+    "prestart": "npm run server-dev &",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "electron": "electron .",
+    "electron-dev": "concurrently \"BROWSER=none npm start\" \"wait-on http://localhost:3000 && electron .\"",
     "server": "node ./src/server.js",
     "server-dev": "nodemon ./src/server.js",
     "pack": "electron-builder --dir",
@@ -59,14 +63,17 @@
     ]
   },
   "devDependencies": {
-    "electron": "^13.1.6",
+    "electron": "^13.1.8",
     "electron-builder": "^22.11.7"
   },
   "build": {
     "appId": "io.coineda.app",
     "files": [
       "build/**/*",
-      "package.json"
-    ]
+      "node_modules/**/*"
+    ],
+    "directories": {
+      "buildResources": "assets"
+    }
   }
 }
