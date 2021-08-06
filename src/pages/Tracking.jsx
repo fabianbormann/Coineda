@@ -15,6 +15,7 @@ const useStyles = createUseStyles({
   },
   page: {
     padding: 16,
+    width: '100%',
   },
 });
 
