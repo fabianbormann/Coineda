@@ -1,6 +1,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pie } from '@ant-design/charts';
-import { Statistic, Card, Row, Col, Divider, Typography, message } from 'antd';
+import {
+  Alert,
+  Statistic,
+  Card,
+  Row,
+  Col,
+  Divider,
+  Typography,
+  message,
+} from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 
 import { useTranslation } from 'react-i18next';
@@ -68,7 +77,7 @@ const Dashboard = () => {
       type: 'inner',
       offset: '-50%',
       style: { textAlign: 'center' },
-      autoRotate: false,
+      autoRotate: true,
       content: '{value}',
     },
     interactions: [{ type: 'element-active' }],
@@ -102,6 +111,17 @@ const Dashboard = () => {
     <div className={classes.page}>
       <Title level={2}>{t('Dashboard')}</Title>
       <Divider />
+      {summary.hasOwnProperty('inconsistency') &&
+        summary.inconsistency.negativeValue.map((coin) => (
+          <Alert
+            message="Inconsistency warning"
+            description={`You have a negative ${coin.name} value of ${coin.value}. Please check your transactions.`}
+            type="warning"
+            showIcon
+            style={{ marginBottom: 12 }}
+            closable
+          />
+        ))}
       {summary.hasOwnProperty('crypto_total_in_euro') ? (
         <Row gutter={0}>
           <Col span={24}>

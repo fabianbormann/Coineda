@@ -41,15 +41,16 @@ const TransactionType = Object.freeze({
   SEND: 'send',
   RECEIVE: 'receive',
   REWARDS: 'rewards',
+  SWAP: 'swap',
 });
 
 const executeQuery = (query, params) => {
   return new Promise((resolve, reject) => {
-    db.run(query, params, (error) => {
+    db.run(query, params, function (error) {
       if (error) {
         reject(error);
       } else {
-        resolve();
+        resolve(this);
       }
     });
   });
@@ -177,8 +178,16 @@ app.get('/summary', async (req, res) => {
     calculatePurchasePrice(transaction);
   }
 
+  coins['inconsistency'] = { negativeValue: [] };
+
   for (const coin of Object.keys(coins.cryptocurrencies)) {
     if (coins.cryptocurrencies[coin].value === 0) {
+      delete coins.cryptocurrencies[coin];
+    } else if (coins.cryptocurrencies[coin].value < 0) {
+      coins.inconsistency.negativeValue.push({
+        ...coins.cryptocurrencies[coin],
+        name: coin,
+      });
       delete coins.cryptocurrencies[coin];
     } else {
       coins.cryptocurrencies[coin].purchase_price =
@@ -241,7 +250,7 @@ app.get('/assets', (req, res) => {
     });
 });
 
-app.post('/transaction', async (req, res) => {
+const createTransaction = async (transaction) => {
   let {
     exchange,
     fromValue,
@@ -251,24 +260,32 @@ app.post('/transaction', async (req, res) => {
     feeValue,
     feeCurrency,
     date,
-  } = req.body;
+    composedKeys,
+    isComposed,
+  } = transaction;
+
   const sql =
-    'INSERT INTO transactions (type, exchange, fromValue, fromCurrency, toValue, toCurrency, feeValue, feeCurrency, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
+    'INSERT INTO transactions (type, exchange, fromValue, fromCurrency, toValue, toCurrency, feeValue, feeCurrency, isComposed, composedKeys, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
   let transactionType = TransactionType.BUY;
   if (!isFiat(fromCurrency) && isFiat(toCurrency)) {
     transactionType = TransactionType.SELL;
   } else if (!isFiat(fromCurrency) && !isFiat(toCurrency)) {
+    isComposed = 1;
     transactionType = TransactionType.SELL;
-
-    let price = await CoinGeckoClient.coins.fetchMarketChartRange(
-      fromCurrency,
-      {
-        from: new Date(date).getTime(),
-        to: new Date(date).getTime(),
-        vs_currency: 'eur',
-      }
+    let price = 0;
+    const toTimestamp = Math.floor(new Date(date).getTime() / 1000);
+    const fromTimestamp = Math.floor(
+      (new Date(date).getTime() - 1000 * 60 * 60 * 5) / 1000
     );
+
+    price = (
+      await CoinGeckoClient.coins.fetchMarketChartRange(fromCurrency, {
+        from: fromTimestamp,
+        to: toTimestamp,
+        vs_currency: 'eur',
+      })
+    ).data.prices[0][1];
 
     await executeQuery(sql, [
       transactionType,
@@ -276,35 +293,142 @@ app.post('/transaction', async (req, res) => {
       fromValue,
       fromCurrency.toUpperCase(),
       price * fromValue,
-      'EUR',
+      'euro',
       feeValue,
       feeCurrency.toUpperCase(),
+      isComposed,
+      composedKeys,
       date,
     ]);
 
     transactionType = TransactionType.BUY;
-    price = await CoinGeckoClient.coins.fetchMarketChartRange(toCurrency, {
-      from: new Date(date).getTime(),
-      to: new Date(date).getTime(),
-      vs_currency: 'eur',
-    });
 
-    fromCurrency = 'EUR';
-    fromValue = price * toValue;
+    fromCurrency = 'euro';
+    fromValue = Math.round(price * fromValue * 100) / 100;
   }
 
-  try {
-    await executeQuery(sql, [
+  await executeQuery(sql, [
+    transactionType,
+    exchange,
+    fromValue,
+    fromCurrency.toUpperCase(),
+    toValue,
+    toCurrency.toUpperCase(),
+    feeValue,
+    feeCurrency.toUpperCase(),
+    isComposed,
+    composedKeys,
+    date,
+  ]);
+
+  if (isComposed === 1) {
+    transactionType = TransactionType.SWAP;
+
+    const children = await executeSelectQuery(
+      'SELECT * FROM transactions ORDER BY id DESC LIMIT 2'
+    );
+
+    const parent = await executeQuery(sql, [
       transactionType,
       exchange,
-      fromValue,
-      fromCurrency.toUpperCase(),
-      toValue,
-      toCurrency.toUpperCase(),
+      children[1].fromValue,
+      children[1].fromCurrency,
+      children[0].toValue,
+      children[0].toCurrency,
       feeValue,
       feeCurrency.toUpperCase(),
+      0,
+      `${children[0].id},${children[1].id}`,
       date,
     ]);
+
+    for (const child of children) {
+      await executeQuery('UPDATE transactions SET parent=? WHERE id=?', [
+        parent.lastID,
+        child.id,
+      ]);
+    }
+  }
+};
+
+app.get('/transactions', async (req, res) => {
+  const sql = 'SELECT * FROM transactions';
+  const transactions = await executeSelectQuery(sql);
+  return res.json(transactions);
+});
+
+app.delete('/transactions', async (req, res) => {
+  const sql = `DELETE FROM transactions WHERE id IN (
+    ${req.body.transactions.join(', ')})`;
+
+  try {
+    await executeSelectQuery(sql);
+    res.status(200).end();
+  } catch (error) {
+    logger.error(error);
+    res.status(500).json(error);
+  }
+});
+
+app.put('/transaction', async (req, res) => {
+  let { updateKey } = req.body;
+
+  const rows = await executeSelectQuery(
+    'SELECT * FROM transactions WHERE id=?',
+    [updateKey]
+  );
+
+  if (rows.length < 1) {
+    return res.status(404).send('There is no transaction with id ' + updateKey);
+  }
+
+  const transaction = rows[0];
+
+  if (transaction.isComposed === 0) {
+    try {
+      await executeQuery('DELETE FROM transactions WHERE id=?', [updateKey]);
+
+      if (transaction.composedKeys.length > 0) {
+        const children = transaction.composedKeys.split(',');
+        for (const child of children) {
+          await executeQuery('DELETE FROM transactions WHERE id=?', [child]);
+        }
+      }
+    } catch (error) {
+      logger.error(error);
+      res
+        .status(500)
+        .send(
+          'There was an error while deleting the transactions from the database'
+        );
+    }
+
+    try {
+      await createTransaction({
+        isComposed: 0,
+        composedKeys: '',
+        ...req.body,
+      });
+      res.status(200).end();
+    } catch (error) {
+      logger.error(error);
+      res
+        .status(500)
+        .send(
+          'There was an error while writing the transaction into the database'
+        );
+    }
+  }
+  res.send();
+});
+
+app.post('/transaction', async (req, res) => {
+  try {
+    await createTransaction({
+      isComposed: 0,
+      composedKeys: '',
+      ...req.body,
+    });
     res.status(200).end();
   } catch (error) {
     logger.error(error);
@@ -320,6 +444,19 @@ app.get('/transactions', async (req, res) => {
   const sql = 'SELECT * FROM transactions';
   const transactions = await executeSelectQuery(sql);
   return res.json(transactions);
+});
+
+app.delete('/transactions', async (req, res) => {
+  const sql = `DELETE FROM transactions WHERE id IN (
+    ${req.body.transactions.join(', ')})`;
+
+  try {
+    await executeSelectQuery(sql);
+    res.status(200).end();
+  } catch (error) {
+    logger.error(error);
+    res.status(500).json(error);
+  }
 });
 
 app.get('/exchange', async (req, res) => {
@@ -347,6 +484,9 @@ const server = app.listen(PORT, async () => {
        feeCurrency TEXT NOT NULL,
        comment TEXT,
        date TIMESTAMP NOT NULL,
+       isComposed INTEGER NOT NULL DEFAULT 0,
+       parent INTEGER,
+       composedKeys TEXT,
        created TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )`
   );

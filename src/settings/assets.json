@@ -433,9 +433,19 @@
       "name": "yearn.finance"
     },
     {
+      "id": "yfii-finance",
+      "symbol": "yfii",
+      "name": "DFI.money"
+    },
+    {
       "id": "flow",
       "symbol": "flow",
       "name": "Flow"
+    },
+    {
+      "id": "stafi",
+      "symbol": "fis",
+      "name": "Stafi"
     },
     {
       "id": "nexo",

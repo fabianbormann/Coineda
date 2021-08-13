@@ -1,4 +1,5 @@
 import { Table, Divider, Typography, Space, Button, message } from 'antd';
+import { DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createUseStyles } from 'react-jss';
@@ -11,11 +12,13 @@ const { Title } = Typography;
 const useStyles = createUseStyles({
   actions: {
     marginTop: 0,
-    marginBottom: 24,
+    marginBottom: 12,
   },
   page: {
     padding: 16,
     width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
   },
 });
 
@@ -23,6 +26,8 @@ const Tracking = () => {
   const { t } = useTranslation();
   const [addDialogVisible, setAddDialogVisible] = useState(false);
   const [dataSource, setDataSource] = useState([]);
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [overrides, setOverrides] = useState();
   const classes = useStyles();
 
   const getAssetSymbol = (assetId) => {
@@ -41,23 +46,37 @@ const Tracking = () => {
             date.toISOString().split('T')[0]
           } ${date.toLocaleTimeString()}`;
         };
-        setDataSource(
-          response.data.map((transaction, key) => ({
-            from: `${transaction.fromValue} ${getAssetSymbol(
-              transaction.fromCurrency
-            )}`,
-            to: `${transaction.toValue} ${getAssetSymbol(
-              transaction.toCurrency
-            )}`,
-            fee: `${transaction.feeValue} ${getAssetSymbol(
-              transaction.feeCurrency
-            )}`,
-            date: formatDateTime(transaction.date),
-            exchange: transaction.exchange,
-            comment: transaction.comment,
-            key: key,
-          }))
+
+        const data = response.data.map((transaction) => ({
+          ...transaction,
+          from: `${transaction.fromValue} ${getAssetSymbol(
+            transaction.fromCurrency
+          )}`,
+          to: `${transaction.toValue} ${getAssetSymbol(
+            transaction.toCurrency
+          )}`,
+          fee: `${transaction.feeValue} ${getAssetSymbol(
+            transaction.feeCurrency
+          )}`,
+          feeCurrency: getAssetSymbol(transaction.feeCurrency),
+          fromCurrency: getAssetSymbol(transaction.fromCurrency),
+          toCurrency: getAssetSymbol(transaction.toCurrency),
+          date: formatDateTime(transaction.date),
+          key: transaction.id,
+        }));
+
+        const transactions = data.filter(
+          (transaction) => transaction.parent === null
         );
+
+        for (const transaction of transactions) {
+          const children = data.filter((row) => row.parent === transaction.id);
+          if (children.length > 0) {
+            transaction.children = children;
+          }
+        }
+
+        setDataSource(transactions);
       })
       .catch((error) => {
         message.error(
@@ -70,6 +89,13 @@ const Tracking = () => {
   useEffect(() => {
     fetchExchanges();
   }, [fetchExchanges]);
+
+  const rowSelection = {
+    checkStrictly: false,
+    onChange: (selectedRowKeys) => {
+      setSelectedRows(selectedRowKeys);
+    },
+  };
 
   const columns = [
     {
@@ -96,6 +122,7 @@ const Tracking = () => {
     {
       title: t('Date'),
       dataIndex: 'date',
+      defaultSortOrder: 'descend',
       sorter: (a, b) => new Date(a.date) - new Date(b.date),
       key: 'date',
     },
@@ -104,13 +131,40 @@ const Tracking = () => {
   const closeAddDialog = () => {
     fetchExchanges();
     setAddDialogVisible(false);
+    setOverrides(undefined);
   };
+
   const openAddDialog = () => setAddDialogVisible(true);
+
+  const deleteRows = () => {
+    axios
+      .delete('http://localhost:5208/transactions', {
+        data: { transactions: selectedRows },
+      })
+      .then(() => {
+        fetchExchanges();
+        setSelectedRows([]);
+      })
+      .catch((error) => {
+        message.error(
+          'Failed to remove the selected rows. Try to restart Coineda and try again. Contact support@coineda.io if the error persists.'
+        );
+        console.warn(error);
+      });
+  };
+
+  const editRow = () => {
+    if (selectedRows.length === 0) return;
+
+    const row = dataSource.find((field) => field.key === selectedRows[0]);
+    setOverrides(row);
+    setAddDialogVisible(true);
+  };
 
   return (
     <div className={classes.page}>
       <Title level={2}>{t('Tracking')}</Title>
-      <Divider />
+      <Divider className={classes.actions} />
       <Space className={classes.actions}>
         <Button type="primary" onClick={openAddDialog}>
           {t('Add Transaction')}
@@ -120,10 +174,33 @@ const Tracking = () => {
         </Button>
         <Button type="primary">{t('Import')}</Button>
       </Space>
-      <Table dataSource={dataSource} columns={columns} />
+      <Space className={classes.actions}>
+        <Button
+          type="primary"
+          icon={<DeleteOutlined />}
+          disabled={selectedRows.length === 0}
+          onClick={deleteRows}
+        >
+          Delete
+        </Button>
+        <Button
+          type="primary"
+          icon={<EditOutlined />}
+          disabled={selectedRows.length !== 1}
+          onClick={editRow}
+        >
+          Edit
+        </Button>
+      </Space>
+      <Table
+        rowSelection={{ ...rowSelection }}
+        dataSource={dataSource}
+        columns={columns}
+      />
       <AddTransactionsDialog
         visible={addDialogVisible}
         onClose={closeAddDialog}
+        overrides={overrides}
       />
     </div>
   );

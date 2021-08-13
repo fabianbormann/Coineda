@@ -2,8 +2,9 @@ import { Modal, Form, Select, Divider, Input, message, DatePicker } from 'antd';
 import ExchangeManger from '../components/ExchangeManager';
 import assets from '../settings/assets.json';
 import { createUseStyles } from 'react-jss';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import axios from 'axios';
+import moment from 'moment';
 
 const { Item } = Form;
 const { Option } = Select;
@@ -20,6 +21,7 @@ const AddTransactionsDialog = (props) => {
   const [feeCurrency, setFeeCurrency] = useState('bitcoin');
   const [toCurrency, setToCurrency] = useState('bitcoin');
   const [fromCurrency, setFromCurrency] = useState('euro');
+  const [updateKey, setUpdateKey] = useState();
   const [form] = Form.useForm();
 
   const layout = {
@@ -32,7 +34,39 @@ const AddTransactionsDialog = (props) => {
     from: 0,
     to: 0,
     fee: 0,
+    date: moment(),
   };
+
+  const { overrides, visible, onClose } = props;
+  const closeDialog = () => {
+    setFeeCurrency('bitcoin');
+    setToCurrency('bitcoin');
+    setFromCurrency('euro');
+    setSelectedExchange(null);
+    form.setFieldsValue({
+      from: 0,
+      to: 0,
+      fee: 0,
+      date: moment(),
+    });
+    onClose();
+  };
+
+  useEffect(() => {
+    if (typeof overrides !== 'undefined') {
+      setFeeCurrency(overrides.feeCurrency);
+      setToCurrency(overrides.toCurrency);
+      setFromCurrency(overrides.fromCurrency);
+      form.setFieldsValue({
+        from: overrides.fromValue,
+        to: overrides.toValue,
+        fee: overrides.feeValue,
+        date: moment(overrides.date),
+      });
+      setSelectedExchange(overrides.exchange);
+      setUpdateKey(overrides.key);
+    }
+  }, [overrides, form]);
 
   const classes = useStyles();
   const decimalValidator = () => ({
@@ -57,27 +91,48 @@ const AddTransactionsDialog = (props) => {
       date: values.date,
     };
 
-    axios
-      .post('http://localhost:5208/transaction', data)
-      .catch((error) => {
-        message.error('Failed to add exchange/wallet');
-        console.warn(error);
-      })
-      .finally(() => {
-        props.onClose();
-      });
+    if (typeof updateKey === 'undefined') {
+      axios
+        .post('http://localhost:5208/transaction', data)
+        .catch((error) => {
+          message.error('Failed to add transaction');
+          console.warn(error);
+        })
+        .finally(() => {
+          closeDialog();
+        });
+    } else {
+      data.updateKey = updateKey;
+      axios
+        .put('http://localhost:5208/transaction', data)
+        .catch((error) => {
+          message.error('Failed to update transaction');
+          console.warn(error);
+        })
+        .finally(() => {
+          closeDialog();
+        });
+    }
   };
+
+  const filterSearch = (input, option) =>
+    input.length <= option.key.length &&
+    option.key.substring(0, input.length).toLocaleLowerCase() ===
+      input.toLocaleLowerCase();
+
+  const sortSearch = (optionA, optionB) =>
+    optionA.key.toLowerCase().localeCompare(optionB.key.toLowerCase());
 
   return (
     <Modal
       title="Add Transaction"
-      visible={props.visible}
+      visible={visible}
       okText="Done"
       okButtonProps={{
         disabled: selectedExchange === null,
       }}
       onOk={() => form.submit()}
-      onCancel={props.onClose}
+      onCancel={closeDialog}
     >
       <div className={classes.section}>
         <ExchangeManger
@@ -93,7 +148,7 @@ const AddTransactionsDialog = (props) => {
         form={form}
       >
         <Item name="date" label="Date">
-          <DatePicker showTime format="DD.MM.YYYY HH:mm:ss" />
+          <DatePicker showTime format="YYYY-MM-DD HH:mm:ss" />
         </Item>
         <Item name="from" label="From" rules={[decimalValidator]}>
           <Input
@@ -102,18 +157,17 @@ const AddTransactionsDialog = (props) => {
                 showSearch
                 style={{ minWidth: 80 }}
                 value={fromCurrency}
+                filterOption={filterSearch}
+                filterSort={sortSearch}
                 onChange={(symbol) => setFromCurrency(symbol)}
               >
-                {assets.fiat.map((currency) => (
-                  <Option key={currency.symbol} value={currency.id}>
-                    {currency.symbol.toUpperCase()}
-                  </Option>
-                ))}
-                {assets.cryptocurrencies.map((currency) => (
-                  <Option key={currency.symbol} value={currency.id}>
-                    {currency.symbol.toUpperCase()}
-                  </Option>
-                ))}
+                {[...assets.fiat, ...assets.cryptocurrencies].map(
+                  (currency) => (
+                    <Option key={currency.symbol} value={currency.id}>
+                      {currency.symbol.toUpperCase()}
+                    </Option>
+                  )
+                )}
               </Select>
             }
           />
@@ -123,28 +177,19 @@ const AddTransactionsDialog = (props) => {
             addonAfter={
               <Select
                 showSearch
-                filterOption={(input, option) =>
-                  option.key.toLowerCase().indexOf(input.toLowerCase()) >= 0
-                }
-                filterSort={(optionA, optionB) =>
-                  optionA.key
-                    .toLowerCase()
-                    .localeCompare(optionB.key.toLowerCase())
-                }
+                filterOption={filterSearch}
+                filterSort={sortSearch}
                 style={{ minWidth: 80 }}
                 value={toCurrency}
                 onChange={(symbol) => setToCurrency(symbol)}
               >
-                {assets.fiat.map((currency) => (
-                  <Option key={currency.symbol} value={currency.id}>
-                    {currency.symbol.toUpperCase()}
-                  </Option>
-                ))}
-                {assets.cryptocurrencies.map((currency) => (
-                  <Option key={currency.symbol} value={currency.id}>
-                    {currency.symbol.toUpperCase()}
-                  </Option>
-                ))}
+                {[...assets.fiat, ...assets.cryptocurrencies].map(
+                  (currency) => (
+                    <Option key={currency.symbol} value={currency.id}>
+                      {currency.symbol.toUpperCase()}
+                    </Option>
+                  )
+                )}
               </Select>
             }
           />
@@ -156,18 +201,17 @@ const AddTransactionsDialog = (props) => {
                 showSearch
                 style={{ minWidth: 80 }}
                 value={feeCurrency}
+                filterOption={filterSearch}
+                filterSort={sortSearch}
                 onChange={(symbol) => setFeeCurrency(symbol)}
               >
-                {assets.fiat.map((currency) => (
-                  <Option key={currency.symbol} value={currency.id}>
-                    {currency.symbol.toUpperCase()}
-                  </Option>
-                ))}
-                {assets.cryptocurrencies.map((currency) => (
-                  <Option key={currency.symbol} value={currency.id}>
-                    {currency.symbol.toUpperCase()}
-                  </Option>
-                ))}
+                {[...assets.fiat, ...assets.cryptocurrencies].map(
+                  (currency) => (
+                    <Option key={currency.symbol} value={currency.id}>
+                      {currency.symbol.toUpperCase()}
+                    </Option>
+                  )
+                )}
               </Select>
             }
           />
