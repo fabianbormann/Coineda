@@ -33,7 +33,7 @@ const Dashboard = () => {
 
   const fetchSummary = useCallback(() => {
     axios
-      .get('http://localhost:5208/summary')
+      .get('http://localhost:5208/dashboard/summary')
       .then((response) => {
         setSummary(response.data);
       })

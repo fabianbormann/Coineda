@@ -40,8 +40,8 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "electron-dev": "concurrently \"BROWSER=none npm start\" \"wait-on http://localhost:3000 && electron .\"",
-    "server": "node ./src/server.js",
-    "server-dev": "nodemon ./src/server.js",
+    "server": "node ./src/server/app.js",
+    "server-dev": "nodemon ./src/server/app.js",
     "pack": "electron-builder --dir",
     "dist": "electron-builder"
   },

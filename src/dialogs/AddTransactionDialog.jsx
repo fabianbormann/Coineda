@@ -93,7 +93,7 @@ const AddTransactionsDialog = (props) => {
 
     if (typeof updateKey === 'undefined') {
       axios
-        .post('http://localhost:5208/transaction', data)
+        .post('http://localhost:5208/transactions', data)
         .catch((error) => {
           message.error('Failed to add transaction');
           console.warn(error);
@@ -104,7 +104,7 @@ const AddTransactionsDialog = (props) => {
     } else {
       data.updateKey = updateKey;
       axios
-        .put('http://localhost:5208/transaction', data)
+        .put('http://localhost:5208/transactions', data)
         .catch((error) => {
           message.error('Failed to update transaction');
           console.warn(error);
