@@ -1,5 +1,6 @@
 const sqlite3 = require('sqlite3').verbose();
-const db = new sqlite3.Database('coineda.db');
+const path = require('path');
+const db = new sqlite3.Database(path.resolve(__dirname, 'coineda.db'));
 
 const executeSelectQuery = (query, params) => {
   return new Promise((resolve, reject) => {

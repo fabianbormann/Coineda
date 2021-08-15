@@ -12,6 +12,7 @@ const logger = bunyan.createLogger({ name: 'coineda-backend' });
 const transactions = require('./routes/transactions.js');
 const exchange = require('./routes/exchange.js');
 const dashboard = require('./routes/dashboard');
+const settings = require('./routes/settings');
 
 const db = require('./database/helper.js');
 
@@ -22,6 +23,7 @@ app.get('/alive', (req, res) => {
 app.use('/transactions', transactions);
 app.use('/exchange', exchange);
 app.use('/dashboard', dashboard);
+app.use('/settings', settings);
 
 app.listen(PORT, async () => {
   await db.init();

@@ -1,13 +1,20 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import resources from './misc/translations.json';
 import LanguageDetector from 'i18next-browser-languagedetector';
+import Cache from 'i18next-localstorage-cache';
+import en from './translations/en.json';
+import de from './translations/de.json';
 
 i18n
-  .use(LanguageDetector)
   .use(initReactI18next)
+  .use(Cache)
+  .use(LanguageDetector)
   .init({
-    resources,
+    resources: {
+      en: en,
+      de: de,
+    },
+    fallbackLng: 'en',
     interpolation: {
       escapeValue: false,
     },
