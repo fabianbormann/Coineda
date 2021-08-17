@@ -173,6 +173,7 @@ const Tracking = () => {
           {t('Add Transfer')}
         </Button>
         <Button type="primary">{t('Import')}</Button>
+        <Button type="primary">{t('Export')}</Button>
       </Space>
       <Space className={classes.actions}>
         <Button
@@ -181,7 +182,7 @@ const Tracking = () => {
           disabled={selectedRows.length === 0}
           onClick={deleteRows}
         >
-          Delete
+          {t('Delete')}
         </Button>
         <Button
           type="primary"
@@ -189,7 +190,7 @@ const Tracking = () => {
           disabled={selectedRows.length !== 1}
           onClick={editRow}
         >
-          Edit
+          {t('Edit')}
         </Button>
       </Space>
       <Table

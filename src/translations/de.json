@@ -1,9 +1,21 @@
 {
   "translation": {
-    "Language": "Sprache",
     "Dashboard": "Übersicht",
+    "Account Balance (EUR)": "Gesamtwert (EUR)",
     "Tracking": "Erfassen",
+    "Add Transaction": "Transaktion hinzufügen",
+    "Add Transfer": "Transfer hinzufügen",
+    "Import": "Import",
+    "Export": "Export",
+    "Delete": "Löschen",
+    "Edit": "Bearbeiten",
+    "From": "Von",
+    "To": "Zu",
+    "Fee": "Gebühren",
+    "Exchange": "Börse",
+    "Date": "Datum",
     "Tax Reports": "Steuerreports",
-    "Settings": "Einstellungen"
+    "Settings": "Einstellungen",
+    "Language": "Sprache"
   }
 }

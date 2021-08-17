@@ -92,7 +92,7 @@ const Dashboard = () => {
           textOverflow: 'ellipsis',
           fontSize: '100%',
         },
-        content: 'Account Balance (EUR)',
+        content: t('Account Balance (EUR)'),
       },
       content: {
         style: {

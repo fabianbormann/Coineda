@@ -1,9 +1,21 @@
 {
   "translation": {
-    "Language": "Language",
     "Dashboard": "Dashboard",
+    "Account Balance (EUR)": "Account Balance (EUR)",
     "Tracking": "Tracking",
+    "Add Transaction": "Add Transaction",
+    "Add Transfer": "Add Transfer",
+    "Import": "Import",
+    "Export": "Export",
+    "Delete": "Delete",
+    "Edit": "Edit",
+    "From": "From",
+    "To": "To",
+    "Fee": "Fee",
+    "Exchange": "Exchange",
+    "Date": "Date",
     "Tax Reports": "Tax Reports",
-    "Settings": "Settings"
+    "Settings": "Settings",
+    "Language": "Language"
   }
 }
