@@ -161,6 +161,15 @@ const Tracking = () => {
     setAddDialogVisible(true);
   };
 
+  const startExport = () => {
+    axios.get('http://localhost:5208/transactions/export').catch((error) => {
+      message.error(
+        'Export failed. Try to restart Coineda and try again. Contact support@coineda.io if the error persists.'
+      );
+      console.warn(error);
+    });
+  };
+
   return (
     <div className={classes.page}>
       <Title level={2}>{t('Tracking')}</Title>
@@ -173,7 +182,9 @@ const Tracking = () => {
           {t('Add Transfer')}
         </Button>
         <Button type="primary">{t('Import')}</Button>
-        <Button type="primary">{t('Export')}</Button>
+        <Button href="http://localhost:5208/transactions/export" type="primary">
+          {t('Export')}
+        </Button>
       </Space>
       <Space className={classes.actions}>
         <Button

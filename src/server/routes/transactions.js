@@ -201,4 +201,29 @@ router.put('/', async (req, res) => {
   res.send();
 });
 
+router.get('/export', async (req, res) => {
+  const sql = 'SELECT * FROM transactions';
+  const transactions = await db.executeSelectQuery(sql);
+
+  if (transactions.length > 0) {
+    let data = Object.keys(transactions[0]).join(';');
+
+    for (const transaction of transactions) {
+      data += '\n' + Object.values(transaction).join(';');
+    }
+
+    const buffer = Buffer.from(data);
+    const filename =
+      'coineda-export-' + new Date().toISOString().split('T')[0] + '.csv';
+    res.writeHead(200, {
+      'Content-Type': 'application/octet-stream',
+      'Content-disposition': 'attachment; filename=' + filename,
+    });
+    res.write(buffer);
+    res.end();
+  } else {
+    res.status(404).end();
+  }
+});
+
 module.exports = router;
