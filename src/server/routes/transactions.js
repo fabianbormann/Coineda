@@ -250,10 +250,9 @@ const removeDuplicates = async (transactions) => {
       feeValue,
       feeCurrency,
       date,
-      composedKeys,
       isComposed,
     } = row;
-    return `${exchange}${fromValue}${fromCurrency}${toValue}${toCurrency}${feeValue}${feeCurrency}${date}${composedKeys}${isComposed}`;
+    return `${exchange}${fromValue}${fromCurrency}${toValue}${toCurrency}${feeValue}${feeCurrency}${date}${isComposed}`;
   });
 
   return transactions.filter((transaction) => {
@@ -266,10 +265,10 @@ const removeDuplicates = async (transactions) => {
       feeValue,
       feeCurrency,
       date,
-      composedKeys,
       isComposed,
     } = transaction;
-    const vector = `${exchange}${fromValue}${fromCurrency}${toValue}${toCurrency}${feeValue}${feeCurrency}${date}${composedKeys}${isComposed}`;
+    const vector = `${exchange}${fromValue}${fromCurrency}${toValue}${toCurrency}${feeValue}${feeCurrency}${date}${isComposed}`;
+
     return rows.findIndex((row) => row === vector) === -1;
   });
 };

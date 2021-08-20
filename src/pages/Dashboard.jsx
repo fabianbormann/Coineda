@@ -9,6 +9,8 @@ import {
   Divider,
   Typography,
   message,
+  Spin,
+  Empty,
 } from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 
@@ -30,8 +32,10 @@ const Dashboard = () => {
   const { t } = useTranslation();
   const classes = useStyles();
   const [summary, setSummary] = useState({});
+  const [loading, setLoading] = useState(false);
 
   const fetchSummary = useCallback(() => {
+    setLoading(true);
     axios
       .get('http://localhost:5208/dashboard/summary')
       .then((response) => {
@@ -42,7 +46,8 @@ const Dashboard = () => {
           'Coineda backend is not available. Please restart the application.'
         );
         console.warn(error);
-      });
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -111,6 +116,7 @@ const Dashboard = () => {
     <div className={classes.page}>
       <Title level={2}>{t('Dashboard')}</Title>
       <Divider />
+      {loading && <Spin />}
       {summary.hasOwnProperty('inconsistency') &&
         summary.inconsistency.negativeValue.map((coin) => (
           <Alert
@@ -155,7 +161,9 @@ const Dashboard = () => {
             );
           })}
         </Row>
-      ) : null}
+      ) : (
+        !loading && <Empty description={t('No Transactions')} />
+      )}
     </div>
   );
 };

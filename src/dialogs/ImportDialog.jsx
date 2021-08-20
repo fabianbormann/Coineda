@@ -2,7 +2,7 @@ import { Upload, Modal, message } from 'antd';
 import { InboxOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import axios from 'axios';
-import { useTranslation } from 'react-i18next';
+import { useTranslation, Trans } from 'react-i18next';
 
 const { Dragger } = Upload;
 
@@ -13,7 +13,7 @@ const ImportDialog = (props) => {
 
   const addFile = (file) => {
     if (file.type !== 'text/csv') {
-      message.error(`${file.name} is not a csv file`);
+      message.error(t('is not a csv file', { filename: file.name }));
     } else {
       setFiles([...files, file]);
     }
@@ -29,8 +29,20 @@ const ImportDialog = (props) => {
     }
 
     try {
-      await axios.post('http://localhost:5208/transactions/import', data);
-      message.success('upload successfully.');
+      const response = (
+        await axios.post('http://localhost:5208/transactions/import', data)
+      ).data;
+
+      const { inserts, duplicates, errors } = response;
+
+      if (duplicates === 0 && errors === 0 && inserts > 0) {
+        message.success(
+          t('Transactions successfully uploaded', { inserts: inserts })
+        );
+      } else {
+        message.warning(t('Transactions partially uploaded', response));
+      }
+
       setFiles([]);
       props.onClose();
     } catch (error) {
@@ -69,10 +81,14 @@ const ImportDialog = (props) => {
           <InboxOutlined />
         </p>
         <p className="ant-upload-text">
-          {t('Click or drag file to this area to upload')}
+          <Trans i18nKey="UploadFieldText">
+            Click or drag file to this area to upload
+          </Trans>
         </p>
         <p className="ant-upload-hint">
-          {t('Support for a single or bulk upload')}
+          <Trans i18nKey="UploadFieldHint">
+            Support for a single or bulk upload
+          </Trans>
         </p>
       </Dragger>
     </Modal>

@@ -4,6 +4,7 @@ import assets from '../settings/assets.json';
 import { createUseStyles } from 'react-jss';
 import { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 import moment from 'moment';
 
 const { Item } = Form;
@@ -23,6 +24,7 @@ const AddTransactionsDialog = (props) => {
   const [fromCurrency, setFromCurrency] = useState('euro');
   const [updateKey, setUpdateKey] = useState();
   const [form] = Form.useForm();
+  const { t } = useTranslation();
 
   const layout = {
     labelCol: { span: 6 },
@@ -125,9 +127,9 @@ const AddTransactionsDialog = (props) => {
 
   return (
     <Modal
-      title="Add Transaction"
+      title={t('Add Transaction')}
       visible={visible}
-      okText="Done"
+      okText={t('Done')}
       okButtonProps={{
         disabled: selectedExchange === null,
       }}
@@ -147,10 +149,10 @@ const AddTransactionsDialog = (props) => {
         onFinish={submitTransaction}
         form={form}
       >
-        <Item name="date" label="Date">
+        <Item name="date" label={t('Date')}>
           <DatePicker showTime format="YYYY-MM-DD HH:mm:ss" />
         </Item>
-        <Item name="from" label="From" rules={[decimalValidator]}>
+        <Item name="from" label={t('From')} rules={[decimalValidator]}>
           <Input
             addonAfter={
               <Select
@@ -172,7 +174,7 @@ const AddTransactionsDialog = (props) => {
             }
           />
         </Item>
-        <Item name="to" label="To" rules={[decimalValidator]}>
+        <Item name="to" label={t('To')} rules={[decimalValidator]}>
           <Input
             addonAfter={
               <Select
@@ -194,7 +196,7 @@ const AddTransactionsDialog = (props) => {
             }
           />
         </Item>
-        <Item name="fee" label="Fee" rules={[decimalValidator]}>
+        <Item name="fee" label={t('Fee')} rules={[decimalValidator]}>
           <Input
             addonAfter={
               <Select

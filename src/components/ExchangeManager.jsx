@@ -3,6 +3,7 @@ import { PlusCircleOutlined } from '@ant-design/icons';
 import { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { createUseStyles } from 'react-jss';
+import { useTranslation } from 'react-i18next';
 
 const useStyles = createUseStyles({
   grow: {
@@ -24,6 +25,7 @@ const ExchangeManger = (props) => {
   const [selectedExchange, setSelectedExchange] = useState(undefined);
   const [inputVisible, setInputVisible] = useState(false);
   const classes = useStyles();
+  const { t } = useTranslation();
 
   const { onExchangeSelected } = props;
 
@@ -76,7 +78,7 @@ const ExchangeManger = (props) => {
       {exchanges.length > 0 && (
         <Select
           labelInValue
-          placeholder="Select an exchange or a wallet"
+          placeholder={t('Select an exchange or a wallet')}
           value={selectedExchange}
           className={classes.grow}
           onChange={(option) => {
@@ -111,7 +113,7 @@ const ExchangeManger = (props) => {
           shape="round"
           icon={<PlusCircleOutlined />}
         >
-          Add new exchange or wallet
+          {t('Add new exchange or wallet')}
         </Button>
       )}
     </Space>
