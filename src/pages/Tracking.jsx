@@ -6,6 +6,7 @@ import { createUseStyles } from 'react-jss';
 import AddTransactionsDialog from '../dialogs/AddTransactionDialog';
 import axios from 'axios';
 import assets from '../settings/assets.json';
+import { ImportDialog } from '../dialogs';
 
 const { Title } = Typography;
 
@@ -25,6 +26,7 @@ const useStyles = createUseStyles({
 const Tracking = () => {
   const { t } = useTranslation();
   const [addDialogVisible, setAddDialogVisible] = useState(false);
+  const [importDialogVisible, setImportDialogVisible] = useState(false);
   const [dataSource, setDataSource] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]);
   const [overrides, setOverrides] = useState();
@@ -134,7 +136,13 @@ const Tracking = () => {
     setOverrides(undefined);
   };
 
+  const closeImportDialog = () => {
+    setImportDialogVisible(false);
+    fetchExchanges();
+  };
+
   const openAddDialog = () => setAddDialogVisible(true);
+  const openImportDialog = () => setImportDialogVisible(true);
 
   const deleteRows = () => {
     axios
@@ -161,15 +169,6 @@ const Tracking = () => {
     setAddDialogVisible(true);
   };
 
-  const startExport = () => {
-    axios.get('http://localhost:5208/transactions/export').catch((error) => {
-      message.error(
-        'Export failed. Try to restart Coineda and try again. Contact support@coineda.io if the error persists.'
-      );
-      console.warn(error);
-    });
-  };
-
   return (
     <div className={classes.page}>
       <Title level={2}>{t('Tracking')}</Title>
@@ -181,7 +180,9 @@ const Tracking = () => {
         <Button type="primary" onClick={openAddDialog}>
           {t('Add Transfer')}
         </Button>
-        <Button type="primary">{t('Import')}</Button>
+        <Button type="primary" onClick={openImportDialog}>
+          {t('Import')}
+        </Button>
         <Button href="http://localhost:5208/transactions/export" type="primary">
           {t('Export')}
         </Button>
@@ -214,6 +215,7 @@ const Tracking = () => {
         onClose={closeAddDialog}
         overrides={overrides}
       />
+      <ImportDialog visible={importDialogVisible} onClose={closeImportDialog} />
     </div>
   );
 };

@@ -15,7 +15,9 @@ const isFiat = (asset) => {
     fs.readFileSync(path.resolve(__dirname, '..', 'settings', 'assets.json'))
   );
 
-  return settings.fiat.map((currency) => currency.id).includes(asset);
+  return settings.fiat
+    .map((currency) => currency.id.toLowerCase())
+    .includes(asset.toLowerCase());
 };
 
 const fetchAssets = () =>
