@@ -8,7 +8,7 @@ import {
 import { createUseStyles } from 'react-jss';
 import './App.css';
 import {
-  BrowserRouter as Router,
+  HashRouter as Router,
   Switch,
   Route,
   Link,

@@ -8,7 +8,7 @@ function createWindow() {
     height: 600,
     title: 'Coineda',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      devTools: true,
     },
   });
 
@@ -18,6 +18,13 @@ function createWindow() {
       ? 'http://localhost:3000'
       : `file://${path.join(__dirname, '../build/index.html')}`
   );
+  mainWindow.maximize();
+}
+
+let server = null;
+
+if (!isDev) {
+  server = require('./server/app.js').server;
 }
 
 app.whenReady().then(() => {
@@ -30,4 +37,8 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', function () {
   if (process.platform !== 'darwin') app.quit();
+
+  if (!isDev) {
+    server.close();
+  }
 });

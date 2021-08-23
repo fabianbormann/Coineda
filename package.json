@@ -1,7 +1,9 @@
 {
   "name": "coineda",
+  "description": "Coineda aims to be a free to use, open source and local running crypto track and tax tool",
   "version": "0.1.2",
   "author": "Fabian Bormann <fabian.bormann@coineda.io>",
+  "homepage": "./",
   "license": "AGPL-3.0",
   "dependencies": {
     "@ant-design/charts": "^1.2.5",
@@ -38,7 +40,8 @@
   "scripts": {
     "prestart": "npm run server-dev &",
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "frontend": "react-scripts start",
+    "build": "react-scripts build && cp -r ./src/server ./build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "electron-dev": "concurrently \"BROWSER=none npm start\" \"wait-on http://localhost:3000 && electron .\"",
@@ -79,7 +82,11 @@
       "buildResources": "assets"
     },
     "linux": {
-      "target": "deb"
+      "category": "Utility",
+      "target": [
+        "AppImage",
+        "deb"
+      ]
     }
   }
 }

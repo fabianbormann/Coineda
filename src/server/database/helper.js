@@ -1,6 +1,20 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
-const db = new sqlite3.Database(path.resolve(__dirname, 'coineda.db'));
+
+const userPreferences =
+  process.env.APPDATA ||
+  (process.platform === 'darwin'
+    ? process.env.HOME + '/Library/Preferences'
+    : process.env.HOME);
+
+const coinedaPreferences = path.resolve(userPreferences, '.coineda');
+const fs = require('fs');
+
+if (!fs.existsSync(coinedaPreferences)) {
+  fs.mkdirSync(coinedaPreferences);
+}
+
+const db = new sqlite3.Database(path.resolve(coinedaPreferences, 'coineda.db'));
 
 const executeSelectQuery = (query, params) => {
   return new Promise((resolve, reject) => {
@@ -31,6 +45,16 @@ const init = async () => {
     'CREATE TABLE IF NOT EXISTS exchanges (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)'
   );
   await executeQuery(
+    `CREATE TABLE IF NOT EXISTS assets
+      (row_id INTEGER PRIMARY KEY, 
+      id TEXT NOT NULL UNIQUE,
+      symbol TEXT NOT NULL UNIQUE, 
+      name TEXT NOT NULL,
+      isFiat INTEGER DEFAULT 0,
+      roughlyEstimatedInEuro REAL
+    )`
+  );
+  await executeQuery(
     `CREATE TABLE IF NOT EXISTS transactions 
         (id INTEGER PRIMARY KEY, 
         type TEXT NOT NULL,
@@ -49,6 +73,26 @@ const init = async () => {
         created TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`
   );
+
+  const assets = await executeSelectQuery('SELECT * FROM assets');
+  if (assets.length === 0) {
+    const defaultAssets = JSON.parse(
+      fs.readFileSync(path.resolve(__dirname, 'assets.json'))
+    );
+    for (const asset of defaultAssets.fiat) {
+      await executeQuery(
+        'INSERT INTO assets (id, symbol, name, isFiat, roughlyEstimatedInEuro) VALUES (?, ?, ?, ?, ?)',
+        [asset.id, asset.symbol, asset.name, 1, asset.roughly_estimated_in_euro]
+      );
+    }
+
+    for (const asset of defaultAssets.cryptocurrencies) {
+      await executeQuery(
+        'INSERT INTO assets (id, symbol, name) VALUES (?, ?, ?)',
+        [asset.id, asset.symbol, asset.name]
+      );
+    }
+  }
 };
 
 module.exports = {

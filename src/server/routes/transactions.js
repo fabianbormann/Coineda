@@ -30,10 +30,16 @@ const createTransaction = async (transaction) => {
   const sql =
     'INSERT INTO transactions (type, exchange, fromValue, fromCurrency, toValue, toCurrency, feeValue, feeCurrency, isComposed, composedKeys, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
+  const fromCurrencyIsFiat = await isFiat(fromCurrency);
+  const toCurrencyIsFiat = await isFiat(toCurrency);
+
+  console.log(transaction);
+  console.log(fromCurrencyIsFiat, toCurrencyIsFiat);
+
   let transactionType = TransactionType.BUY;
-  if (!isFiat(fromCurrency) && isFiat(toCurrency)) {
+  if (!fromCurrencyIsFiat && toCurrencyIsFiat) {
     transactionType = TransactionType.SELL;
-  } else if (!isFiat(fromCurrency) && !isFiat(toCurrency)) {
+  } else if (!fromCurrencyIsFiat && !toCurrencyIsFiat) {
     isComposed = 1;
     transactionType = TransactionType.SELL;
     let price = 0;

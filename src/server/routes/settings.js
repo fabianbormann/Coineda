@@ -7,13 +7,7 @@ const logger = bunyan.createLogger({ name: 'coineda-backend-transactions' });
 const fs = require('fs');
 const path = require('path');
 
-const settingsPath = path.resolve(
-  __dirname,
-  '..',
-  '..',
-  'settings',
-  'main.json'
-);
+const settingsPath = path.resolve(__dirname, '..', 'database', 'main.json');
 
 router.get('/', (req, res) => {
   try {

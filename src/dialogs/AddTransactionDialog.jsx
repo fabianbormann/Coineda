@@ -1,6 +1,5 @@
 import { Modal, Form, Select, Divider, Input, message, DatePicker } from 'antd';
 import ExchangeManger from '../components/ExchangeManager';
-import assets from '../settings/assets.json';
 import { createUseStyles } from 'react-jss';
 import { useEffect, useState } from 'react';
 import axios from 'axios';
@@ -23,6 +22,7 @@ const AddTransactionsDialog = (props) => {
   const [toCurrency, setToCurrency] = useState('bitcoin');
   const [fromCurrency, setFromCurrency] = useState('euro');
   const [updateKey, setUpdateKey] = useState();
+  const [assets, setAssets] = useState({ fiat: [], cryptocurrencies: [] });
   const [form] = Form.useForm();
   const { t } = useTranslation();
 
@@ -53,6 +53,18 @@ const AddTransactionsDialog = (props) => {
     });
     onClose();
   };
+
+  useEffect(() => {
+    axios
+      .get('http://localhost:5208/assets')
+      .then((response) => {
+        setAssets(response.data);
+      })
+      .catch((error) => {
+        message.error('Failed to fetch assets');
+        console.warn(error);
+      });
+  }, []);
 
   useEffect(() => {
     if (typeof overrides !== 'undefined') {

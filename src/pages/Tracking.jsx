@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { createUseStyles } from 'react-jss';
 import AddTransactionsDialog from '../dialogs/AddTransactionDialog';
 import axios from 'axios';
-import assets from '../settings/assets.json';
 import { ImportDialog } from '../dialogs';
 
 const { Title } = Typography;
@@ -30,15 +29,33 @@ const Tracking = () => {
   const [dataSource, setDataSource] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]);
   const [overrides, setOverrides] = useState();
+  const [assets, setAssets] = useState({ fiat: [], cryptocurrencies: [] });
   const classes = useStyles();
 
-  const getAssetSymbol = (assetId) => {
-    return [...assets.cryptocurrencies, ...assets.fiat]
-      .find((asset) => asset.id.toLowerCase() === assetId.toLowerCase())
-      .symbol.toUpperCase();
-  };
+  useEffect(() => {
+    axios
+      .get('http://localhost:5208/assets')
+      .then((response) => {
+        setAssets(response.data);
+      })
+      .catch((error) => {
+        message.error('Failed to fetch assets');
+        console.warn(error);
+      });
+  }, []);
 
   const fetchExchanges = useCallback(() => {
+    if (assets.fiat.length === 0) {
+      return;
+    }
+    const { cryptocurrencies, fiat } = assets;
+
+    const getAssetSymbol = (assetId) => {
+      return [...cryptocurrencies, ...fiat]
+        .find((asset) => asset.id.toLowerCase() === assetId.toLowerCase())
+        .symbol.toUpperCase();
+    };
+
     axios
       .get('http://localhost:5208/transactions')
       .then((response) => {
@@ -86,7 +103,7 @@ const Tracking = () => {
         );
         console.warn(error);
       });
-  }, []);
+  }, [assets]);
 
   useEffect(() => {
     fetchExchanges();

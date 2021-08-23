@@ -13,6 +13,7 @@ const transactions = require('./routes/transactions.js');
 const exchange = require('./routes/exchange.js');
 const dashboard = require('./routes/dashboard');
 const settings = require('./routes/settings');
+const assets = require('./routes/assets');
 
 const db = require('./database/helper.js');
 
@@ -24,8 +25,13 @@ app.use('/transactions', transactions);
 app.use('/exchange', exchange);
 app.use('/dashboard', dashboard);
 app.use('/settings', settings);
+app.use('/assets', assets);
 
-app.listen(PORT, async () => {
+const server = app.listen(PORT, async () => {
   await db.init();
   logger.info('Coineda backend listening on localhost port ' + PORT);
 });
+
+module.exports = {
+  server: server,
+};

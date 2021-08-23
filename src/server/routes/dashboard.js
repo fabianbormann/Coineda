@@ -16,9 +16,9 @@ router.get('/summary', async (req, res) => {
   const transactions = await db.executeSelectQuery(sql);
 
   const coins = { cryptocurrencies: {}, fiat: {} };
-  const calculateBalance = (currency, value, add) => {
+  const calculateBalance = async (currency, value, add) => {
     currency = currency.toLowerCase();
-    const target = isFiat(currency) ? 'fiat' : 'cryptocurrencies';
+    const target = (await isFiat(currency)) ? 'fiat' : 'cryptocurrencies';
 
     coins[target][currency] = coins[target][currency] || {};
 
@@ -37,7 +37,7 @@ router.get('/summary', async (req, res) => {
     }
   };
 
-  const assets = fetchAssets();
+  const assets = await fetchAssets();
 
   const calculatePurchasePrice = (transaction) => {
     const targetCurrency = transaction.toCurrency.toLowerCase();
@@ -47,8 +47,11 @@ router.get('/summary', async (req, res) => {
         const fiat = assets.fiat.find(
           (currency) => currency.id === transaction.fromCurrency.toLowerCase()
         );
+        console.log(transaction);
+        console.log(assets.fiat);
+        console.log(fiat);
         purchasePrice =
-          (transaction.fromValue * fiat['roughly_estimated_in_euro']) /
+          (transaction.fromValue * fiat['roughlyEstimatedInEuro']) /
           transaction.toValue;
       }
 
@@ -74,9 +77,9 @@ router.get('/summary', async (req, res) => {
       feeCurrency,
     } = transaction;
 
-    calculateBalance(toCurrency, toValue, true);
-    calculateBalance(fromCurrency, fromValue, false);
-    calculateBalance(feeCurrency, feeValue, false);
+    await calculateBalance(toCurrency, toValue, true);
+    await calculateBalance(fromCurrency, fromValue, false);
+    await calculateBalance(feeCurrency, feeValue, false);
     calculatePurchasePrice(transaction);
   }
 
