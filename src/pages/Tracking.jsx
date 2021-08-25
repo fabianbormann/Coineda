@@ -3,7 +3,7 @@ import { DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createUseStyles } from 'react-jss';
-import AddTransactionsDialog from '../dialogs/AddTransactionDialog';
+import { AddTransactionDialog, AddTransferDialog } from '../dialogs';
 import axios from 'axios';
 import { ImportDialog } from '../dialogs';
 
@@ -24,7 +24,10 @@ const useStyles = createUseStyles({
 
 const Tracking = () => {
   const { t } = useTranslation();
-  const [addDialogVisible, setAddDialogVisible] = useState(false);
+  const [addTransactionDialogVisible, setAddTransactionDialogVisible] =
+    useState(false);
+  const [addTransferDialogVisible, setAddTransferDialogVisible] =
+    useState(false);
   const [importDialogVisible, setImportDialogVisible] = useState(false);
   const [dataSource, setDataSource] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]);
@@ -147,10 +150,15 @@ const Tracking = () => {
     },
   ];
 
-  const closeAddDialog = () => {
+  const closeAddTransactionDialog = () => {
     fetchExchanges();
-    setAddDialogVisible(false);
+    setAddTransactionDialogVisible(false);
     setOverrides(undefined);
+  };
+
+  const closeAddTransferDialog = () => {
+    fetchExchanges();
+    setAddTransferDialogVisible(false);
   };
 
   const closeImportDialog = () => {
@@ -158,7 +166,8 @@ const Tracking = () => {
     fetchExchanges();
   };
 
-  const openAddDialog = () => setAddDialogVisible(true);
+  const openAddTransferDialog = () => setAddTransferDialogVisible(true);
+  const openAddTransactionDialog = () => setAddTransactionDialogVisible(true);
   const openImportDialog = () => setImportDialogVisible(true);
 
   const deleteRows = () => {
@@ -183,7 +192,7 @@ const Tracking = () => {
 
     const row = dataSource.find((field) => field.key === selectedRows[0]);
     setOverrides(row);
-    setAddDialogVisible(true);
+    setAddTransactionDialogVisible(true);
   };
 
   return (
@@ -191,10 +200,10 @@ const Tracking = () => {
       <Title level={2}>{t('Tracking')}</Title>
       <Divider className={classes.actions} />
       <Space className={classes.actions}>
-        <Button type="primary" onClick={openAddDialog}>
+        <Button type="primary" onClick={openAddTransactionDialog}>
           {t('Add Transaction')}
         </Button>
-        <Button type="primary" onClick={openAddDialog}>
+        <Button type="primary" onClick={openAddTransferDialog}>
           {t('Add Transfer')}
         </Button>
         <Button type="primary" onClick={openImportDialog}>
@@ -227,10 +236,14 @@ const Tracking = () => {
         dataSource={dataSource}
         columns={columns}
       />
-      <AddTransactionsDialog
-        visible={addDialogVisible}
-        onClose={closeAddDialog}
+      <AddTransactionDialog
+        visible={addTransactionDialogVisible}
+        onClose={closeAddTransactionDialog}
         overrides={overrides}
+      />
+      <AddTransferDialog
+        visible={addTransferDialogVisible}
+        onClose={closeAddTransferDialog}
       />
       <ImportDialog visible={importDialogVisible} onClose={closeImportDialog} />
     </div>

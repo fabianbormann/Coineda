@@ -15,6 +15,14 @@ const useStyles = createUseStyles({
     paddingTop: 0,
     paddingBottom: 0,
   },
+  wrapper: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    '& > span': {
+      minWidth: 40,
+    },
+  },
 });
 
 const { Option } = Select;
@@ -73,40 +81,46 @@ const ExchangeManger = (props) => {
       });
   };
 
+  const label = props.label ? <span>{props.label}:</span> : null;
+
   return (
     <Space direction="vertical" className={classes.grow}>
       {exchanges.length > 0 && (
-        <Select
-          labelInValue
-          placeholder={t('Select an exchange or a wallet')}
-          value={selectedExchange}
-          className={classes.grow}
-          onChange={(option) => {
-            props.onExchangeSelected(option.label);
-            console.log(option);
-            setSelectedExchange(option);
-          }}
-        >
-          {exchanges.map((exchange) => (
-            <Option key={exchange.id} value={exchange.id}>
-              {exchange.name}
-            </Option>
-          ))}
-        </Select>
+        <div className={classes.wrapper}>
+          {label}
+          <Select
+            labelInValue
+            placeholder={t('Select an exchange or a wallet')}
+            value={selectedExchange}
+            className={classes.grow}
+            onChange={(option) => {
+              props.onExchangeSelected(option.label);
+              setSelectedExchange(option);
+            }}
+          >
+            {exchanges.map((exchange) => (
+              <Option key={exchange.id} value={exchange.id}>
+                {exchange.name}
+              </Option>
+            ))}
+          </Select>
+        </div>
       )}
       {inputVisible ? (
-        <Input
-          className={classes.input}
-          value={newExchangeName}
-          onChange={(event) => setNewExchangeName(event.target.value)}
-          placeholder="Exchange/Wallet name"
-          suffix={
-            <Button type="primary" onClick={addExchange}>
-              Add
-            </Button>
-          }
-        />
-      ) : (
+        <div className={classes.wrapper}>
+          <Input
+            className={classes.input}
+            value={newExchangeName}
+            onChange={(event) => setNewExchangeName(event.target.value)}
+            placeholder="Exchange/Wallet name"
+            suffix={
+              <Button type="primary" onClick={addExchange}>
+                Add
+              </Button>
+            }
+          />
+        </div>
+      ) : props.showAddExchangeButton ? (
         <Button
           onClick={() => setInputVisible(true)}
           type="primary"
@@ -115,7 +129,7 @@ const ExchangeManger = (props) => {
         >
           {t('Add new exchange or wallet')}
         </Button>
-      )}
+      ) : null}
     </Space>
   );
 };
@@ -124,6 +138,7 @@ ExchangeManger.defaultProps = {
   onExchangeSelected: () => {
     console.warn('onExchangeSelected not implemented yet.');
   },
+  showAddExchangeButton: true,
 };
 
 export default ExchangeManger;

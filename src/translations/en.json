@@ -6,6 +6,8 @@
     "Tracking": "Tracking",
     "Add Transaction": "Add Transaction",
     "Add Transfer": "Add Transfer",
+    "Currency": "Currency",
+    "Please select different exchanges": "Please select different exchanges or wallets for your transfer",
     "Import": "Import",
     "UploadFieldText": "Click or drag file to this area to upload",
     "UploadFieldHint": "Support for a single or bulk upload",

@@ -6,6 +6,8 @@
     "Tracking": "Erfassen",
     "Add Transaction": "Transaktion hinzufügen",
     "Add Transfer": "Transfer hinzufügen",
+    "Currency": "Währung",
+    "Please select different exchanges": "Wähle bitte unterschiedliche Börsen für den Transfer aus.",
     "Import": "Import",
     "UploadFieldText": "Das Hochladen der Dateien ist durch Klicken oder Hineinziehen möglich.",
     "UploadFieldHint": "Unterstützt Einzel- und Sammel-Uploads",
