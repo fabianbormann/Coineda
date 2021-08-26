@@ -95,7 +95,7 @@ const AddTransferDialog = (props) => {
     };
 
     axios
-      .post('http://localhost:5208/transfer', data)
+      .post('http://localhost:5208/transfers', data)
       .catch((error) => {
         message.error('Failed to add transfer');
         console.warn(error);
@@ -134,6 +134,7 @@ const AddTransferDialog = (props) => {
       <div className={classes.section}>
         <ExchangeManger
           label={t('To')}
+          defaultSelectionIndex={1}
           onExchangeSelected={(exchange) => setToExchange(exchange)}
         />
       </div>

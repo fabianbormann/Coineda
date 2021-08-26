@@ -74,6 +74,20 @@ const init = async () => {
         )`
   );
 
+  await executeQuery(
+    `CREATE TABLE IF NOT EXISTS transfers 
+        (id INTEGER PRIMARY KEY, 
+        fromExchange TEXT NOT NULL,
+        toExchange TEXT NOT NULL, 
+        value REAL NOT NULL, 
+        currency TEXT NOT NULL, 
+        feeValue REAL NOT NULL, 
+        feeCurrency TEXT NOT NULL,
+        date TIMESTAMP NOT NULL,
+        created TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`
+  );
+
   const assets = await executeSelectQuery('SELECT * FROM assets');
   if (assets.length === 0) {
     const defaultAssets = JSON.parse(

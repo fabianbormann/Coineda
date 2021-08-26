@@ -37,12 +37,17 @@ const ExchangeManger = (props) => {
 
   const { onExchangeSelected } = props;
 
-  const fetchExchanges = useCallback(() => {
+  const fetchExchanges = useCallback((defaultSelectionIndex) => {
     axios
       .get('http://localhost:5208/exchange')
       .then((response) => {
         setExchanges(response.data);
-        if (response.data.length > 0) {
+        if (response.data.length > defaultSelectionIndex) {
+          setSelectedExchange({
+            value: response.data[defaultSelectionIndex].id,
+            label: response.data[defaultSelectionIndex].name,
+          });
+        } else if (response.data.length > 0) {
           setSelectedExchange({
             value: response.data[0].id,
             label: response.data[0].name,
@@ -58,8 +63,8 @@ const ExchangeManger = (props) => {
   }, []);
 
   useEffect(() => {
-    fetchExchanges();
-  }, [fetchExchanges]);
+    fetchExchanges(props.defaultSelectionIndex);
+  }, [fetchExchanges, props.defaultSelectionIndex]);
 
   useEffect(() => {
     if (typeof selectedExchange !== 'undefined') {
@@ -85,27 +90,26 @@ const ExchangeManger = (props) => {
 
   return (
     <Space direction="vertical" className={classes.grow}>
-      {exchanges.length > 0 && (
-        <div className={classes.wrapper}>
-          {label}
-          <Select
-            labelInValue
-            placeholder={t('Select an exchange or a wallet')}
-            value={selectedExchange}
-            className={classes.grow}
-            onChange={(option) => {
-              props.onExchangeSelected(option.label);
-              setSelectedExchange(option);
-            }}
-          >
-            {exchanges.map((exchange) => (
-              <Option key={exchange.id} value={exchange.id}>
-                {exchange.name}
-              </Option>
-            ))}
-          </Select>
-        </div>
-      )}
+      <div className={classes.wrapper}>
+        {label}
+        <Select
+          labelInValue
+          placeholder={t('Select an exchange or a wallet')}
+          value={selectedExchange}
+          disabled={exchanges.length === 0}
+          className={classes.grow}
+          onChange={(option) => {
+            props.onExchangeSelected(option.label);
+            setSelectedExchange(option);
+          }}
+        >
+          {exchanges.map((exchange) => (
+            <Option key={exchange.id} value={exchange.id}>
+              {exchange.name}
+            </Option>
+          ))}
+        </Select>
+      </div>
       {inputVisible ? (
         <div className={classes.wrapper}>
           <Input
@@ -139,6 +143,7 @@ ExchangeManger.defaultProps = {
     console.warn('onExchangeSelected not implemented yet.');
   },
   showAddExchangeButton: true,
+  defaultSelectionIndex: 0,
 };
 
 export default ExchangeManger;
