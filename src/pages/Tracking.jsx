@@ -1,4 +1,4 @@
-import { Table, Divider, Typography, Space, Button, message } from 'antd';
+import { Table, Divider, Typography, Space, Tag, Button, message } from 'antd';
 import { DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -51,9 +51,9 @@ const Tracking = () => {
     if (assets.fiat.length === 0) {
       return;
     }
-    const { cryptocurrencies, fiat } = assets;
 
     const getAssetSymbol = (assetId) => {
+      const { cryptocurrencies, fiat } = assets;
       return [...cryptocurrencies, ...fiat]
         .find((asset) => asset.id.toLowerCase() === assetId.toLowerCase())
         .symbol.toUpperCase();
@@ -98,7 +98,29 @@ const Tracking = () => {
           }
         }
 
-        setDataSource(transactions);
+        axios
+          .get('http://localhost:5208/transfers')
+          .then((response) => {
+            const transfers = response.data.map((transfer) => ({
+              ...transfer,
+              type: 'transfer',
+              currency: getAssetSymbol(transfer.currency),
+              key: transfer.id + '-transfer',
+              fee: `${transfer.feeValue} ${getAssetSymbol(
+                transfer.feeCurrency
+              )}`,
+              date: formatDateTime(transfer.date),
+              exchange: `${transfer.fromExchange}, ${transfer.toExchange}`,
+            }));
+
+            setDataSource([...transactions, ...transfers]);
+          })
+          .catch((error) => {
+            message.error(
+              'Coineda backend is not available. Please restart the application.'
+            );
+            console.warn(error);
+          });
       })
       .catch((error) => {
         message.error(
@@ -124,11 +146,59 @@ const Tracking = () => {
       title: t('From'),
       dataIndex: 'from',
       key: 'from',
+      render: (value, row, index) => {
+        if (row.type === 'transfer') {
+          return {
+            children: (
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                }}
+              >
+                <div>{`${row.value} ${row.currency}`}</div>
+                <Tag color="red">{row.fromExchange}</Tag>
+              </div>
+            ),
+            key: row.key,
+          };
+        }
+
+        return {
+          children: value,
+          key: row.key,
+        };
+      },
     },
     {
       title: t('To'),
       dataIndex: 'to',
       key: 'to',
+      render: (value, row, index) => {
+        if (row.type === 'transfer') {
+          return {
+            children: (
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                }}
+              >
+                <div>{`${row.value} ${row.currency}`}</div>
+                <Tag color="green">{row.toExchange}</Tag>
+              </div>
+            ),
+            key: row.key,
+          };
+        }
+
+        return {
+          children: value,
+          key: row.key,
+        };
+      },
     },
     {
       title: t('Fee'),
