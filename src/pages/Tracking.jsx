@@ -31,7 +31,8 @@ const Tracking = () => {
   const [importDialogVisible, setImportDialogVisible] = useState(false);
   const [dataSource, setDataSource] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]);
-  const [overrides, setOverrides] = useState();
+  const [transactionOverrides, setTransactionOverrides] = useState();
+  const [transferOverrides, setTransferOverrides] = useState();
   const [assets, setAssets] = useState({ fiat: [], cryptocurrencies: [] });
   const classes = useStyles();
 
@@ -104,6 +105,7 @@ const Tracking = () => {
             const transfers = response.data.map((transfer) => ({
               ...transfer,
               type: 'transfer',
+              valueCurrency: transfer.currency,
               currency: getAssetSymbol(transfer.currency),
               key: transfer.id + '-transfer',
               fee: `${transfer.feeValue} ${getAssetSymbol(
@@ -223,12 +225,13 @@ const Tracking = () => {
   const closeAddTransactionDialog = () => {
     fetchExchanges();
     setAddTransactionDialogVisible(false);
-    setOverrides(undefined);
+    setTransactionOverrides(undefined);
   };
 
   const closeAddTransferDialog = () => {
     fetchExchanges();
     setAddTransferDialogVisible(false);
+    setTransferOverrides(undefined);
   };
 
   const closeImportDialog = () => {
@@ -240,29 +243,49 @@ const Tracking = () => {
   const openAddTransactionDialog = () => setAddTransactionDialogVisible(true);
   const openImportDialog = () => setImportDialogVisible(true);
 
-  const deleteRows = () => {
-    axios
-      .delete('http://localhost:5208/transactions', {
-        data: { transactions: selectedRows },
-      })
-      .then(() => {
-        fetchExchanges();
-        setSelectedRows([]);
-      })
-      .catch((error) => {
-        message.error(
-          'Failed to remove the selected rows. Try to restart Coineda and try again. Contact support@coineda.io if the error persists.'
-        );
-        console.warn(error);
+  const deleteRows = async () => {
+    const selectedTransactions = selectedRows.filter(
+      (row) => dataSource.find((item) => item.key === row).type !== 'transfer'
+    );
+    const selectedTransfers = selectedRows.filter(
+      (row) => dataSource.find((item) => item.key === row).type === 'transfer'
+    );
+
+    try {
+      await axios.delete('http://localhost:5208/transactions', {
+        data: { transactions: selectedTransactions },
       });
+
+      await axios.delete('http://localhost:5208/transfers', {
+        data: {
+          transfers: selectedTransfers.map(
+            (transferId) => transferId.split('-')[0]
+          ),
+        },
+      });
+
+      fetchExchanges();
+      setSelectedRows([]);
+    } catch (error) {
+      message.error(
+        'Failed to remove the selected rows. Try to restart Coineda and try again. Contact support@coineda.io if the error persists.'
+      );
+      console.warn(error);
+    }
   };
 
   const editRow = () => {
     if (selectedRows.length === 0) return;
 
     const row = dataSource.find((field) => field.key === selectedRows[0]);
-    setOverrides(row);
-    setAddTransactionDialogVisible(true);
+
+    if (row.type === 'transfer') {
+      setTransferOverrides(row);
+      setAddTransferDialogVisible(true);
+    } else {
+      setTransactionOverrides(row);
+      setAddTransactionDialogVisible(true);
+    }
   };
 
   return (
@@ -309,11 +332,12 @@ const Tracking = () => {
       <AddTransactionDialog
         visible={addTransactionDialogVisible}
         onClose={closeAddTransactionDialog}
-        overrides={overrides}
+        overrides={transactionOverrides}
       />
       <AddTransferDialog
         visible={addTransferDialogVisible}
         onClose={closeAddTransferDialog}
+        overrides={transferOverrides}
       />
       <ImportDialog visible={importDialogVisible} onClose={closeImportDialog} />
     </div>

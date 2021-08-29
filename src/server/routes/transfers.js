@@ -45,4 +45,55 @@ router.post('/', async (req, res) => {
   }
 });
 
+router.delete('/', async (req, res) => {
+  const sql = `DELETE FROM transfers WHERE id IN (
+    ${req.body.transfers.join(', ')})`;
+
+  try {
+    await db.executeSelectQuery(sql);
+    res.status(200).end();
+  } catch (error) {
+    logger.error(error);
+    res.status(500).json(error);
+  }
+});
+
+router.put('/', async (req, res) => {
+  const {
+    id,
+    fromExchange,
+    toExchange,
+    value,
+    currency,
+    feeValue,
+    feeCurrency,
+    date,
+  } = req.body;
+
+  const sql =
+    'UPDATE transfers SET fromExchange=?, toExchange=?, value=?, currency=?, feeValue=?, feeCurrency=?, date=? WHERE id=?';
+
+  try {
+    await db.executeQuery(sql, [
+      fromExchange,
+      toExchange,
+      value,
+      currency,
+      feeValue,
+      feeCurrency,
+      date,
+      id,
+    ]);
+    res.status(200).end();
+  } catch (error) {
+    logger.error(error);
+    res.status(500).end();
+  }
+});
+
+router.delete('/records', async (req, res) => {
+  await db.executeSelectQuery('DELETE FROM transfers');
+  res.status(200).end();
+});
+
 module.exports = router;

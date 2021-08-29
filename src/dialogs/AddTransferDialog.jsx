@@ -31,6 +31,7 @@ const AddTransferDialog = (props) => {
   const [feeCurrency, setFeeCurrency] = useState('bitcoin');
   const [currency, setCurrency] = useState('bitcoin');
   const [assets, setAssets] = useState([]);
+  const [updateKey, setUpdateKey] = useState();
   const [form] = Form.useForm();
   const { t } = useTranslation();
 
@@ -46,7 +47,7 @@ const AddTransferDialog = (props) => {
     date: moment(),
   };
 
-  const { visible, onClose } = props;
+  const { visible, onClose, overrides } = props;
   const closeDialog = () => {
     setFeeCurrency('bitcoin');
     setCurrency('bitcoin');
@@ -59,6 +60,21 @@ const AddTransferDialog = (props) => {
     });
     onClose();
   };
+
+  useEffect(() => {
+    if (typeof overrides !== 'undefined') {
+      setFeeCurrency(overrides.feeCurrency);
+      setCurrency(overrides.valueCurrency);
+      form.setFieldsValue({
+        value: overrides.value,
+        fee: overrides.feeValue,
+        date: moment(overrides.date),
+      });
+      setFromExchange(overrides.fromExchange);
+      setToExchange(overrides.toExchange);
+      setUpdateKey(overrides.id);
+    }
+  }, [overrides, form]);
 
   useEffect(() => {
     axios
@@ -94,15 +110,28 @@ const AddTransferDialog = (props) => {
       date: values.date,
     };
 
-    axios
-      .post('http://localhost:5208/transfers', data)
-      .catch((error) => {
-        message.error('Failed to add transfer');
-        console.warn(error);
-      })
-      .finally(() => {
-        closeDialog();
-      });
+    if (typeof updateKey === 'undefined') {
+      axios
+        .post('http://localhost:5208/transfers', data)
+        .catch((error) => {
+          message.error('Failed to add transfer');
+          console.warn(error);
+        })
+        .finally(() => {
+          closeDialog();
+        });
+    } else {
+      data.id = updateKey;
+      axios
+        .put('http://localhost:5208/transfers', data)
+        .catch((error) => {
+          message.error('Failed to update transfer');
+          console.warn(error);
+        })
+        .finally(() => {
+          closeDialog();
+        });
+    }
   };
 
   const filterSearch = (input, option) =>
