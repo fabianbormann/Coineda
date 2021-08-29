@@ -14,6 +14,7 @@ const exchange = require('./routes/exchange.js');
 const dashboard = require('./routes/dashboard');
 const settings = require('./routes/settings');
 const assets = require('./routes/assets');
+const transfers = require('./routes/transfers');
 
 const db = require('./database/helper.js');
 
@@ -26,6 +27,7 @@ app.use('/exchange', exchange);
 app.use('/dashboard', dashboard);
 app.use('/settings', settings);
 app.use('/assets', assets);
+app.use('/transfers', transfers);
 
 const server = app.listen(PORT, async () => {
   await db.init();
