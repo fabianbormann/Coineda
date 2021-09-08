@@ -12,10 +12,10 @@ const ImportDialog = (props) => {
   const [uploading, setUploading] = useState(false);
 
   const addFile = (file) => {
-    if (file.type !== 'text/csv') {
-      message.error(t('is not a csv file', { filename: file.name }));
-    } else {
+    if (file.name.endsWith('.cnd')) {
       setFiles([...files, file]);
+    } else {
+      message.error(t('is not a cnd file', { filename: file.name }));
     }
 
     return false;
@@ -29,9 +29,8 @@ const ImportDialog = (props) => {
     }
 
     try {
-      const response = (
-        await axios.post('http://localhost:5208/transactions/import', data)
-      ).data;
+      const response = (await axios.post('http://localhost:5208/import', data))
+        .data;
 
       const { inserts, duplicates, errors } = response;
 

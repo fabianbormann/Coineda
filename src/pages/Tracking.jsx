@@ -302,7 +302,7 @@ const Tracking = () => {
         <Button type="primary" onClick={openImportDialog}>
           {t('Import')}
         </Button>
-        <Button href="http://localhost:5208/transactions/export" type="primary">
+        <Button href="http://localhost:5208/export" type="primary">
           {t('Export')}
         </Button>
       </Space>

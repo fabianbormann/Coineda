@@ -33,7 +33,7 @@ router.get('/sorted', async (req, res) => {
 
   res.json([
     ...tradedAssets.map((asset) =>
-      assets.find((currency) => currency.id == asset)
+      assets.find((currency) => currency.id === asset)
     ),
     ...assets.filter((asset) => !tradedAssets.includes(asset.id)),
   ]);

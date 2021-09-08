@@ -1,6 +1,9 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
+const bunyan = require('bunyan');
+const logger = bunyan.createLogger({ name: 'coineda-backend-database-helper' });
+
 const userPreferences =
   process.env.APPDATA ||
   (process.platform === 'darwin'
@@ -14,7 +17,13 @@ if (!fs.existsSync(coinedaPreferences)) {
   fs.mkdirSync(coinedaPreferences);
 }
 
-const db = new sqlite3.Database(path.resolve(coinedaPreferences, 'coineda.db'));
+let db;
+if (process.env.NODE_ENV === 'test') {
+  db = new sqlite3.Database(':memory:');
+  logger.info('Setup in memory db due to testing mode.');
+} else {
+  db = new sqlite3.Database(path.resolve(coinedaPreferences, 'coineda.db'));
+}
 
 const executeSelectQuery = (query, params) => {
   return new Promise((resolve, reject) => {
@@ -70,6 +79,7 @@ const init = async () => {
         isComposed INTEGER NOT NULL DEFAULT 0,
         parent INTEGER,
         composedKeys TEXT,
+        account INTEGER DEFAULT 0,
         created TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`
   );
@@ -84,9 +94,23 @@ const init = async () => {
         feeValue REAL NOT NULL, 
         feeCurrency TEXT NOT NULL,
         date TIMESTAMP NOT NULL,
+        account INTEGER DEFAULT 0,
         created TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`
   );
+
+  await executeQuery(
+    `CREATE TABLE IF NOT EXISTS accounts 
+        (id INTEGER PRIMARY KEY, 
+        name TEXT NOT NULL UNIQUE,
+        created TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`
+  );
+
+  const accounts = await executeSelectQuery('SELECT * FROM accounts');
+  if (accounts.length === 0) {
+    await executeQuery('INSERT INTO accounts (name) VALUES (?)', ['Default']);
+  }
 
   const assets = await executeSelectQuery('SELECT * FROM assets');
   if (assets.length === 0) {

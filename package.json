@@ -1,7 +1,7 @@
 {
   "name": "coineda",
   "description": "Coineda aims to be a free to use, open source and local running crypto track and tax tool",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "author": "Fabian Bormann <fabian.bormann@coineda.io>",
   "homepage": "./",
   "license": "AGPL-3.0",
@@ -42,11 +42,11 @@
     "start": "react-scripts start",
     "frontend": "react-scripts start",
     "build": "react-scripts build && cp -r ./src/server ./build",
-    "test": "react-scripts test",
+    "test": "NODE_ENV=test jest",
     "eject": "react-scripts eject",
     "electron-dev": "concurrently \"BROWSER=none npm start\" \"wait-on http://localhost:3000 && electron .\"",
-    "server": "node ./src/server/app.js",
-    "server-dev": "nodemon ./src/server/app.js",
+    "server": "node ./src/server/index.js",
+    "server-dev": "nodemon ./src/server/index.js",
     "pack": "electron-builder --dir",
     "dist": "electron-builder"
   },
@@ -70,7 +70,15 @@
   },
   "devDependencies": {
     "electron": "^13.1.8",
-    "electron-builder": "^22.9.1"
+    "electron-builder": "^22.9.1",
+    "supertest": "^6.1.6"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "rootDir": "src/server",
+    "coveragePathIgnorePatterns": [
+      "/node_modules/"
+    ]
   },
   "build": {
     "appId": "io.coineda.app",

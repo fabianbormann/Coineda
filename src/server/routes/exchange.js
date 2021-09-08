@@ -12,6 +12,10 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
+  if (req.body.name === 'External Wallet') {
+    return res.status(400).send('External Wallet is a reserved name');
+  }
+
   try {
     await db.executeQuery(
       'INSERT INTO exchanges (name) VALUES (?)',

@@ -16,6 +16,7 @@ router.get('/summary', async (req, res) => {
   const transactions = await db.executeSelectQuery(sql);
 
   const coins = { cryptocurrencies: {}, fiat: {} };
+
   const calculateBalance = async (currency, value, add) => {
     currency = currency.toLowerCase();
     const target = (await isFiat(currency)) ? 'fiat' : 'cryptocurrencies';
@@ -47,9 +48,6 @@ router.get('/summary', async (req, res) => {
         const fiat = assets.fiat.find(
           (currency) => currency.id === transaction.fromCurrency.toLowerCase()
         );
-        console.log(transaction);
-        console.log(assets.fiat);
-        console.log(fiat);
         purchasePrice =
           (transaction.fromValue * fiat['roughlyEstimatedInEuro']) /
           transaction.toValue;
@@ -77,10 +75,15 @@ router.get('/summary', async (req, res) => {
       feeCurrency,
     } = transaction;
 
-    await calculateBalance(toCurrency, toValue, true);
-    await calculateBalance(fromCurrency, fromValue, false);
-    await calculateBalance(feeCurrency, feeValue, false);
-    calculatePurchasePrice(transaction);
+    if (
+      transaction.type === TransactionType.BUY ||
+      transaction.type === TransactionType.SELL
+    ) {
+      await calculateBalance(toCurrency, toValue, true);
+      await calculateBalance(fromCurrency, fromValue, false);
+      await calculateBalance(feeCurrency, feeValue, false);
+      calculatePurchasePrice(transaction);
+    }
   }
 
   coins['inconsistency'] = { negativeValue: [] };
