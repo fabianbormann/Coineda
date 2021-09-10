@@ -20,6 +20,7 @@
     "eslint-plugin-prettier": "^3.4.0",
     "express": "^4.17.1",
     "express-fileupload": "^1.2.1",
+    "geopattern": "^1.2.3",
     "i18next": "^20.3.5",
     "i18next-browser-languagedetector": "^6.1.2",
     "i18next-localstorage-cache": "^1.1.1",

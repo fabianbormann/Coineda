@@ -103,13 +103,17 @@ const init = async () => {
     `CREATE TABLE IF NOT EXISTS accounts 
         (id INTEGER PRIMARY KEY, 
         name TEXT NOT NULL UNIQUE,
+        pattern TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         created TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`
   );
 
   const accounts = await executeSelectQuery('SELECT * FROM accounts');
   if (accounts.length === 0) {
-    await executeQuery('INSERT INTO accounts (name) VALUES (?)', ['Default']);
+    await executeQuery('INSERT INTO accounts (name, pattern) VALUES (?, ?)', [
+      'Coineda',
+      'DEFAULT7',
+    ]);
   }
 
   const assets = await executeSelectQuery('SELECT * FROM assets');

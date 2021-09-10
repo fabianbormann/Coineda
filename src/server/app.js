@@ -13,13 +13,14 @@ const assets = require('./routes/assets');
 const transfers = require('./routes/transfers');
 const fileExport = require('./routes/exports');
 const fileImport = require('./routes/imports');
+const accounts = require('./routes/accounts');
 
 app.use((req, res, next) => {
   req.coineda_version = '0.1.3';
   next();
 });
 
-app.get('/alive', (req, res) => {
+app.get('/alive', (_req, res) => {
   return res.status(200).end();
 });
 
@@ -29,6 +30,7 @@ app.use('/dashboard', dashboard);
 app.use('/settings', settings);
 app.use('/assets', assets);
 app.use('/transfers', transfers);
+app.use('/accounts', accounts);
 app.use('/import', fileImport);
 app.use('/export', fileExport);
 

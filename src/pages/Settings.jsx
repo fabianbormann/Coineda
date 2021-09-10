@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useState, useEffect, useCallback } from 'react';
 import { Select, Space, Typography, Divider, message } from 'antd';
 import { createUseStyles } from 'react-jss';
+import AccountManagement from '../components/AccountManagement';
 
 const { Option } = Select;
 const { Title } = Typography;
@@ -52,7 +53,7 @@ const Settings = () => {
   return (
     <div className={classes.page}>
       <Title level={2}>{t('Settings')}</Title>
-      <Divider />
+      <Title level={4}>{t('General')}</Title>
       <Space>
         <span>{t('Language')}</span>
         <Select
@@ -63,6 +64,10 @@ const Settings = () => {
           <Option value="de">Deutsch</Option>
           <Option value="en">English</Option>
         </Select>
+      </Space>
+      <Divider />
+      <Space>
+        <AccountManagement />
       </Space>
     </div>
   );
