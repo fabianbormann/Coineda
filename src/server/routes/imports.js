@@ -33,7 +33,7 @@ const removeDuplicateObjects = async (values, table) => {
   });
 };
 
-const textToObjects = (text) => {
+const textToObjects = (text, account = 0) => {
   if (text === '') {
     return [];
   }
@@ -47,19 +47,19 @@ const textToObjects = (text) => {
     if (i === 0) {
       keys = rows[0].split(';');
     } else {
-      const transaction = {};
+      const item = {};
       const fields = rows[i].split(';');
 
       let key = 0;
       for (const field of fields) {
         if (keys[key] === 'id') {
-          transaction[keys[key]] = Number(field);
+          item[keys[key]] = Number(field);
         } else {
-          transaction[keys[key]] = field;
+          item[keys[key]] = field;
         }
         key += 1;
       }
-      objects.push(transaction);
+      objects.push({ ...item, account });
     }
   }
 
@@ -117,8 +117,13 @@ const readFile = (text) => {
 };
 
 router.post('/', fileUpload(), async (req, res) => {
-  if (typeof req.files.files === undefined) {
+  if (typeof req.files.files === 'undefined') {
     return res.status(400).send('No files provided');
+  }
+
+  let account = 0;
+  if (typeof req.body.account !== 'undefined') {
+    account = req.body.account;
   }
   let errors = 0;
 
@@ -134,8 +139,11 @@ router.post('/', fileUpload(), async (req, res) => {
         transfersText != null &&
         transactionsText != null
       ) {
-        transactions = [transactions, ...textToObjects(transactionsText)];
-        transfers = [transfers, ...textToObjects(transfersText)];
+        transactions = [
+          transactions,
+          ...textToObjects(transactionsText, account),
+        ];
+        transfers = [transfers, ...textToObjects(transfersText, account)];
       } else {
         errors += 1;
       }
@@ -149,8 +157,8 @@ router.post('/', fileUpload(), async (req, res) => {
       transfersText != null &&
       transactionsText != null
     ) {
-      transactions = textToObjects(transactionsText);
-      transfers = textToObjects(transfersText);
+      transactions = textToObjects(transactionsText, account);
+      transfers = textToObjects(transfersText, account);
     } else {
       errors += 1;
     }
@@ -179,7 +187,7 @@ router.post('/', fileUpload(), async (req, res) => {
 
   for (const transaction of transactions) {
     try {
-      await createTransaction({ account: 0, ...transaction });
+      await createTransaction(transaction);
       await addExchangeIfNotExists(transaction.exchange);
     } catch (error) {
       logger.error(error);

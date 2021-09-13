@@ -1,11 +1,12 @@
 import { Table, Divider, Typography, Space, Tag, Button, message } from 'antd';
 import { DeleteOutlined, EditOutlined } from '@ant-design/icons';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useContext } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createUseStyles } from 'react-jss';
 import { AddTransactionDialog, AddTransferDialog } from '../dialogs';
 import axios from 'axios';
 import { ImportDialog } from '../dialogs';
+import { SettingsContext } from '../SettingsContext';
 
 const { Title } = Typography;
 
@@ -24,6 +25,7 @@ const useStyles = createUseStyles({
 
 const Tracking = () => {
   const { t } = useTranslation();
+  const [settings] = useContext(SettingsContext);
   const [addTransactionDialogVisible, setAddTransactionDialogVisible] =
     useState(false);
   const [addTransferDialogVisible, setAddTransferDialogVisible] =
@@ -35,6 +37,8 @@ const Tracking = () => {
   const [transferOverrides, setTransferOverrides] = useState();
   const [assets, setAssets] = useState({ fiat: [], cryptocurrencies: [] });
   const classes = useStyles();
+
+  const { account } = settings;
 
   useEffect(() => {
     axios
@@ -61,7 +65,7 @@ const Tracking = () => {
     };
 
     axios
-      .get('http://localhost:5208/transactions')
+      .get('http://localhost:5208/transactions/' + account.id)
       .then((response) => {
         const formatDateTime = (timestamp) => {
           const date = new Date(timestamp);
@@ -100,7 +104,7 @@ const Tracking = () => {
         }
 
         axios
-          .get('http://localhost:5208/transfers')
+          .get('http://localhost:5208/transfers/' + account.id)
           .then((response) => {
             const transfers = response.data.map((transfer) => ({
               ...transfer,
@@ -130,7 +134,7 @@ const Tracking = () => {
         );
         console.warn(error);
       });
-  }, [assets]);
+  }, [assets, account]);
 
   useEffect(() => {
     fetchExchanges();
@@ -141,6 +145,7 @@ const Tracking = () => {
     onChange: (selectedRowKeys) => {
       setSelectedRows(selectedRowKeys);
     },
+    selectedRowKeys: selectedRows,
   };
 
   const columns = [
@@ -223,18 +228,21 @@ const Tracking = () => {
   ];
 
   const closeAddTransactionDialog = () => {
+    setSelectedRows([]);
     fetchExchanges();
     setAddTransactionDialogVisible(false);
     setTransactionOverrides(undefined);
   };
 
   const closeAddTransferDialog = () => {
+    setSelectedRows([]);
     fetchExchanges();
     setAddTransferDialogVisible(false);
     setTransferOverrides(undefined);
   };
 
   const closeImportDialog = () => {
+    setSelectedRows([]);
     setImportDialogVisible(false);
     fetchExchanges();
   };
@@ -244,16 +252,40 @@ const Tracking = () => {
   const openImportDialog = () => setImportDialogVisible(true);
 
   const deleteRows = async () => {
-    const selectedTransactions = selectedRows.filter(
-      (row) => dataSource.find((item) => item.key === row).type !== 'transfer'
-    );
-    const selectedTransfers = selectedRows.filter(
-      (row) => dataSource.find((item) => item.key === row).type === 'transfer'
-    );
+    const selectedTransactions = selectedRows.filter((row) => {
+      const selectedRow = dataSource.find((item) => item.key === row);
+      if (selectedRow) {
+        return selectedRow.type !== 'transfer';
+      } else {
+        return false;
+      }
+    });
+
+    const selectedTransfers = selectedRows.filter((row) => {
+      const selectedRow = dataSource.find((item) => item.key === row);
+      if (selectedRow) {
+        return selectedRow.type === 'transfer';
+      } else {
+        return false;
+      }
+    });
+
+    let children = [];
+    for (const selectedTransaction of selectedTransactions) {
+      const selectedRow = dataSource.find(
+        (item) => item.key === selectedTransaction
+      );
+      if (typeof selectedRow.children !== 'undefined') {
+        children = [
+          ...children,
+          ...selectedRow.children.map((child) => child.key),
+        ];
+      }
+    }
 
     try {
       await axios.delete('http://localhost:5208/transactions', {
-        data: { transactions: selectedTransactions },
+        data: { transactions: [...selectedTransactions, ...children] },
       });
 
       await axios.delete('http://localhost:5208/transfers', {
@@ -264,8 +296,8 @@ const Tracking = () => {
         },
       });
 
-      fetchExchanges();
       setSelectedRows([]);
+      fetchExchanges();
     } catch (error) {
       message.error(
         'Failed to remove the selected rows. Try to restart Coineda and try again. Contact support@coineda.io if the error persists.'
