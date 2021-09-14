@@ -85,9 +85,9 @@ const Tracking = () => {
           fee: `${transaction.feeValue} ${getAssetSymbol(
             transaction.feeCurrency
           )}`,
-          feeCurrency: getAssetSymbol(transaction.feeCurrency),
-          fromCurrency: getAssetSymbol(transaction.fromCurrency),
-          toCurrency: getAssetSymbol(transaction.toCurrency),
+          feeCurrency: transaction.feeCurrency.toLowerCase(),
+          fromCurrency: transaction.fromCurrency.toLowerCase(),
+          toCurrency: transaction.toCurrency.toLowerCase(),
           date: formatDateTime(transaction.date),
           key: transaction.id,
         }));
@@ -334,7 +334,10 @@ const Tracking = () => {
         <Button type="primary" onClick={openImportDialog}>
           {t('Import')}
         </Button>
-        <Button href="http://localhost:5208/export" type="primary">
+        <Button
+          href={`http://localhost:5208/export/${account.id}`}
+          type="primary"
+        >
           {t('Export')}
         </Button>
       </Space>

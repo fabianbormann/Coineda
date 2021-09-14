@@ -11,9 +11,13 @@ const { isFiat, TransactionType, fetchAssets } = common;
 const CoinGecko = require('coingecko-api');
 const CoinGeckoClient = new CoinGecko();
 
-router.get('/summary', async (req, res) => {
-  const sql = 'SELECT * FROM transactions';
-  const transactions = await db.executeSelectQuery(sql);
+router.get('/summary/:account', async (req, res) => {
+  if (req.params.account === 'undefined') {
+    return res.status(500).send('Please provide an account id.');
+  }
+
+  const sql = 'SELECT * FROM transactions WHERE account=?';
+  const transactions = await db.executeSelectQuery(sql, [req.params.account]);
 
   const coins = { cryptocurrencies: {}, fiat: {} };
 

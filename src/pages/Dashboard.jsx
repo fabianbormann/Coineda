@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useContext } from 'react';
 import { Pie } from '@ant-design/charts';
 import {
   Alert,
@@ -17,6 +17,8 @@ import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { createUseStyles } from 'react-jss';
 import axios from 'axios';
+import { SettingsContext } from '../SettingsContext';
+
 const { Title } = Typography;
 
 const useStyles = createUseStyles({
@@ -31,13 +33,16 @@ const useStyles = createUseStyles({
 const Dashboard = () => {
   const { t } = useTranslation();
   const classes = useStyles();
+  const [settings] = useContext(SettingsContext);
   const [summary, setSummary] = useState({});
   const [loading, setLoading] = useState(false);
+
+  const { account } = settings;
 
   const fetchSummary = useCallback(() => {
     setLoading(true);
     axios
-      .get('http://localhost:5208/dashboard/summary')
+      .get('http://localhost:5208/dashboard/summary/' + account.id)
       .then((response) => {
         setSummary(response.data);
       })
@@ -48,7 +53,7 @@ const Dashboard = () => {
         console.warn(error);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [account]);
 
   useEffect(() => {
     fetchSummary();

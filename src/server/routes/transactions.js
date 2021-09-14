@@ -44,6 +44,8 @@ const createTransaction = async (transaction) => {
       (new Date(date).getTime() - 1000 * 60 * 60 * 5) / 1000
     );
 
+    console.log(fromCurrency.toLowerCase(), fromTimestamp, toTimestamp);
+
     price = (
       await CoinGeckoClient.coins.fetchMarketChartRange(
         fromCurrency.toLowerCase(),
@@ -144,7 +146,7 @@ router.post('/', async (req, res) => {
     await createTransaction({
       isComposed: 0,
       composedKeys: '',
-      account: 0,
+      account: 1,
       ...req.body,
     });
     res.status(200).end();
@@ -208,7 +210,7 @@ router.put('/', async (req, res) => {
       await createTransaction({
         isComposed: 0,
         composedKeys: '',
-        account: 0,
+        account: transaction.account,
         ...req.body,
       });
       res.status(200).end();

@@ -1,10 +1,11 @@
 import { Modal, Form, Select, Divider, Input, message, DatePicker } from 'antd';
 import ExchangeManger from '../components/ExchangeManager';
 import { createUseStyles } from 'react-jss';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useContext } from 'react';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 import moment from 'moment';
+import { SettingsContext } from '../SettingsContext';
 
 const { Item } = Form;
 const { Option } = Select;
@@ -22,6 +23,7 @@ const AddTransactionsDialog = (props) => {
   const [toCurrency, setToCurrency] = useState('bitcoin');
   const [fromCurrency, setFromCurrency] = useState('euro');
   const [updateKey, setUpdateKey] = useState();
+  const [settings] = useContext(SettingsContext);
   const [assets, setAssets] = useState({ fiat: [], cryptocurrencies: [] });
   const [form] = Form.useForm();
   const { t } = useTranslation();
@@ -38,6 +40,8 @@ const AddTransactionsDialog = (props) => {
     fee: 0,
     date: moment(),
   };
+
+  const { account } = settings;
 
   const { overrides, visible, onClose } = props;
   const closeDialog = () => {
@@ -107,7 +111,10 @@ const AddTransactionsDialog = (props) => {
 
     if (typeof updateKey === 'undefined') {
       axios
-        .post('http://localhost:5208/transactions', data)
+        .post('http://localhost:5208/transactions', {
+          ...data,
+          account: account.id,
+        })
         .catch((error) => {
           message.error('Failed to add transaction');
           console.warn(error);
