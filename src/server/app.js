@@ -15,8 +15,8 @@ const fileExport = require('./routes/exports');
 const fileImport = require('./routes/imports');
 const accounts = require('./routes/accounts');
 
-app.use((req, res, next) => {
-  req.coineda_version = '0.1.3';
+app.use((req, _res, next) => {
+  req.coineda_version = '0.1.4';
   next();
 });
 
