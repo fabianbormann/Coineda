@@ -1,5 +1,8 @@
 # Coineda
+
 [![Build/release](https://github.com/fabianbormann/Coineda/actions/workflows/build.yml/badge.svg)](https://github.com/fabianbormann/Coineda/actions/workflows/build.yml)
+
+[![Tests](https://github.com/fabianbormann/Coineda/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/fabianbormann/Coineda/actions/workflows/test.yml)
 
 Coineda aims to be a free to use, open source and local running crypto track and tax tool
 
@@ -13,7 +16,7 @@ Tracking of crypo currencies should be free and open source. As a crypto trader 
 
 ## Why AGPL-3.0
 
-This software should be free to use and therefore forks, improvements or programs using Coineda should also be free to use for everyone. Even "as a service" solutions using Coineda functions should be open source and free to use. That's the reason why I used the AGPL-3.0 License for Coineda. 
+This software should be free to use and therefore forks, improvements or programs using Coineda should also be free to use for everyone. Even "as a service" solutions using Coineda functions should be open source and free to use. That's the reason why I used the AGPL-3.0 License for Coineda.
 
 ## How to contribute
 

@@ -16,6 +16,19 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.get('/:account', async (req, res) => {
+  try {
+    const transfers = await db.executeSelectQuery(
+      'SELECT * FROM transfers WHERE account=?',
+      [req.params.account]
+    );
+    res.json(transfers);
+  } catch (error) {
+    logger.error(error);
+    res.status(500).send('Unable to read transfers from database');
+  }
+});
+
 router.post('/', async (req, res) => {
   const {
     fromExchange,
@@ -25,10 +38,11 @@ router.post('/', async (req, res) => {
     feeValue,
     feeCurrency,
     date,
+    account,
   } = req.body;
   try {
     const sql =
-      'INSERT INTO transfers (fromExchange, toExchange, value, currency, feeValue, feeCurrency, date) VALUES (?, ?, ?, ?, ?, ?, ?)';
+      'INSERT INTO transfers (fromExchange, toExchange, value, currency, feeValue, feeCurrency, date, account) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
     await db.executeQuery(sql, [
       fromExchange,
       toExchange,
@@ -37,6 +51,7 @@ router.post('/', async (req, res) => {
       feeValue,
       feeCurrency,
       date,
+      account,
     ]);
     res.status(200).end();
   } catch (error) {
@@ -91,8 +106,19 @@ router.put('/', async (req, res) => {
   }
 });
 
-router.delete('/records', async (req, res) => {
-  await db.executeSelectQuery('DELETE FROM transfers');
+router.delete('/records/:account', async (req, res) => {
+  try {
+    if (typeof req.params.account === 'undefined') {
+      await db.executeSelectQuery('DELETE FROM transfers');
+    } else {
+      await db.executeSelectQuery('DELETE FROM transfers WHERE account=?', [
+        req.params.account,
+      ]);
+    }
+  } catch (error) {
+    logger.error(error);
+    res.status(500).send('Failed to delete transfer rows');
+  }
   res.status(200).end();
 });
 

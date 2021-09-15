@@ -1,21 +1,23 @@
 import { Upload, Modal, message } from 'antd';
 import { InboxOutlined } from '@ant-design/icons';
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import axios from 'axios';
 import { useTranslation, Trans } from 'react-i18next';
+import { SettingsContext } from '../SettingsContext';
 
 const { Dragger } = Upload;
 
 const ImportDialog = (props) => {
   const { t } = useTranslation();
   const [files, setFiles] = useState([]);
+  const [settings] = useContext(SettingsContext);
   const [uploading, setUploading] = useState(false);
 
   const addFile = (file) => {
-    if (file.type !== 'text/csv') {
-      message.error(t('is not a csv file', { filename: file.name }));
-    } else {
+    if (file.name.endsWith('.cnd')) {
       setFiles([...files, file]);
+    } else {
+      message.error(t('is not a cnd file', { filename: file.name }));
     }
 
     return false;
@@ -23,15 +25,15 @@ const ImportDialog = (props) => {
 
   const handleUpload = async () => {
     const data = new FormData();
+    data.append('account', settings.account.id);
 
     for (const file of files) {
       data.append('files', file);
     }
 
     try {
-      const response = (
-        await axios.post('http://localhost:5208/transactions/import', data)
-      ).data;
+      const response = (await axios.post('http://localhost:5208/import', data))
+        .data;
 
       const { inserts, duplicates, errors } = response;
 

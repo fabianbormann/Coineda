@@ -11,11 +11,16 @@ const { isFiat, TransactionType, fetchAssets } = common;
 const CoinGecko = require('coingecko-api');
 const CoinGeckoClient = new CoinGecko();
 
-router.get('/summary', async (req, res) => {
-  const sql = 'SELECT * FROM transactions';
-  const transactions = await db.executeSelectQuery(sql);
+router.get('/summary/:account', async (req, res) => {
+  if (req.params.account === 'undefined') {
+    return res.status(500).send('Please provide an account id.');
+  }
+
+  const sql = 'SELECT * FROM transactions WHERE account=?';
+  const transactions = await db.executeSelectQuery(sql, [req.params.account]);
 
   const coins = { cryptocurrencies: {}, fiat: {} };
+
   const calculateBalance = async (currency, value, add) => {
     currency = currency.toLowerCase();
     const target = (await isFiat(currency)) ? 'fiat' : 'cryptocurrencies';
@@ -47,9 +52,6 @@ router.get('/summary', async (req, res) => {
         const fiat = assets.fiat.find(
           (currency) => currency.id === transaction.fromCurrency.toLowerCase()
         );
-        console.log(transaction);
-        console.log(assets.fiat);
-        console.log(fiat);
         purchasePrice =
           (transaction.fromValue * fiat['roughlyEstimatedInEuro']) /
           transaction.toValue;
@@ -77,10 +79,15 @@ router.get('/summary', async (req, res) => {
       feeCurrency,
     } = transaction;
 
-    await calculateBalance(toCurrency, toValue, true);
-    await calculateBalance(fromCurrency, fromValue, false);
-    await calculateBalance(feeCurrency, feeValue, false);
-    calculatePurchasePrice(transaction);
+    if (
+      transaction.type === TransactionType.BUY ||
+      transaction.type === TransactionType.SELL
+    ) {
+      await calculateBalance(toCurrency, toValue, true);
+      await calculateBalance(fromCurrency, fromValue, false);
+      await calculateBalance(feeCurrency, feeValue, false);
+      calculatePurchasePrice(transaction);
+    }
   }
 
   coins['inconsistency'] = { negativeValue: [] };

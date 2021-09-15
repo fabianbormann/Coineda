@@ -1,4 +1,4 @@
-import { Layout, Menu } from 'antd';
+import { Layout, Menu, Avatar } from 'antd';
 import {
   AreaChartOutlined,
   DiffOutlined,
@@ -16,18 +16,28 @@ import {
 } from 'react-router-dom';
 import { Dashboard, Tracking, TaxReports, Settings } from './pages';
 import { useTranslation } from 'react-i18next';
-import { useState } from 'react';
+import { useState, useContext, useEffect } from 'react';
+import { SettingsContext, defaultSettings } from './SettingsContext';
+import axios from 'axios';
+import GeoPattern from 'geopattern';
 
 const { Content, Footer, Sider } = Layout;
 
 const useStyles = createUseStyles({
-  logo: {
+  account: {
     color: 'white',
     display: 'flex',
     alignItems: 'center',
-    marginLeft: 24,
+    padding: '12px 12px 0 12px',
     fontWeight: 600,
-    height: 40,
+  },
+  accountName: {
+    marginLeft: 6,
+  },
+  accountRow: {
+    paddingTop: 12,
+    paddingBottom: 12,
+    width: 176,
   },
   content: {
     minHeight: '100vh',
@@ -44,6 +54,17 @@ const Main = () => {
   const location = useLocation();
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(false);
+  const [settings, updateSettings] = useContext(SettingsContext);
+  const { backendUrl, account } = settings;
+
+  useEffect(() => {
+    axios.get(`${backendUrl}/accounts`).then((response) => {
+      updateSettings((prevSettings) => ({
+        ...prevSettings,
+        account: response.data[0],
+      }));
+    });
+  }, [backendUrl, updateSettings]);
 
   return (
     <Layout>
@@ -52,7 +73,15 @@ const Main = () => {
         collapsed={collapsed}
         onCollapse={(isCollapsed) => setCollapsed(isCollapsed)}
       >
-        <div className={classes.logo}>Coineda</div>
+        <div className={classes.account}>
+          <Avatar
+            style={{
+              backgroundImage: GeoPattern.generate(account.pattern).toDataUrl(),
+              backgroundSize: 'cover',
+            }}
+          />
+          <span className={classes.accountName}>{account.name}</span>
+        </div>
         <Menu
           theme="dark"
           mode="inline"
@@ -101,10 +130,14 @@ const Main = () => {
 };
 
 const App = () => {
+  const [settings, updateSettings] = useState(defaultSettings);
+
   return (
-    <Router>
-      <Main />
-    </Router>
+    <SettingsContext.Provider value={[settings, updateSettings]}>
+      <Router>
+        <Main />
+      </Router>
+    </SettingsContext.Provider>
   );
 };
 

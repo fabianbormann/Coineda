@@ -11,8 +11,6 @@ const { TransactionType, isFiat } = common;
 const CoinGecko = require('coingecko-api');
 const CoinGeckoClient = new CoinGecko();
 
-const fileUpload = require('express-fileupload');
-
 const createTransaction = async (transaction) => {
   let {
     exchange,
@@ -25,16 +23,14 @@ const createTransaction = async (transaction) => {
     date,
     composedKeys,
     isComposed,
+    account,
   } = transaction;
 
   const sql =
-    'INSERT INTO transactions (type, exchange, fromValue, fromCurrency, toValue, toCurrency, feeValue, feeCurrency, isComposed, composedKeys, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+    'INSERT INTO transactions (type, exchange, fromValue, fromCurrency, toValue, toCurrency, feeValue, feeCurrency, isComposed, composedKeys, date, account) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
   const fromCurrencyIsFiat = await isFiat(fromCurrency);
   const toCurrencyIsFiat = await isFiat(toCurrency);
-
-  console.log(transaction);
-  console.log(fromCurrencyIsFiat, toCurrencyIsFiat);
 
   let transactionType = TransactionType.BUY;
   if (!fromCurrencyIsFiat && toCurrencyIsFiat) {
@@ -47,6 +43,8 @@ const createTransaction = async (transaction) => {
     const fromTimestamp = Math.floor(
       (new Date(date).getTime() - 1000 * 60 * 60 * 5) / 1000
     );
+
+    console.log(fromCurrency.toLowerCase(), fromTimestamp, toTimestamp);
 
     price = (
       await CoinGeckoClient.coins.fetchMarketChartRange(
@@ -71,6 +69,7 @@ const createTransaction = async (transaction) => {
       isComposed,
       composedKeys,
       date,
+      account,
     ]);
 
     transactionType = TransactionType.BUY;
@@ -91,6 +90,7 @@ const createTransaction = async (transaction) => {
     isComposed,
     composedKeys,
     date,
+    account,
   ]);
 
   if (isComposed === 1) {
@@ -112,6 +112,7 @@ const createTransaction = async (transaction) => {
       0,
       `${children[0].id},${children[1].id}`,
       date,
+      account,
     ]);
 
     for (const child of children) {
@@ -125,7 +126,18 @@ const createTransaction = async (transaction) => {
 
 router.get('/', async (req, res) => {
   const sql = 'SELECT * FROM transactions';
-  const transactions = await db.executeSelectQuery(sql);
+  try {
+    const transactions = await db.executeSelectQuery(sql);
+    return res.json(transactions);
+  } catch (error) {
+    logger.error(error);
+    return res.status(500).send('Failed to fetch transactions.');
+  }
+});
+
+router.get('/:account', async (req, res) => {
+  const sql = 'SELECT * FROM transactions WHERE account=?';
+  const transactions = await db.executeSelectQuery(sql, [req.params.account]);
   return res.json(transactions);
 });
 
@@ -134,6 +146,7 @@ router.post('/', async (req, res) => {
     await createTransaction({
       isComposed: 0,
       composedKeys: '',
+      account: 1,
       ...req.body,
     });
     res.status(200).end();
@@ -197,6 +210,7 @@ router.put('/', async (req, res) => {
       await createTransaction({
         isComposed: 0,
         composedKeys: '',
+        account: transaction.account,
         ...req.body,
       });
       res.status(200).end();
@@ -213,158 +227,22 @@ router.put('/', async (req, res) => {
 });
 
 router.delete('/records', async (req, res) => {
-  await db.executeSelectQuery('DELETE FROM transactions');
+  try {
+    if (typeof req.params.account === 'undefined') {
+      await db.executeSelectQuery('DELETE FROM transactions');
+    } else {
+      await db.executeSelectQuery('DELETE FROM transactions WHERE account=?', [
+        req.params.account,
+      ]);
+    }
+  } catch (error) {
+    logger.error(error);
+    res.status(500).send('Failed to delete transactions');
+  }
   res.status(200).end();
 });
 
-router.get('/export', async (req, res) => {
-  const sql = 'SELECT * FROM transactions';
-  const transactions = await db.executeSelectQuery(sql);
-
-  if (transactions.length > 0) {
-    let data = Object.keys(transactions[0]).join(';');
-
-    for (const transaction of transactions) {
-      data += '\n' + Object.values(transaction).join(';');
-    }
-
-    const buffer = Buffer.from(data);
-    const filename =
-      'coineda-export-' + new Date().toISOString().split('T')[0] + '.csv';
-    res.writeHead(200, {
-      'Content-Type': 'application/octet-stream',
-      'Content-disposition': 'attachment; filename=' + filename,
-    });
-    res.write(buffer);
-    res.end();
-  } else {
-    res.status(404).end();
-  }
-});
-
-const removeDuplicates = async (transactions) => {
-  const sql = 'SELECT * FROM transactions';
-  let rows = await db.executeSelectQuery(sql);
-
-  rows = rows.map((row) => {
-    let {
-      exchange,
-      fromValue,
-      fromCurrency,
-      toValue,
-      toCurrency,
-      feeValue,
-      feeCurrency,
-      date,
-      isComposed,
-    } = row;
-    return `${exchange}${fromValue}${fromCurrency}${toValue}${toCurrency}${feeValue}${feeCurrency}${date}${isComposed}`;
-  });
-
-  return transactions.filter((transaction) => {
-    const {
-      exchange,
-      fromValue,
-      fromCurrency,
-      toValue,
-      toCurrency,
-      feeValue,
-      feeCurrency,
-      date,
-      isComposed,
-    } = transaction;
-    const vector = `${exchange}${fromValue}${fromCurrency}${toValue}${toCurrency}${feeValue}${feeCurrency}${date}${isComposed}`;
-
-    return rows.findIndex((row) => row === vector) === -1;
-  });
+module.exports = {
+  transactions: router,
+  createTransaction: createTransaction,
 };
-
-router.post('/import', fileUpload(), async (req, res) => {
-  if (typeof req.files.files === undefined) {
-    return res.status(400).send('No files provided');
-  }
-
-  const textToTransactions = (text) => {
-    const rows = text.split('\n');
-    const transactions = [];
-
-    let keys = [];
-
-    for (let i = 0; i < rows.length; i++) {
-      if (i === 0) {
-        keys = rows[0].split(';');
-      } else {
-        const transaction = {};
-        const fields = rows[i].split(';');
-
-        let key = 0;
-        for (const field of fields) {
-          if (keys[key] === 'id') {
-            transaction[keys[key]] = Number(field);
-          } else {
-            transaction[keys[key]] = field;
-          }
-          key += 1;
-        }
-        transactions.push(transaction);
-      }
-    }
-
-    return transactions;
-  };
-
-  let transactions = [];
-  if (req.files.files instanceof Array) {
-    for (const file of req.files.files) {
-      const data = file.data.toString();
-      transactions = [transactions, ...textToTransactions(data)];
-    }
-  } else {
-    const data = req.files.files.data.toString();
-    transactions = textToTransactions(data);
-  }
-
-  let totalTransactions = transactions.length;
-  transactions = await removeDuplicates(transactions);
-  let duplicates = totalTransactions - transactions.length;
-
-  transactions = transactions.filter(
-    (transaction) => transaction.isComposed !== '1'
-  );
-
-  const exchanges = await db.executeSelectQuery('SELECT * FROM exchanges');
-
-  let errors = 0;
-  for (const transaction of transactions) {
-    try {
-      await createTransaction(transaction);
-
-      if (
-        exchanges.findIndex(
-          (exchange) => exchange.name === transaction.exchange
-        ) === -1
-      ) {
-        await db.executeQuery(
-          'INSERT INTO exchanges (name) VALUES (?)',
-          transaction.exchange
-        );
-        exchanges.push({ name: transaction.exchange });
-      }
-    } catch (error) {
-      logger.error(error);
-      if (transaction.type === TransactionType.SWAP) {
-        errors += 3;
-      } else {
-        errors += 1;
-      }
-    }
-  }
-
-  return res.json({
-    inserts: totalTransactions - duplicates - errors,
-    duplicates: duplicates,
-    errors: errors,
-  });
-});
-
-module.exports = router;
