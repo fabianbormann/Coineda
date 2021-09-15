@@ -1,8 +1,6 @@
 # Coineda
 
-[![Build/release](https://github.com/fabianbormann/Coineda/actions/workflows/build.yml/badge.svg)](https://github.com/fabianbormann/Coineda/actions/workflows/build.yml)
-
-[![Tests](https://github.com/fabianbormann/Coineda/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/fabianbormann/Coineda/actions/workflows/test.yml)
+[![Test & Build/Release](https://github.com/fabianbormann/Coineda/actions/workflows/build.yml/badge.svg)](https://github.com/fabianbormann/Coineda/actions/workflows/build.yml)
 
 Coineda aims to be a free to use, open source and local running crypto track and tax tool
 
