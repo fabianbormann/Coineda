@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { createUseStyles } from 'react-jss';
 import axios from 'axios';
 import { SettingsContext } from '../SettingsContext';
+import WhenLambo from '../components/WhenLambo';
 
 const { Title } = Typography;
 
@@ -139,6 +140,9 @@ const Dashboard = () => {
             <Card>
               <Pie {...config} />
             </Card>
+          </Col>
+          <Col span={24}>
+            <WhenLambo value={summary.crypto_total_in_euro} />
           </Col>
           {Object.keys(summary.cryptocurrencies).map((account) => {
             const change =
