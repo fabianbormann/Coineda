@@ -14,6 +14,7 @@ const transfers = require('./routes/transfers');
 const fileExport = require('./routes/exports');
 const fileImport = require('./routes/imports');
 const accounts = require('./routes/accounts');
+const tax = require('./routes/tax');
 
 app.use((req, _res, next) => {
   req.coineda_version = '0.1.4';
@@ -33,5 +34,6 @@ app.use('/transfers', transfers);
 app.use('/accounts', accounts);
 app.use('/import', fileImport);
 app.use('/export', fileExport);
+app.use('/tax', tax);
 
 module.exports = app;
