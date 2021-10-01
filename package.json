@@ -25,6 +25,7 @@
     "i18next-browser-languagedetector": "^6.1.2",
     "i18next-localstorage-cache": "^1.1.1",
     "moment": "^2.29.1",
+    "node-cache": "^5.1.2",
     "prettier": "^2.3.2",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",

@@ -127,6 +127,7 @@ const AccountManagement = () => {
           ...prevSettings,
           account: accounts.find((account) => account.name === key),
         }));
+        localStorage.setItem('activeAccount', key);
       }}
     >
       {accounts.map((account) => (

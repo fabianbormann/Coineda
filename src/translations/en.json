@@ -25,7 +25,15 @@
     "Exchange": "Exchange",
     "Date": "Date",
     "Tax Reports": "Tax Reports",
-    "Tax report not implemented yet": "Tax report generation is an upcomming feature and not implemented yet",
+    "Taxable gains and losses": "Taxable gains and losses",
+    "You need to pay": "You need to pay {{approx}} ",
+    "Tax this year": " tax for the tax year {{year}}",
+    "Download Report": "Download Report",
+    "Realized Gains": "Realized Gains/Losses",
+    "Unrealized Gains": "Potential Gains/Losses",
+    "Bought asset summary": "Bought {{value}} {{symbol}} on {{date}} for {{fiat}}",
+    "Selled asset summary": "Selled {{value}} {{symbol}} on {{date}} for {{fiat}}",
+    "approx": "approx.",
     "Settings": "Settings",
     "Language": "Language"
   }

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Select, Space, Typography, Divider, message } from 'antd';
 import { createUseStyles } from 'react-jss';
 import AccountManagement from '../components/AccountManagement';
+import AssetManagement from '../components/AssetManagement';
 
 const { Option } = Select;
 const { Title } = Typography;
@@ -68,6 +69,10 @@ const Settings = () => {
       <Divider />
       <Space>
         <AccountManagement />
+      </Space>
+      <Divider />
+      <Space>
+        <AssetManagement />
       </Space>
     </div>
   );

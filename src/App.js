@@ -59,9 +59,18 @@ const Main = () => {
 
   useEffect(() => {
     axios.get(`${backendUrl}/accounts`).then((response) => {
+      let activeAccount = localStorage.getItem('activeAccount');
+      let selectedAccount = response.data[0];
+
+      if (typeof activeAccount !== 'undefined') {
+        selectedAccount =
+          response.data.find((account) => account.name === activeAccount) ||
+          selectedAccount;
+      }
+
       updateSettings((prevSettings) => ({
         ...prevSettings,
-        account: response.data[0],
+        account: selectedAccount,
       }));
     });
   }, [backendUrl, updateSettings]);
