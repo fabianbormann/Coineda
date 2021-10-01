@@ -25,7 +25,15 @@
     "Exchange": "Börse",
     "Date": "Datum",
     "Tax Reports": "Steuerreports",
-    "Tax report not implemented yet": "Steuerreports stehen auf der Roadmap, sind jedoch zur Zeit noch nicht implementiert.",
+    "Taxable gains and losses": "Steuerrelevante Einnahmen und Verluste",
+    "You need to pay": "Du musst {{approx}} ",
+    "Tax this year": " Steuern im Steuerjahr {{year}} zahlen",
+    "Download Report": "Report herunterladen",
+    "Realized Gains": "Realisierte Gewinne/Verluste",
+    "Unrealized Gains": "Potentielle Gewinne/Verluste",
+    "Bought asset summary": "Kauf von {{value}} {{symbol}} am {{date}} für {{fiat}}",
+    "Selled asset summary": "Verkauf von {{value}} {{symbol}} am {{date}} für {{fiat}}",
+    "approx": "ungefähr",
     "Settings": "Einstellungen",
     "Language": "Sprache"
   }

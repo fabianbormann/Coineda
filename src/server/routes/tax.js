@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../database/helper');
 
 const bunyan = require('bunyan');
-const { TransactionType, fetchPrice } = require('../common');
+const { TransactionType, fetchPrice, getAssetSymbol } = require('../common');
 const logger = bunyan.createLogger({ name: 'coineda-backend-tax' });
 const moment = require('moment');
 
@@ -19,28 +19,35 @@ router.get('/:account', async (req, res) => {
         coins[transaction.toCurrency] = [
           {
             value: transaction.toValue,
-            date: transaction.date,
+            gain: 0,
+            symbol: await getAssetSymbol(transaction.toCurrency),
+            ...transaction,
           },
         ];
       } else {
         coins[transaction.toCurrency].push({
           value: transaction.toValue,
-          date: transaction.date,
+          gain: 0,
+          symbol: await getAssetSymbol(transaction.toCurrency),
+          ...transaction,
         });
       }
     }
   }
 
+  const tax = {
+    realizedGains: {},
+    unrealizedGains: {},
+  };
+
   for (const coin of Object.keys(coins)) {
     coins[coin].sort((a, b) =>
       a.date < b.date ? -1 : Number(a.date > b.date)
     );
-  }
 
-  const tax = {
-    realizedGains: [],
-    unrealizedGains: [],
-  };
+    tax.realizedGains[coin] = [...coins[coin]];
+    tax.unrealizedGains[coin] = [];
+  }
 
   for (const transaction of transactions) {
     if (transaction.type === TransactionType.SELL) {
@@ -62,27 +69,29 @@ router.get('/:account', async (req, res) => {
         const gainInEuro = sellingPrice - purchasePrice;
 
         if (target[i].value > 0) {
-          tax.realizedGains.push({
+          tax.realizedGains[transaction.fromCurrency].push({
+            ...transaction,
             currency: transaction.fromCurrency,
+            symbol: await getAssetSymbol(transaction.fromCurrency),
             amount: amount,
             gain: amount * gainInEuro,
             daysFromPurchase: moment(transaction.date).diff(
               target[i].date,
               'days'
             ),
-            date: transaction.date,
           });
           amount = 0;
         } else {
-          tax.realizedGains.push({
+          tax.realizedGains[transaction.fromCurrency].push({
+            ...transaction,
             currency: transaction.fromCurrency,
+            symbol: await getAssetSymbol(transaction.fromCurrency),
             amount: amount + target[i].value,
             gain: (amount + target[i].value) * gainInEuro,
             daysFromPurchase: moment(transaction.date).diff(
               target[i].date,
               'days'
             ),
-            date: transaction.date,
           });
 
           amount = Math.abs(target[i].value);
@@ -105,16 +114,15 @@ router.get('/:account', async (req, res) => {
   for (const coin of Object.keys(coins)) {
     if (coins[coin].length > 0) {
       for (const transaction of coins[coin]) {
-        const purchasePrice = await fetchPrice(coin, transaction.date);
+        const purchasePrice = transaction.fromValue / transaction.toValue;
         const sellingPrice = currentPrices[coin.toLowerCase()];
 
         const gainInEuro = sellingPrice - purchasePrice;
 
-        tax.unrealizedGains.push({
+        tax.unrealizedGains[coin].push({
+          ...transaction,
           amount: transaction.value,
           gain: transaction.value * gainInEuro,
-          date: transaction.date,
-          currency: coin,
           daysFromPurchase: moment().diff(moment(transaction.date), 'days'),
         });
       }

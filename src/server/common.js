@@ -38,6 +38,14 @@ const fetchAssets = async () => {
   };
 };
 
+const getAssetSymbol = async (id) => {
+  const symbol = await db.executeSelectQuery(
+    'SELECT symbol FROM assets WHERE id=?',
+    id.toLowerCase()
+  );
+  return symbol[0].symbol;
+};
+
 const fetchPrice = async (currency, date = null) => {
   let fetchSingle = true;
   if (typeof currency !== 'string') {
@@ -121,4 +129,5 @@ module.exports = {
   isFiat: isFiat,
   fetchAssets: fetchAssets,
   fetchPrice: fetchPrice,
+  getAssetSymbol: getAssetSymbol,
 };
