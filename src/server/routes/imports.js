@@ -8,10 +8,14 @@ const logger = bunyan.createLogger({ name: 'coineda-backend-import' });
 const { createTransaction } = require('./transactions.js');
 const { TransactionType } = require('../common.js');
 
+const xlsx = require('xlsx');
+const axios = require('axios');
+
 const fileUpload = require('express-fileupload');
 
 const ImportType = Object.freeze({
   COINEDA: 'coineda',
+  BINANCE_SPOT_ORDER_HISTORY: 'binance_spot_order_history',
   UNKNOWN: 'unknown',
 });
 
@@ -116,117 +120,156 @@ const readFile = (text) => {
   }
 };
 
+const importFromBinanceSpotOrderHistory = async (xlsxFile) => {
+  const workbook = xlsx.read(new Uint8Array(xlsxFile), { type: 'array' });
+  const sheetNameList = workbook.SheetNames;
+  const rows = xlsx.utils.sheet_to_json(workbook.Sheets[sheetNameList[0]]);
+
+  const transactions = [];
+
+  for (const row of rows) {
+    if (typeof row['Date(UTC)'] !== 'undefined') {
+      const response = await axios.get(
+        'https://api.binance.com/api/v3/exchangeInfo?symbol=' + row['Pair']
+      );
+
+      const fromCurrency = response.data.symbols[0].baseAsset;
+      const toCurrency = response.data.symbols[0].quoteAsset;
+
+      transactions.push({
+        fromCurrency: fromCurrency,
+        toCurrency: toCurrency,
+        type: row['Type'],
+        value: Number(row['Order Amount']),
+        date: new Date(row['Date(UTC)']),
+        fee: [],
+      });
+    } else if (
+      typeof row['Date(UTC)'] === 'undefined' &&
+      row['AvgTrading Price'] !== 'Fee'
+    ) {
+      transactions[transactions.length - 1].fee.push(row['AvgTrading Price']);
+    }
+  }
+
+  return transactions;
+};
+
 router.post('/', fileUpload(), async (req, res) => {
-  if (typeof req.files.files === 'undefined') {
-    return res.status(400).send('No files provided');
-  }
+  if (req.body.type === ImportType.BINANCE_SPOT_ORDER_HISTORY) {
+    res.json(await importFromBinanceSpotOrderHistory(req.files.files.data));
+  } else {
+    if (typeof req.files.files === 'undefined') {
+      return res.status(400).send('No files provided');
+    }
 
-  let account = 0;
-  if (typeof req.body.account !== 'undefined') {
-    account = req.body.account;
-  }
-  let errors = 0;
+    let account = 0;
+    if (typeof req.body.account !== 'undefined') {
+      account = req.body.account;
+    }
+    let errors = 0;
 
-  let transactions = [];
-  let transfers = [];
-  if (req.files.files instanceof Array) {
-    for (const file of req.files.files) {
+    let transactions = [];
+    let transfers = [];
+    if (req.files.files instanceof Array) {
+      for (const file of req.files.files) {
+        const { format, transfersText, transactionsText } = readFile(
+          file.data.toString()
+        );
+        if (
+          format !== ImportType.UNKNOWN &&
+          transfersText != null &&
+          transactionsText != null
+        ) {
+          transactions = [
+            transactions,
+            ...textToObjects(transactionsText, account),
+          ];
+          transfers = [transfers, ...textToObjects(transfersText, account)];
+        } else {
+          errors += 1;
+        }
+      }
+    } else {
       const { format, transfersText, transactionsText } = readFile(
-        file.data.toString()
+        req.files.files.data.toString()
       );
       if (
         format !== ImportType.UNKNOWN &&
         transfersText != null &&
         transactionsText != null
       ) {
-        transactions = [
-          transactions,
-          ...textToObjects(transactionsText, account),
-        ];
-        transfers = [transfers, ...textToObjects(transfersText, account)];
+        transactions = textToObjects(transactionsText, account);
+        transfers = textToObjects(transfersText, account);
       } else {
         errors += 1;
       }
     }
-  } else {
-    const { format, transfersText, transactionsText } = readFile(
-      req.files.files.data.toString()
+
+    let totalTransfers = transfers.length;
+    transfers = await removeDuplicateObjects(transfers, 'transfers');
+    let duplicates = totalTransfers - transfers.length;
+
+    let totalTransactions = transactions.length;
+    transactions = await removeDuplicateObjects(transactions, 'transactions');
+    duplicates += totalTransactions - transactions.length;
+
+    transactions = transactions.filter(
+      (transaction) => transaction.isComposed !== '1'
     );
-    if (
-      format !== ImportType.UNKNOWN &&
-      transfersText != null &&
-      transactionsText != null
-    ) {
-      transactions = textToObjects(transactionsText, account);
-      transfers = textToObjects(transfersText, account);
-    } else {
-      errors += 1;
+
+    let exchanges = await db.executeSelectQuery('SELECT * FROM exchanges');
+
+    const addExchangeIfNotExists = async (name) => {
+      if (exchanges.findIndex((exchange) => exchange.name === name) === -1) {
+        await db.executeQuery('INSERT INTO exchanges (name) VALUES (?)', name);
+        exchanges.push({ name: name });
+      }
+    };
+
+    for (const transaction of transactions) {
+      try {
+        await createTransaction(transaction);
+        await addExchangeIfNotExists(transaction.exchange);
+      } catch (error) {
+        logger.error(error);
+        if (transaction.type === TransactionType.SWAP) {
+          errors += 3;
+        } else {
+          errors += 1;
+        }
+      }
     }
-  }
 
-  let totalTransfers = transfers.length;
-  transfers = await removeDuplicateObjects(transfers, 'transfers');
-  let duplicates = totalTransfers - transfers.length;
+    for (const transfer of transfers) {
+      try {
+        const sql =
+          'INSERT INTO transfers (fromExchange, toExchange, value, currency, feeValue, feeCurrency, date, account) VALUES (?, ?, ?, ?, ?, ?, ?)';
+        await db.executeQuery(sql, [
+          transfer.fromExchange,
+          transfer.toExchange,
+          transfer.value,
+          transfer.currency,
+          transfer.feeValue,
+          transfer.feeCurrency,
+          transfer.date,
+          typeof transfer.account !== 'undefined' ? transfer.account : 0,
+        ]);
 
-  let totalTransactions = transactions.length;
-  transactions = await removeDuplicateObjects(transactions, 'transactions');
-  duplicates += totalTransactions - transactions.length;
-
-  transactions = transactions.filter(
-    (transaction) => transaction.isComposed !== '1'
-  );
-
-  let exchanges = await db.executeSelectQuery('SELECT * FROM exchanges');
-
-  const addExchangeIfNotExists = async (name) => {
-    if (exchanges.findIndex((exchange) => exchange.name === name) === -1) {
-      await db.executeQuery('INSERT INTO exchanges (name) VALUES (?)', name);
-      exchanges.push({ name: name });
-    }
-  };
-
-  for (const transaction of transactions) {
-    try {
-      await createTransaction(transaction);
-      await addExchangeIfNotExists(transaction.exchange);
-    } catch (error) {
-      logger.error(error);
-      if (transaction.type === TransactionType.SWAP) {
-        errors += 3;
-      } else {
+        await addExchangeIfNotExists(transfer.fromExchange);
+        await addExchangeIfNotExists(transfer.toExchange);
+      } catch (error) {
+        logger.error(error);
         errors += 1;
       }
     }
+
+    return res.json({
+      inserts: totalTransactions + totalTransfers - duplicates - errors,
+      duplicates: duplicates,
+      errors: errors,
+    });
   }
-
-  for (const transfer of transfers) {
-    try {
-      const sql =
-        'INSERT INTO transfers (fromExchange, toExchange, value, currency, feeValue, feeCurrency, date, account) VALUES (?, ?, ?, ?, ?, ?, ?)';
-      await db.executeQuery(sql, [
-        transfer.fromExchange,
-        transfer.toExchange,
-        transfer.value,
-        transfer.currency,
-        transfer.feeValue,
-        transfer.feeCurrency,
-        transfer.date,
-        typeof transfer.account !== 'undefined' ? transfer.account : 0,
-      ]);
-
-      await addExchangeIfNotExists(transfer.fromExchange);
-      await addExchangeIfNotExists(transfer.toExchange);
-    } catch (error) {
-      logger.error(error);
-      errors += 1;
-    }
-  }
-
-  return res.json({
-    inserts: totalTransactions + totalTransfers - duplicates - errors,
-    duplicates: duplicates,
-    errors: errors,
-  });
 });
 
 module.exports = router;
