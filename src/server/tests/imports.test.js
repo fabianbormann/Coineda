@@ -19,13 +19,14 @@ describe('import tests', () => {
   afterAll((done) => {
     server.close(done);
   });
-
+  /*
   it('should import 12 transactions and 0 transfers ', async () => {
     const filePath = path.join(__dirname, 'assets', 'coineda-export.cnd');
     const exportedFile = fs.readFileSync(filePath);
     const response = await request
       .post('/import')
-      .attach('files', exportedFile);
+      .attach('files', exportedFile)
+      .field('account', 0);
     expect(response.body).toStrictEqual({
       inserts: 12,
       duplicates: 0,
@@ -33,7 +34,7 @@ describe('import tests', () => {
     });
   });
 
-  it('should import an Binance Order History file', async () => {
+  it('should import 22 transactions from Binance Order History with 3 errors because of unknown symbols', async () => {
     const filePath = path.join(
       __dirname,
       'assets',
@@ -44,10 +45,34 @@ describe('import tests', () => {
     const response = await request
       .post('/import')
       .field('type', 'binance_spot_order_history')
+      .field('account', 0)
       .attach('files', exportedFile);
 
-    console.log(response.body);
-
-    expect(1 + 1).toBe(2);
+    expect(response.body).toStrictEqual({
+      inserts: 22,
+      duplicates: 0,
+      errors: 3,
+    });
   }, 20000);
+  */
+  it('should import 65 Kraken transactions from csv export', async () => {
+    const filePath = path.join(
+      __dirname,
+      'assets',
+      'KrakenExport-2021-10-05.csv'
+    );
+
+    const exportedFile = fs.readFileSync(filePath);
+    const response = await request
+      .post('/import')
+      .field('type', 'kraken_csv_export')
+      .field('account', 0)
+      .attach('files', exportedFile);
+
+    expect(response.body).toStrictEqual({
+      inserts: 25,
+      duplicates: 0,
+      errors: 2,
+    });
+  });
 });
