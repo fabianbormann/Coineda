@@ -90,6 +90,13 @@
   },
   "build": {
     "appId": "io.coineda.app",
+    "mac": {
+      "icon": "./public/icons/icon.png",
+      "category": "public.app-category.utilities"
+    },
+    "win": {
+      "icon": "./public/icons/256x256.png"
+    },
     "files": [
       "build/**/*",
       "node_modules/**/*"
