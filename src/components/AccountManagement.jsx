@@ -13,7 +13,6 @@ import {
   Popconfirm,
   Modal,
   Input,
-  Typography,
   Dropdown,
   Menu,
 } from 'antd';
@@ -21,8 +20,6 @@ import { createUseStyles } from 'react-jss';
 import GeoPattern from 'geopattern';
 import { useTranslation } from 'react-i18next';
 import { SettingsContext } from '../SettingsContext';
-
-const { Title } = Typography;
 
 const useStyles = createUseStyles({
   name: {
@@ -63,6 +60,13 @@ const useStyles = createUseStyles({
     '& > :first-child': {
       minWidth: 180,
     },
+  },
+  headline: {
+    marginTop: 0,
+    marginBottom: 12,
+    fontWeight: 500,
+    fontSize: '1.1rem',
+    color: '#2F4858',
   },
 });
 
@@ -155,7 +159,7 @@ const AccountManagement = () => {
 
   return (
     <>
-      <Title level={4}>{t('Account Management')}</Title>
+      <p className={classes.headline}>{t('Account Management')}</p>
       <div className={classes.content} style={{ marginTop: 12 }}>
         <div className={classes.selected}>
           <Dropdown overlay={menu}>

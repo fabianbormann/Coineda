@@ -2,14 +2,17 @@ const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const isDev = require('electron-is-dev');
 
+console.log(path.join(__dirname, '..', 'build', 'icons', 'icon.png'));
+
 function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
     title: 'Coineda',
     webPreferences: {
-      devTools: true,
+      devTools: isDev,
     },
+    icon: path.join(__dirname, '..', 'build', 'icons', 'icon.png'),
   });
 
   mainWindow.setMenu(null);

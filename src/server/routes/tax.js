@@ -2,9 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../database/helper');
 
-const bunyan = require('bunyan');
 const { TransactionType, fetchPrice, getAssetSymbol } = require('../common');
-const logger = bunyan.createLogger({ name: 'coineda-backend-tax' });
 const moment = require('moment');
 
 router.get('/:account', async (req, res) => {

@@ -1,17 +1,5 @@
 import React, { useCallback, useEffect, useState, useContext } from 'react';
-import { Pie } from '@ant-design/charts';
-import {
-  Alert,
-  Statistic,
-  Card,
-  Row,
-  Col,
-  Divider,
-  Typography,
-  message,
-  Spin,
-  Empty,
-} from 'antd';
+import { Alert, Statistic, Card, Row, Col, message, Spin, Empty } from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 
 import { useTranslation } from 'react-i18next';
@@ -19,15 +7,25 @@ import { createUseStyles } from 'react-jss';
 import axios from 'axios';
 import { SettingsContext } from '../SettingsContext';
 import WhenLambo from '../components/WhenLambo';
-
-const { Title } = Typography;
+import DoughnutChart from '../components/DoughnutChart';
 
 const useStyles = createUseStyles({
   page: {
     display: 'flex',
     flexDirection: 'column',
     width: '100%',
-    padding: 16,
+  },
+  title: {
+    color: '#2F4858 !important',
+    fontWeight: 600,
+    fontSize: '1.5rem',
+    marginBottom: 0,
+  },
+  loading: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100vh',
   },
 });
 
@@ -66,7 +64,7 @@ const Dashboard = () => {
   if (summary.hasOwnProperty('crypto_total_in_euro')) {
     for (const account of Object.keys(summary.cryptocurrencies)) {
       data.push({
-        type: account,
+        type: account.replace('-', ' '),
         Amount: summary.cryptocurrencies[account].value,
         value:
           Math.round(summary.cryptocurrencies[account].price_in_euro * 100) /
@@ -77,52 +75,13 @@ const Dashboard = () => {
     total = summary.crypto_total_in_euro;
   }
 
-  const config = {
-    appendPadding: 35,
-    data,
-    angleField: 'value',
-    colorField: 'type',
-    radius: 1,
-    innerRadius: 0.6,
-    label: {
-      type: 'inner',
-      offset: '-50%',
-      style: { textAlign: 'center' },
-      autoRotate: true,
-      content: '{value}',
-    },
-    interactions: [{ type: 'element-active' }],
-    tooltip: {
-      fields: ['key', 'Amount'],
-    },
-    statistic: {
-      title: {
-        style: {
-          whiteSpace: 'pre-wrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          fontSize: '100%',
-        },
-        content: t('Account Balance (EUR)'),
-      },
-      content: {
-        style: {
-          whiteSpace: 'pre-wrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          paddingTop: '2%',
-          fontSize: '120%',
-        },
-        content: Math.round(total * 100) / 100,
-      },
-    },
-  };
-
   return (
     <div className={classes.page}>
-      <Title level={2}>{t('Dashboard')}</Title>
-      <Divider />
-      {loading && <Spin />}
+      {loading && (
+        <div className={classes.loading}>
+          <Spin />
+        </div>
+      )}
       {summary.hasOwnProperty('inconsistency') &&
         summary.inconsistency.negativeValue.map((coin) => (
           <Alert
@@ -135,41 +94,55 @@ const Dashboard = () => {
           />
         ))}
       {summary.hasOwnProperty('crypto_total_in_euro') ? (
-        <Row gutter={0}>
-          <Col span={24}>
-            <Card>
-              <Pie {...config} />
-            </Card>
-          </Col>
-          <Col span={24}>
-            <WhenLambo value={summary.crypto_total_in_euro} />
-          </Col>
-          {Object.keys(summary.cryptocurrencies).map((account) => {
-            const change =
-              summary.cryptocurrencies[account].price_in_euro /
-                (summary.cryptocurrencies[account].purchase_price *
-                  summary.cryptocurrencies[account].value) -
-              1;
-            return (
-              <Col span={12} key={account}>
-                <Card>
-                  <Statistic
-                    title={account}
-                    value={change}
-                    precision={4}
-                    valueStyle={
-                      change > 0 ? { color: '#3f8600' } : { color: '#cf1322' }
-                    }
-                    prefix={
-                      change > 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />
-                    }
-                    suffix="%"
-                  />
-                </Card>
-              </Col>
-            );
-          })}
-        </Row>
+        <>
+          <Row>
+            <Col sm={24} md={18} lg={12}>
+              <Card>
+                <DoughnutChart
+                  label={`${Math.round(total * 100) / 100} €`}
+                  data={data}
+                />
+              </Card>
+            </Col>
+          </Row>
+          <Row>
+            {Object.keys(summary.cryptocurrencies).map((account) => {
+              const change =
+                summary.cryptocurrencies[account].price_in_euro /
+                  (summary.cryptocurrencies[account].purchase_price *
+                    summary.cryptocurrencies[account].value) -
+                1;
+              return (
+                <Col sm={12} md={6} lg={4} key={account}>
+                  <Card>
+                    <Statistic
+                      title={account.replace('-', ' ')}
+                      value={Math.round(change * 10000) / 100}
+                      precision={2}
+                      style={{
+                        textTransform: 'capitalize',
+                        fontFamily: 'PTSerif',
+                      }}
+                      valueStyle={{
+                        fontSize: '1rem',
+                        color: change > 0 ? '#03A678' : '#C36491',
+                      }}
+                      prefix={
+                        change > 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />
+                      }
+                      suffix="%"
+                    />
+                  </Card>
+                </Col>
+              );
+            })}
+          </Row>
+          <Row>
+            <Col sm={24} md={12}>
+              <WhenLambo value={summary.crypto_total_in_euro} />
+            </Col>
+          </Row>
+        </>
       ) : (
         !loading && <Empty description={t('No Transactions')} />
       )}

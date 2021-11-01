@@ -1,5 +1,10 @@
 const db = require('./database/helper.js');
 
+const bunyan = require('bunyan');
+const logger = bunyan.createLogger({ name: 'coineda-backend-common' });
+
+const axios = require('axios');
+
 const TransactionType = Object.freeze({
   BUY: 'buy',
   SELL: 'sell',
@@ -7,6 +12,10 @@ const TransactionType = Object.freeze({
   RECEIVE: 'receive',
   REWARDS: 'rewards',
   SWAP: 'swap',
+});
+
+const CoinedaError = Object.freeze({
+  UNKOWN_TOKEN_SYMBOL: { message: 'Unkown token symbol', code: 0 },
 });
 
 const CoinGecko = require('coingecko-api');
@@ -19,14 +28,17 @@ const CoinedaCache = new NodeCache({
   checkperiod: 60 * 60,
 });
 
-const isFiat = async (asset) => {
-  const currencies = await db.executeSelectQuery(
-    'SELECT * FROM assets WHERE isFiat=1'
+const isFiat = async (assetId) => {
+  const currency = await db.executeSelectQuery(
+    'SELECT isFiat FROM assets WHERE lower(id)=?',
+    [assetId.toLowerCase()]
   );
 
-  return currencies
-    .map((currency) => currency.id.toLowerCase())
-    .includes(asset.toLowerCase());
+  if (currency.length === 0) {
+    return false;
+  } else {
+    return currency[0].isFiat;
+  }
 };
 
 const fetchAssets = async () => {
@@ -38,12 +50,55 @@ const fetchAssets = async () => {
   };
 };
 
+const getBinanceTokenPair = async (binanceSymbol) => {
+  let pair = CoinedaCache.get(`binance-pair-${binanceSymbol.toLowerCase()}`);
+  if (typeof pair === 'undefined') {
+    try {
+      const response = await axios.get(
+        'https://api.binance.com/api/v3/exchangeInfo?symbol=' + binanceSymbol
+      );
+
+      const fromCurrency = response.data.symbols[0].baseAsset;
+      const toCurrency = response.data.symbols[0].quoteAsset;
+
+      CoinedaCache.set(
+        `binance-pair-${binanceSymbol.toLowerCase()}`,
+        { fromCurrency, toCurrency },
+        365 * TIMEOUT
+      );
+
+      return { fromCurrency, toCurrency };
+    } catch (error) {
+      logger.error(error);
+      return {
+        fromCurrency: null,
+        toCurrency: null,
+      };
+    }
+  } else {
+    return pair;
+  }
+};
+
 const getAssetSymbol = async (id) => {
-  const symbol = await db.executeSelectQuery(
+  const result = await db.executeSelectQuery(
     'SELECT symbol FROM assets WHERE id=?',
     id.toLowerCase()
   );
-  return symbol[0].symbol;
+  return result[0].symbol;
+};
+
+const getAssetId = async (symbol) => {
+  const result = await db.executeSelectQuery(
+    'SELECT id FROM assets WHERE lower(symbol)=?',
+    symbol.toLowerCase()
+  );
+  if (result.length === 0) {
+    logger.warn('No id found for symbol ' + symbol);
+    throw CoinedaError.UNKOWN_TOKEN_SYMBOL;
+  } else {
+    return result[0].id;
+  }
 };
 
 const fetchPrice = async (currency, date = null) => {
@@ -125,9 +180,12 @@ const fetchPrice = async (currency, date = null) => {
 };
 
 module.exports = {
-  TransactionType: TransactionType,
-  isFiat: isFiat,
-  fetchAssets: fetchAssets,
-  fetchPrice: fetchPrice,
-  getAssetSymbol: getAssetSymbol,
+  TransactionType,
+  CoinedaError,
+  isFiat,
+  fetchAssets,
+  fetchPrice,
+  getAssetSymbol,
+  getAssetId,
+  getBinanceTokenPair,
 };

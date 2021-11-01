@@ -1,14 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import {
-  Divider,
-  Typography,
-  Empty,
-  message,
-  Spin,
-  DatePicker,
-  Statistic,
-  Button,
-} from 'antd';
+import { Divider, Empty, message, Spin, DatePicker, Button, Alert } from 'antd';
 import { DownloadOutlined } from '@ant-design/icons';
 import { createUseStyles } from 'react-jss';
 import { useState, useContext, useCallback, useEffect } from 'react';
@@ -16,8 +7,6 @@ import { SettingsContext } from '../SettingsContext';
 import axios from 'axios';
 import moment from 'moment';
 import GainSummary from '../components/GainSummary';
-
-const { Title } = Typography;
 
 const useStyles = createUseStyles({
   actions: {
@@ -29,10 +18,10 @@ const useStyles = createUseStyles({
     marginBottom: 12,
   },
   negative: {
-    color: '#cf1322',
+    color: '#C36491',
   },
   positive: {
-    color: '#3f8600',
+    color: '#03A678',
   },
   page: {
     padding: 16,
@@ -41,8 +30,22 @@ const useStyles = createUseStyles({
     flexDirection: 'column',
   },
   summary: {
-    marginTop: 24,
     marginBottom: 12,
+    fontFamily: 'PTSerif',
+    fontWeight: 600,
+    fontSize: '1.2rem',
+  },
+  loading: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100vh',
+  },
+  headline: {
+    margin: 0,
+    fontWeight: 500,
+    fontSize: '1.1rem',
+    color: '#2F4858',
   },
 });
 
@@ -115,42 +118,54 @@ const TaxReports = () => {
 
   return (
     <div className={classes.page}>
-      <Title level={2}>{t('Tax Reports')}</Title>
-      <Divider className={classes.actions} />
-
-      {loading && <Spin />}
-
-      {!loading && (
-        <DatePicker
-          style={{ maxWidth: 200 }}
-          value={moment(selectedYear)}
-          onChange={(date, dateString) => setSelectedYear(new Date(dateString))}
-          picker="year"
-        />
+      {loading ? (
+        <div className={classes.loading}>
+          <Spin />
+        </div>
+      ) : (
+        <>
+          <p className={classes.headline}>{t('Tax Year')}</p>
+          <DatePicker
+            style={{ maxWidth: 200, marginBottom: 16 }}
+            value={moment(selectedYear)}
+            onChange={(date, dateString) => {
+              setSelectedYear(new Date(dateString));
+            }}
+            picker="year"
+          />
+        </>
       )}
 
       {Object.keys(realizedWithinTaxYear).length > 0 ||
       Object.keys(unrealizedAfterTaxYear).length > 0 ? (
         <div>
-          <Statistic
+          <p className={classes.headline}>{t('Taxable gains and losses')}</p>
+          <span
+            style={hasLoss ? { color: '#C36491' } : { color: '#03A678' }}
             className={classes.summary}
-            valueStyle={{ color: hasLoss ? '#cf1322' : '#3f8600' }}
-            title={t('Taxable gains and losses')}
-            value={`${hasLoss ? '-' : '+'}${roundFiat(
-              Math.abs(totalGain)
-            )} EUR`}
+          >{`${hasLoss ? '-' : '+'}${roundFiat(
+            Math.abs(totalGain)
+          )} EUR`}</span>
+
+          <Alert
+            style={{ marginBottom: 24, marginTop: 16, maxWidth: 600 }}
+            message={
+              <span>
+                {t('You need to pay', {
+                  approx: isBelowLimit ? ' ' : ` ${t('approx')} `,
+                })}
+                <span
+                  className={isBelowLimit ? classes.positive : classes.negative}
+                >
+                  {isBelowLimit ? '' : '~'} {roundFiat(tax)} €
+                </span>
+                {t('Tax this year', { year: selectedYear.getFullYear() })}
+              </span>
+            }
+            type={isBelowLimit ? 'info' : 'warning'}
+            showIcon
           />
-          <p>
-            {t('You need to pay', {
-              approx: isBelowLimit ? ' ' : ` ${t('approx')} `,
-            })}
-            <span
-              className={isBelowLimit ? classes.positive : classes.negative}
-            >
-              {isBelowLimit ? '' : '~'} {roundFiat(tax)} EUR
-            </span>
-            {t('Tax this year', { year: selectedYear.getFullYear() })}
-          </p>
+
           <Button disabled={true} icon={<DownloadOutlined />}>
             {t('Download Report')}
           </Button>

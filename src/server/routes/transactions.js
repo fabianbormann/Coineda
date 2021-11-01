@@ -44,16 +44,23 @@ const createTransaction = async (transaction) => {
       (new Date(date).getTime() - 1000 * 60 * 60 * 5) / 1000
     );
 
-    price = (
-      await CoinGeckoClient.coins.fetchMarketChartRange(
-        fromCurrency.toLowerCase(),
-        {
-          from: fromTimestamp,
-          to: toTimestamp,
-          vs_currency: 'eur',
-        }
-      )
-    ).data.prices[0][1];
+    try {
+      price = (
+        await CoinGeckoClient.coins.fetchMarketChartRange(
+          fromCurrency.toLowerCase(),
+          {
+            from: fromTimestamp,
+            to: toTimestamp,
+            vs_currency: 'eur',
+          }
+        )
+      ).data.prices[0][1];
+    } catch (error) {
+      logger.warn(
+        `Failed to fetch price in range ${fromTimestamp} - ${toTimestamp} for currency ${fromCurrency.toLowerCase()}`
+      );
+      throw error;
+    }
 
     await db.executeQuery(sql, [
       transactionType,

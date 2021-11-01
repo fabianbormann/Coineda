@@ -1,12 +1,11 @@
 import { useState, useContext } from 'react';
 import axios from 'axios';
-import { message, Input, Typography, Select, Button } from 'antd';
+import { message, Input, Select, Button } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { createUseStyles } from 'react-jss';
 import { useTranslation } from 'react-i18next';
 import { SettingsContext } from '../SettingsContext';
 
-const { Title } = Typography;
 const { Search } = Input;
 const { Option } = Select;
 
@@ -28,6 +27,13 @@ const useStyles = createUseStyles({
     alignItems: 'center',
     marginTop: 12,
     flexWrap: 'wrap',
+  },
+  headline: {
+    marginBottom: 12,
+    marginTop: 0,
+    fontWeight: 500,
+    fontSize: '1.1rem',
+    color: '#2F4858',
   },
 });
 
@@ -91,7 +97,7 @@ const AssetManagement = () => {
 
   return (
     <div className={classes.content}>
-      <Title level={4}>{t('Asset Management')}</Title>
+      <p className={classes.headline}>{t('Asset Management')}</p>
       <p>
         Not all assets were added by default because the selection menu would be
         overloaded with the number of available tokens. However, you can easily
