@@ -1,13 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { useState, useEffect, useCallback } from 'react';
-import { Select, Space, Typography, Divider, message } from 'antd';
+import { Select, Space, Divider, message } from 'antd';
 import { createUseStyles } from 'react-jss';
 import AccountManagement from '../components/AccountManagement';
 import AssetManagement from '../components/AssetManagement';
 
 const { Option } = Select;
-const { Title } = Typography;
 
 const useStyles = createUseStyles({
   page: {
@@ -15,6 +14,13 @@ const useStyles = createUseStyles({
     width: '100%',
     display: 'flex',
     flexDirection: 'column',
+  },
+  headline: {
+    marginTop: 0,
+    marginBottom: 12,
+    fontWeight: 500,
+    fontSize: '1.1rem',
+    color: '#2F4858',
   },
 });
 
@@ -53,7 +59,7 @@ const Settings = () => {
 
   return (
     <div className={classes.page}>
-      <Title level={4}>{t('General')}</Title>
+      <p className={classes.headline}>{t('General')}</p>
       <Space>
         <span>{t('Language')}</span>
         <Select

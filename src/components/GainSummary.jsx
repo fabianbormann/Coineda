@@ -1,10 +1,9 @@
-import { Collapse, Typography, Timeline } from 'antd';
+import { Collapse, Timeline } from 'antd';
 import { createUseStyles } from 'react-jss';
 import { useTranslation } from 'react-i18next';
 import moment from 'moment';
 
 const { Panel } = Collapse;
-const { Title } = Typography;
 
 const useStyles = createUseStyles({
   collapse: {
@@ -21,8 +20,10 @@ const useStyles = createUseStyles({
     color: '#03A678',
   },
   title: {
-    marginTop: 12,
-    marginBottom: 12,
+    margin: '12px 0 12px 0',
+    fontWeight: 500,
+    fontSize: '1.1rem',
+    color: '#2F4858',
   },
 });
 
@@ -41,11 +42,7 @@ const GainSummary = (props) => {
 
   return (
     <>
-      {title && (
-        <Title className={classes.title} level={4}>
-          {title}
-        </Title>
-      )}
+      {title && <p className={classes.title}>{title}</p>}
       <Collapse className={classes.collapse}>
         {Object.keys(gains).map((coin, key) => {
           if (gains[coin].length === 0) {

@@ -36,10 +36,18 @@ const useStyles = createUseStyles({
     paddingBottom: 12,
     width: 176,
   },
+  sider: {
+    height: '100vh',
+    position: 'fixed',
+    left: 0,
+    zIndex: 2,
+  },
   content: {
+    overflow: 'auto',
     minHeight: '100vh',
     display: 'flex',
     justifyContent: 'center',
+    transition: 'margin-left 250ms ease-in-out',
   },
 });
 
@@ -73,6 +81,7 @@ const Main = () => {
   return (
     <Layout>
       <Sider
+        className={classes.sider}
         collapsible
         collapsed={collapsed}
         breakpoint="sm"
@@ -138,7 +147,10 @@ const Main = () => {
       </Sider>
       <Layout>
         <Content>
-          <div className={classes.content}>
+          <div
+            className={classes.content}
+            style={{ marginLeft: collapsed ? 80 : 200 }}
+          >
             <Switch>
               <Route exact path="/">
                 <Dashboard />
