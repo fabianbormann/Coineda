@@ -19,8 +19,6 @@
     "concurrently": "^6.2.0",
     "cors": "^2.8.5",
     "craco-less": "^1.20.0",
-    "electron": "^15.3.0",
-    "electron-is-dev": "^2.0.0",
     "eslint-plugin-prettier": "^3.4.0",
     "express": "^4.17.1",
     "express-fileupload": "^1.2.1",
@@ -79,7 +77,9 @@
   },
   "devDependencies": {
     "electron-builder": "^22.9.1",
-    "supertest": "^6.1.6"
+    "supertest": "^6.1.6",
+    "electron": "^15.3.0",
+    "electron-is-dev": "^2.0.0"
   },
   "jest": {
     "testEnvironment": "node",
