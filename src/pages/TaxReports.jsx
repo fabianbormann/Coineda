@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import {
   Divider,
-  Typography,
   Empty,
   message,
   Spin,
@@ -17,8 +16,6 @@ import axios from 'axios';
 import moment from 'moment';
 import GainSummary from '../components/GainSummary';
 
-const { Title } = Typography;
-
 const useStyles = createUseStyles({
   actions: {
     marginTop: 0,
@@ -29,10 +26,10 @@ const useStyles = createUseStyles({
     marginBottom: 12,
   },
   negative: {
-    color: '#cf1322',
+    color: '#C36491',
   },
   positive: {
-    color: '#3f8600',
+    color: '#03A678',
   },
   page: {
     padding: 16,
@@ -43,6 +40,12 @@ const useStyles = createUseStyles({
   summary: {
     marginTop: 24,
     marginBottom: 12,
+  },
+  loading: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100vh',
   },
 });
 
@@ -115,18 +118,22 @@ const TaxReports = () => {
 
   return (
     <div className={classes.page}>
-      <Title level={2}>{t('Tax Reports')}</Title>
-      <Divider className={classes.actions} />
-
-      {loading && <Spin />}
-
-      {!loading && (
-        <DatePicker
-          style={{ maxWidth: 200 }}
-          value={moment(selectedYear)}
-          onChange={(date, dateString) => setSelectedYear(new Date(dateString))}
-          picker="year"
-        />
+      {loading ? (
+        <div className={classes.loading}>
+          <Spin />
+        </div>
+      ) : (
+        <>
+          <p>{t('Tax Year')}</p>
+          <DatePicker
+            style={{ maxWidth: 200 }}
+            value={moment(selectedYear)}
+            onChange={(date, dateString) => {
+              setSelectedYear(new Date(dateString));
+            }}
+            picker="year"
+          />
+        </>
       )}
 
       {Object.keys(realizedWithinTaxYear).length > 0 ||
@@ -134,7 +141,10 @@ const TaxReports = () => {
         <div>
           <Statistic
             className={classes.summary}
-            valueStyle={{ color: hasLoss ? '#cf1322' : '#3f8600' }}
+            valueStyle={{
+              fontFamily: 'PTSerif',
+              color: hasLoss ? '#C36491' : '#03A678',
+            }}
             title={t('Taxable gains and losses')}
             value={`${hasLoss ? '-' : '+'}${roundFiat(
               Math.abs(totalGain)

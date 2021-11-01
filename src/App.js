@@ -28,11 +28,8 @@ const useStyles = createUseStyles({
     color: 'white',
     display: 'flex',
     alignItems: 'center',
-    padding: '12px 12px 0 12px',
+    padding: '12px 12px 6px 12px',
     fontWeight: 600,
-  },
-  accountName: {
-    marginLeft: 6,
   },
   accountRow: {
     paddingTop: 12,
@@ -41,11 +38,8 @@ const useStyles = createUseStyles({
   },
   content: {
     minHeight: '100vh',
-    width: '80%',
-    margin: '0 auto',
     display: 'flex',
     justifyContent: 'center',
-    marginTop: 2,
   },
 });
 
@@ -54,6 +48,7 @@ const Main = () => {
   const location = useLocation();
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(false);
+  const [collapsing, setCollapsing] = useState(false);
   const [settings, updateSettings] = useContext(SettingsContext);
   const { backendUrl, account } = settings;
 
@@ -80,16 +75,46 @@ const Main = () => {
       <Sider
         collapsible
         collapsed={collapsed}
-        onCollapse={(isCollapsed) => setCollapsed(isCollapsed)}
+        breakpoint="sm"
+        onCollapse={(isCollapsed) => {
+          setCollapsing(true);
+          setTimeout(() => {
+            setCollapsing(false);
+          }, 250);
+          setCollapsed(isCollapsed);
+        }}
       >
-        <div className={classes.account}>
+        <div
+          className={classes.account}
+          style={
+            collapsed
+              ? { justifyContent: 'center', marginLeft: -2 }
+              : { justifyContent: 'flex-start', marginLeft: 2 }
+          }
+        >
           <Avatar
             style={{
               backgroundImage: GeoPattern.generate(account.pattern).toDataUrl(),
               backgroundSize: 'cover',
             }}
           />
-          <span className={classes.accountName}>{account.name}</span>
+          <span
+            style={
+              collapsed || collapsing
+                ? {
+                    width: 0,
+                    opacity: 0,
+                    overflow: 'hidden',
+                  }
+                : {
+                    marginLeft: 6,
+                    opacity: 1,
+                    width: 'auto',
+                  }
+            }
+          >
+            {account.name}
+          </span>
         </div>
         <Menu
           theme="dark"

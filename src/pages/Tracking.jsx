@@ -1,4 +1,4 @@
-import { Table, Divider, Typography, Space, Tag, Button, message } from 'antd';
+import { Table, Space, Tag, Button, message } from 'antd';
 import { DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import { useEffect, useState, useCallback, useContext } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -7,8 +7,6 @@ import { AddTransactionDialog, AddTransferDialog } from '../dialogs';
 import axios from 'axios';
 import { ImportDialog } from '../dialogs';
 import { SettingsContext } from '../SettingsContext';
-
-const { Title } = Typography;
 
 const useStyles = createUseStyles({
   actions: {
@@ -322,8 +320,6 @@ const Tracking = () => {
 
   return (
     <div className={classes.page}>
-      <Title level={2}>{t('Tracking')}</Title>
-      <Divider className={classes.actions} />
       <Space className={classes.actions}>
         <Button type="primary" onClick={openAddTransactionDialog}>
           {t('Add Transaction')}

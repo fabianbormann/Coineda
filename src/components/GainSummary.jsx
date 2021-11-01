@@ -15,10 +15,10 @@ const useStyles = createUseStyles({
     width: 'calc(100% - 32px)',
   },
   negative: {
-    color: '#cf1322',
+    color: '#C36491',
   },
   positive: {
-    color: '#3f8600',
+    color: '#03A678',
   },
   title: {
     marginTop: 12,
@@ -84,23 +84,30 @@ const GainSummary = (props) => {
               key={key}
             >
               <Timeline>
-                {gains[coin].map((transaction) => (
+                {gains[coin].map((transaction, key) => (
                   <Timeline.Item
-                    color={transaction.type === 'buy' ? 'green' : 'red'}
+                    key={key}
+                    color={transaction.type === 'buy' ? '#03A678' : '#C36491'}
                   >
-                    {transaction.type === 'buy'
-                      ? t('Bought asset summary', {
-                          value: roundCrypto(transaction.toValue),
-                          symbol: transaction.symbol.toUpperCase(),
-                          date: moment(transaction.date).format('DD.MM.YYYY'),
-                          fiat: `${roundFiat(transaction.fromValue)} EUR`,
-                        })
-                      : t('Selled asset summary', {
+                    {transaction.type === 'buy' ? (
+                      <p>
+                        {t('Bought asset summary', {
                           value: roundCrypto(transaction.toValue),
                           symbol: transaction.symbol.toUpperCase(),
                           date: moment(transaction.date).format('DD.MM.YYYY'),
                           fiat: `${roundFiat(transaction.fromValue)} EUR`,
                         })}
+                      </p>
+                    ) : (
+                      <p>
+                        {t('Selled asset summary', {
+                          value: roundCrypto(transaction.toValue),
+                          symbol: transaction.symbol.toUpperCase(),
+                          date: moment(transaction.date).format('DD.MM.YYYY'),
+                          fiat: `${roundFiat(transaction.fromValue)} EUR`,
+                        })}
+                      </p>
+                    )}
                   </Timeline.Item>
                 ))}
               </Timeline>

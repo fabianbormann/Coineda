@@ -53,7 +53,6 @@ const Settings = () => {
 
   return (
     <div className={classes.page}>
-      <Title level={2}>{t('Settings')}</Title>
       <Title level={4}>{t('General')}</Title>
       <Space>
         <span>{t('Language')}</span>
