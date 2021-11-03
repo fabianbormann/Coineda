@@ -1,25 +1,27 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, nativeImage } = require('electron');
 const path = require('path');
 const isDev = require('electron-is-dev');
 
-console.log(path.join(__dirname, '..', 'build', 'icons', 'icon.png'));
-
 function createWindow() {
+  const image = nativeImage.createFromPath(
+    path.join(__dirname, 'icons', 'icon.png')
+  );
+
   const mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
     title: 'Coineda',
+    icon: image,
     webPreferences: {
       devTools: isDev,
     },
-    icon: path.join(__dirname, '..', 'build', 'icons', 'icon.png'),
   });
 
   mainWindow.setMenu(null);
   mainWindow.loadURL(
     isDev
       ? 'http://localhost:3000'
-      : `file://${path.join(__dirname, '../build/index.html')}`
+      : `file://${path.join(__dirname, 'index.html')}`
   );
   mainWindow.maximize();
 }
@@ -27,7 +29,7 @@ function createWindow() {
 let server = null;
 
 if (!isDev) {
-  server = require('./server/app.js').server;
+  server = require('./server/index.js').server;
 }
 
 app.whenReady().then(() => {
