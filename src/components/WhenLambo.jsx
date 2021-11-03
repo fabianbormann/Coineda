@@ -45,7 +45,7 @@ const WhenLambo = (props) => {
           className={classes.image}
           preview={false}
           style={{ maxWidth: 100 }}
-          src={'/assets/lamborghini.svg'}
+          src={'assets/lamborghini.svg'}
         />
       </div>
     </div>
