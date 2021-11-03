@@ -4,6 +4,8 @@
 
 Coineda aims to be a free to use, open source and local running crypto track and tax tool
 
+<img src="https://user-images.githubusercontent.com/1525818/140197814-83013769-8de1-4496-8bac-a0e6feac19fd.gif" height="400"/>
+
 ## :exclamation: Disclaimer
 
 Coineda does not provide tax, legal or accounting advices. The provided dashboard and rudimentary tax calculations may contain errors, are incorrect for your country or doesn't cover all tax relevant regulations. Those calculations are developed to the best of my knowledge but I'm not a tax export and I do not take any responsibility for incorrect calculations.
