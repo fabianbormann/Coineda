@@ -11,7 +11,7 @@
     "Import": "Import",
     "UploadFieldText": "Das Hochladen der Dateien ist durch Klicken oder Hineinziehen möglich.",
     "UploadFieldHint": "Unterstützt Einzel- und Sammel-Uploads",
-    "is not a csv file": "{{filename}} ist keine CSV-Datei",
+    "File type is not supported": "Der Dateityp wird nicht unterstützt (.{{fileType}})",
     "Transactions successfully uploaded": "{{inserts}} Transaktionen wurden erfolgreich importiert",
     "Transactions partially uploaded": "{{inserts}} Transaktionen wurden erfolgreich importiert. {{duplicates}} waren Duplikate. {{errors}} Fehler",
     "Export": "Export",

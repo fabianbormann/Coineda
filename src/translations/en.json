@@ -11,7 +11,7 @@
     "Import": "Import",
     "UploadFieldText": "Click or drag file to this area to upload",
     "UploadFieldHint": "Support for a single or bulk upload",
-    "is not a csv file": "{{filename}} is not a csv file",
+    "File type is not supported": "File typ is not supported (.{{fileType}})",
     "Transactions successfully uploaded": "{{inserts}} transactions successfully imported",
     "Transactions partially uploaded": "{{inserts}} transactions successfully imported. {{duplicates}} were duplicates. {{errors}} errors",
     "Export": "Export",
