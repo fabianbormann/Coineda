@@ -10,10 +10,11 @@ import {
 } from 'antd';
 import ExchangeManger from '../components/ExchangeManager';
 import { createUseStyles } from 'react-jss';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useContext } from 'react';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 import moment from 'moment';
+import { SettingsContext } from '../SettingsContext';
 
 const { Item } = Form;
 const { Option } = Select;
@@ -30,10 +31,13 @@ const AddTransferDialog = (props) => {
   const [toExchange, setToExchange] = useState(null);
   const [feeCurrency, setFeeCurrency] = useState('bitcoin');
   const [currency, setCurrency] = useState('bitcoin');
+  const [settings] = useContext(SettingsContext);
   const [assets, setAssets] = useState([]);
   const [updateKey, setUpdateKey] = useState();
   const [form] = Form.useForm();
   const { t } = useTranslation();
+
+  const { account } = settings;
 
   const layout = {
     labelCol: { span: 6 },
@@ -108,6 +112,7 @@ const AddTransferDialog = (props) => {
       feeValue: values.fee,
       feeCurrency: feeCurrency,
       date: values.date,
+      account: account.id,
     };
 
     if (typeof updateKey === 'undefined') {
