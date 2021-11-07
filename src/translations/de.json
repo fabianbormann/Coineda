@@ -32,7 +32,7 @@
     "Realized Gains": "Realisierte Gewinne/Verluste",
     "Unrealized Gains": "Potentielle Gewinne/Verluste",
     "Bought asset summary": "Kauf von {{value}} {{symbol}} am {{date}} für {{fiat}}",
-    "Selled asset summary": "Verkauf von {{value}} {{symbol}} am {{date}} für {{fiat}}",
+    "Selled asset summary": "Verkauf von {{value}} {{symbol}} am {{date}} für {{fiat}}. Durch deine Haltedauer von {{days}} Tagen hast du damit {{gains}} realisiert.",
     "approx": "ungefähr",
     "Settings": "Einstellungen",
     "Language": "Sprache"

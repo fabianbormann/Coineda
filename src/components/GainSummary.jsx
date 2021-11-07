@@ -63,6 +63,8 @@ const GainSummary = (props) => {
             0
           );
 
+          console.log(gains[coin]);
+
           return (
             <Panel
               header={
@@ -98,10 +100,12 @@ const GainSummary = (props) => {
                     ) : (
                       <p>
                         {t('Selled asset summary', {
-                          value: roundCrypto(transaction.toValue),
+                          value: roundCrypto(transaction.fromValue),
                           symbol: transaction.symbol.toUpperCase(),
                           date: moment(transaction.date).format('DD.MM.YYYY'),
-                          fiat: `${roundFiat(transaction.fromValue)} EUR`,
+                          fiat: `${roundFiat(transaction.toValue)} EUR`,
+                          days: transaction.daysFromPurchase,
+                          gains: `${roundFiat(transaction.gain)} EUR`,
                         })}
                       </p>
                     )}
