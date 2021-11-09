@@ -1,4 +1,4 @@
-import { Collapse, Timeline } from 'antd';
+import { Collapse, Progress, Timeline } from 'antd';
 import { createUseStyles } from 'react-jss';
 import { useTranslation } from 'react-i18next';
 import moment from 'moment';
@@ -28,8 +28,13 @@ const useStyles = createUseStyles({
 });
 
 const GainSummary = (props) => {
-  const { gains, title } = props;
+  const { gains, showUnrealizedGains } = props;
   const { t } = useTranslation();
+
+  let title = t('Realized Gains');
+  if (showUnrealizedGains) {
+    title = t('Unrealized Gains');
+  }
 
   const classes = useStyles();
 
@@ -63,8 +68,6 @@ const GainSummary = (props) => {
             0
           );
 
-          console.log(gains[coin]);
-
           return (
             <Panel
               header={
@@ -82,36 +85,67 @@ const GainSummary = (props) => {
               }
               key={key}
             >
-              <Timeline>
-                {gains[coin].map((transaction, key) => (
-                  <Timeline.Item
-                    key={key}
-                    color={transaction.type === 'buy' ? '#03A678' : '#C36491'}
-                  >
-                    {transaction.type === 'buy' ? (
-                      <p>
-                        {t('Bought asset summary', {
-                          value: roundCrypto(transaction.toValue),
-                          symbol: transaction.symbol.toUpperCase(),
-                          date: moment(transaction.date).format('DD.MM.YYYY'),
-                          fiat: `${roundFiat(transaction.fromValue)} EUR`,
-                        })}
-                      </p>
-                    ) : (
-                      <p>
-                        {t('Selled asset summary', {
-                          value: roundCrypto(transaction.fromValue),
-                          symbol: transaction.symbol.toUpperCase(),
-                          date: moment(transaction.date).format('DD.MM.YYYY'),
-                          fiat: `${roundFiat(transaction.toValue)} EUR`,
-                          days: transaction.daysFromPurchase,
-                          gains: `${roundFiat(transaction.gain)} EUR`,
-                        })}
-                      </p>
-                    )}
-                  </Timeline.Item>
-                ))}
-              </Timeline>
+              {showUnrealizedGains ? (
+                <Timeline>
+                  {gains[coin].map((transaction, key) =>
+                    transaction.value > 0 ? (
+                      <Timeline.Item key={key}>
+                        <div>
+                          <Progress
+                            showInfo={false}
+                            percent={Math.min(
+                              100,
+                              (transaction.daysFromPurchase / 366) * 100
+                            )}
+                          />
+                          <p>
+                            {t('Asset becomes tax free', {
+                              value: roundCrypto(transaction.value),
+                              symbol: transaction.symbol.toUpperCase(),
+                              days: Math.max(
+                                0,
+                                366 - transaction.daysFromPurchase
+                              ),
+                              gain: `${roundFiat(transaction.gain)} EUR`,
+                            })}
+                          </p>
+                        </div>
+                      </Timeline.Item>
+                    ) : null
+                  )}
+                </Timeline>
+              ) : (
+                <Timeline>
+                  {gains[coin].map((transaction, key) => (
+                    <Timeline.Item
+                      key={key}
+                      color={transaction.type === 'buy' ? '#03A678' : '#C36491'}
+                    >
+                      {transaction.type === 'buy' ? (
+                        <p>
+                          {t('Bought asset summary', {
+                            value: roundCrypto(transaction.toValue),
+                            symbol: transaction.symbol.toUpperCase(),
+                            date: moment(transaction.date).format('DD.MM.YYYY'),
+                            fiat: `${roundFiat(transaction.fromValue)} EUR`,
+                          })}
+                        </p>
+                      ) : (
+                        <p>
+                          {t('Selled asset summary', {
+                            value: roundCrypto(transaction.fromValue),
+                            symbol: transaction.symbol.toUpperCase(),
+                            date: moment(transaction.date).format('DD.MM.YYYY'),
+                            fiat: `${roundFiat(transaction.toValue)} EUR`,
+                            days: transaction.daysFromPurchase,
+                            gains: `${roundFiat(transaction.gain)} EUR`,
+                          })}
+                        </p>
+                      )}
+                    </Timeline.Item>
+                  ))}
+                </Timeline>
+              )}
             </Panel>
           );
         })}

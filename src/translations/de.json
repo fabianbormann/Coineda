@@ -31,6 +31,7 @@
     "Download Report": "Report herunterladen",
     "Realized Gains": "Realisierte Gewinne/Verluste",
     "Unrealized Gains": "Potentielle Gewinne/Verluste",
+    "Asset becomes tax free": "{{value}} {{symbol}} werden in {{days}} Tagen steuerfrei. Der aktuelle Gewinn beträgt ungefähr {{gain}}",
     "Bought asset summary": "Kauf von {{value}} {{symbol}} am {{date}} für {{fiat}}",
     "Selled asset summary": "Verkauf von {{value}} {{symbol}} am {{date}} für {{fiat}}. Durch deine Haltedauer von {{days}} Tagen hast du damit {{gains}} realisiert.",
     "approx": "ungefähr",

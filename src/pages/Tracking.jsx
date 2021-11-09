@@ -38,6 +38,8 @@ const Tracking = () => {
 
   const { account } = settings;
 
+  const roundCrypto = (value) => Math.round(value * 100000) / 100000;
+
   useEffect(() => {
     axios
       .get('http://localhost:5208/assets')
@@ -74,15 +76,9 @@ const Tracking = () => {
 
         const data = response.data.map((transaction) => ({
           ...transaction,
-          from: `${transaction.fromValue} ${getAssetSymbol(
-            transaction.fromCurrency
-          )}`,
-          to: `${transaction.toValue} ${getAssetSymbol(
-            transaction.toCurrency
-          )}`,
-          fee: `${transaction.feeValue} ${getAssetSymbol(
-            transaction.feeCurrency
-          )}`,
+          fromSymbol: getAssetSymbol(transaction.fromCurrency),
+          toSymbol: getAssetSymbol(transaction.toCurrency),
+          feeSymbol: getAssetSymbol(transaction.feeCurrency),
           feeCurrency: transaction.feeCurrency.toLowerCase(),
           fromCurrency: transaction.fromCurrency.toLowerCase(),
           toCurrency: transaction.toCurrency.toLowerCase(),
@@ -171,7 +167,7 @@ const Tracking = () => {
         }
 
         return {
-          children: value,
+          children: `${roundCrypto(row.fromValue)} ${row.fromSymbol}`,
           key: row.key,
         };
       },
@@ -200,7 +196,7 @@ const Tracking = () => {
         }
 
         return {
-          children: value,
+          children: `${roundCrypto(row.toValue)} ${row.toSymbol}`,
           key: row.key,
         };
       },
@@ -209,6 +205,10 @@ const Tracking = () => {
       title: t('Fee'),
       dataIndex: 'fee',
       key: 'fee',
+      render: (value, row, index) => ({
+        children: `${roundCrypto(row.feeValue)} ${row.feeSymbol}`,
+        key: row.key,
+      }),
     },
     {
       title: t('Exchange'),
@@ -304,10 +304,24 @@ const Tracking = () => {
     }
   };
 
+  let editable = false;
+  let rows = [];
+
+  for (const row of dataSource) {
+    rows.push(row);
+    if (typeof row.children !== 'undefined') {
+      rows = [...rows, ...row.children];
+    }
+  }
+
   const editRow = () => {
     if (selectedRows.length === 0) return;
 
-    const row = dataSource.find((field) => field.key === selectedRows[0]);
+    let row = rows.find((field) => field.key === selectedRows[0]);
+
+    if (row.isComposed === 1) {
+      row = rows.find((field) => field.key === row.parent);
+    }
 
     if (row.type === 'transfer') {
       setTransferOverrides(row);
@@ -317,6 +331,29 @@ const Tracking = () => {
       setAddTransactionDialogVisible(true);
     }
   };
+
+  const selectedItems = selectedRows
+    .map((selection) => rows.find((item) => item.key === selection))
+    .filter((selection) => typeof selection !== 'undefined');
+
+  if (selectedItems) {
+    const parentItems = selectedItems.filter((item) => item.isComposed === 0);
+    if (parentItems.length < 2) {
+      const childItems = selectedItems.filter((item) => item.isComposed === 1);
+
+      if (parentItems.length === 0 && childItems.length > 0) {
+        editable = childItems.every(
+          (item) => item.parent === childItems[0].parent
+        );
+      } else if (parentItems.length === 1 && childItems.length > 0) {
+        editable = childItems.every(
+          (item) => item.parent === parentItems[0].id
+        );
+      } else if (parentItems.length === 1) {
+        editable = true;
+      }
+    }
+  }
 
   return (
     <div className={classes.page}>
@@ -349,7 +386,7 @@ const Tracking = () => {
         <Button
           type="primary"
           icon={<EditOutlined />}
-          disabled={selectedRows.length !== 1}
+          disabled={!editable}
           onClick={editRow}
         >
           {t('Edit')}
