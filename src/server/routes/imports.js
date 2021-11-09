@@ -24,6 +24,20 @@ const ImportType = Object.freeze({
   UNKNOWN: 'unknown',
 });
 
+const inferInputType = (file) => {
+  const filename = file.name.toLowerCase();
+
+  if (filename.endsWith('.cnd')) {
+    return ImportType.COINEDA;
+  } else if (filename.endsWith('.xlsx')) {
+    return ImportType.BINANCE_SPOT_ORDER_HISTORY;
+  } else if (filename.endsWith('.csv')) {
+    return ImportType.KRAKEN_CSV_EXPORT;
+  } else {
+    return ImportType.UNKNOWN;
+  }
+};
+
 const removeDuplicateObjects = async (values, table) => {
   const sql = 'SELECT * FROM ' + table;
   let rows = await db.executeSelectQuery(sql);
@@ -338,7 +352,9 @@ router.post('/', fileUpload(), async (req, res) => {
     req.files.files instanceof Array ? req.files.files : [req.files.files];
 
   for (const file of files) {
-    if (req.body.type === ImportType.BINANCE_SPOT_ORDER_HISTORY) {
+    const importType = inferInputType(file);
+
+    if (importType === ImportType.BINANCE_SPOT_ORDER_HISTORY) {
       try {
         let { importedTransactions, importErrors } =
           await readBinanceSpotOrderHistory(file.data);
@@ -347,7 +363,7 @@ router.post('/', fileUpload(), async (req, res) => {
       } catch {
         errors += 1;
       }
-    } else if (req.body.type === ImportType.KRAKEN_CSV_EXPORT) {
+    } else if (importType === ImportType.KRAKEN_CSV_EXPORT) {
       try {
         let { importedTransactions, importErrors } = await readKrakenCSVExport(
           file.data

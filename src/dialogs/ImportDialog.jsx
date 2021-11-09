@@ -14,10 +14,17 @@ const ImportDialog = (props) => {
   const [uploading, setUploading] = useState(false);
 
   const addFile = (file) => {
-    if (file.name.endsWith('.cnd')) {
+    if (
+      file.name.endsWith('.cnd') ||
+      file.name.endsWith('.xlsx') ||
+      file.name.endsWith('.csv')
+    ) {
       setFiles([...files, file]);
     } else {
-      message.error(t('is not a cnd file', { filename: file.name }));
+      const parts = file.name.split('.');
+      message.error(
+        t('File type is not supported', { fileType: parts[parts.length - 1] })
+      );
     }
 
     return false;

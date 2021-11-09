@@ -171,11 +171,11 @@ const TaxReports = () => {
           </Button>
           <Divider className={classes.divider} />
           <GainSummary
-            title={t('Realized Gains')}
+            showUnrealizedGains={false}
             gains={realizedWithinTaxYear}
           />
           <GainSummary
-            title={t('Unrealized Gains')}
+            showUnrealizedGains={true}
             gains={unrealizedAfterTaxYear}
           />
         </div>

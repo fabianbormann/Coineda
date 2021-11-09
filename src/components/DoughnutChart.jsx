@@ -6,6 +6,8 @@ import {
   Tooltip,
   Label,
 } from 'recharts';
+import { createUseStyles } from 'react-jss';
+import useWindowDimensions from '../helper/WindowDimensions';
 
 const colors = [
   '#03A678',
@@ -33,14 +35,26 @@ const colors = [
   '#197396',
 ];
 
+const useStyles = createUseStyles({
+  pie: {
+    '& .recharts-legend-wrapper': {
+      height: '95% !important',
+      overflowY: 'auto',
+    },
+  },
+});
+
 const DoughnutChart = (props) => {
   const { data, label } = props;
+  const classes = useStyles();
+  const { width } = useWindowDimensions();
   data.map((segment, i) => (segment.fill = colors[i]));
 
   return (
     <ResponsiveContainer minHeight={256}>
-      <PieChart>
+      <PieChart className={classes.pie}>
         <Pie
+          cx={width < 620 ? 100 : 150}
           data={data}
           isAnimationActive={false}
           nameKey="type"
