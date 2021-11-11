@@ -17,7 +17,7 @@ const accounts = require('./routes/accounts');
 const tax = require('./routes/tax');
 
 app.use((req, _res, next) => {
-  req.coineda_version = '0.1.5';
+  req.coineda_version = '0.1.6';
   next();
 });
 
