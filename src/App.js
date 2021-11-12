@@ -9,7 +9,7 @@ import { createUseStyles } from 'react-jss';
 import './App.css';
 import {
   HashRouter as Router,
-  Switch,
+  Routes,
   Route,
   Link,
   useLocation,
@@ -151,20 +151,12 @@ const Main = () => {
             className={classes.content}
             style={{ marginLeft: collapsed ? 80 : 200 }}
           >
-            <Switch>
-              <Route exact path="/">
-                <Dashboard />
-              </Route>
-              <Route path="/tracking">
-                <Tracking />
-              </Route>
-              <Route path="/reports">
-                <TaxReports />
-              </Route>
-              <Route path="/settings">
-                <Settings />
-              </Route>
-            </Switch>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/tracking/*" element={<Tracking />} />
+              <Route path="/reports/*" element={<TaxReports />} />
+              <Route path="/settings/*" element={<Settings />} />
+            </Routes>
           </div>
         </Content>
         <Footer style={{ textAlign: 'center' }}>
