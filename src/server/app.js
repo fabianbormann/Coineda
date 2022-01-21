@@ -15,9 +15,10 @@ const fileExport = require('./routes/exports');
 const fileImport = require('./routes/imports');
 const accounts = require('./routes/accounts');
 const tax = require('./routes/tax');
+const { version } = require('./common');
 
 app.use((req, _res, next) => {
-  req.coineda_version = '0.1.7';
+  req.coineda_version = `${version.major}.${version.minor}.${version.patch}`;
   next();
 });
 

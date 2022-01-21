@@ -4,6 +4,7 @@ import {
   DiffOutlined,
   AuditOutlined,
   ToolOutlined,
+  WalletOutlined,
 } from '@ant-design/icons';
 import { createUseStyles } from 'react-jss';
 import './App.css';
@@ -14,7 +15,7 @@ import {
   Link,
   useLocation,
 } from 'react-router-dom';
-import { Dashboard, Tracking, TaxReports, Settings } from './pages';
+import { Dashboard, Tracking, TaxReports, Settings, Wallets } from './pages';
 import { useTranslation } from 'react-i18next';
 import { useState, useContext, useEffect } from 'react';
 import { SettingsContext, defaultSettings } from './SettingsContext';
@@ -140,6 +141,9 @@ const Main = () => {
           <Menu.Item key="/reports" icon={<AuditOutlined />}>
             <Link to="/reports">{t('Tax Reports')}</Link>
           </Menu.Item>
+          <Menu.Item key="/wallets" icon={<WalletOutlined />}>
+            <Link to="/wallets">{t('Wallets')}</Link>
+          </Menu.Item>
           <Menu.Item key="/settings" icon={<ToolOutlined />}>
             <Link to="/settings">{t('Settings')}</Link>
           </Menu.Item>
@@ -155,6 +159,7 @@ const Main = () => {
               <Route path="/" element={<Dashboard />} />
               <Route path="/tracking/*" element={<Tracking />} />
               <Route path="/reports/*" element={<TaxReports />} />
+              <Route path="/wallets/*" element={<Wallets />} />
               <Route path="/settings/*" element={<Settings />} />
             </Routes>
           </div>

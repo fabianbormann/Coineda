@@ -4,6 +4,8 @@ const path = require('path');
 const bunyan = require('bunyan');
 const logger = bunyan.createLogger({ name: 'coineda-backend-database-helper' });
 
+const performUpgradeIfNeeded = require('./upgrade');
+
 const userPreferences =
   process.env.APPDATA ||
   (process.platform === 'darwin'
@@ -105,7 +107,15 @@ const init = async () => {
         name TEXT NOT NULL UNIQUE,
         pattern TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         created TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )`
+    )`
+  );
+
+  await executeQuery(
+    `CREATE TABLE IF NOT EXISTS upgrades
+        (id INTEGER PRIMARY KEY, 
+        version TEXT NOT NULL UNIQUE,
+        date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`
   );
 
   const accounts = await executeSelectQuery('SELECT * FROM accounts');
@@ -135,6 +145,8 @@ const init = async () => {
       );
     }
   }
+
+  await performUpgradeIfNeeded(executeSelectQuery, executeQuery);
 };
 
 module.exports = {

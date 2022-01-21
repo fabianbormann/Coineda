@@ -17,6 +17,7 @@
     "Export": "Export",
     "Delete": "Delete",
     "Edit": "Edit",
+    "Save": "Save",
     "Select an exchange or a wallet": "Select an exchange or a wallet",
     "Add new exchange or wallet": "Add new exchange or wallet",
     "From": "From",
@@ -36,6 +37,8 @@
     "Selled asset summary": "Selled {{value}} {{symbol}} on {{date}} for {{fiat}}. You were holding the currency for {{days}} days, therefore you have realized {{gains}}.",
     "approx": "approx.",
     "Settings": "Settings",
-    "Language": "Language"
+    "Language": "Language",
+    "Ethereum Wallet": "Non-Custodial Ethereum Wallet (e.g. MetaMask)",
+    "Other": "Other"
   }
 }
