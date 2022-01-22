@@ -1,3 +1,4 @@
+import React from 'react';
 import { Layout, Menu, Avatar } from 'antd';
 import {
   AreaChartOutlined,
@@ -63,7 +64,7 @@ const Main = () => {
 
   useEffect(() => {
     axios.get(`${backendUrl}/accounts`).then((response) => {
-      let activeAccount = localStorage.getItem('activeAccount');
+      let activeAccount = document.localStorage.getItem('activeAccount');
       let selectedAccount = response.data[0];
 
       if (typeof activeAccount !== 'undefined') {
@@ -177,9 +178,7 @@ const App = () => {
 
   return (
     <SettingsContext.Provider value={[settings, updateSettings]}>
-      <Router>
-        <Main />
-      </Router>
+      <Router>{/*<Main />*/}</Router>
     </SettingsContext.Provider>
   );
 };
