@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback, useContext } from 'react';
-import axios from 'axios';
+import { useState, useEffect, useContext } from 'react';
 import {
   ReloadOutlined,
   DownOutlined,
@@ -20,6 +19,7 @@ import { createUseStyles } from 'react-jss';
 import GeoPattern from 'geopattern';
 import { useTranslation } from 'react-i18next';
 import { SettingsContext } from '../SettingsContext';
+import storage from '../persistence/storage';
 
 const useStyles = createUseStyles({
   name: {
@@ -77,44 +77,32 @@ const AccountManagement = () => {
   const [accounts, setAccounts] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [accountName, setAccountName] = useState('');
-  const { backendUrl } = settings;
 
   const generateRandomString = () =>
     (Math.random().toString(36) + '00000000000000000').slice(2, 8 + 2);
 
   const [pattern, setPattern] = useState(generateRandomString());
 
-  const fetchAccounts = useCallback(async () => {
-    try {
-      const response = await axios.get(`${backendUrl}/accounts`);
-      setAccounts(response.data);
-    } catch (error) {
-      message.error(
-        'Coineda backend is not available. Please restart the application.'
-      );
-      console.warn(error);
-    }
-  }, [backendUrl]);
-
   useEffect(() => {
+    const fetchAccounts = async () => {
+      setAccounts(await storage.accounts.getAll());
+    };
+
     fetchAccounts();
-  }, [fetchAccounts]);
+  }, []);
 
   const submit = async () => {
     try {
-      await axios.post(`${backendUrl}/accounts`, {
-        name: accountName,
-        pattern: pattern,
-      });
-      const response = await axios.get(`${backendUrl}/accounts`);
-      setAccounts(response.data);
+      await storage.accounts.add(accountName, pattern);
+      const updatedAccounts = await storage.accounts.getAll();
+      setAccounts(updatedAccounts);
       updateSettings((prevSettings) => ({
         ...prevSettings,
-        account: response.data[response.data.length - 1],
+        account: updatedAccounts[updatedAccounts.length - 1],
       }));
     } catch (error) {
       message.error(
-        'Coineda backend is not available. Please restart the application.'
+        'Failed to save the account. Please restart the application.'
       );
       console.warn(error);
     } finally {

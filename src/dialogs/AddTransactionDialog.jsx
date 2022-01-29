@@ -6,9 +6,24 @@ import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 import moment from 'moment';
 import { SettingsContext } from '../SettingsContext';
+import storage from '../persistence/storage';
 
 const { Item } = Form;
 const { Option } = Select;
+
+const TransactionType = Object.freeze({
+  BUY: 'buy',
+  SELL: 'sell',
+  SEND: 'send',
+  RECEIVE: 'receive',
+  REWARDS: 'rewards',
+  SWAP: 'swap',
+});
+
+const isFiat = async (assetId) => {
+  const currency = await storage.assets.get(assetId);
+  return currency.isFiat === 1;
+};
 
 const useStyles = createUseStyles({
   section: {
@@ -24,7 +39,7 @@ const AddTransactionsDialog = (props) => {
   const [fromCurrency, setFromCurrency] = useState('euro');
   const [updateKey, setUpdateKey] = useState();
   const [settings] = useContext(SettingsContext);
-  const [assets, setAssets] = useState({ fiat: [], cryptocurrencies: [] });
+  const [assets, setAssets] = useState([]);
   const [form] = Form.useForm();
   const { t } = useTranslation();
 
@@ -59,15 +74,9 @@ const AddTransactionsDialog = (props) => {
   };
 
   useEffect(() => {
-    axios
-      .get('http://localhost:5208/assets')
-      .then((response) => {
-        setAssets(response.data);
-      })
-      .catch((error) => {
-        message.error('Failed to fetch assets');
-        console.warn(error);
-      });
+    storage.assets.getAll().then((currencies) => {
+      setAssets(currencies);
+    });
   }, []);
 
   useEffect(() => {
@@ -97,7 +106,132 @@ const AddTransactionsDialog = (props) => {
     },
   });
 
-  const submitTransaction = (values) => {
+  const createTransaction = async (transaction) => {
+    let {
+      exchange,
+      fromValue,
+      fromCurrency,
+      toValue,
+      toCurrency,
+      feeValue,
+      feeCurrency,
+      date,
+      composedKeys,
+      isComposed,
+      account,
+    } = transaction;
+
+    const fromCurrencyIsFiat = await isFiat(fromCurrency);
+    const toCurrencyIsFiat = await isFiat(toCurrency);
+    const children = [];
+
+    let transactionType = TransactionType.BUY;
+    if (!fromCurrencyIsFiat && toCurrencyIsFiat) {
+      transactionType = TransactionType.SELL;
+    } else if (!fromCurrencyIsFiat && !toCurrencyIsFiat) {
+      isComposed = 1;
+      transactionType = TransactionType.SELL;
+      let price = 0;
+      const toTimestamp = Math.floor(new Date(date).getTime() / 1000);
+      const fromTimestamp = Math.floor(
+        (new Date(date).getTime() - 1000 * 60 * 60 * 5) / 1000
+      );
+
+      try {
+        const response = await axios.get(
+          `https://api.coingecko.com/api/v3/coins/${fromCurrency.toLowerCase()}/market_chart/range?vs_currency=eur&from=${fromTimestamp}&to=${toTimestamp}`
+        );
+        console.log(response.data);
+        price = response.data.prices[0][1];
+      } catch (error) {
+        console.log(error);
+        message.error(
+          'Failed to fetch price from CoinGeckoApi. Please try again later.'
+        );
+        return;
+      }
+
+      const sellTransaction = {
+        type: transactionType,
+        exchange: exchange,
+        fromValue: fromValue,
+        fromCurrency: fromCurrency.toUpperCase(),
+        toValue: price * fromValue,
+        toCurrency: 'euro',
+        feeValue: feeValue,
+        feeCurrency: feeCurrency.toUpperCase(),
+        isComposed: isComposed,
+        parent: undefined,
+        composedKeys: composedKeys,
+        date: date.unix(),
+        account: account,
+      };
+
+      const key = await storage.transactions.add(sellTransaction);
+
+      children.push({
+        id: key,
+        ...sellTransaction,
+      });
+
+      transactionType = TransactionType.BUY;
+
+      fromCurrency = 'euro';
+      fromValue = Math.round(price * fromValue * 100) / 100;
+    }
+
+    const buyTransaction = {
+      type: transactionType,
+      exchange: exchange,
+      fromValue: fromValue,
+      fromCurrency: fromCurrency.toUpperCase(),
+      toValue: toValue,
+      toCurrency: toCurrency.toUpperCase(),
+      feeValue: feeValue,
+      feeCurrency: feeCurrency.toUpperCase(),
+      isComposed: isComposed,
+      parent: undefined,
+      composedKeys: composedKeys,
+      date: date.unix(),
+      account: account,
+    };
+
+    const key = await storage.transactions.add(buyTransaction);
+
+    children.push({
+      id: key,
+      ...buyTransaction,
+    });
+
+    if (isComposed === 1) {
+      transactionType = TransactionType.SWAP;
+
+      const parent = await storage.transactions.add({
+        type: transactionType,
+        exchange: exchange,
+        fromValue: children[1].fromValue,
+        fromCurrency: children[1].fromCurrency,
+        toValue: children[0].toValue,
+        toCurrency: children[0].toCurrency,
+        feeValue: feeValue,
+        feeCurrency: feeCurrency.toUpperCase(),
+        isComposed: 0,
+        parent: undefined,
+        composedKeys: `${children[0].id},${children[1].id}`,
+        date: date.unix(),
+        account: account,
+      });
+
+      for (const child of children) {
+        storage.transactions.put({
+          ...child,
+          parent: parent,
+        });
+      }
+    }
+  };
+
+  const addTransaction = (values) => {
     const data = {
       exchange: selectedExchange,
       fromValue: values.from,
@@ -110,11 +244,10 @@ const AddTransactionsDialog = (props) => {
     };
 
     if (typeof updateKey === 'undefined') {
-      axios
-        .post('http://localhost:5208/transactions', {
-          ...data,
-          account: account.id,
-        })
+      createTransaction({
+        ...data,
+        account: account.id,
+      })
         .catch((error) => {
           message.error('Failed to add transaction');
           console.warn(error);
@@ -165,7 +298,7 @@ const AddTransactionsDialog = (props) => {
         {...layout}
         initialValues={defaults}
         className={classes.section}
-        onFinish={submitTransaction}
+        onFinish={addTransaction}
         form={form}
       >
         <Item name="date" label={t('Date')}>
@@ -182,13 +315,11 @@ const AddTransactionsDialog = (props) => {
                 filterSort={sortSearch}
                 onChange={(symbol) => setFromCurrency(symbol)}
               >
-                {[...assets.fiat, ...assets.cryptocurrencies].map(
-                  (currency) => (
-                    <Option key={currency.symbol} value={currency.id}>
-                      {currency.symbol.toUpperCase()}
-                    </Option>
-                  )
-                )}
+                {assets.map((currency) => (
+                  <Option key={currency.symbol} value={currency.id}>
+                    {currency.symbol}
+                  </Option>
+                ))}
               </Select>
             }
           />
@@ -204,13 +335,11 @@ const AddTransactionsDialog = (props) => {
                 value={toCurrency}
                 onChange={(symbol) => setToCurrency(symbol)}
               >
-                {[...assets.fiat, ...assets.cryptocurrencies].map(
-                  (currency) => (
-                    <Option key={currency.symbol} value={currency.id}>
-                      {currency.symbol.toUpperCase()}
-                    </Option>
-                  )
-                )}
+                {assets.map((currency) => (
+                  <Option key={currency.symbol} value={currency.id}>
+                    {currency.symbol}
+                  </Option>
+                ))}
               </Select>
             }
           />
@@ -226,13 +355,11 @@ const AddTransactionsDialog = (props) => {
                 filterSort={sortSearch}
                 onChange={(symbol) => setFeeCurrency(symbol)}
               >
-                {[...assets.fiat, ...assets.cryptocurrencies].map(
-                  (currency) => (
-                    <Option key={currency.symbol} value={currency.id}>
-                      {currency.symbol.toUpperCase()}
-                    </Option>
-                  )
-                )}
+                {assets.map((currency) => (
+                  <Option key={currency.symbol} value={currency.id}>
+                    {currency.symbol}
+                  </Option>
+                ))}
               </Select>
             }
           />

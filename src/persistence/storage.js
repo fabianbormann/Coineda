@@ -1,0 +1,109 @@
+import { openDB } from 'idb';
+import defaultAssets from './assets.json';
+
+const setup = () => {
+  const database = openDB('Coineda', 1, {
+    async upgrade(db, oldVersion, _newVersion, transaction) {
+      if (oldVersion < 1) {
+        db.createObjectStore('accounts', {
+          keyPath: 'id',
+          autoIncrement: true,
+        });
+        const assetStorage = db.createObjectStore('assets', { keyPath: 'id' });
+        assetStorage.createIndex('symbol', 'symbol');
+        assetStorage.createIndex('isFiat', 'isFiat');
+
+        const transactionStore = db.createObjectStore('transactions', {
+          keyPath: 'id',
+          autoIncrement: true,
+        });
+
+        transactionStore.createIndex('account', 'account');
+        transactionStore.createIndex('exchange', 'exchange');
+        transactionStore.createIndex('date', 'date');
+
+        for (const asset of [
+          ...defaultAssets.fiat,
+          ...defaultAssets.cryptocurrencies,
+        ]) {
+          await transaction.objectStore('assets').add({
+            ...asset,
+            symbol: asset.symbol.toUpperCase(),
+            isFiat: asset.hasOwnProperty('roughly_estimated_in_euro') ? 1 : 2,
+          });
+        }
+      }
+    },
+  });
+
+  const wrapObjectStore = (storeName, connection) => ({
+    async get(key) {
+      return (await connection).get(storeName, key);
+    },
+    async getAll() {
+      return (await connection).getAll(storeName);
+    },
+    async set(key, val) {
+      return (await connection).put(storeName, val, key);
+    },
+    async delete(key) {
+      return (await connection).delete(storeName, key);
+    },
+    async clear() {
+      return (await connection).clear(storeName);
+    },
+    async keys() {
+      return (await connection).getAllKeys(storeName);
+    },
+  });
+
+  return {
+    transactions: {
+      ...wrapObjectStore('transactions', database),
+      async add(transaction) {
+        return (await database).add('transactions', transaction);
+      },
+      async put(transaction) {
+        return (await database).put('transactions', transaction);
+      },
+    },
+    assets: {
+      ...wrapObjectStore('assets', database),
+      async getAllFiat() {
+        return (await database).getAllFromIndex(
+          'assets',
+          'isFiat',
+          IDBKeyRange.only(1)
+        );
+      },
+      async getAllCrypto() {
+        return (await database).getAllFromIndex(
+          'assets',
+          'isFiat',
+          IDBKeyRange.only(2)
+        );
+      },
+      async add(asset) {
+        return (await database).add('assets', {
+          ...asset,
+          symbol: asset.symbol.toUpperCase(),
+          id: asset.id.toLowerCase(),
+          isFiat: asset.hasOwnProperty('roughly_estimated_in_euro') ? 1 : 2,
+        });
+      },
+    },
+    accounts: {
+      ...wrapObjectStore('accounts', database),
+      async add(name, pattern) {
+        return (await database).add('accounts', {
+          name: name,
+          pattern: pattern,
+          created: new Date().toISOString().slice(0, 19).replace('T', ' '),
+        });
+      },
+    },
+  };
+};
+
+const storage = setup();
+export default storage;

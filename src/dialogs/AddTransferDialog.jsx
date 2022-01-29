@@ -15,6 +15,7 @@ import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 import moment from 'moment';
 import { SettingsContext } from '../SettingsContext';
+import storage from '../persistence/storage';
 
 const { Item } = Form;
 const { Option } = Select;
@@ -81,15 +82,9 @@ const AddTransferDialog = (props) => {
   }, [overrides, form]);
 
   useEffect(() => {
-    axios
-      .get('http://localhost:5208/assets/sorted')
-      .then((response) => {
-        setAssets(response.data);
-      })
-      .catch((error) => {
-        message.error('Failed to fetch assets');
-        console.warn(error);
-      });
+    storage.assets.getAll().then((currencies) => {
+      setAssets(currencies);
+    });
   }, []);
 
   const classes = useStyles();

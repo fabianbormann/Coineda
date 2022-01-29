@@ -7,6 +7,7 @@ import { AddTransactionDialog, AddTransferDialog } from '../dialogs';
 import axios from 'axios';
 import { ImportDialog } from '../dialogs';
 import { SettingsContext } from '../SettingsContext';
+import storage from '../persistence/storage';
 
 const useStyles = createUseStyles({
   actions: {
@@ -41,15 +42,12 @@ const Tracking = () => {
   const roundCrypto = (value) => Math.round(value * 100000) / 100000;
 
   useEffect(() => {
-    axios
-      .get('http://localhost:5208/assets')
-      .then((response) => {
-        setAssets(response.data);
-      })
-      .catch((error) => {
-        message.error('Failed to fetch assets');
-        console.warn(error);
+    storage.assets.getAll().then((currencies) => {
+      setAssets({
+        fiat: currencies.filter((asset) => asset.isFiat === 1),
+        cryptocurrencies: currencies.filter((asset) => asset.isFiat === 2),
       });
+    });
   }, []);
 
   const fetchExchanges = useCallback(() => {

@@ -28,19 +28,4 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.put('/', async (req, res) => {
-  const { walletType, apiKey, publicAddress, automaticImport, name, id } =
-    req.body;
-  try {
-    await db.executeQuery(
-      'UPDATE exchanges SET walletType=?, apiKey=?, publicAddress=?, automaitcImport=? WHERE id=?',
-      [walletType, apiKey, publicAddress, automaticImport, name, id]
-    );
-    res.status(200).end();
-  } catch (error) {
-    logger.error(error);
-    res.status(500).send('Failed to update exchange.');
-  }
-});
-
 module.exports = router;

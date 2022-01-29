@@ -1,9 +1,3 @@
-const version = {
-  major: 0,
-  minor: 1,
-  patch: 8,
-};
-
 const db = require('./database/helper.js');
 
 const bunyan = require('bunyan');
@@ -194,5 +188,4 @@ module.exports = {
   getAssetSymbol,
   getAssetId,
   getBinanceTokenPair,
-  version,
 };
