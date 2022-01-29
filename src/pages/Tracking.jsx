@@ -61,9 +61,8 @@ const Tracking = () => {
         .find((asset) => asset.id.toLowerCase() === assetId.toLowerCase())
         .symbol.toUpperCase();
     };
-
-    axios
-      .get('http://localhost:5208/transactions/' + account.id)
+    storage.transactions
+      .getAllFromAccount(account.id)
       .then((response) => {
         const formatDateTime = (timestamp) => {
           const date = new Date(timestamp);
@@ -72,7 +71,7 @@ const Tracking = () => {
           } ${date.toLocaleTimeString()}`;
         };
 
-        const data = response.data.map((transaction) => ({
+        const data = response.map((transaction) => ({
           ...transaction,
           fromSymbol: getAssetSymbol(transaction.fromCurrency),
           toSymbol: getAssetSymbol(transaction.toCurrency),
@@ -80,12 +79,12 @@ const Tracking = () => {
           feeCurrency: transaction.feeCurrency.toLowerCase(),
           fromCurrency: transaction.fromCurrency.toLowerCase(),
           toCurrency: transaction.toCurrency.toLowerCase(),
-          date: formatDateTime(transaction.date),
+          date: formatDateTime(transaction.date * 1000),
           key: transaction.id,
         }));
 
         const transactions = data.filter(
-          (transaction) => transaction.parent === null
+          (transaction) => typeof transaction.parent === 'undefined'
         );
 
         for (const transaction of transactions) {
@@ -280,9 +279,9 @@ const Tracking = () => {
     }
 
     try {
-      await axios.delete('http://localhost:5208/transactions', {
-        data: { transactions: [...selectedTransactions, ...children] },
-      });
+      for (const key of [...selectedTransactions, ...children]) {
+        await storage.transactions.delete(key);
+      }
 
       await axios.delete('http://localhost:5208/transfers', {
         data: {
@@ -317,7 +316,7 @@ const Tracking = () => {
 
     let row = rows.find((field) => field.key === selectedRows[0]);
 
-    if (row.isComposed === 1) {
+    if (row.isComposed) {
       row = rows.find((field) => field.key === row.parent);
     }
 
@@ -335,9 +334,9 @@ const Tracking = () => {
     .filter((selection) => typeof selection !== 'undefined');
 
   if (selectedItems) {
-    const parentItems = selectedItems.filter((item) => item.isComposed === 0);
+    const parentItems = selectedItems.filter((item) => !item.isComposed);
     if (parentItems.length < 2) {
-      const childItems = selectedItems.filter((item) => item.isComposed === 1);
+      const childItems = selectedItems.filter((item) => item.isComposed);
 
       if (parentItems.length === 0 && childItems.length > 0) {
         editable = childItems.every(

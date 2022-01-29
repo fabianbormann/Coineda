@@ -66,6 +66,13 @@ const setup = () => {
       async put(transaction) {
         return (await database).put('transactions', transaction);
       },
+      async getAllFromAccount(account) {
+        return (await database).getAllFromIndex(
+          'transactions',
+          'account',
+          IDBKeyRange.only(account)
+        );
+      },
     },
     assets: {
       ...wrapObjectStore('assets', database),

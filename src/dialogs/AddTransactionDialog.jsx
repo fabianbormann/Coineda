@@ -8,22 +8,10 @@ import moment from 'moment';
 import { SettingsContext } from '../SettingsContext';
 import storage from '../persistence/storage';
 
+import { isFiat, TransactionType } from '../helper/common';
+
 const { Item } = Form;
 const { Option } = Select;
-
-const TransactionType = Object.freeze({
-  BUY: 'buy',
-  SELL: 'sell',
-  SEND: 'send',
-  RECEIVE: 'receive',
-  REWARDS: 'rewards',
-  SWAP: 'swap',
-});
-
-const isFiat = async (assetId) => {
-  const currency = await storage.assets.get(assetId);
-  return currency.isFiat === 1;
-};
 
 const useStyles = createUseStyles({
   section: {
@@ -116,20 +104,18 @@ const AddTransactionsDialog = (props) => {
       feeValue,
       feeCurrency,
       date,
-      composedKeys,
-      isComposed,
-      account,
     } = transaction;
 
     const fromCurrencyIsFiat = await isFiat(fromCurrency);
     const toCurrencyIsFiat = await isFiat(toCurrency);
     const children = [];
+    let isSwap = false;
 
     let transactionType = TransactionType.BUY;
     if (!fromCurrencyIsFiat && toCurrencyIsFiat) {
       transactionType = TransactionType.SELL;
     } else if (!fromCurrencyIsFiat && !toCurrencyIsFiat) {
-      isComposed = 1;
+      isSwap = true;
       transactionType = TransactionType.SELL;
       let price = 0;
       const toTimestamp = Math.floor(new Date(date).getTime() / 1000);
@@ -141,7 +127,6 @@ const AddTransactionsDialog = (props) => {
         const response = await axios.get(
           `https://api.coingecko.com/api/v3/coins/${fromCurrency.toLowerCase()}/market_chart/range?vs_currency=eur&from=${fromTimestamp}&to=${toTimestamp}`
         );
-        console.log(response.data);
         price = response.data.prices[0][1];
       } catch (error) {
         console.log(error);
@@ -160,15 +145,14 @@ const AddTransactionsDialog = (props) => {
         toCurrency: 'euro',
         feeValue: feeValue,
         feeCurrency: feeCurrency.toUpperCase(),
-        isComposed: isComposed,
+        isComposed: false,
         parent: undefined,
-        composedKeys: composedKeys,
+        composedKeys: undefined,
         date: date.unix(),
-        account: account,
+        account: account.id,
       };
 
       const key = await storage.transactions.add(sellTransaction);
-
       children.push({
         id: key,
         ...sellTransaction,
@@ -189,11 +173,11 @@ const AddTransactionsDialog = (props) => {
       toCurrency: toCurrency.toUpperCase(),
       feeValue: feeValue,
       feeCurrency: feeCurrency.toUpperCase(),
-      isComposed: isComposed,
+      isComposed: false,
       parent: undefined,
-      composedKeys: composedKeys,
+      composedKeys: undefined,
       date: date.unix(),
-      account: account,
+      account: account.id,
     };
 
     const key = await storage.transactions.add(buyTransaction);
@@ -203,23 +187,23 @@ const AddTransactionsDialog = (props) => {
       ...buyTransaction,
     });
 
-    if (isComposed === 1) {
+    if (isSwap) {
       transactionType = TransactionType.SWAP;
 
       const parent = await storage.transactions.add({
         type: transactionType,
         exchange: exchange,
-        fromValue: children[1].fromValue,
-        fromCurrency: children[1].fromCurrency,
-        toValue: children[0].toValue,
-        toCurrency: children[0].toCurrency,
+        fromValue: children[0].fromValue,
+        fromCurrency: children[0].fromCurrency,
+        toValue: children[1].toValue,
+        toCurrency: children[1].toCurrency,
         feeValue: feeValue,
         feeCurrency: feeCurrency.toUpperCase(),
-        isComposed: 0,
+        isComposed: true,
         parent: undefined,
         composedKeys: `${children[0].id},${children[1].id}`,
         date: date.unix(),
-        account: account,
+        account: account.id,
       });
 
       for (const child of children) {
@@ -231,7 +215,7 @@ const AddTransactionsDialog = (props) => {
     }
   };
 
-  const addTransaction = (values) => {
+  const addTransaction = async (values) => {
     const data = {
       exchange: selectedExchange,
       fromValue: values.from,
@@ -243,30 +227,25 @@ const AddTransactionsDialog = (props) => {
       date: values.date,
     };
 
-    if (typeof updateKey === 'undefined') {
-      createTransaction({
-        ...data,
-        account: account.id,
-      })
-        .catch((error) => {
-          message.error('Failed to add transaction');
-          console.warn(error);
-        })
-        .finally(() => {
-          closeDialog();
-        });
-    } else {
-      data.updateKey = updateKey;
-      axios
-        .put('http://localhost:5208/transactions', data)
-        .catch((error) => {
-          message.error('Failed to update transaction');
-          console.warn(error);
-        })
-        .finally(() => {
-          closeDialog();
-        });
+    if (typeof updateKey !== 'undefined') {
+      const transaction = await storage.transactions.get(updateKey);
+      if (transaction.isComposed) {
+        const children = transaction.composedKeys.split(',');
+        for (const child of children) {
+          storage.transactions.delete(child);
+        }
+      }
+      storage.transactions.delete(updateKey);
     }
+
+    createTransaction(data)
+      .catch((error) => {
+        message.error('Failed to add transaction');
+        console.warn(error);
+      })
+      .finally(() => {
+        closeDialog();
+      });
   };
 
   const filterSearch = (input, option) =>
