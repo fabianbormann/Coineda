@@ -65,7 +65,7 @@ const Main = () => {
       if (accounts.length === 0) {
         accounts = [
           {
-            id: 0,
+            id: 1,
             name: 'Coineda',
             pattern: 'DEFAULT7',
           },

@@ -11,7 +11,6 @@ import {
 import ExchangeManger from '../components/ExchangeManager';
 import { createUseStyles } from 'react-jss';
 import { useEffect, useState, useContext } from 'react';
-import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 import moment from 'moment';
 import { SettingsContext } from '../SettingsContext';
@@ -32,6 +31,7 @@ const AddTransferDialog = (props) => {
   const [toExchange, setToExchange] = useState(null);
   const [feeCurrency, setFeeCurrency] = useState('bitcoin');
   const [currency, setCurrency] = useState('bitcoin');
+  const [refreshExchanges, setRefreshExchanges] = useState(0);
   const [settings] = useContext(SettingsContext);
   const [assets, setAssets] = useState([]);
   const [updateKey, setUpdateKey] = useState();
@@ -98,7 +98,7 @@ const AddTransferDialog = (props) => {
     },
   });
 
-  const submitTransaction = (values) => {
+  const submitTransaction = async (values) => {
     const data = {
       fromExchange: fromExchange,
       toExchange: toExchange,
@@ -106,32 +106,23 @@ const AddTransferDialog = (props) => {
       currency: currency,
       feeValue: values.fee,
       feeCurrency: feeCurrency,
-      date: values.date,
+      date: values.date.unix(),
       account: account.id,
     };
 
-    if (typeof updateKey === 'undefined') {
-      axios
-        .post('http://localhost:5208/transfers', data)
-        .catch((error) => {
-          message.error('Failed to add transfer');
-          console.warn(error);
-        })
-        .finally(() => {
-          closeDialog();
-        });
-    } else {
-      data.id = updateKey;
-      axios
-        .put('http://localhost:5208/transfers', data)
-        .catch((error) => {
-          message.error('Failed to update transfer');
-          console.warn(error);
-        })
-        .finally(() => {
-          closeDialog();
-        });
+    if (typeof updateKey !== 'undefined') {
+      await storage.transfers.delete(updateKey);
     }
+
+    storage.transfers
+      .add(data)
+      .catch((error) => {
+        message.error('Failed to add transfer');
+        console.warn(error);
+      })
+      .finally(() => {
+        closeDialog();
+      });
   };
 
   const filterSearch = (input, option) =>
@@ -157,12 +148,21 @@ const AddTransferDialog = (props) => {
         <ExchangeManger
           showAddExchangeButton={false}
           label={t('From')}
+          refreshExchanges={refreshExchanges}
+          forceRefreshExchanges={() =>
+            setRefreshExchanges(1 - refreshExchanges)
+          }
+          defaultSelectionIndex={0}
           onExchangeSelected={(exchange) => setFromExchange(exchange)}
         />
       </div>
       <div className={classes.section}>
         <ExchangeManger
           label={t('To')}
+          refreshExchanges={refreshExchanges}
+          forceRefreshExchanges={() =>
+            setRefreshExchanges(1 - refreshExchanges)
+          }
           defaultSelectionIndex={1}
           onExchangeSelected={(exchange) => setToExchange(exchange)}
         />

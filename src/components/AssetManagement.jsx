@@ -48,7 +48,7 @@ const AssetManagement = () => {
     if (value.length > 1) {
       const tokenList = JSON.parse(localStorage.getItem('TOKEN_LIST'));
       let results = [];
-      if (tokenList && new Date().getTime() - tokenList.age > 1000 * 60 * 15) {
+      if (tokenList && new Date().getTime() - tokenList.age < 1000 * 60 * 15) {
         results = tokenList.entries.filter(
           (coin) => coin.symbol.toLowerCase() === value.toLowerCase()
         );

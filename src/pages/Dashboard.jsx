@@ -4,13 +4,13 @@ import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 
 import { useTranslation } from 'react-i18next';
 import { createUseStyles } from 'react-jss';
-import axios from 'axios';
+
 import { SettingsContext } from '../SettingsContext';
 import WhenLambo from '../components/WhenLambo';
 import DoughnutChart from '../components/DoughnutChart';
 import storage from '../persistence/storage';
 
-import { isFiat, TransactionType } from '../helper/common';
+import { fetchPrice, isFiat, TransactionType } from '../helper/common';
 
 const useStyles = createUseStyles({
   page: {
@@ -144,18 +144,17 @@ const Dashboard = () => {
     }
 
     try {
-      const ids = Object.keys(coins.cryptocurrencies).join(',');
-      const data = (
-        await axios.get(
-          `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=eur`
-        )
-      ).data;
+      const ids = Object.keys(coins.cryptocurrencies);
+      const data = await fetchPrice(ids);
 
       for (const coin in data) {
         coins.cryptocurrencies[coin].price_in_euro =
-          data[coin].eur * coins.cryptocurrencies[coin].value;
-        coins.cryptocurrencies[coin].current_price = data[coin].eur;
+          data[coin] * coins.cryptocurrencies[coin].value;
+
+        coins.cryptocurrencies[coin].current_price = data[coin];
+
         coins['crypto_total_in_euro'] = coins['crypto_total_in_euro'] || 0;
+
         coins['crypto_total_in_euro'] +=
           coins.cryptocurrencies[coin].price_in_euro;
       }

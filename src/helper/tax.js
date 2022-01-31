@@ -1,13 +1,14 @@
-const express = require('express');
-const router = express.Router();
-const db = require('../database/helper');
+import moment from 'moment';
+import storage from '../persistence/storage';
+import { TransactionType, getAssetSymbol, fetchPrice } from './common';
 
-const { TransactionType, fetchPrice, getAssetSymbol } = require('../common');
-const moment = require('moment');
+const calculateTax = async (account) => {
+  const transactions = await storage.transactions.getAllFromAccount(account);
+  for (const transaction of transactions) {
+    transaction.date = new Date(transaction.date);
+  }
 
-router.get('/:account', async (req, res) => {
-  const sql = 'SELECT * FROM transactions WHERE account=? ORDER BY date';
-  const transactions = await db.executeSelectQuery(sql, [req.params.account]);
+  transactions.sort((a, b) => a.date - b.date);
 
   const coins = {};
 
@@ -127,7 +128,7 @@ router.get('/:account', async (req, res) => {
     }
   }
 
-  return res.json(tax);
-});
+  return tax;
+};
 
-module.exports = router;
+export { calculateTax };

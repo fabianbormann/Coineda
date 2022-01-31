@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useContext } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createUseStyles } from 'react-jss';
 import { AddTransactionDialog, AddTransferDialog } from '../dialogs';
-import axios from 'axios';
+import packageJSON from '../../package.json';
 import { ImportDialog } from '../dialogs';
 import { SettingsContext } from '../SettingsContext';
 import storage from '../persistence/storage';
@@ -50,17 +50,20 @@ const Tracking = () => {
     });
   }, []);
 
-  const fetchExchanges = useCallback(() => {
-    if (assets.fiat.length === 0) {
-      return;
-    }
-
-    const getAssetSymbol = (assetId) => {
+  const getAssetSymbol = useCallback(
+    (assetId) => {
       const { cryptocurrencies, fiat } = assets;
       return [...cryptocurrencies, ...fiat]
         .find((asset) => asset.id.toLowerCase() === assetId.toLowerCase())
         .symbol.toUpperCase();
-    };
+    },
+    [assets]
+  );
+
+  const fetchExchanges = useCallback(() => {
+    if (assets.fiat.length === 0) {
+      return;
+    }
     storage.transactions
       .getAllFromAccount(account.id)
       .then((response) => {
@@ -79,7 +82,7 @@ const Tracking = () => {
           feeCurrency: transaction.feeCurrency.toLowerCase(),
           fromCurrency: transaction.fromCurrency.toLowerCase(),
           toCurrency: transaction.toCurrency.toLowerCase(),
-          date: formatDateTime(transaction.date * 1000),
+          date: formatDateTime(transaction.date),
           key: transaction.id,
         }));
 
@@ -94,10 +97,10 @@ const Tracking = () => {
           }
         }
 
-        axios
-          .get('http://localhost:5208/transfers/' + account.id)
+        storage.transfers
+          .getAllFromAccount(account.id)
           .then((response) => {
-            const transfers = response.data.map((transfer) => ({
+            const transfers = response.map((transfer) => ({
               ...transfer,
               type: 'transfer',
               valueCurrency: transfer.currency,
@@ -125,7 +128,7 @@ const Tracking = () => {
         );
         console.warn(error);
       });
-  }, [assets, account]);
+  }, [assets, account, getAssetSymbol]);
 
   useEffect(() => {
     fetchExchanges();
@@ -203,7 +206,9 @@ const Tracking = () => {
       dataIndex: 'fee',
       key: 'fee',
       render: (value, row, index) => ({
-        children: `${roundCrypto(row.feeValue)} ${row.feeSymbol}`,
+        children: `${roundCrypto(row.feeValue)} ${getAssetSymbol(
+          row.feeCurrency
+        )}`,
         key: row.key,
       }),
     },
@@ -283,13 +288,13 @@ const Tracking = () => {
         await storage.transactions.delete(key);
       }
 
-      await axios.delete('http://localhost:5208/transfers', {
-        data: {
-          transfers: selectedTransfers.map(
-            (transferId) => transferId.split('-')[0]
-          ),
-        },
-      });
+      const transferIds = selectedTransfers.map(
+        (transferId) => transferId.split('-')[0]
+      );
+
+      for (const key of transferIds) {
+        await storage.transfers.delete(Number(key));
+      }
 
       setSelectedRows([]);
       fetchExchanges();
@@ -365,7 +370,58 @@ const Tracking = () => {
           {t('Import')}
         </Button>
         <Button
-          href={`http://localhost:5208/export/${account.id}`}
+          onClick={async () => {
+            const transactions = await storage.transactions.getAllFromAccount(
+              account.id
+            );
+            const transfers = await storage.transfers.getAllFromAccount(
+              account.id
+            );
+
+            let data =
+              '<header>\nformat:coineda\nversion:' +
+              packageJSON.version +
+              '\n</header>\n';
+            data += '<transactions>';
+
+            if (transactions.length > 0) {
+              data += '\n';
+              data += Object.keys(transactions[0]).join(';');
+
+              for (const transaction of transactions) {
+                data += '\n' + Object.values(transaction).join(';');
+              }
+            }
+
+            data += '\n</transactions>\n<transfers>';
+
+            if (transfers.length > 0) {
+              data += '\n';
+              data += Object.keys(transfers[0]).join(';');
+
+              for (const transfer of transfers) {
+                data += '\n' + Object.values(transfer).join(';');
+              }
+            }
+
+            data += '\n</transfers>';
+
+            const filename =
+              'coineda-export-' +
+              new Date().toISOString().split('T')[0] +
+              '.cnd';
+
+            const element = document.createElement('a');
+            element.setAttribute(
+              'href',
+              'data:text/plain;charset=utf-8,' + encodeURIComponent(data)
+            );
+            element.setAttribute('download', filename);
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+          }}
           type="primary"
         >
           {t('Export')}

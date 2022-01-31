@@ -22,6 +22,21 @@ const setup = () => {
         transactionStore.createIndex('exchange', 'exchange');
         transactionStore.createIndex('date', 'date');
 
+        const transferStore = db.createObjectStore('transfers', {
+          keyPath: 'id',
+          autoIncrement: true,
+        });
+
+        transferStore.createIndex('account', 'account');
+        transferStore.createIndex('exchange', 'exchange');
+        transferStore.createIndex('date', 'date');
+
+        const exchangeStore = db.createObjectStore('exchanges', {
+          keyPath: 'id',
+          autoIncrement: true,
+        });
+        exchangeStore.createIndex('name', 'name');
+
         for (const asset of [
           ...defaultAssets.fiat,
           ...defaultAssets.cryptocurrencies,
@@ -55,14 +70,28 @@ const setup = () => {
     async keys() {
       return (await connection).getAllKeys(storeName);
     },
+    async add(val) {
+      return (await connection).add(storeName, val);
+    },
   });
 
   return {
+    transfers: {
+      ...wrapObjectStore('transfers', database),
+      async put(transfer) {
+        return (await database).put('transfers', transfer);
+      },
+      async getAllFromAccount(account) {
+        return (await database).getAllFromIndex(
+          'transfers',
+          'account',
+          IDBKeyRange.only(account)
+        );
+      },
+    },
+    exchanges: wrapObjectStore('exchanges', database),
     transactions: {
       ...wrapObjectStore('transactions', database),
-      async add(transaction) {
-        return (await database).add('transactions', transaction);
-      },
       async put(transaction) {
         return (await database).put('transactions', transaction);
       },
@@ -97,6 +126,13 @@ const setup = () => {
           id: asset.id.toLowerCase(),
           isFiat: asset.hasOwnProperty('roughly_estimated_in_euro') ? 1 : 2,
         });
+      },
+      async getBySymbol(symbol) {
+        return (await database).getAllFromIndex(
+          'assets',
+          'symbol',
+          IDBKeyRange.only(symbol)
+        );
       },
     },
     accounts: {

@@ -2,13 +2,12 @@ import { Modal, Form, Select, Divider, Input, message, DatePicker } from 'antd';
 import ExchangeManger from '../components/ExchangeManager';
 import { createUseStyles } from 'react-jss';
 import { useEffect, useState, useContext } from 'react';
-import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 import moment from 'moment';
 import { SettingsContext } from '../SettingsContext';
 import storage from '../persistence/storage';
 
-import { isFiat, TransactionType } from '../helper/common';
+import { createTransaction } from '../helper/common';
 
 const { Item } = Form;
 const { Option } = Select;
@@ -94,127 +93,6 @@ const AddTransactionsDialog = (props) => {
     },
   });
 
-  const createTransaction = async (transaction) => {
-    let {
-      exchange,
-      fromValue,
-      fromCurrency,
-      toValue,
-      toCurrency,
-      feeValue,
-      feeCurrency,
-      date,
-    } = transaction;
-
-    const fromCurrencyIsFiat = await isFiat(fromCurrency);
-    const toCurrencyIsFiat = await isFiat(toCurrency);
-    const children = [];
-    let isSwap = false;
-
-    let transactionType = TransactionType.BUY;
-    if (!fromCurrencyIsFiat && toCurrencyIsFiat) {
-      transactionType = TransactionType.SELL;
-    } else if (!fromCurrencyIsFiat && !toCurrencyIsFiat) {
-      isSwap = true;
-      transactionType = TransactionType.SELL;
-      let price = 0;
-      const toTimestamp = Math.floor(new Date(date).getTime() / 1000);
-      const fromTimestamp = Math.floor(
-        (new Date(date).getTime() - 1000 * 60 * 60 * 5) / 1000
-      );
-
-      try {
-        const response = await axios.get(
-          `https://api.coingecko.com/api/v3/coins/${fromCurrency.toLowerCase()}/market_chart/range?vs_currency=eur&from=${fromTimestamp}&to=${toTimestamp}`
-        );
-        price = response.data.prices[0][1];
-      } catch (error) {
-        console.log(error);
-        message.error(
-          'Failed to fetch price from CoinGeckoApi. Please try again later.'
-        );
-        return;
-      }
-
-      const sellTransaction = {
-        type: transactionType,
-        exchange: exchange,
-        fromValue: fromValue,
-        fromCurrency: fromCurrency.toUpperCase(),
-        toValue: price * fromValue,
-        toCurrency: 'euro',
-        feeValue: feeValue,
-        feeCurrency: feeCurrency.toUpperCase(),
-        isComposed: false,
-        parent: undefined,
-        composedKeys: undefined,
-        date: date.unix(),
-        account: account.id,
-      };
-
-      const key = await storage.transactions.add(sellTransaction);
-      children.push({
-        id: key,
-        ...sellTransaction,
-      });
-
-      transactionType = TransactionType.BUY;
-
-      fromCurrency = 'euro';
-      fromValue = Math.round(price * fromValue * 100) / 100;
-    }
-
-    const buyTransaction = {
-      type: transactionType,
-      exchange: exchange,
-      fromValue: fromValue,
-      fromCurrency: fromCurrency.toUpperCase(),
-      toValue: toValue,
-      toCurrency: toCurrency.toUpperCase(),
-      feeValue: feeValue,
-      feeCurrency: feeCurrency.toUpperCase(),
-      isComposed: false,
-      parent: undefined,
-      composedKeys: undefined,
-      date: date.unix(),
-      account: account.id,
-    };
-
-    const key = await storage.transactions.add(buyTransaction);
-
-    children.push({
-      id: key,
-      ...buyTransaction,
-    });
-
-    if (isSwap) {
-      transactionType = TransactionType.SWAP;
-
-      const parent = await storage.transactions.add({
-        type: transactionType,
-        exchange: exchange,
-        fromValue: children[0].fromValue,
-        fromCurrency: children[0].fromCurrency,
-        toValue: children[1].toValue,
-        toCurrency: children[1].toCurrency,
-        feeValue: feeValue,
-        feeCurrency: feeCurrency.toUpperCase(),
-        isComposed: true,
-        parent: undefined,
-        composedKeys: `${children[0].id},${children[1].id}`,
-        date: date.unix(),
-        account: account.id,
-      });
-
-      for (const child of children) {
-        storage.transactions.put({
-          ...child,
-          parent: parent,
-        });
-      }
-    }
-  };
-
   const addTransaction = async (values) => {
     const data = {
       exchange: selectedExchange,
@@ -238,7 +116,7 @@ const AddTransactionsDialog = (props) => {
       storage.transactions.delete(updateKey);
     }
 
-    createTransaction(data)
+    createTransaction(data, account.id, message)
       .catch((error) => {
         message.error('Failed to add transaction');
         console.warn(error);
