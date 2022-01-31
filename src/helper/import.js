@@ -1,21 +1,13 @@
-const express = require('express');
-const router = express.Router();
-const db = require('../database/helper');
+import * as XLSX from 'xlsx';
+import storage from '../persistence/storage';
+import axios from 'axios';
 
-const bunyan = require('bunyan');
-const logger = bunyan.createLogger({ name: 'coineda-backend-import' });
-
-const { createTransaction } = require('./transactions.js');
-const {
+import {
   TransactionType,
-  getBinanceTokenPair,
-  getAssetId,
   isFiat,
-} = require('../common.js');
-
-const xlsx = require('xlsx');
-
-const fileUpload = require('express-fileupload');
+  getAssetId,
+  createTransaction,
+} from './common';
 
 const ImportType = Object.freeze({
   COINEDA: 'coineda',
@@ -38,9 +30,43 @@ const inferInputType = (file) => {
   }
 };
 
-const removeDuplicateObjects = async (values, table) => {
-  const sql = 'SELECT * FROM ' + table;
-  let rows = await db.executeSelectQuery(sql);
+const getBinanceTokenPair = async (binanceSymbol) => {
+  const pair = JSON.parse(
+    localStorage.getItem(`binance-pair-${binanceSymbol.toLowerCase()}`)
+  );
+
+  if (pair && new Date().getTime() - pair.age < 365 * 24 * 60 * 60 * 1000) {
+    try {
+      const response = await axios.get(
+        'https://api.binance.com/api/v3/exchangeInfo?symbol=' + binanceSymbol
+      );
+
+      const fromCurrency = response.data.symbols[0].baseAsset;
+      const toCurrency = response.data.symbols[0].quoteAsset;
+
+      localStorage.setItem(
+        `binance-pair-${binanceSymbol.toLowerCase()}`,
+        JSON.stringify({
+          data: { fromCurrency, toCurrency },
+          age: new Date().getTime(),
+        })
+      );
+
+      return { fromCurrency, toCurrency };
+    } catch (error) {
+      console.error(error);
+      return {
+        fromCurrency: null,
+        toCurrency: null,
+      };
+    }
+  } else {
+    return pair.data;
+  }
+};
+
+const removeDuplicateObjects = async (values, objectStore) => {
+  let rows = await storage[objectStore].getAll();
 
   rows = rows.map((row) => {
     return Object.values({ ...row, id: 0 }).reduce(
@@ -163,9 +189,9 @@ const readCoinedaExport = (csvFile) => {
 };
 
 const readBinanceSpotOrderHistory = async (xlsxFile) => {
-  const workbook = xlsx.read(new Uint8Array(xlsxFile), { type: 'array' });
+  const workbook = XLSX.read(new Uint8Array(xlsxFile), { type: 'array' });
   const sheetNameList = workbook.SheetNames;
-  const rows = xlsx.utils.sheet_to_json(workbook.Sheets[sheetNameList[0]]);
+  const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetNameList[0]]);
 
   let transactions = [];
   let importErrors = 0;
@@ -192,7 +218,7 @@ const readBinanceSpotOrderHistory = async (xlsxFile) => {
         fromCurrency = await getAssetId(fromCurrency);
         toCurrency = await getAssetId(toCurrency);
       } catch (error) {
-        logger.warn(error);
+        console.warn(error);
         fromCurrency = null;
         toCurrency = null;
       }
@@ -295,7 +321,7 @@ const readKrakenCSVExport = async (csvFile) => {
     try {
       currency = await getKrakenAssetId(columns[6]);
     } catch (error) {
-      logger.warn(error);
+      console.warn(error);
       importErrors += 1;
     }
 
@@ -334,24 +360,26 @@ const readKrakenCSVExport = async (csvFile) => {
   return { importedTransactions, importErrors };
 };
 
-router.post('/', fileUpload(), async (req, res) => {
-  if (typeof req.files.files === 'undefined') {
-    return res.status(400).send('No files provided');
-  }
+const readFileContent = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      return resolve(event.target.result);
+    };
+    reader.onerror = (error) => {
+      return reject(error);
+    };
 
-  if (typeof req.body.account === 'undefined') {
-    return res.status(400).send('No account provided');
-  }
-  const account = req.body.account;
+    reader.readAsText(file);
+  });
 
+const importFiles = async (files, account) => {
   let errors = 0;
   let transactions = [];
   let transfers = [];
 
-  const files =
-    req.files.files instanceof Array ? req.files.files : [req.files.files];
-
   for (const file of files) {
+    file.data = await readFileContent(file);
     const importType = inferInputType(file);
 
     if (importType === ImportType.BINANCE_SPOT_ORDER_HISTORY) {
@@ -371,7 +399,7 @@ router.post('/', fileUpload(), async (req, res) => {
         transactions = [...transactions, ...importedTransactions];
         errors += importErrors;
       } catch (error) {
-        logger.warn(error);
+        console.warn(error);
         errors += 1;
       }
     } else {
@@ -400,21 +428,21 @@ router.post('/', fileUpload(), async (req, res) => {
     (transaction) => transaction.isComposed !== '1'
   );
 
-  let exchanges = await db.executeSelectQuery('SELECT * FROM exchanges');
+  let exchanges = await storage.exchanges.getAll();
 
   const addExchangeIfNotExists = async (name) => {
     if (exchanges.findIndex((exchange) => exchange.name === name) === -1) {
-      await db.executeQuery('INSERT INTO exchanges (name) VALUES (?)', name);
+      await storage.exchanges.add({ name: name });
       exchanges.push({ name: name });
     }
   };
 
   for (const transaction of transactions) {
     try {
-      await createTransaction({ ...transaction, account: account });
+      await createTransaction(transaction, account);
       await addExchangeIfNotExists(transaction.exchange);
     } catch (error) {
-      logger.error(error);
+      console.error(error);
       if (transaction.type === TransactionType.SWAP) {
         errors += 3;
       } else {
@@ -425,35 +453,24 @@ router.post('/', fileUpload(), async (req, res) => {
 
   for (const transfer of transfers) {
     try {
-      const sql =
-        'INSERT INTO transfers (fromExchange, toExchange, value, currency, feeValue, feeCurrency, date, account) VALUES (?, ?, ?, ?, ?, ?, ?)';
-      await db.executeQuery(sql, [
-        transfer.fromExchange,
-        transfer.toExchange,
-        transfer.value,
-        transfer.currency,
-        transfer.feeValue,
-        transfer.feeCurrency,
-        transfer.date,
-        account,
-      ]);
+      await storage.transfers.add({ ...transfer, account: account });
 
       await addExchangeIfNotExists(transfer.fromExchange);
       await addExchangeIfNotExists(transfer.toExchange);
     } catch (error) {
-      logger.error(error);
+      console.error(error);
       errors += 1;
     }
   }
 
-  return res.json({
+  return {
     inserts: Math.max(
       0,
       totalTransactions + totalTransfers - duplicates - errors
     ),
     duplicates: duplicates,
     errors: errors,
-  });
-});
+  };
+};
 
-module.exports = router;
+export { importFiles };
