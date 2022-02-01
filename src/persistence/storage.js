@@ -89,7 +89,12 @@ const setup = () => {
         );
       },
     },
-    exchanges: wrapObjectStore('exchanges', database),
+    exchanges: {
+      async put(exchange) {
+        return (await database).put('exchanges', exchange);
+      },
+      ...wrapObjectStore('exchanges', database),
+    },
     transactions: {
       ...wrapObjectStore('transactions', database),
       async put(transaction) {

@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import axios from 'axios';
 import { useState, useEffect, useCallback } from 'react';
 import {
   Select,
@@ -15,6 +14,7 @@ import {
 import { SaveOutlined, DeleteOutlined } from '@ant-design/icons';
 import { createUseStyles } from 'react-jss';
 import FloatingLabel from '../components/FloatingLabel';
+import storage from '../persistence/storage';
 
 const { Option } = Select;
 
@@ -60,18 +60,18 @@ const Wallets = () => {
   const [apiKey, setApiKey] = useState('');
 
   const fetchExchanges = useCallback(() => {
-    axios
-      .get('http://localhost:5208/exchange')
+    storage.exchanges
+      .getAll()
       .then((response) => {
-        setExchanges(response.data);
-        if (response.data.length > 0) {
+        setExchanges(response);
+        if (response.length > 0) {
           setSelectedExchange({
-            ...response.data[0],
-            value: response.data[0].id,
-            label: response.data[0].name,
+            ...response[0],
+            value: response[0].id,
+            label: response[0].name,
           });
-          setWalletName(response.data[0].name);
-          setWalletType(response.data[0].walletType);
+          setWalletName(response[0].name);
+          setWalletType(response[0].walletType);
         }
       })
       .catch((error) => {
@@ -88,14 +88,18 @@ const Wallets = () => {
 
   const saveWallet = async () => {
     try {
-      await axios.put('http://localhost:5208/exchange', {
-        walletType: walletType,
-        apiKey: apiKey,
-        publicAddress: walletAddress,
-        automaticImport: false,
-        name: walletName,
-        id: selectedExchange.value,
-      });
+      await storage.exchanges
+        .put({
+          id: selectedExchange.value,
+          walletType: walletType,
+          apiKey: apiKey,
+          publicAddress: walletAddress,
+          automaticImport: false,
+          name: walletName,
+        })
+        .then(() => {
+          message.success('Wallet successfully updated');
+        });
     } catch (error) {
       message.error(
         'Coineda backend is not available. Please restart the application.'
