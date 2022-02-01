@@ -4,9 +4,9 @@ import { DownloadOutlined } from '@ant-design/icons';
 import { createUseStyles } from 'react-jss';
 import { useState, useContext, useCallback, useEffect } from 'react';
 import { SettingsContext } from '../SettingsContext';
+import axios from 'axios';
 import moment from 'moment';
 import GainSummary from '../components/GainSummary';
-import { calculateTax } from '../helper/tax';
 
 const useStyles = createUseStyles({
   actions: {
@@ -64,13 +64,14 @@ const TaxReports = () => {
 
   const fetchSummary = useCallback(() => {
     setLoading(true);
-    calculateTax(account.id)
-      .then((tax) => {
-        setSummary(tax);
+    axios
+      .get('http://localhost:5208/tax/' + account.id)
+      .then((response) => {
+        setSummary(response.data);
       })
       .catch((error) => {
         message.error(
-          'Tax calculation failed. Please restart the application.'
+          'Coineda backend is not available. Please restart the application.'
         );
         console.warn(error);
       })

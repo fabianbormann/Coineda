@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { Select, Space, Divider } from 'antd';
+import axios from 'axios';
+import { useState, useEffect, useCallback } from 'react';
+import { Select, Space, Divider, message } from 'antd';
 import { createUseStyles } from 'react-jss';
 import AccountManagement from '../components/AccountManagement';
 import AssetManagement from '../components/AssetManagement';
@@ -25,12 +27,35 @@ const useStyles = createUseStyles({
 const Settings = () => {
   const { t, i18n } = useTranslation();
   const classes = useStyles();
+  const [settings, setSettings] = useState({});
 
-  const changeLanguage = (value) => {
+  const changeLanguage = async (value) => {
+    setSettings({ language: value, ...settings });
     i18n.changeLanguage(value);
+    await axios.post('http://localhost:5208/settings/language', {
+      language: value,
+    });
   };
 
   const { language } = i18n;
+
+  const fetchSettings = useCallback(() => {
+    axios
+      .get('http://localhost:5208/settings')
+      .then((response) => {
+        setSettings({ ...response.data, language: language });
+      })
+      .catch((error) => {
+        message.error(
+          'Coineda backend is not available. Please restart the application.'
+        );
+        console.warn(error);
+      });
+  }, [language]);
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
 
   return (
     <div className={classes.page}>

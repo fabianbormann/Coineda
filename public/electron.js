@@ -26,6 +26,12 @@ function createWindow() {
   mainWindow.maximize();
 }
 
+let server = null;
+
+if (!isDev) {
+  server = require('./server/index.js').server;
+}
+
 app.whenReady().then(() => {
   createWindow();
 
@@ -36,4 +42,8 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', function () {
   if (process.platform !== 'darwin') app.quit();
+
+  if (!isDev) {
+    server.close();
+  }
 });

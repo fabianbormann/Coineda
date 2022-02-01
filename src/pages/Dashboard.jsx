@@ -4,13 +4,10 @@ import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 
 import { useTranslation } from 'react-i18next';
 import { createUseStyles } from 'react-jss';
-
+import axios from 'axios';
 import { SettingsContext } from '../SettingsContext';
 import WhenLambo from '../components/WhenLambo';
 import DoughnutChart from '../components/DoughnutChart';
-import storage from '../persistence/storage';
-
-import { fetchPrice, isFiat, TransactionType } from '../helper/common';
 
 const useStyles = createUseStyles({
   page: {
@@ -41,137 +38,25 @@ const Dashboard = () => {
 
   const { account } = settings;
 
-  const calculateSummary = useCallback(async () => {
+  const fetchSummary = useCallback(() => {
     setLoading(true);
-
-    const transactions = await storage.transactions.getAllFromAccount(
-      account.id
-    );
-
-    const coins = { cryptocurrencies: {}, fiat: {} };
-
-    const calculateBalance = async (currency, value, add) => {
-      currency = currency.toLowerCase();
-      const target = (await isFiat(currency)) ? 'fiat' : 'cryptocurrencies';
-
-      coins[target][currency] = coins[target][currency] || {};
-
-      if (coins[target][currency].hasOwnProperty('value')) {
-        if (add) {
-          coins[target][currency].value += value;
-        } else {
-          coins[target][currency].value -= value;
-        }
-      } else {
-        if (add) {
-          coins[target][currency].value = value;
-        } else {
-          coins[target][currency].value = -value;
-        }
-      }
-    };
-
-    const assets = await storage.assets.getAllFiat();
-
-    const calculatePurchasePrice = (transaction) => {
-      const targetCurrency = transaction.toCurrency.toLowerCase();
-      if (transaction.type === TransactionType.BUY) {
-        let purchasePrice = transaction.fromValue / transaction.toValue;
-        if (transaction.fromCurrency.toLowerCase() !== 'euro') {
-          const fiat = assets.find(
-            (currency) => currency.id === transaction.fromCurrency.toLowerCase()
-          );
-          purchasePrice =
-            (transaction.fromValue * fiat['roughlyEstimatedInEuro']) /
-            transaction.toValue;
-        }
-
-        if (
-          coins.cryptocurrencies[targetCurrency].hasOwnProperty(
-            'purchase_price'
-          )
-        ) {
-          coins.cryptocurrencies[targetCurrency].purchase_price.push(
-            purchasePrice
-          );
-        } else {
-          coins.cryptocurrencies[targetCurrency].purchase_price = [
-            purchasePrice,
-          ];
-        }
-      }
-    };
-
-    for (const transaction of transactions) {
-      const {
-        fromValue,
-        fromCurrency,
-        toValue,
-        toCurrency,
-        feeValue,
-        feeCurrency,
-      } = transaction;
-
-      if (
-        transaction.type === TransactionType.BUY ||
-        transaction.type === TransactionType.SELL
-      ) {
-        await calculateBalance(toCurrency, toValue, true);
-        await calculateBalance(fromCurrency, fromValue, false);
-        await calculateBalance(feeCurrency, feeValue, false);
-        calculatePurchasePrice(transaction);
-      }
-    }
-
-    coins['inconsistency'] = { negativeValue: [] };
-
-    for (const coin of Object.keys(coins.cryptocurrencies)) {
-      if (coins.cryptocurrencies[coin].value === 0) {
-        delete coins.cryptocurrencies[coin];
-      } else if (coins.cryptocurrencies[coin].value < 0) {
-        coins.inconsistency.negativeValue.push({
-          ...coins.cryptocurrencies[coin],
-          name: coin,
-        });
-        delete coins.cryptocurrencies[coin];
-      } else {
-        coins.cryptocurrencies[coin].purchase_price =
-          coins.cryptocurrencies[coin].purchase_price.reduce(
-            (previous, current) => current + previous,
-            0
-          ) / coins.cryptocurrencies[coin].purchase_price.length;
-      }
-    }
-
-    try {
-      const ids = Object.keys(coins.cryptocurrencies);
-      const data = await fetchPrice(ids);
-
-      for (const coin in data) {
-        coins.cryptocurrencies[coin].price_in_euro =
-          data[coin] * coins.cryptocurrencies[coin].value;
-
-        coins.cryptocurrencies[coin].current_price = data[coin];
-
-        coins['crypto_total_in_euro'] = coins['crypto_total_in_euro'] || 0;
-
-        coins['crypto_total_in_euro'] +=
-          coins.cryptocurrencies[coin].price_in_euro;
-      }
-
-      setSummary(coins);
-      setLoading(false);
-    } catch (error) {
-      console.error(error);
-      message.error('Unable to fetch meta data from coingecko.');
-      setLoading(false);
-      return;
-    }
+    axios
+      .get('http://localhost:5208/dashboard/summary/' + account.id)
+      .then((response) => {
+        setSummary(response.data);
+      })
+      .catch((error) => {
+        message.error(
+          'Coineda backend is not available. Please restart the application.'
+        );
+        console.warn(error);
+      })
+      .finally(() => setLoading(false));
   }, [account]);
 
   useEffect(() => {
-    calculateSummary();
-  }, [calculateSummary]);
+    fetchSummary();
+  }, [fetchSummary]);
 
   const data = [];
   let total = 0;

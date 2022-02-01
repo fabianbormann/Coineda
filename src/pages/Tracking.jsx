@@ -4,10 +4,9 @@ import { useEffect, useState, useCallback, useContext } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createUseStyles } from 'react-jss';
 import { AddTransactionDialog, AddTransferDialog } from '../dialogs';
-import packageJSON from '../../package.json';
+import axios from 'axios';
 import { ImportDialog } from '../dialogs';
 import { SettingsContext } from '../SettingsContext';
-import storage from '../persistence/storage';
 
 const useStyles = createUseStyles({
   actions: {
@@ -42,30 +41,31 @@ const Tracking = () => {
   const roundCrypto = (value) => Math.round(value * 100000) / 100000;
 
   useEffect(() => {
-    storage.assets.getAll().then((currencies) => {
-      setAssets({
-        fiat: currencies.filter((asset) => asset.isFiat === 1),
-        cryptocurrencies: currencies.filter((asset) => asset.isFiat === 2),
+    axios
+      .get('http://localhost:5208/assets')
+      .then((response) => {
+        setAssets(response.data);
+      })
+      .catch((error) => {
+        message.error('Failed to fetch assets');
+        console.warn(error);
       });
-    });
   }, []);
-
-  const getAssetSymbol = useCallback(
-    (assetId) => {
-      const { cryptocurrencies, fiat } = assets;
-      return [...cryptocurrencies, ...fiat]
-        .find((asset) => asset.id.toLowerCase() === assetId.toLowerCase())
-        .symbol.toUpperCase();
-    },
-    [assets]
-  );
 
   const fetchExchanges = useCallback(() => {
     if (assets.fiat.length === 0) {
       return;
     }
-    storage.transactions
-      .getAllFromAccount(account.id)
+
+    const getAssetSymbol = (assetId) => {
+      const { cryptocurrencies, fiat } = assets;
+      return [...cryptocurrencies, ...fiat]
+        .find((asset) => asset.id.toLowerCase() === assetId.toLowerCase())
+        .symbol.toUpperCase();
+    };
+
+    axios
+      .get('http://localhost:5208/transactions/' + account.id)
       .then((response) => {
         const formatDateTime = (timestamp) => {
           const date = new Date(timestamp);
@@ -74,7 +74,7 @@ const Tracking = () => {
           } ${date.toLocaleTimeString()}`;
         };
 
-        const data = response.map((transaction) => ({
+        const data = response.data.map((transaction) => ({
           ...transaction,
           fromSymbol: getAssetSymbol(transaction.fromCurrency),
           toSymbol: getAssetSymbol(transaction.toCurrency),
@@ -87,7 +87,7 @@ const Tracking = () => {
         }));
 
         const transactions = data.filter(
-          (transaction) => typeof transaction.parent === 'undefined'
+          (transaction) => transaction.parent === null
         );
 
         for (const transaction of transactions) {
@@ -97,10 +97,10 @@ const Tracking = () => {
           }
         }
 
-        storage.transfers
-          .getAllFromAccount(account.id)
+        axios
+          .get('http://localhost:5208/transfers/' + account.id)
           .then((response) => {
-            const transfers = response.map((transfer) => ({
+            const transfers = response.data.map((transfer) => ({
               ...transfer,
               type: 'transfer',
               valueCurrency: transfer.currency,
@@ -128,7 +128,7 @@ const Tracking = () => {
         );
         console.warn(error);
       });
-  }, [assets, account, getAssetSymbol]);
+  }, [assets, account]);
 
   useEffect(() => {
     fetchExchanges();
@@ -206,9 +206,7 @@ const Tracking = () => {
       dataIndex: 'fee',
       key: 'fee',
       render: (value, row, index) => ({
-        children: `${roundCrypto(row.feeValue)} ${getAssetSymbol(
-          row.feeCurrency
-        )}`,
+        children: `${roundCrypto(row.feeValue)} ${row.feeSymbol}`,
         key: row.key,
       }),
     },
@@ -284,17 +282,17 @@ const Tracking = () => {
     }
 
     try {
-      for (const key of [...selectedTransactions, ...children]) {
-        await storage.transactions.delete(key);
-      }
+      await axios.delete('http://localhost:5208/transactions', {
+        data: { transactions: [...selectedTransactions, ...children] },
+      });
 
-      const transferIds = selectedTransfers.map(
-        (transferId) => transferId.split('-')[0]
-      );
-
-      for (const key of transferIds) {
-        await storage.transfers.delete(Number(key));
-      }
+      await axios.delete('http://localhost:5208/transfers', {
+        data: {
+          transfers: selectedTransfers.map(
+            (transferId) => transferId.split('-')[0]
+          ),
+        },
+      });
 
       setSelectedRows([]);
       fetchExchanges();
@@ -321,7 +319,7 @@ const Tracking = () => {
 
     let row = rows.find((field) => field.key === selectedRows[0]);
 
-    if (row.isComposed) {
+    if (row.isComposed === 1) {
       row = rows.find((field) => field.key === row.parent);
     }
 
@@ -339,9 +337,9 @@ const Tracking = () => {
     .filter((selection) => typeof selection !== 'undefined');
 
   if (selectedItems) {
-    const parentItems = selectedItems.filter((item) => !item.isComposed);
+    const parentItems = selectedItems.filter((item) => item.isComposed === 0);
     if (parentItems.length < 2) {
-      const childItems = selectedItems.filter((item) => item.isComposed);
+      const childItems = selectedItems.filter((item) => item.isComposed === 1);
 
       if (parentItems.length === 0 && childItems.length > 0) {
         editable = childItems.every(
@@ -370,58 +368,7 @@ const Tracking = () => {
           {t('Import')}
         </Button>
         <Button
-          onClick={async () => {
-            const transactions = await storage.transactions.getAllFromAccount(
-              account.id
-            );
-            const transfers = await storage.transfers.getAllFromAccount(
-              account.id
-            );
-
-            let data =
-              '<header>\nformat:coineda\nversion:' +
-              packageJSON.version +
-              '\n</header>\n';
-            data += '<transactions>';
-
-            if (transactions.length > 0) {
-              data += '\n';
-              data += Object.keys(transactions[0]).join(';');
-
-              for (const transaction of transactions) {
-                data += '\n' + Object.values(transaction).join(';');
-              }
-            }
-
-            data += '\n</transactions>\n<transfers>';
-
-            if (transfers.length > 0) {
-              data += '\n';
-              data += Object.keys(transfers[0]).join(';');
-
-              for (const transfer of transfers) {
-                data += '\n' + Object.values(transfer).join(';');
-              }
-            }
-
-            data += '\n</transfers>';
-
-            const filename =
-              'coineda-export-' +
-              new Date().toISOString().split('T')[0] +
-              '.cnd';
-
-            const element = document.createElement('a');
-            element.setAttribute(
-              'href',
-              'data:text/plain;charset=utf-8,' + encodeURIComponent(data)
-            );
-            element.setAttribute('download', filename);
-            element.style.display = 'none';
-            document.body.appendChild(element);
-            element.click();
-            document.body.removeChild(element);
-          }}
+          href={`http://localhost:5208/export/${account.id}`}
           type="primary"
         >
           {t('Export')}

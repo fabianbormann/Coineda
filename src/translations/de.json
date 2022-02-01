@@ -17,6 +17,7 @@
     "Export": "Export",
     "Delete": "Löschen",
     "Edit": "Bearbeiten",
+    "Save": "Speichern",
     "Select an exchange or a wallet": "Wähle eine Börse oder ein Wallet aus",
     "Add new exchange or wallet": "Neue Börse oder Wallet hinzufügen",
     "From": "Von",
@@ -36,6 +37,8 @@
     "Selled asset summary": "Verkauf von {{value}} {{symbol}} am {{date}} für {{fiat}}. Durch deine Haltedauer von {{days}} Tagen hast du damit {{gains}} realisiert.",
     "approx": "ungefähr",
     "Settings": "Einstellungen",
-    "Language": "Sprache"
+    "Language": "Sprache",
+    "Ethereum Wallet": "Non-Custodial Ethereum Wallet (z.B. MetaMask)",
+    "Other": "Andere"
   }
 }

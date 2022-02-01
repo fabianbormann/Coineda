@@ -1,9 +1,11 @@
+import React from 'react';
 import { Layout, Menu, Avatar } from 'antd';
 import {
   AreaChartOutlined,
   DiffOutlined,
   AuditOutlined,
   ToolOutlined,
+  WalletOutlined,
 } from '@ant-design/icons';
 import { createUseStyles } from 'react-jss';
 import './App.css';
@@ -14,12 +16,12 @@ import {
   Link,
   useLocation,
 } from 'react-router-dom';
-import { Dashboard, Tracking, TaxReports, Settings } from './pages';
+import { Dashboard, Tracking, TaxReports, Settings, Wallets } from './pages';
 import { useTranslation } from 'react-i18next';
 import { useState, useContext, useEffect } from 'react';
 import { SettingsContext, defaultSettings } from './SettingsContext';
+import axios from 'axios';
 import GeoPattern from 'geopattern';
-import storage from './persistence/storage';
 
 const { Content, Footer, Sider } = Layout;
 
@@ -58,28 +60,16 @@ const Main = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [collapsing, setCollapsing] = useState(false);
   const [settings, updateSettings] = useContext(SettingsContext);
-  const { account } = settings;
+  const { backendUrl, account } = settings;
 
   useEffect(() => {
-    storage.accounts.getAll().then((accounts) => {
-      if (accounts.length === 0) {
-        accounts = [
-          {
-            id: 1,
-            name: 'Coineda',
-            pattern: 'DEFAULT7',
-          },
-        ];
-
-        storage.accounts.add(accounts[0].name, accounts[0].pattern);
-      }
-
-      let activeAccount = localStorage.getItem('activeAccount');
-      let selectedAccount = accounts[0];
+    axios.get(`${backendUrl}/accounts`).then((response) => {
+      let activeAccount = document.localStorage.getItem('activeAccount');
+      let selectedAccount = response.data[0];
 
       if (typeof activeAccount !== 'undefined') {
         selectedAccount =
-          accounts.find((account) => account.name === activeAccount) ||
+          response.data.find((account) => account.name === activeAccount) ||
           selectedAccount;
       }
 
@@ -88,7 +78,7 @@ const Main = () => {
         account: selectedAccount,
       }));
     });
-  }, [updateSettings]);
+  }, [backendUrl, updateSettings]);
 
   return (
     <Layout>
@@ -152,6 +142,9 @@ const Main = () => {
           <Menu.Item key="/reports" icon={<AuditOutlined />}>
             <Link to="/reports">{t('Tax Reports')}</Link>
           </Menu.Item>
+          <Menu.Item key="/wallets" icon={<WalletOutlined />}>
+            <Link to="/wallets">{t('Wallets')}</Link>
+          </Menu.Item>
           <Menu.Item key="/settings" icon={<ToolOutlined />}>
             <Link to="/settings">{t('Settings')}</Link>
           </Menu.Item>
@@ -167,6 +160,7 @@ const Main = () => {
               <Route path="/" element={<Dashboard />} />
               <Route path="/tracking/*" element={<Tracking />} />
               <Route path="/reports/*" element={<TaxReports />} />
+              <Route path="/wallets/*" element={<Wallets />} />
               <Route path="/settings/*" element={<Settings />} />
             </Routes>
           </div>
@@ -184,9 +178,7 @@ const App = () => {
 
   return (
     <SettingsContext.Provider value={[settings, updateSettings]}>
-      <Router>
-        <Main />
-      </Router>
+      <Router>{/*<Main />*/}</Router>
     </SettingsContext.Provider>
   );
 };

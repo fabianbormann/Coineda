@@ -1,9 +1,9 @@
 import { Upload, Modal, message } from 'antd';
 import { InboxOutlined } from '@ant-design/icons';
 import { useState, useContext } from 'react';
+import axios from 'axios';
 import { useTranslation, Trans } from 'react-i18next';
 import { SettingsContext } from '../SettingsContext';
-import { importFiles } from '../helper/import';
 
 const { Dragger } = Upload;
 
@@ -11,7 +11,6 @@ const ImportDialog = (props) => {
   const { t } = useTranslation();
   const [files, setFiles] = useState([]);
   const [settings] = useContext(SettingsContext);
-  const { account } = settings;
   const [uploading, setUploading] = useState(false);
 
   const addFile = (file) => {
@@ -32,20 +31,25 @@ const ImportDialog = (props) => {
   };
 
   const handleUpload = async () => {
+    const data = new FormData();
+    data.append('account', settings.account.id);
+
+    for (const file of files) {
+      data.append('files', file);
+    }
+
     try {
-      const { inserts, duplicates, errors } = await importFiles(
-        files,
-        account.id
-      );
+      const response = (await axios.post('http://localhost:5208/import', data))
+        .data;
+
+      const { inserts, duplicates, errors } = response;
 
       if (duplicates === 0 && errors === 0 && inserts > 0) {
         message.success(
           t('Transactions successfully uploaded', { inserts: inserts })
         );
       } else {
-        message.warning(
-          t('Transactions partially uploaded', { inserts, duplicates, errors })
-        );
+        message.warning(t('Transactions partially uploaded', response));
       }
 
       setFiles([]);

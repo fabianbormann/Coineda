@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import axios from 'axios';
 import { message, Input, Select, Button } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { createUseStyles } from 'react-jss';
 import { useTranslation } from 'react-i18next';
-import storage from '../persistence/storage';
+import { SettingsContext } from '../SettingsContext';
 
 const { Search } = Input;
 const { Option } = Select;
@@ -38,41 +38,20 @@ const useStyles = createUseStyles({
 });
 
 const AssetManagement = () => {
+  const [settings] = useContext(SettingsContext);
   const classes = useStyles();
   const { t } = useTranslation();
   const [searchResults, setSearchResults] = useState([]);
   const [selectedAsset, setSelectedAsset] = useState();
   const [searchText, setSearchText] = useState('');
+  const { backendUrl } = settings;
 
   const onSearch = async (value) => {
     if (value.length > 1) {
-      const tokenList = JSON.parse(localStorage.getItem('TOKEN_LIST'));
-      let results = [];
-      if (tokenList && new Date().getTime() - tokenList.age < 1000 * 60 * 15) {
-        results = tokenList.entries.filter(
-          (coin) => coin.symbol.toLowerCase() === value.toLowerCase()
-        );
-      } else {
-        try {
-          const coins = await axios.get(
-            'https://api.coingecko.com/api/v3/coins/list'
-          );
-
-          localStorage.setItem(
-            'TOKEN_LIST',
-            JSON.stringify({ entries: coins.data, age: new Date().getTime() })
-          );
-          results = coins.data.filter(
-            (coin) => coin.symbol.toLowerCase() === value.toLowerCase()
-          );
-        } catch (error) {
-          console.log(error);
-        }
-      }
-
-      setSearchResults(results);
-      if (results.length > 0) {
-        setSelectedAsset(results[0].id);
+      const response = await axios.get(`${backendUrl}/assets/search/${value}`);
+      setSearchResults(response.data);
+      if (response.data.length > 0) {
+        setSelectedAsset(response.data[0].id);
       } else {
         setSelectedAsset();
         message.info(
@@ -90,13 +69,14 @@ const AssetManagement = () => {
   const addAsset = async () => {
     const asset = searchResults.find((result) => result.id === selectedAsset);
     try {
-      const existingAsset = await storage.assets.get(asset.id);
-      if (existingAsset) {
+      const response = await axios.post(`${backendUrl}/assets`, {
+        asset: asset,
+      });
+      if (response.status === 203) {
         message.info(
           t(`${asset.name} (${asset.symbol}) is already on your list of assets`)
         );
-      } else {
-        await storage.assets.add(asset);
+      } else if (response.status === 200) {
         message.success(
           t(
             `Successfully added ${asset.name} (${asset.symbol}) to your asset list`
@@ -105,7 +85,7 @@ const AssetManagement = () => {
       }
     } catch (error) {
       message.error(
-        'Asset persistence failed. Please restart the application.'
+        'Coineda backend is not available. Please restart the application.'
       );
       console.warn(error);
     } finally {
