@@ -74,13 +74,6 @@
   "resolutions": {
     "react-error-overlay": "6.0.9"
   },
-  "jest": {
-    "testEnvironment": "node",
-    "rootDir": "src/server",
-    "coveragePathIgnorePatterns": [
-      "/node_modules/"
-    ]
-  },
   "build": {
     "appId": "io.coineda.app",
     "mac": {
