@@ -118,18 +118,14 @@ const AssetManagement = () => {
   return (
     <div className={classes.content}>
       <p className={classes.headline}>{t('Asset Management')}</p>
-      <p>
-        Not all assets were added by default because the selection menu would be
-        overloaded with the number of available tokens. However, you can easily
-        search and add missing assets.
-      </p>
+      <p>{t('Asset Explanation')}</p>
       <Search
-        placeholder="input a symbol e.g. btc"
+        placeholder={t('Asset input placeholder')}
         allowClear
         className={classes.search}
         value={searchText}
         onChange={(event) => setSearchText(event.target.value)}
-        enterButton="Search"
+        enterButton={t('Search')}
         onSearch={onSearch}
       />
       {searchResults.length > 0 && (
