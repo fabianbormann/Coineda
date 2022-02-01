@@ -1,4 +1,3 @@
-import React from 'react';
 import { Layout, Menu, Avatar } from 'antd';
 import {
   AreaChartOutlined,
@@ -20,8 +19,8 @@ import { Dashboard, Tracking, TaxReports, Settings, Wallets } from './pages';
 import { useTranslation } from 'react-i18next';
 import { useState, useContext, useEffect } from 'react';
 import { SettingsContext, defaultSettings } from './SettingsContext';
-import axios from 'axios';
 import GeoPattern from 'geopattern';
+import storage from './persistence/storage';
 
 const { Content, Footer, Sider } = Layout;
 
@@ -60,16 +59,28 @@ const Main = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [collapsing, setCollapsing] = useState(false);
   const [settings, updateSettings] = useContext(SettingsContext);
-  const { backendUrl, account } = settings;
+  const { account } = settings;
 
   useEffect(() => {
-    axios.get(`${backendUrl}/accounts`).then((response) => {
-      let activeAccount = document.localStorage.getItem('activeAccount');
-      let selectedAccount = response.data[0];
+    storage.accounts.getAll().then((accounts) => {
+      if (accounts.length === 0) {
+        accounts = [
+          {
+            id: 1,
+            name: 'Coineda',
+            pattern: 'DEFAULT7',
+          },
+        ];
+
+        storage.accounts.add(accounts[0].name, accounts[0].pattern);
+      }
+
+      let activeAccount = localStorage.getItem('activeAccount');
+      let selectedAccount = accounts[0];
 
       if (typeof activeAccount !== 'undefined') {
         selectedAccount =
-          response.data.find((account) => account.name === activeAccount) ||
+          accounts.find((account) => account.name === activeAccount) ||
           selectedAccount;
       }
 
@@ -78,7 +89,7 @@ const Main = () => {
         account: selectedAccount,
       }));
     });
-  }, [backendUrl, updateSettings]);
+  }, [updateSettings]);
 
   return (
     <Layout>
@@ -178,7 +189,9 @@ const App = () => {
 
   return (
     <SettingsContext.Provider value={[settings, updateSettings]}>
-      <Router>{/*<Main />*/}</Router>
+      <Router>
+        <Main />
+      </Router>
     </SettingsContext.Provider>
   );
 };

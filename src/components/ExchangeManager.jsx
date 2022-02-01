@@ -1,9 +1,9 @@
 import { message, Select, Button, Space, Input } from 'antd';
 import { PlusCircleOutlined } from '@ant-design/icons';
 import { useCallback, useEffect, useState } from 'react';
-import axios from 'axios';
 import { createUseStyles } from 'react-jss';
 import { useTranslation } from 'react-i18next';
+import storage from '../persistence/storage';
 
 const useStyles = createUseStyles({
   grow: {
@@ -35,36 +35,40 @@ const ExchangeManger = (props) => {
   const classes = useStyles();
   const { t } = useTranslation();
 
-  const { onExchangeSelected } = props;
+  const {
+    onExchangeSelected,
+    defaultSelectionIndex,
+    label,
+    showAddExchangeButton,
+    refreshExchanges,
+    forceRefreshExchanges,
+  } = props;
 
   const fetchExchanges = useCallback((defaultSelectionIndex) => {
-    axios
-      .get('http://localhost:5208/exchange')
-      .then((response) => {
-        setExchanges(response.data);
-        if (response.data.length > defaultSelectionIndex) {
+    storage.exchanges
+      .getAll()
+      .then((results) => {
+        setExchanges(results);
+        if (results.length > defaultSelectionIndex) {
           setSelectedExchange({
-            value: response.data[defaultSelectionIndex].id,
-            label: response.data[defaultSelectionIndex].name,
+            value: results[defaultSelectionIndex].id,
+            label: results[defaultSelectionIndex].name,
           });
-        } else if (response.data.length > 0) {
+        } else if (results.length > 0) {
           setSelectedExchange({
-            value: response.data[0].id,
-            label: response.data[0].name,
+            value: results[0].id,
+            label: results[0].name,
           });
         }
       })
       .catch((error) => {
-        message.error(
-          'Coineda backend is not available. Please restart the application.'
-        );
         console.warn(error);
       });
   }, []);
 
   useEffect(() => {
-    fetchExchanges(props.defaultSelectionIndex);
-  }, [fetchExchanges, props.defaultSelectionIndex]);
+    fetchExchanges(defaultSelectionIndex);
+  }, [fetchExchanges, defaultSelectionIndex, refreshExchanges]);
 
   useEffect(() => {
     if (typeof selectedExchange !== 'undefined') {
@@ -73,9 +77,12 @@ const ExchangeManger = (props) => {
   }, [selectedExchange, onExchangeSelected]);
 
   const addExchange = () => {
-    axios
-      .post('http://localhost:5208/exchange', { name: newExchangeName })
-      .then(() => fetchExchanges())
+    storage.exchanges
+      .add({ name: newExchangeName })
+      .then(() => {
+        forceRefreshExchanges();
+        fetchExchanges();
+      })
       .catch((error) => {
         message.error('Failed to add exchange/wallet');
         console.warn(error);
@@ -86,12 +93,12 @@ const ExchangeManger = (props) => {
       });
   };
 
-  const label = props.label ? <span>{props.label}:</span> : null;
+  const text = label ? <span>{label}:</span> : null;
 
   return (
     <Space direction="vertical" className={classes.grow}>
       <div className={classes.wrapper}>
-        {label}
+        {text}
         <Select
           labelInValue
           placeholder={t('Select an exchange or a wallet')}
@@ -99,7 +106,7 @@ const ExchangeManger = (props) => {
           disabled={exchanges.length === 0}
           className={classes.grow}
           onChange={(option) => {
-            props.onExchangeSelected(option.label);
+            onExchangeSelected(option.label);
             setSelectedExchange(option);
           }}
         >
@@ -124,7 +131,7 @@ const ExchangeManger = (props) => {
             }
           />
         </div>
-      ) : props.showAddExchangeButton ? (
+      ) : showAddExchangeButton ? (
         <Button
           onClick={() => setInputVisible(true)}
           type="primary"
@@ -144,6 +151,8 @@ ExchangeManger.defaultProps = {
   },
   showAddExchangeButton: true,
   defaultSelectionIndex: 0,
+  forceRefreshExchanges: () => {},
+  refreshExchanges: 0,
 };
 
 export default ExchangeManger;
