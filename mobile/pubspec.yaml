@@ -62,7 +62,6 @@ flutter:
     - assets/index.html
     - assets/assets/
     - assets/icons/
-    - assets/server/
     - assets/static/css/
     - assets/static/js/
     - assets/static/media/

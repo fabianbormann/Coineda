@@ -1,9 +1,5 @@
 # Coineda Mobile
 
-Coineda Mobile
-
-## Getting Started
-
 Coineda Mobile is a flutter application that wraps the Coineda React App within a local
 running WebView.
 
