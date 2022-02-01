@@ -38,7 +38,14 @@
     "approx": "approx.",
     "Settings": "Settings",
     "Language": "Language",
+    "General": "General",
+    "Account Management": "Account Management",
+    "Add Account": "Add Account",
+    "Search": "Search",
+    "Asset Management": "Asset Management",
+    "Asset Explanation": "Not all assets were added by default because the selection menu would be overloaded with the number of available tokens. However, you can easily search and add missing assets.",
     "Ethereum Wallet": "Non-Custodial Ethereum Wallet (e.g. MetaMask)",
+    "Asset input placeholder": "input a symbol e.g. btc",
     "Other": "Other"
   }
 }

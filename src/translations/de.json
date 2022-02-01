@@ -38,6 +38,13 @@
     "approx": "ungefähr",
     "Settings": "Einstellungen",
     "Language": "Sprache",
+    "General": "Allgemein",
+    "Account Management": "Account Management",
+    "Add Account": "Account hinzufügen",
+    "Search": "Suche",
+    "Asset Management": "Asset Management",
+    "Asset Explanation": "Nicht alle Assets sind standardmäßig verfügbar, da die Masse an Token das Menü unbenutzbar machen würden. Allerdings können bei Bedarf Token gesucht und hinzugefügt werden.",
+    "Asset input placeholder": "Gib ein Symbol ein z.B. BTC",
     "Ethereum Wallet": "Non-Custodial Ethereum Wallet (z.B. MetaMask)",
     "Other": "Andere"
   }
