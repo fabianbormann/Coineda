@@ -4,7 +4,7 @@
 
 Coineda aims to be a free to use, open source and local running crypto track and tax tool
 
-<img src="https://user-images.githubusercontent.com/1525818/140197814-83013769-8de1-4496-8bac-a0e6feac19fd.gif" height="400"/>
+<img src="https://user-images.githubusercontent.com/1525818/140197814-83013769-8de1-4496-8bac-a0e6feac19fd.gif" width="100%"/>
 
 ## :exclamation: Disclaimer
 
