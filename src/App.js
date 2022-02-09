@@ -50,6 +50,9 @@ const useStyles = createUseStyles({
     justifyContent: 'center',
     transition: 'margin-left 250ms ease-in-out',
   },
+  footer: {
+    textAlign: 'center',
+  },
 });
 
 const Main = () => {
@@ -90,6 +93,8 @@ const Main = () => {
       }));
     });
   }, [updateSettings]);
+
+  const smallScreen = window.screen.width < 768;
 
   return (
     <Layout>
@@ -165,7 +170,7 @@ const Main = () => {
         <Content>
           <div
             className={classes.content}
-            style={{ marginLeft: collapsed ? 80 : 200 }}
+            style={{ marginLeft: collapsed || smallScreen ? 80 : 200 }}
           >
             <Routes>
               <Route path="/" element={<Dashboard />} />
@@ -176,7 +181,10 @@ const Main = () => {
             </Routes>
           </div>
         </Content>
-        <Footer style={{ textAlign: 'center' }}>
+        <Footer
+          className={classes.footer}
+          style={{ marginLeft: collapsed || smallScreen ? 80 : 200 }}
+        >
           Coineda ©2021 Created by Fabian Bormann
         </Footer>
       </Layout>
