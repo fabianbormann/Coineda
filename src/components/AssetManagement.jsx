@@ -15,7 +15,7 @@ const useStyles = createUseStyles({
     flexDirection: 'column',
   },
   search: {
-    width: 300,
+    maxWidth: 300,
   },
   selection: {
     width: '50%',

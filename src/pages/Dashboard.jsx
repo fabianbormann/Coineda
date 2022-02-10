@@ -211,7 +211,7 @@ const Dashboard = () => {
       {summary.hasOwnProperty('crypto_total_in_euro') ? (
         <>
           <Row>
-            <Col sm={24} md={18} lg={12}>
+            <Col sm={24} md={18} lg={12} style={{ width: '100%' }}>
               <Card>
                 <DoughnutChart
                   label={`${Math.round(total * 100) / 100} €`}
@@ -228,7 +228,13 @@ const Dashboard = () => {
                     summary.cryptocurrencies[account].value) -
                 1;
               return (
-                <Col sm={12} md={6} lg={4} key={account}>
+                <Col
+                  sm={12}
+                  md={6}
+                  lg={4}
+                  key={account}
+                  style={{ width: '50%' }}
+                >
                   <Card>
                     <Statistic
                       title={account.replace('-', ' ')}
@@ -253,13 +259,15 @@ const Dashboard = () => {
             })}
           </Row>
           <Row>
-            <Col sm={24} md={12}>
+            <Col sm={24} md={12} style={{ width: '100%' }}>
               <WhenLambo value={summary.crypto_total_in_euro} />
             </Col>
           </Row>
         </>
       ) : (
-        !loading && <Empty description={t('No Transactions')} />
+        !loading && (
+          <Empty style={{ marginTop: 24 }} description={t('No Transactions')} />
+        )
       )}
     </div>
   );

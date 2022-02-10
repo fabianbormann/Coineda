@@ -33,7 +33,6 @@ const useStyles = createUseStyles({
     color: '#2F4858',
   },
   form: {
-    width: '80%',
     maxWidth: 500,
     minWidth: 100,
     display: 'flex',
@@ -205,7 +204,7 @@ const Wallets = () => {
           {walletType === 'ethereum' && ethereumWalletContent}
           {walletType === 'binance' && binanceWalletContent}
           <Divider />
-          <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+          <Space>
             <Button onClick={saveWallet} icon={<SaveOutlined />} type="primary">
               {t('Save')}
             </Button>
