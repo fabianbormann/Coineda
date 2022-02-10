@@ -212,7 +212,14 @@ const Tracking = () => {
     if (entry.type === 'transfer') {
       await storage.transfers.delete(entry.id);
     } else {
-      await storage.transactions.delete(entry.id);
+      let entries = [entry];
+      if (entry.hasOwnProperty('children')) {
+        entries = [...entries, ...entry.children];
+      }
+
+      for (const action of entries) {
+        await storage.transactions.delete(action.id);
+      }
     }
     fetchExchanges();
   };
