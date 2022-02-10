@@ -76,7 +76,9 @@ const createTransaction = async (transaction, account, message) => {
       parent: undefined,
       composedKeys: undefined,
       date:
-        typeof date === 'object' ? date.unix * 1000 : new Date(date).getTime(),
+        typeof date === 'object'
+          ? date.unix() * 1000
+          : new Date(date).getTime(),
       account: account,
     };
 
@@ -105,7 +107,7 @@ const createTransaction = async (transaction, account, message) => {
     parent: undefined,
     composedKeys: undefined,
     date:
-      typeof date === 'object' ? date.unix * 1000 : new Date(date).getTime(),
+      typeof date === 'object' ? date.unix() * 1000 : new Date(date).getTime(),
     account: account,
   };
 
@@ -132,7 +134,9 @@ const createTransaction = async (transaction, account, message) => {
       parent: undefined,
       composedKeys: `${children[0].id},${children[1].id}`,
       date:
-        typeof date === 'object' ? date.unix * 1000 : new Date(date).getTime(),
+        typeof date === 'object'
+          ? date.unix() * 1000
+          : new Date(date).getTime(),
       account: account,
     });
 

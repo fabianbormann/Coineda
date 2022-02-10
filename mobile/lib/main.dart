@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:flutter/services.dart';
 
 InAppLocalhostServer localhostServer = new InAppLocalhostServer();
 
 void main() async {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+        statusBarColor: Color(0xff006e7c), // status bar color
+    ));
     WidgetsFlutterBinding.ensureInitialized();
     await localhostServer.start();
     runApp(const MyApp());
@@ -54,9 +59,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(children: <Widget>[
-        Expanded(
-          child: InAppWebView(
+      body: SafeArea(child: InAppWebView(
             initialUrlRequest: URLRequest(
                 url: Uri.parse("http://localhost:8080/assets/index.html")
             ),
@@ -64,8 +67,7 @@ class _MyHomePageState extends State<MyHomePage> {
             onLoadStart: (controller, url) {},
             onLoadStop: (controller, url) {},
           ),
-        )]
-      ),
-    );
+        )
+      );
   }
 }
