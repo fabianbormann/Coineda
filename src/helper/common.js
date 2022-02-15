@@ -31,6 +31,10 @@ const createTransaction = async (transaction, account, message) => {
   toValue = Number(toValue);
   feeValue = Number(feeValue);
 
+  if (typeof date === 'string') {
+    date = Number(date);
+  }
+
   const fromCurrencyIsFiat = await isFiat(fromCurrency);
   const toCurrencyIsFiat = await isFiat(toCurrency);
   const children = [];

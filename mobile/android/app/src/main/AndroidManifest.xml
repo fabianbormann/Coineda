@@ -1,7 +1,9 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="io.coineda.mobile.coineda_mobile">
-   <application
-        android:label="coineda_mobile"
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="io.coineda.mobile.coineda_mobile">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:label="Coineda"
         android:usesCleartextTraffic="true"
         android:icon="@mipmap/ic_launcher">
         <activity
