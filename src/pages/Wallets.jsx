@@ -10,6 +10,7 @@ import {
   Alert,
   Switch,
   Tooltip,
+  Popconfirm,
 } from 'antd';
 import { SaveOutlined, DeleteOutlined } from '@ant-design/icons';
 import { createUseStyles } from 'react-jss';
@@ -100,9 +101,18 @@ const Wallets = () => {
           message.success('Wallet successfully updated');
         });
     } catch (error) {
-      message.error(
-        'Coineda backend is not available. Please restart the application.'
-      );
+      message.error('Failed to save wallet information.');
+      console.warn(error);
+    }
+  };
+
+  const deleteWallet = async () => {
+    try {
+      await storage.exchanges.delete(selectedExchange.value).then(() => {
+        fetchExchanges();
+      });
+    } catch (error) {
+      message.error('Failed to delete the wallet');
       console.warn(error);
     }
   };
@@ -208,7 +218,14 @@ const Wallets = () => {
             <Button onClick={saveWallet} icon={<SaveOutlined />} type="primary">
               {t('Save')}
             </Button>
-            <Button icon={<DeleteOutlined />}>{t('Delete')}</Button>
+            <Popconfirm
+              title="Are you sure to delete this wallet?"
+              onConfirm={deleteWallet}
+              okText="Yes"
+              cancelText="No"
+            >
+              <Button icon={<DeleteOutlined />}>{t('Delete')}</Button>
+            </Popconfirm>
           </Space>
         </Space>
       </div>

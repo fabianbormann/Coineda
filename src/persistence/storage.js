@@ -35,7 +35,7 @@ const setup = () => {
           keyPath: 'id',
           autoIncrement: true,
         });
-        exchangeStore.createIndex('name', 'name');
+        exchangeStore.createIndex('name', 'name', { unique: true });
 
         for (const asset of [
           ...defaultAssets.fiat,
