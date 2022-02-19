@@ -11,6 +11,7 @@ import DoughnutChart from '../components/DoughnutChart';
 import storage from '../persistence/storage';
 
 import { fetchPrice, isFiat, TransactionType } from '../helper/common';
+import HistoryChart from '../components/HistoryChart';
 
 const useStyles = createUseStyles({
   page: {
@@ -175,9 +176,11 @@ const Dashboard = () => {
 
   const data = [];
   let total = 0;
+  let currencies = [];
 
   if (summary.hasOwnProperty('crypto_total_in_euro')) {
     for (const account of Object.keys(summary.cryptocurrencies)) {
+      currencies.push(account);
       data.push({
         type: account.replace('-', ' '),
         Amount: summary.cryptocurrencies[account].value,
@@ -211,6 +214,11 @@ const Dashboard = () => {
       {summary.hasOwnProperty('crypto_total_in_euro') ? (
         <>
           <Row>
+            <Col sm={24} md={18} lg={12} style={{ width: '100%' }}>
+              <Card>
+                <HistoryChart currencies={currencies} />
+              </Card>
+            </Col>
             <Col sm={24} md={18} lg={12} style={{ width: '100%' }}>
               <Card>
                 <DoughnutChart

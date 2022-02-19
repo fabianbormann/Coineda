@@ -115,6 +115,13 @@ const TaxReports = () => {
   const isBelowLimit = totalGain < 600;
   const tax = isBelowLimit ? 0 : totalGain * 0.5;
 
+  let disclaimerVisible =
+    localStorage.getItem('coineda.show.discalimer') || true;
+
+  if (disclaimerVisible === 'false') {
+    disclaimerVisible = false;
+  }
+
   return (
     <div className={classes.page}>
       {loading ? (
@@ -123,6 +130,19 @@ const TaxReports = () => {
         </div>
       ) : (
         <>
+          {' '}
+          {disclaimerVisible && (
+            <Alert
+              message="Disclaimer"
+              showIcon
+              description="Coineda does not provide tax, legal or accounting advices. The provided dashboard and rudimentary tax calculations may contain errors, are incorrect for your country or doesn't cover all tax relevant regulations. Those calculations are developed to the best of my knowledge but I'm not a tax export and I do not take any responsibility for incorrect calculations."
+              type="warning"
+              closeText="Got it"
+              onClose={() => {
+                localStorage.setItem('coineda.show.discalimer', false);
+              }}
+            />
+          )}
           <p className={classes.headline}>{t('Tax Year')}</p>
           <DatePicker
             style={{ maxWidth: 200, marginBottom: 16 }}

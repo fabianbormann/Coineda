@@ -247,6 +247,9 @@ const Tracking = () => {
   ];
 
   const now = moment();
+  const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|Opera Mini/i.test(
+    navigator.userAgent
+  );
 
   for (const operation of dataSource) {
     const daysSinceNow = now.diff(moment(operation.date), 'days');
@@ -283,24 +286,28 @@ const Tracking = () => {
             onClick={openAddTransferDialog}
           />
         </Tooltip>
-        <Tooltip title={t('Export')}>
-          <Button
-            size="large"
-            type="primary"
-            shape="circle"
-            icon={<ExportOutlined />}
-            onClick={() => exportData(account.id)}
-          />
-        </Tooltip>
-        <Tooltip title={t('Import')}>
-          <Button
-            size="large"
-            type="primary"
-            shape="circle"
-            icon={<ImportOutlined />}
-            onClick={openImportDialog}
-          />
-        </Tooltip>
+        {!isMobileDevice && (
+          <Tooltip title={t('Export')}>
+            <Button
+              size="large"
+              type="primary"
+              shape="circle"
+              icon={<ExportOutlined />}
+              onClick={() => exportData(account.id)}
+            />
+          </Tooltip>
+        )}
+        {!isMobileDevice && (
+          <Tooltip title={t('Import')}>
+            <Button
+              size="large"
+              type="primary"
+              shape="circle"
+              icon={<ImportOutlined />}
+              onClick={openImportDialog}
+            />
+          </Tooltip>
+        )}
       </Space>
 
       <div className={classes.container}>

@@ -172,6 +172,82 @@ const getAssetSymbol = async (id) => {
   }
 };
 
+const getPurchaseValue = async (currency, account) => {
+  let transactions = await storage.transactions.getAllFromAccount(account);
+  transactions = transactions.filter(
+    (transaction) =>
+      (transaction.fromCurrency === currency.toUpperCase() ||
+        transaction.toCurrency === currency.toUpperCase()) &&
+      transaction.type !== TransactionType.SWAP
+  );
+
+  let buyTransactions = transactions.filter(
+    (transaction) => transaction.type === TransactionType.BUY
+  );
+  let sellTransactions = transactions.filter(
+    (transaction) => transaction.type === TransactionType.SELL
+  );
+
+  buyTransactions = buyTransactions.map((transaction) => ({
+    ...transaction,
+    value: transaction.toValue,
+  }));
+  buyTransactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+  sellTransactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  for (const sellTransaction of sellTransactions) {
+    let amount = Number(sellTransaction.fromValue);
+
+    while (amount > 0 && buyTransactions.length > 0) {
+      let value = Number(buyTransactions[0].value) - amount;
+
+      if (value > 0) {
+        buyTransactions[0].value = value;
+        amount = 0;
+      } else {
+        amount -= Number(buyTransactions[0].value);
+        buyTransactions.shift();
+      }
+    }
+  }
+
+  if (buyTransactions.length > 0) {
+    let purchaseValue = 0;
+    for (const buyTransaction of buyTransactions) {
+      purchaseValue +=
+        (Number(buyTransaction.fromValue) / Number(buyTransaction.toValue)) *
+        Number(buyTransaction.value);
+    }
+
+    return purchaseValue;
+  } else {
+    return 0;
+  }
+};
+
+const getCoinCount = async (currency, date, account) => {
+  let transactions = await storage.transactions.getAllFromAccount(account);
+
+  transactions = transactions.filter(
+    (transaction) =>
+      (transaction.fromCurrency === currency.toUpperCase() ||
+        transaction.toCurrency === currency.toUpperCase()) &&
+      transaction.type !== TransactionType.SWAP &&
+      transaction.date <= date.getTime()
+  );
+
+  let count = 0;
+  for (const transaction of transactions) {
+    if (transaction.type === TransactionType.BUY) {
+      count += transaction.toValue;
+    } else if (transaction.type === TransactionType.SELL) {
+      count += transaction.fromValue;
+    }
+  }
+
+  return count;
+};
+
 const fetchPrice = async (currency, date = null) => {
   let fetchSingle = true;
   if (typeof currency !== 'string') {
@@ -281,5 +357,7 @@ export {
   getAssetSymbol,
   createTransaction,
   fetchPrice,
+  getCoinCount,
   colors,
+  getPurchaseValue,
 };
