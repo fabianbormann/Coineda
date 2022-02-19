@@ -1,4 +1,4 @@
-import { Layout, Menu, Avatar } from 'antd';
+import { Layout, Menu } from 'antd';
 import {
   AreaChartOutlined,
   DiffOutlined,
@@ -19,8 +19,8 @@ import { Dashboard, Tracking, TaxReports, Settings, Wallets } from './pages';
 import { useTranslation } from 'react-i18next';
 import { useState, useContext, useEffect } from 'react';
 import { SettingsContext, defaultSettings } from './SettingsContext';
-import GeoPattern from 'geopattern';
 import storage from './persistence/storage';
+import Blockies from 'react-blockies';
 
 const { Content, Footer, Sider } = Layout;
 
@@ -31,6 +31,9 @@ const useStyles = createUseStyles({
     alignItems: 'center',
     padding: '12px 12px 6px 12px',
     fontWeight: 600,
+  },
+  blockie: {
+    borderRadius: '50%',
   },
   accountRow: {
     paddingTop: 12,
@@ -119,11 +122,10 @@ const Main = () => {
               : { justifyContent: 'flex-start', marginLeft: 2 }
           }
         >
-          <Avatar
-            style={{
-              backgroundImage: GeoPattern.generate(account.pattern).toDataUrl(),
-              backgroundSize: 'cover',
-            }}
+          <Blockies
+            seed={account.pattern}
+            size={8}
+            className={classes.blockie}
           />
           <span
             style={

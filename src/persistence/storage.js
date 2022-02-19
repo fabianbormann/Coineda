@@ -5,10 +5,12 @@ const setup = () => {
   const database = openDB('Coineda', 1, {
     async upgrade(db, oldVersion, _newVersion, transaction) {
       if (oldVersion < 1) {
-        db.createObjectStore('accounts', {
+        const accountStorage = db.createObjectStore('accounts', {
           keyPath: 'id',
           autoIncrement: true,
         });
+        accountStorage.createIndex('name', 'name', { unique: true });
+
         const assetStorage = db.createObjectStore('assets', { keyPath: 'id' });
         assetStorage.createIndex('symbol', 'symbol');
         assetStorage.createIndex('isFiat', 'isFiat');

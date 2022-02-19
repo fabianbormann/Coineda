@@ -7,7 +7,6 @@ import {
 } from '@ant-design/icons';
 import {
   Button,
-  Avatar,
   message,
   Popconfirm,
   Modal,
@@ -16,7 +15,7 @@ import {
   Menu,
 } from 'antd';
 import { createUseStyles } from 'react-jss';
-import GeoPattern from 'geopattern';
+import Blockies from 'react-blockies';
 import { useTranslation } from 'react-i18next';
 import { SettingsContext } from '../SettingsContext';
 import storage from '../persistence/storage';
@@ -27,6 +26,11 @@ const useStyles = createUseStyles({
   },
   row: {
     width: 176,
+    display: 'flex',
+    alignItems: 'center',
+  },
+  blockie: {
+    borderRadius: '50%',
   },
   content: {
     display: 'flex',
@@ -59,6 +63,8 @@ const useStyles = createUseStyles({
     justifyContent: 'space-between',
     '& > :first-child': {
       minWidth: 180,
+      display: 'flex',
+      alignItems: 'center',
     },
   },
   headline: {
@@ -125,13 +131,10 @@ const AccountManagement = () => {
       {accounts.map((account) => (
         <Menu.Item key={account.name}>
           <div className={classes.row}>
-            <Avatar
-              style={{
-                backgroundImage: GeoPattern.generate(
-                  account.pattern
-                ).toDataUrl(),
-                backgroundSize: 'cover',
-              }}
+            <Blockies
+              seed={account.pattern}
+              size={8}
+              className={classes.blockie}
             />
             <span className={classes.name}>{account.name}</span>
           </div>
@@ -152,13 +155,10 @@ const AccountManagement = () => {
         <div className={classes.selected}>
           <Dropdown overlay={menu}>
             <span onClick={(e) => e.preventDefault()}>
-              <Avatar
-                style={{
-                  backgroundImage: GeoPattern.generate(
-                    settings.account.pattern
-                  ).toDataUrl(),
-                  backgroundSize: 'cover',
-                }}
+              <Blockies
+                seed={settings.account.pattern}
+                size={8}
+                className={classes.blockie}
               />
               <span className={classes.name}>{settings.account.name}</span>
               <DownOutlined style={{ marginLeft: 8 }} />
@@ -196,12 +196,7 @@ const AccountManagement = () => {
         <div className={classes.content}>
           <div className={classes.field}>
             <span>Pattern:</span>
-            <Avatar
-              style={{
-                backgroundImage: GeoPattern.generate(pattern).toDataUrl(),
-                backgroundSize: 'cover',
-              }}
-            />
+            <Blockies seed={pattern} size={8} className={classes.blockie} />
             <Button
               type="primary"
               icon={<ReloadOutlined />}
