@@ -30,7 +30,8 @@ const Settings = () => {
     i18n.changeLanguage(value);
   };
 
-  const { language } = i18n;
+  let { language } = i18n;
+  language = language.split('-')[0];
 
   return (
     <div className={classes.page}>
