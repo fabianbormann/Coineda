@@ -144,6 +144,9 @@ const setup = () => {
     },
     accounts: {
       ...wrapObjectStore('accounts', database),
+      async put(account) {
+        return (await database).put('accounts', account);
+      },
       async add(name, pattern) {
         return (await database).add('accounts', {
           name: name,

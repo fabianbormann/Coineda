@@ -20,6 +20,11 @@ import { useTranslation } from 'react-i18next';
 import { SettingsContext } from '../SettingsContext';
 import storage from '../persistence/storage';
 
+const DialogMode = Object.freeze({
+  ADD: 'add',
+  EDIT: 'edit',
+});
+
 const useStyles = createUseStyles({
   name: {
     marginLeft: 8,
@@ -81,13 +86,16 @@ const AccountManagement = () => {
   const classes = useStyles();
   const { t } = useTranslation();
   const [accounts, setAccounts] = useState([]);
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [accountName, setAccountName] = useState('');
 
   const generateRandomString = () =>
     (Math.random().toString(36) + '00000000000000000').slice(2, 8 + 2);
 
   const [pattern, setPattern] = useState(generateRandomString());
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogTitle, setDialogTitle] = useState(t('Add Account'));
+  const [dialogMode, setDialogMode] = useState(DialogMode.ADD);
 
   useEffect(() => {
     const fetchAccounts = async () => {
@@ -98,23 +106,46 @@ const AccountManagement = () => {
   }, []);
 
   const submit = async () => {
-    try {
-      await storage.accounts.add(accountName, pattern);
-      const updatedAccounts = await storage.accounts.getAll();
-      setAccounts(updatedAccounts);
-      updateSettings((prevSettings) => ({
-        ...prevSettings,
-        account: updatedAccounts[updatedAccounts.length - 1],
-      }));
-    } catch (error) {
-      message.error(
-        'Failed to save the account. Please restart the application.'
-      );
-      console.warn(error);
-    } finally {
-      setAccountName('');
-      setPattern(generateRandomString());
-      setDialogOpen(false);
+    if (dialogMode === DialogMode.ADD) {
+      try {
+        await storage.accounts.add(accountName, pattern);
+        const updatedAccounts = await storage.accounts.getAll();
+        setAccounts(updatedAccounts);
+        updateSettings((prevSettings) => ({
+          ...prevSettings,
+          account: updatedAccounts[updatedAccounts.length - 1],
+        }));
+      } catch (error) {
+        message.error(
+          'Failed to save the account. Please restart the application.'
+        );
+        console.warn(error);
+      } finally {
+        setDialogOpen(false);
+      }
+    } else {
+      try {
+        await storage.accounts.put({
+          id: settings.account.id,
+          name: accountName,
+          pattern: pattern,
+        });
+        const updatedAccounts = await storage.accounts.getAll();
+        setAccounts(updatedAccounts);
+        updateSettings((prevSettings) => ({
+          ...prevSettings,
+          account: updatedAccounts.find(
+            (account) => account.id === settings.account.id
+          ),
+        }));
+      } catch (error) {
+        message.error(
+          'Failed to save the account. Please restart the application.'
+        );
+        console.warn(error);
+      } finally {
+        setDialogOpen(false);
+      }
     }
   };
 
@@ -143,10 +174,45 @@ const AccountManagement = () => {
     </Menu>
   );
 
-  const editAccount = () => {
+  const addAccount = () => {
+    setDialogTitle(t('Add Account'));
+    setDialogMode(DialogMode.ADD);
+    setPattern(generateRandomString());
+    setAccountName('');
     setDialogOpen(true);
   };
-  const deleteAccount = () => {};
+
+  const editAccount = () => {
+    setDialogTitle(t('Edit Account'));
+    setDialogMode(DialogMode.EDIT);
+    setPattern(settings.account.pattern);
+    setAccountName(settings.account.name);
+    setDialogOpen(true);
+  };
+
+  const deleteAccount = async () => {
+    if (settings.account.id === 1) {
+      message.warn(
+        t('This account is protected by default and cannot be removed')
+      );
+      return;
+    }
+
+    try {
+      await storage.accounts.delete(settings.account.id);
+      const updatedAccounts = await storage.accounts.getAll();
+      setAccounts(updatedAccounts);
+      updateSettings((prevSettings) => ({
+        ...prevSettings,
+        account: updatedAccounts[0],
+      }));
+    } catch (error) {
+      message.error(
+        'Failed to delete the account. Please try again or contact the support.'
+      );
+      console.warn(error);
+    }
+  };
 
   return (
     <>
@@ -167,27 +233,23 @@ const AccountManagement = () => {
           <div className={classes.actions}>
             <Button icon={<EditOutlined />} onClick={editAccount} />
             <Popconfirm
-              title="Are you sure to delete this account?"
+              title={t('Are you sure to delete this account?')}
               onConfirm={deleteAccount}
-              okText="Yes"
-              cancelText="No"
+              okText={t('Yes')}
+              cancelText={t('No')}
             >
               <Button danger icon={<DeleteOutlined />} />
             </Popconfirm>
           </div>
         </div>
-        <Button
-          type="primary"
-          style={{ marginTop: 12 }}
-          onClick={() => setDialogOpen(true)}
-        >
+        <Button type="primary" style={{ marginTop: 12 }} onClick={addAccount}>
           {t('Add Account')}
         </Button>
       </div>
       <Modal
         visible={dialogOpen}
         onOk={submit}
-        title={t('Add Account')}
+        title={dialogTitle}
         okButtonProps={{
           disabled: accountName.length === 0,
         }}
