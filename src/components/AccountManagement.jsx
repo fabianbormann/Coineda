@@ -249,6 +249,7 @@ const AccountManagement = () => {
       <Modal
         visible={dialogOpen}
         onOk={submit}
+        cancelText={t('Cancel')}
         title={dialogTitle}
         okButtonProps={{
           disabled: accountName.length === 0,
@@ -257,7 +258,7 @@ const AccountManagement = () => {
       >
         <div className={classes.content}>
           <div className={classes.field}>
-            <span>Pattern:</span>
+            <span>{t('Pattern:')}</span>
             <Blockies seed={pattern} size={8} className={classes.blockie} />
             <Button
               type="primary"
@@ -266,7 +267,7 @@ const AccountManagement = () => {
                 setPattern(generateRandomString());
               }}
             >
-              New Pattern
+              {t('New Pattern')}
             </Button>
           </div>
           <div className={classes.field}>
