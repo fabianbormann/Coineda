@@ -13,6 +13,7 @@ const ImportType = Object.freeze({
   COINEDA: 'coineda',
   BINANCE_SPOT_ORDER_HISTORY: 'binance_spot_order_history',
   KRAKEN_CSV_EXPORT: 'kraken_csv_export',
+  COINTRACKING_CSV_EXPORT: 'cointracking_csv_export',
   UNKNOWN: 'unknown',
 });
 
@@ -24,7 +25,11 @@ const inferInputType = (file) => {
   } else if (filename.endsWith('.xlsx')) {
     return ImportType.BINANCE_SPOT_ORDER_HISTORY;
   } else if (filename.endsWith('.csv')) {
-    return ImportType.KRAKEN_CSV_EXPORT;
+    if (isCointrackingCSV(file.data)) {
+      return ImportType.COINTRACKING_CSV_EXPORT;
+    } else {
+      return ImportType.KRAKEN_CSV_EXPORT;
+    }
   } else {
     return ImportType.UNKNOWN;
   }
@@ -302,6 +307,72 @@ const getKrakenAssetId = async (symbol) => {
   }
 };
 
+const isCointrackingCSV = async (csvFile) => {
+  const rows = csvFile.toString().split('\n');
+  const header = rows[0];
+
+  return header[2] === 'Cur.' && header[4] === 'Cur.' && header[6] === 'Cur.';
+};
+
+const readCointrackingCSVExport = async (csvFile) => {
+  const rows = csvFile.toString().split('\n');
+  rows.shift();
+  let importedTransactions = [];
+  let importErrors = 0;
+
+  for (const row of rows) {
+    if (row === '') {
+      continue;
+    }
+    const columns = row.split('"').join('').split(',');
+    let type = columns[0];
+
+    let fromCurrency = null;
+    let toCurrency = null;
+
+    try {
+      toCurrency = await getAssetId(columns[2]);
+      fromCurrency = await getAssetId(columns[4]);
+    } catch (error) {
+      console.warn(error);
+      importErrors += 1;
+    }
+
+    if (fromCurrency && toCurrency) {
+      const feeValue = Number(columns[5]);
+      let feeCurrency = 'bitcoin';
+
+      if (columns[6] !== '') {
+        try {
+          feeCurrency = await getAssetId(columns[6]);
+        } catch (error) {
+          if (feeValue > 0) {
+            importErrors += 1;
+            console.warn(error);
+            type = 'invalid';
+          }
+        }
+      }
+
+      if (type === 'Trade') {
+        importedTransactions.push({
+          exchange: columns[7],
+          isComposed: 0,
+          fromCurrency: fromCurrency,
+          fromValue: Number(columns[3]),
+          toCurrency: toCurrency,
+          toValue: Number(columns[1]),
+          feeCurrency: feeCurrency,
+          feeValue: feeValue,
+          date: new Date(columns[10]).getTime(),
+        });
+      }
+    }
+  }
+
+  return { importedTransactions, importErrors };
+};
+
 const readKrakenCSVExport = async (csvFile) => {
   const rows = csvFile.toString().split('\n');
   rows.shift();
@@ -397,6 +468,17 @@ const importFiles = async (files, account) => {
           file.data
         );
         transactions = [...transactions, ...importedTransactions];
+        errors += importErrors;
+      } catch (error) {
+        console.warn(error);
+        errors += 1;
+      }
+    } else if (importType === ImportType.COINTRACKING_CSV_EXPORT) {
+      try {
+        let { importedTransactions, importErrors } =
+          await readCointrackingCSVExport(file.data);
+        transactions = [...transactions, ...importedTransactions];
+        console.log(transactions);
         errors += importErrors;
       } catch (error) {
         console.warn(error);

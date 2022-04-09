@@ -187,7 +187,7 @@ const Main = () => {
           className={classes.footer}
           style={{ marginLeft: collapsed || smallScreen ? 80 : 200 }}
         >
-          Coineda ©2021 Created by Fabian Bormann
+          Coineda ©2022 made with ❤️ Fabian Bormann
         </Footer>
       </Layout>
     </Layout>
