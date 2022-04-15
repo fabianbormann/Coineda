@@ -4,6 +4,7 @@ import {
   DiffOutlined,
   AuditOutlined,
   ToolOutlined,
+  ExclamationCircleOutlined,
   WalletOutlined,
 } from '@ant-design/icons';
 import { createUseStyles } from 'react-jss';
@@ -15,7 +16,14 @@ import {
   Link,
   useLocation,
 } from 'react-router-dom';
-import { Dashboard, Tracking, TaxReports, Settings, Wallets } from './pages';
+import {
+  Dashboard,
+  Tracking,
+  TaxReports,
+  Settings,
+  Wallets,
+  Issues,
+} from './pages';
 import { useTranslation } from 'react-i18next';
 import { useState, useContext, useEffect } from 'react';
 import { SettingsContext, defaultSettings } from './SettingsContext';
@@ -166,6 +174,9 @@ const Main = () => {
           <Menu.Item key="/settings" icon={<ToolOutlined />}>
             <Link to="/settings">{t('Settings')}</Link>
           </Menu.Item>
+          <Menu.Item key="/issues" icon={<ExclamationCircleOutlined />}>
+            <Link to="/issues">{t('Issues')}</Link>
+          </Menu.Item>
         </Menu>
       </Sider>
       <Layout>
@@ -180,6 +191,7 @@ const Main = () => {
               <Route path="/reports/*" element={<TaxReports />} />
               <Route path="/wallets/*" element={<Wallets />} />
               <Route path="/settings/*" element={<Settings />} />
+              <Route path="/issues/*" element={<Issues />} />
             </Routes>
           </div>
         </Content>
@@ -187,7 +199,7 @@ const Main = () => {
           className={classes.footer}
           style={{ marginLeft: collapsed || smallScreen ? 80 : 200 }}
         >
-          Coineda ©2022 made with ❤️ Fabian Bormann
+          Coineda ©2022 made with ❤️ by Fabian Bormann
         </Footer>
       </Layout>
     </Layout>

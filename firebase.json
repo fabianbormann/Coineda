@@ -1,0 +1,7 @@
+{
+  "hosting": {
+    "site": "coineda-app",
+    "public": "build",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+  }
+}
