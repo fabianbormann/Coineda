@@ -9,8 +9,8 @@
     "Currency": "Currency",
     "Please select different exchanges": "Please select different exchanges or wallets for your transfer",
     "Import": "Import",
-    "UploadFieldText": "Click or drag file to this area to upload",
-    "UploadFieldHint": "Support for a single or bulk upload",
+    "UploadFieldText": "Click or drag file(s) to this upload area",
+    "UploadFieldHint": "Supports Coineda, Binance (Spot Order History), Kraken CSV exports, Cointracking CSV exports",
     "File type is not supported": "File typ is not supported (.{{fileType}})",
     "Transactions successfully uploaded": "{{inserts}} transactions successfully imported",
     "Transactions partially uploaded": "{{inserts}} transactions successfully imported. {{duplicates}} were duplicates. {{errors}} errors",
@@ -46,6 +46,17 @@
     "Asset Explanation": "Not all assets were added by default because the selection menu would be overloaded with the number of available tokens. However, you can easily search and add missing assets.",
     "Ethereum Wallet": "Non-Custodial Ethereum Wallet (e.g. MetaMask)",
     "Asset input placeholder": "input a symbol e.g. btc",
-    "Other": "Other"
+    "Other": "Other",
+    "Cancel": "Cancel",
+    "Pattern:": "Pattern:",
+    "New Pattern": "New pattern",
+    "Edit Account": "Edit account",
+    "Yes": "Yes",
+    "No": "No",
+    "Are you sure to delete this account?": "Are you sure to delete this account?",
+    "Disclaimer": "Disclaimer",
+    "Disclaimer Text": "Coineda does not provide tax, legal or accounting advices. The provided dashboard and rudimentary tax calculations may contain errors, are incorrect for your country or doesn't cover all tax relevant regulations. Those calculations are developed to the best of my knowledge but I'm not a tax export and I do not take any responsibility for incorrect calculations.",
+    "Got it": "Got it",
+    "Tax Year": "Tax Year"
   }
 }

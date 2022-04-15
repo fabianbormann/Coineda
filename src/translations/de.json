@@ -9,8 +9,8 @@
     "Currency": "Währung",
     "Please select different exchanges": "Wähle bitte unterschiedliche Börsen für den Transfer aus.",
     "Import": "Import",
-    "UploadFieldText": "Das Hochladen der Dateien ist durch Klicken oder Hineinziehen möglich.",
-    "UploadFieldHint": "Unterstützt Einzel- und Sammel-Uploads",
+    "UploadFieldText": "Das Hochladen der Datei(en) ist durch Klicken oder Hineinziehen möglich.",
+    "UploadFieldHint": "Unterstützt Coineda, Binance (Spot Order History), Kraken CSV exports, Cointracking CSV exports",
     "File type is not supported": "Der Dateityp wird nicht unterstützt (.{{fileType}})",
     "Transactions successfully uploaded": "{{inserts}} Transaktionen wurden erfolgreich importiert",
     "Transactions partially uploaded": "{{inserts}} Transaktionen wurden erfolgreich importiert. {{duplicates}} waren Duplikate. {{errors}} Fehler",
@@ -46,6 +46,17 @@
     "Asset Explanation": "Nicht alle Assets sind standardmäßig verfügbar, da die Masse an Token das Menü unbenutzbar machen würden. Allerdings können bei Bedarf Token gesucht und hinzugefügt werden.",
     "Asset input placeholder": "Gib ein Symbol ein z.B. BTC",
     "Ethereum Wallet": "Non-Custodial Ethereum Wallet (z.B. MetaMask)",
-    "Other": "Andere"
+    "Other": "Andere",
+    "Cancel": "Abbrechen",
+    "Pattern:": "Muster:",
+    "New Pattern": "Neues Muster",
+    "Edit Account": "Account bearbeiten",
+    "Yes": "Ja",
+    "No": "Nein",
+    "Are you sure to delete this account?": "Bist du sicher, dass du diesen Account löschen möchtest?",
+    "Disclaimer": "Haftungsausschluss",
+    "Disclaimer Text": "Coineda bietet keine Steuer- oder Rechtsberatung. Das bereitgestellte Dashboard und die rudimentären Steuerberechnungen können Fehler enthalten, für Ihr Land falsch sein oder nicht alle steuerrelevanten Vorschriften abdecken. Diese Berechnungen werden nach bestem Wissen und Gewissen erstellt, aber ich bin kein Steuerberater oder Steuerexperte und übernehme keine Verantwortung für fehlerhafte Berechnungen.",
+    "Got it": "Verstanden",
+    "Tax Year": "Steuerjahr"
   }
 }

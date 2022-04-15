@@ -67,6 +67,8 @@ const createTransaction = async (transaction, account, message) => {
       return;
     }
 
+    console.log(date);
+
     const sellTransaction = {
       type: transactionType,
       exchange: exchange,
@@ -154,10 +156,10 @@ const createTransaction = async (transaction, account, message) => {
 };
 
 const getAssetId = async (symbol) => {
-  const result = await storage.assets.getBySymbol(symbol.toUpperCase());
+  const result = await storage.assets.getBySymbol(symbol.toUpperCase().trim());
 
-  if (result) {
-    return result.id;
+  if (result.length > 0) {
+    return result[0].id;
   } else {
     return null;
   }
