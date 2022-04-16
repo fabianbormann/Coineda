@@ -16,4 +16,4 @@ Tracking of crypo currencies should be free and open source. As a crypto trader 
 
 ## How to contribute
 
-Just fork Coineda and implement your features. Send a pull request back once you've finished and make sure you've filled out the CLA. Please understand that I do not accept pull requests without an agreed CLA. The CLA prevents Coineda for bad situations like e.g. you are an employee and you wrote your changes during your work which was denied by your company etc. within the CLA you are also clarify that you are wrote the code by yourself.
+Fork Coineda and implement a feature within a "feature/<feature_name>" branch or use "bug/<bug_name_or_issue_reference>" for bug fixes. Open a pull request  once you've finished. It would be really helpful if you open an issue with a short description for the feature or a bug before you start your implementation.
