@@ -8,7 +8,7 @@ import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 
 ReactDOM.render(<App />, document.getElementById('root'));
 
-if (process.env.REACT_APP_TARGET === 'single-page-application') {
+if (process.env.REACT_APP_TARGET === 'SINGLE_PAGE_APPLICATION') {
   serviceWorkerRegistration.register();
 } else {
   serviceWorkerRegistration.unregister();
