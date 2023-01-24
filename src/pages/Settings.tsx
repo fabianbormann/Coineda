@@ -1,32 +1,12 @@
+import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Select, Space, Divider } from 'antd';
-import { createUseStyles } from 'react-jss';
 import AccountManagement from '../components/AccountManagement';
 import AssetManagement from '../components/AssetManagement';
 
-const { Option } = Select;
-
-const useStyles = createUseStyles({
-  page: {
-    padding: 16,
-    width: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  headline: {
-    marginTop: 0,
-    marginBottom: 12,
-    fontWeight: 500,
-    fontSize: '1.1rem',
-    color: '#2F4858',
-  },
-});
-
 const Settings = () => {
   const { t, i18n } = useTranslation();
-  const classes = useStyles();
 
-  const changeLanguage = (value) => {
+  const changeLanguage = (value: string) => {
     i18n.changeLanguage(value);
   };
 
@@ -34,10 +14,10 @@ const Settings = () => {
   language = language.split('-')[0];
 
   return (
-    <div className={classes.page}>
-      <p className={classes.headline}>{t('General')}</p>
+    <div>
+      {/*<p>{t('General') as string}</p>
       <Space>
-        <span>{t('Language')}</span>
+        <span>{t('Language') as string}</span>
         <Select
           onChange={changeLanguage}
           value={language}
@@ -54,7 +34,7 @@ const Settings = () => {
       <Divider />
       <Space>
         <AssetManagement />
-      </Space>
+  </Space>*/}
     </div>
   );
 };

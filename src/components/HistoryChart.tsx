@@ -1,5 +1,5 @@
+import React from 'react';
 import { useEffect, useState, useContext } from 'react';
-import { Spin, Result } from 'antd';
 import {
   ResponsiveContainer,
   Line,
@@ -11,29 +11,17 @@ import {
 } from 'recharts';
 import { fetchPrice, getCoinCount, getPurchaseValue } from '../helper/common';
 import { SettingsContext } from '../SettingsContext';
-import { createUseStyles } from 'react-jss';
 
-const useStyles = createUseStyles({
-  wrapper: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 300,
-    width: '100%',
-  },
-});
-
-const HistoryChart = (props) => {
-  const { currencies } = props;
-  const [settings] = useContext(SettingsContext);
+const HistoryChart = () => {
+  //const { currencies } = props;
+  const { settings } = useContext(SettingsContext);
   const [data, setData] = useState([]);
   const [purchasePrice, setPurchasePrice] = useState(0);
   const [state, setState] = useState('LOADING');
 
   const { account } = settings;
-  const classes = useStyles();
 
-  useEffect(() => {
+  /*useEffect(() => {
     const calculatePurchasePrice = async () => {
       let value = 0;
       for (const currency of currencies) {
@@ -145,7 +133,9 @@ const HistoryChart = (props) => {
     <ResponsiveContainer debounce={1} maxHeight={300} width="100%" aspect={1.4}>
       {content}
     </ResponsiveContainer>
-  );
+  );*/
+
+  return <div></div>;
 };
 
 export default HistoryChart;

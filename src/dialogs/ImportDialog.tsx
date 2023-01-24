@@ -1,20 +1,17 @@
-import { Upload, Modal, message } from 'antd';
-import { InboxOutlined } from '@ant-design/icons';
 import { useState, useContext } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 import { SettingsContext } from '../SettingsContext';
 import { importFiles } from '../helper/import';
+import React from 'react';
 
-const { Dragger } = Upload;
-
-const ImportDialog = (props) => {
+const ImportDialog = () => {
   const { t } = useTranslation();
   const [files, setFiles] = useState([]);
-  const [settings] = useContext(SettingsContext);
+  const { settings } = useContext(SettingsContext);
   const { account } = settings;
   const [uploading, setUploading] = useState(false);
 
-  const addFile = (file) => {
+  /*const addFile = (file) => {
     if (
       file.name.endsWith('.cnd') ||
       file.name.endsWith('.xlsx') ||
@@ -97,7 +94,8 @@ const ImportDialog = (props) => {
         </p>
       </Dragger>
     </Modal>
-  );
+  );*/
+  return <div></div>;
 };
 
 export default ImportDialog;

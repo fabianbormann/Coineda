@@ -1,55 +1,11 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect, useCallback } from 'react';
-import {
-  Select,
-  Input,
-  message,
-  Space,
-  Button,
-  Divider,
-  Alert,
-  Switch,
-  Tooltip,
-  Popconfirm,
-} from 'antd';
-import { SaveOutlined, DeleteOutlined } from '@ant-design/icons';
-import { createUseStyles } from 'react-jss';
 import FloatingLabel from '../components/FloatingLabel';
 import storage from '../persistence/storage';
-
-const { Option } = Select;
-
-const useStyles = createUseStyles({
-  page: {
-    padding: 16,
-    width: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  headline: {
-    marginTop: 0,
-    marginBottom: 12,
-    fontWeight: 500,
-    fontSize: '1.1rem',
-    color: '#2F4858',
-  },
-  form: {
-    maxWidth: 500,
-    minWidth: 100,
-    display: 'flex',
-    flexDirection: 'column',
-    '& .ant-input': {
-      padding: '16px 12px 4px 11px',
-    },
-  },
-  select: {
-    width: '100%',
-  },
-});
+import React from 'react';
 
 const Wallets = () => {
   const { t } = useTranslation();
-  const classes = useStyles();
   const [selectedExchange, setSelectedExchange] = useState(undefined);
   const [walletType, setWalletType] = useState();
   const [exchanges, setExchanges] = useState([]);
@@ -75,9 +31,9 @@ const Wallets = () => {
         }
       })
       .catch((error) => {
-        message.error(
+        /*message.error(
           'Coineda backend is not available. Please restart the application.'
-        );
+        );*/
         console.warn(error);
       });
   }, []);
@@ -86,7 +42,7 @@ const Wallets = () => {
     fetchExchanges();
   }, [fetchExchanges]);
 
-  const saveWallet = async () => {
+  /*const saveWallet = async () => {
     try {
       await storage.exchanges
         .put({
@@ -229,8 +185,8 @@ const Wallets = () => {
           </Space>
         </Space>
       </div>
-    </div>
-  );
+    </div>*/
+  return <div></div>;
 };
 
 export default Wallets;

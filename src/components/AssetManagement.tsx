@@ -1,50 +1,15 @@
 import { useState } from 'react';
 import axios from 'axios';
-import { message, Input, Select, Button } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
-import { createUseStyles } from 'react-jss';
 import { useTranslation } from 'react-i18next';
 import storage from '../persistence/storage';
 
-const { Search } = Input;
-const { Option } = Select;
-
-const useStyles = createUseStyles({
-  content: {
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  search: {
-    maxWidth: 300,
-  },
-  selection: {
-    width: '50%',
-    minWidth: 300,
-    marginRight: 6,
-  },
-  selectionContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    marginTop: 12,
-    flexWrap: 'wrap',
-  },
-  headline: {
-    marginBottom: 12,
-    marginTop: 0,
-    fontWeight: 500,
-    fontSize: '1.1rem',
-    color: '#2F4858',
-  },
-});
-
 const AssetManagement = () => {
-  const classes = useStyles();
   const { t } = useTranslation();
   const [searchResults, setSearchResults] = useState([]);
   const [selectedAsset, setSelectedAsset] = useState();
   const [searchText, setSearchText] = useState('');
 
-  const onSearch = async (value) => {
+  /*const onSearch = async (value) => {
     if (value.length > 1) {
       const tokenList = JSON.parse(localStorage.getItem('TOKEN_LIST'));
       let results = [];
@@ -149,7 +114,9 @@ const AssetManagement = () => {
         </div>
       )}
     </div>
-  );
+  );*/
+
+  return <div></div>;
 };
 
 export default AssetManagement;

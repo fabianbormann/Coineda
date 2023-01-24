@@ -1,9 +1,6 @@
 import React, { useCallback, useEffect, useState, useContext } from 'react';
-import { Alert, Statistic, Card, Row, Col, message, Spin, Empty } from 'antd';
-import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 
 import { useTranslation } from 'react-i18next';
-import { createUseStyles } from 'react-jss';
 
 import { SettingsContext } from '../SettingsContext';
 import WhenLambo from '../components/WhenLambo';
@@ -13,32 +10,28 @@ import storage from '../persistence/storage';
 import { fetchPrice, isFiat, TransactionType } from '../helper/common';
 import HistoryChart from '../components/HistoryChart';
 
-const useStyles = createUseStyles({
-  page: {
-    display: 'flex',
-    flexDirection: 'column',
-    width: '100%',
-  },
-  title: {
-    color: '#2F4858 !important',
-    fontWeight: 600,
-    fontSize: '1.5rem',
-    marginBottom: 0,
-  },
-  loading: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: '100vh',
-  },
-});
+import InfoIcon from '@mui/icons-material/Info';
+import { CoinedaSummary, MessageType, Transaction } from '../global/types';
+import {
+  Alert,
+  AlertTitle,
+  CircularProgress,
+  Grid,
+  Paper,
+  Snackbar,
+} from '@mui/material';
 
 const Dashboard = () => {
   const { t } = useTranslation();
-  const classes = useStyles();
-  const [settings] = useContext(SettingsContext);
-  const [summary, setSummary] = useState({});
+  const { settings } = useContext(SettingsContext);
+  const [summary, setSummary] = useState<CoinedaSummary>({
+    cryptocurrencies: {},
+    fiat: {},
+  });
   const [loading, setLoading] = useState(false);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarType, setSnackbarType] = useState<MessageType>('success');
+  const [snackbarMessage, setSnackbarMessage] = useState('');
 
   const { account } = settings;
 
@@ -49,9 +42,13 @@ const Dashboard = () => {
       account.id
     );
 
-    const coins = { cryptocurrencies: {}, fiat: {} };
+    const coins: CoinedaSummary = { cryptocurrencies: {}, fiat: {} };
 
-    const calculateBalance = async (currency, value, add) => {
+    const calculateBalance = async (
+      currency: string,
+      value: number,
+      add: boolean
+    ) => {
       currency = currency.toLowerCase();
       const target = (await isFiat(currency)) ? 'fiat' : 'cryptocurrencies';
 
@@ -74,7 +71,7 @@ const Dashboard = () => {
 
     const assets = await storage.assets.getAllFiat();
 
-    const calculatePurchasePrice = (transaction) => {
+    const calculatePurchasePrice = (transaction: Transaction) => {
       const targetCurrency = transaction.toCurrency.toLowerCase();
       if (transaction.type === TransactionType.BUY) {
         let purchasePrice = transaction.fromValue / transaction.toValue;
@@ -92,11 +89,11 @@ const Dashboard = () => {
             'purchase_price'
           )
         ) {
-          coins.cryptocurrencies[targetCurrency].purchase_price.push(
+          coins.cryptocurrencies[targetCurrency].purchase_prices.push(
             purchasePrice
           );
         } else {
-          coins.cryptocurrencies[targetCurrency].purchase_price = [
+          coins.cryptocurrencies[targetCurrency].purchase_prices = [
             purchasePrice,
           ];
         }
@@ -136,11 +133,11 @@ const Dashboard = () => {
         });
         delete coins.cryptocurrencies[coin];
       } else {
-        coins.cryptocurrencies[coin].purchase_price =
-          coins.cryptocurrencies[coin].purchase_price.reduce(
+        coins.cryptocurrencies[coin].avg_purchase_price =
+          coins.cryptocurrencies[coin].purchase_prices.reduce(
             (previous, current) => current + previous,
             0
-          ) / coins.cryptocurrencies[coin].purchase_price.length;
+          ) / coins.cryptocurrencies[coin].purchase_prices.length;
       }
     }
 
@@ -164,7 +161,9 @@ const Dashboard = () => {
       setLoading(false);
     } catch (error) {
       console.error(error);
-      message.error('Unable to fetch meta data from coingecko.');
+      setSnackbarType('error');
+      setSnackbarMessage('Unable to fetch meta data from coingecko.');
+      setSnackbarOpen(true);
       setLoading(false);
       return;
     }
@@ -190,91 +189,112 @@ const Dashboard = () => {
       });
     }
 
-    total = summary.crypto_total_in_euro;
+    total = summary.crypto_total_in_euro || 0;
   }
 
+  const handleSnackbarClose = (
+    event?: React.SyntheticEvent | Event,
+    reason?: string
+  ) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+
+    setSnackbarOpen(false);
+  };
+
   return (
-    <div className={classes.page}>
+    <div>
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
+      >
+        <Alert
+          onClose={handleSnackbarClose}
+          severity={snackbarType}
+          sx={{ width: '100%' }}
+        >
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
+
       {loading && (
-        <div className={classes.loading}>
-          <Spin />
+        <div>
+          <CircularProgress />
         </div>
       )}
       {summary.hasOwnProperty('inconsistency') &&
-        summary.inconsistency.negativeValue.map((coin) => (
-          <Alert
-            message="Inconsistency warning"
-            description={`You have a negative ${coin.name} value of ${coin.value}. Please check your transactions.`}
-            type="warning"
-            showIcon
-            style={{ marginBottom: 12 }}
-            closable
-          />
+        summary.inconsistency?.negativeValue.map((coin) => (
+          <Alert severity="warning">
+            <AlertTitle>Inconsistency warning</AlertTitle>
+            {`You have a negative ${coin.name} value of ${coin.value}. Please check your transactions.`}
+          </Alert>
         ))}
       {summary.hasOwnProperty('crypto_total_in_euro') ? (
         <>
-          <Row>
-            <Col sm={24} md={18} lg={12} style={{ width: '100%' }}>
-              <Card>
+          <Grid>
+            <Grid sm={24} md={18} lg={12}>
+              <Paper>
                 <HistoryChart currencies={currencies} />
-              </Card>
-            </Col>
-            <Col sm={24} md={18} lg={12} style={{ width: '100%' }}>
-              <Card>
+              </Paper>
+            </Grid>
+            <Grid sm={24} md={18} lg={12}>
+              <Paper>
                 <DoughnutChart
                   label={`${Math.round(total * 100) / 100} €`}
                   data={data}
                 />
-              </Card>
-            </Col>
-          </Row>
-          <Row>
+              </Paper>
+            </Grid>
+          </Grid>
+          <Grid>
             {Object.keys(summary.cryptocurrencies).map((account) => {
               const change =
                 summary.cryptocurrencies[account].price_in_euro /
-                  (summary.cryptocurrencies[account].purchase_price *
+                  (summary.cryptocurrencies[account].avg_purchase_price *
                     summary.cryptocurrencies[account].value) -
                 1;
               return (
-                <Col
+                <Grid
                   sm={12}
                   md={6}
                   lg={4}
                   key={account}
                   style={{ width: '50%' }}
                 >
-                  <Card>
-                    <Statistic
-                      title={account.replace('-', ' ')}
-                      value={Math.round(change * 10000) / 100}
-                      precision={2}
+                  <Paper>
+                    <h2
                       style={{
                         textTransform: 'capitalize',
                         fontFamily: 'PTSerif',
                       }}
-                      valueStyle={{
+                    >
+                      {account.replace('-', ' ')}
+                    </h2>
+                    <h3
+                      style={{
                         fontSize: '1rem',
                         color: change > 0 ? '#03A678' : '#C36491',
                       }}
-                      prefix={
-                        change > 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />
-                      }
-                      suffix="%"
-                    />
-                  </Card>
-                </Col>
+                    >{`${Math.round(change * 10000) / 100}%`}</h3>
+                  </Paper>
+                </Grid>
               );
             })}
-          </Row>
-          <Row>
-            <Col sm={24} md={12} style={{ width: '100%' }}>
+          </Grid>
+          <Grid>
+            <Grid sm={24} md={12} style={{ width: '100%' }}>
               <WhenLambo value={summary.crypto_total_in_euro} />
-            </Col>
-          </Row>
+            </Grid>
+          </Grid>
         </>
       ) : (
         !loading && (
-          <Empty style={{ marginTop: 24 }} description={t('No Transactions')} />
+          <>
+            <InfoIcon />
+            <p>{t('No Transactions') as string}</p>
+          </>
         )
       )}
     </div>

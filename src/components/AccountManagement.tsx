@@ -1,89 +1,17 @@
 import { useState, useEffect, useContext } from 'react';
-import {
-  ReloadOutlined,
-  DownOutlined,
-  EditOutlined,
-  DeleteOutlined,
-} from '@ant-design/icons';
-import {
-  Button,
-  message,
-  Popconfirm,
-  Modal,
-  Input,
-  Dropdown,
-  Menu,
-} from 'antd';
-import { createUseStyles } from 'react-jss';
-import Blockies from 'react-blockies';
+//import Blockies from 'react-blockies';
 import { useTranslation } from 'react-i18next';
 import { SettingsContext } from '../SettingsContext';
 import storage from '../persistence/storage';
+import React from 'react';
 
 const DialogMode = Object.freeze({
   ADD: 'add',
   EDIT: 'edit',
 });
 
-const useStyles = createUseStyles({
-  name: {
-    marginLeft: 8,
-  },
-  row: {
-    width: 176,
-    display: 'flex',
-    alignItems: 'center',
-  },
-  blockie: {
-    borderRadius: '50%',
-  },
-  content: {
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  field: {
-    display: 'flex',
-    alignItems: 'center',
-    marginBottom: 16,
-    '& > span:first-child': {
-      width: 80,
-    },
-    '& > .ant-input': {
-      width: 'unset',
-      flexGrow: 1,
-    },
-    '& > *': {
-      marginLeft: 8,
-    },
-  },
-  actions: {
-    display: 'flex',
-    '& > :first-child': {
-      marginRight: 4,
-    },
-  },
-  selected: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    '& > :first-child': {
-      minWidth: 180,
-      display: 'flex',
-      alignItems: 'center',
-    },
-  },
-  headline: {
-    marginTop: 0,
-    marginBottom: 12,
-    fontWeight: 500,
-    fontSize: '1.1rem',
-    color: '#2F4858',
-  },
-});
-
 const AccountManagement = () => {
-  const [settings, updateSettings] = useContext(SettingsContext);
-  const classes = useStyles();
+  const { settings, setSettings } = useContext(SettingsContext);
   const { t } = useTranslation();
   const [accounts, setAccounts] = useState([]);
   const [accountName, setAccountName] = useState('');
@@ -105,7 +33,7 @@ const AccountManagement = () => {
     fetchAccounts();
   }, []);
 
-  const submit = async () => {
+  /*const submit = async () => {
     if (dialogMode === DialogMode.ADD) {
       try {
         await storage.accounts.add(accountName, pattern);
@@ -281,7 +209,8 @@ const AccountManagement = () => {
         </div>
       </Modal>
     </>
-  );
+  );*/
+  return <div></div>;
 };
 
 export default AccountManagement;

@@ -1,33 +1,11 @@
-import { Collapse, Progress, Timeline } from 'antd';
-import { createUseStyles } from 'react-jss';
 import { useTranslation } from 'react-i18next';
 import moment from 'moment';
+import React from 'react';
 
-const { Panel } = Collapse;
-
-const useStyles = createUseStyles({
-  collapse: {
-    maxWidth: 600,
-  },
-  panel: {
-    display: 'inline-block',
-    width: 'calc(100% - 32px)',
-  },
-  negative: {
-    color: '#C36491',
-  },
-  positive: {
-    color: '#03A678',
-  },
-  title: {
-    margin: '12px 0 12px 0',
-    fontWeight: 500,
-    fontSize: '1.1rem',
-    color: '#2F4858',
-  },
-});
-
-const GainSummary = (props) => {
+const GainSummary = (props: {
+  gains: Array<any>;
+  showUnrealizedGains: boolean;
+}) => {
   const { gains, showUnrealizedGains } = props;
   const { t } = useTranslation();
 
@@ -36,15 +14,13 @@ const GainSummary = (props) => {
     title = t('Unrealized Gains');
   }
 
-  const classes = useStyles();
-
   if (typeof gains === 'undefined' || gains.length === 0) {
     return null;
   }
 
-  const roundFiat = (value) => Math.round(value * 100) / 100;
-  const roundCrypto = (value) => Math.round(value * 100000) / 100000;
-
+  const roundFiat = (value: number) => Math.round(value * 100) / 100;
+  const roundCrypto = (value: number) => Math.round(value * 100000) / 100000;
+  /*
   return (
     <>
       {title && <p className={classes.title}>{title}</p>}
@@ -151,7 +127,8 @@ const GainSummary = (props) => {
         })}
       </Collapse>
     </>
-  );
+  );*/
+  return <div></div>;
 };
 
 export default GainSummary;

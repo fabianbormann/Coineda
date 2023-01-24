@@ -1,40 +1,15 @@
-import { message, Select, Button, Space, Input } from 'antd';
-import { PlusCircleOutlined } from '@ant-design/icons';
+import React from 'react';
 import { useCallback, useEffect, useState } from 'react';
-import { createUseStyles } from 'react-jss';
 import { useTranslation } from 'react-i18next';
 import storage from '../persistence/storage';
 
-const useStyles = createUseStyles({
-  grow: {
-    width: '100%',
-    paddingBottom: 6,
-  },
-  input: {
-    paddingRight: 0,
-    paddingTop: 0,
-    paddingBottom: 0,
-  },
-  wrapper: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    '& > span': {
-      minWidth: 40,
-    },
-  },
-});
-
-const { Option } = Select;
-
-const ExchangeManger = (props) => {
+const ExchangeManger = () => {
   const [exchanges, setExchanges] = useState([]);
   const [newExchangeName, setNewExchangeName] = useState(undefined);
   const [selectedExchange, setSelectedExchange] = useState(undefined);
   const [inputVisible, setInputVisible] = useState(false);
-  const classes = useStyles();
   const { t } = useTranslation();
-
+  /*
   const {
     onExchangeSelected,
     defaultSelectionIndex,
@@ -142,7 +117,8 @@ const ExchangeManger = (props) => {
         </Button>
       ) : null}
     </Space>
-  );
+  );*/
+  return <div></div>;
 };
 
 ExchangeManger.defaultProps = {

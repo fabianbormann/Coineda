@@ -1,33 +1,41 @@
-import { Modal, Form, Select, Divider, Input, message, DatePicker } from 'antd';
 import ExchangeManger from '../components/ExchangeManager';
-import { createUseStyles } from 'react-jss';
-import { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import { useTranslation } from 'react-i18next';
 import moment from 'moment';
 import { SettingsContext } from '../SettingsContext';
 import storage from '../persistence/storage';
-
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { Dayjs } from 'dayjs';
 import { createTransaction } from '../helper/common';
+import { TextField } from '@mui/material';
 
-const { Item } = Form;
-const { Option } = Select;
+const BasicDatePicker = (props: { label: string }) => {
+  const [value, setValue] = useState<Dayjs | null>(null);
 
-const useStyles = createUseStyles({
-  section: {
-    width: '80%',
-    padding: 2,
-  },
-});
+  return (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <DatePicker
+        label={props.label}
+        value={value}
+        onChange={(newValue) => {
+          setValue(newValue);
+        }}
+        renderInput={(params) => <TextField {...params} />}
+      />
+    </LocalizationProvider>
+  );
+};
 
-const AddTransactionsDialog = (props) => {
+const AddTransactionsDialog = () => {
   const [selectedExchange, setSelectedExchange] = useState(null);
   const [feeCurrency, setFeeCurrency] = useState('bitcoin');
   const [toCurrency, setToCurrency] = useState('bitcoin');
   const [fromCurrency, setFromCurrency] = useState('euro');
   const [updateKey, setUpdateKey] = useState();
-  const [settings] = useContext(SettingsContext);
+  const { settings } = useContext(SettingsContext);
   const [assets, setAssets] = useState([]);
-  const [form] = Form.useForm();
   const { t } = useTranslation();
 
   const layout = {
@@ -45,21 +53,15 @@ const AddTransactionsDialog = (props) => {
 
   const { account } = settings;
 
-  const { overrides, visible, onClose } = props;
+  //const { overrides, visible, onClose } = props;
   const closeDialog = () => {
     setFeeCurrency('bitcoin');
     setToCurrency('bitcoin');
     setFromCurrency('euro');
     setSelectedExchange(null);
-    form.setFieldsValue({
-      from: 0,
-      to: 0,
-      fee: 0,
-      date: moment(),
-    });
-    onClose();
+    //onClose();
   };
-
+  /*
   useEffect(() => {
     storage.assets.getAll().then((currencies) => {
       setAssets(currencies);
@@ -71,18 +73,11 @@ const AddTransactionsDialog = (props) => {
       setFeeCurrency(overrides.feeCurrency);
       setToCurrency(overrides.toCurrency);
       setFromCurrency(overrides.fromCurrency);
-      form.setFieldsValue({
-        from: overrides.fromValue,
-        to: overrides.toValue,
-        fee: overrides.feeValue,
-        date: moment(overrides.date),
-      });
       setSelectedExchange(overrides.exchange);
       setUpdateKey(overrides.key);
     }
   }, [overrides, form]);
 
-  const classes = useStyles();
   const decimalValidator = () => ({
     validator(_, value) {
       const reg = /^\d*((\.|,)\d*)?$/;
@@ -135,52 +130,61 @@ const AddTransactionsDialog = (props) => {
     optionA.key.toLowerCase().localeCompare(optionB.key.toLowerCase());
 
   return (
-    <Modal
-      title={t('Add Transaction')}
-      visible={visible}
-      okText={t('Done')}
-      okButtonProps={{
-        disabled: selectedExchange === null,
-      }}
-      onOk={() => form.submit()}
-      onCancel={closeDialog}
-    >
-      <div className={classes.section}>
-        <ExchangeManger
-          onExchangeSelected={(exchange) => setSelectedExchange(exchange)}
-        />
-      </div>
-      <Divider />
-      <Form
-        {...layout}
-        initialValues={defaults}
-        className={classes.section}
-        onFinish={addTransaction}
-        form={form}
+
+<Dialog
+        fullWidth={fullWidth}
+        maxWidth={maxWidth}
+        open={visible}
+        onClose={closeDialog}
       >
-        <Item name="date" label={t('Date')}>
-          <DatePicker showTime format="YYYY-MM-DD HH:mm:ss" />
-        </Item>
-        <Item name="from" label={t('From')} rules={[decimalValidator]}>
-          <Input
-            addonAfter={
-              <Select
-                showSearch
-                style={{ minWidth: 80 }}
-                value={fromCurrency}
+        <DialogTitle>{t('Add Transaction')}</DialogTitle>
+        <DialogContent>
+
+          <ExchangeManger
+            onExchangeSelected={(exchange) => setSelectedExchange(exchange)}
+          />
+          <Box
+            noValidate
+            component="form"
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              m: 'auto',
+              width: 'fit-content',
+            }}
+          >
+            <BasicDatePicker label={t('Date')} />
+            <FormControl>
+              <TextField
+                id="origin"
+                select
+                label={t('From')
+                sx={{ minWidth: 80 }}
                 filterOption={filterSearch}
                 filterSort={sortSearch}
                 onChange={(symbol) => setFromCurrency(symbol)}
+                value={fromCurrency}
+                SelectProps={{
+                  native: true,
+                }}
+                helperText="Please select your currency"
               >
                 {assets.map((currency) => (
-                  <Option key={currency.symbol} value={currency.id}>
+                  <option key={currency.symbol} value={currency.id}>
                     {currency.symbol}
-                  </Option>
+                  </option>
                 ))}
-              </Select>
-            }
-          />
-        </Item>
+              </TextField>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => form.submit()}>Done</Button>
+          <Button onClick={handleClose}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
+
+        
         <Item name="to" label={t('To')} rules={[decimalValidator]}>
           <Input
             addonAfter={
@@ -221,9 +225,10 @@ const AddTransactionsDialog = (props) => {
             }
           />
         </Item>
-      </Form>
-    </Modal>
-  );
+    </Dialog>
+  );*/
+
+  return <div></div>;
 };
 
 export default AddTransactionsDialog;

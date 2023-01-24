@@ -22,9 +22,3 @@
 body {
   font-family: PTSerif;
 }
-
-@media only screen and (max-width: 576px) {
-  .ant-modal {
-    top: 0;
-  }
-}

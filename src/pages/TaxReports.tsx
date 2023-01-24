@@ -1,58 +1,14 @@
 import { useTranslation } from 'react-i18next';
-import { Divider, Empty, message, Spin, DatePicker, Button, Alert } from 'antd';
-import { DownloadOutlined } from '@ant-design/icons';
-import { createUseStyles } from 'react-jss';
 import { useState, useContext, useCallback, useEffect } from 'react';
 import { SettingsContext } from '../SettingsContext';
 import moment from 'moment';
 import GainSummary from '../components/GainSummary';
 import { calculateTax } from '../helper/tax';
-
-const useStyles = createUseStyles({
-  actions: {
-    marginTop: 0,
-    marginBottom: 12,
-  },
-  divider: {
-    marginTop: 12,
-    marginBottom: 12,
-  },
-  negative: {
-    color: '#C36491',
-  },
-  positive: {
-    color: '#03A678',
-  },
-  page: {
-    padding: 16,
-    width: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  summary: {
-    marginBottom: 12,
-    fontFamily: 'PTSerif',
-    fontWeight: 600,
-    fontSize: '1.2rem',
-  },
-  loading: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: '100vh',
-  },
-  headline: {
-    margin: 0,
-    fontWeight: 500,
-    fontSize: '1.1rem',
-    color: '#2F4858',
-  },
-});
+import React from 'react';
 
 const TaxReports = () => {
   const { t } = useTranslation();
-  const classes = useStyles();
-  const [settings] = useContext(SettingsContext);
+  const { settings } = useContext(SettingsContext);
   const [summary, setSummary] = useState({
     realizedGains: {},
     unrealizedGains: {},
@@ -62,7 +18,7 @@ const TaxReports = () => {
 
   const { account } = settings;
 
-  const fetchSummary = useCallback(() => {
+  /*const fetchSummary = useCallback(() => {
     setLoading(true);
     calculateTax(account.id)
       .then((tax) => {
@@ -206,7 +162,8 @@ const TaxReports = () => {
         )
       )}
     </div>
-  );
+  );*/
+  return <div></div>;
 };
 
 export default TaxReports;

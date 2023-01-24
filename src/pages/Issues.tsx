@@ -1,5 +1,5 @@
+import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Result } from 'antd';
 import { createUseStyles } from 'react-jss';
 
 const useStyles = createUseStyles({
@@ -24,8 +24,8 @@ const Issues = () => {
 
   return (
     <div className={classes.page}>
-      <p className={classes.headline}>{t('Issues')}</p>
-      <Result status="success" title="No issues detected" />
+      <p className={classes.headline}>{t('Issues') as string}</p>
+      <div>No issues detected</div>
     </div>
   );
 };

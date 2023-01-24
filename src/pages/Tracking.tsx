@@ -1,114 +1,91 @@
-import { Card, Space, Button, message, Tooltip } from 'antd';
-import {
-  DeleteOutlined,
-  EditOutlined,
-  PlusOutlined,
-  SwapOutlined,
-  ImportOutlined,
-  ExportOutlined,
-  DollarCircleOutlined,
-  InteractionOutlined,
-  ShoppingCartOutlined,
-} from '@ant-design/icons';
 import { useEffect, useState, useCallback, useContext } from 'react';
 import { useTranslation } from 'react-i18next';
-import { createUseStyles } from 'react-jss';
 import { AddTransactionDialog, AddTransferDialog } from '../dialogs';
 import { exportData } from '../helper/export';
 import { ImportDialog } from '../dialogs';
 import { SettingsContext } from '../SettingsContext';
 import storage from '../persistence/storage';
 import moment from 'moment';
-
-const { Meta } = Card;
-const useStyles = createUseStyles({
-  actions: {
-    marginTop: 0,
-    marginBottom: 12,
-  },
-  page: {
-    padding: 16,
-    width: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  bucket: {
-    '& > h2': {
-      color: '#2f4858',
-    },
-  },
-  operation: {
-    fontSize: '1.6rem',
-    borderRadius: '50%',
-    color: 'white',
-    padding: 8,
-  },
-  card: {
-    width: 340,
-    margin: 6,
-    '@media screen and (max-width: 440px)': {
-      width: 300,
-    },
-    '@media screen and (max-width: 400px)': {
-      width: 260,
-    },
-    '@media screen and (max-width: 361px)': {
-      width: 240,
-    },
-    '@media screen and (max-width: 321px)': {
-      width: 200,
-    },
-  },
-  container: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    '& > div': {
-      display: 'flex',
-      alignItems: 'center',
-      flexDirection: 'column',
-      '& > div': {
-        display: 'flex',
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-      },
-    },
-  },
-});
+import React from 'react';
+import {
+  CoinedaAsset,
+  CoinedaAssets,
+  MessageType,
+  Transaction,
+  TransactionBucket,
+  TransactionCardContent,
+  TransactionType,
+} from '../global/types';
+import {
+  Alert,
+  Card,
+  CardActions,
+  CardContent,
+  CardHeader,
+  IconButton,
+  Snackbar,
+  Tooltip,
+  Typography,
+} from '@mui/material';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import UploadIcon from '@mui/icons-material/Upload';
+import SwapHorizontalCircleIcon from '@mui/icons-material/SwapHorizontalCircle';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
+import SendIcon from '@mui/icons-material/Send';
 
 const Tracking = () => {
   const { t } = useTranslation();
-  const [settings] = useContext(SettingsContext);
+  const { settings } = useContext(SettingsContext);
   const [addTransactionDialogVisible, setAddTransactionDialogVisible] =
     useState(false);
   const [addTransferDialogVisible, setAddTransferDialogVisible] =
     useState(false);
   const [importDialogVisible, setImportDialogVisible] = useState(false);
-  const [dataSource, setDataSource] = useState([]);
-  const [transactionOverrides, setTransactionOverrides] = useState();
-  const [transferOverrides, setTransferOverrides] = useState();
-  const [assets, setAssets] = useState({ fiat: [], cryptocurrencies: [] });
-  const classes = useStyles();
+  const [dataSource, setDataSource] = useState<Array<Transaction>>([]);
+  const [transactionOverrides, setTransactionOverrides] =
+    useState<Transaction>();
+  const [transferOverrides, setTransferOverrides] = useState<Transaction>();
+  const [assets, setAssets] = useState<CoinedaAssets>({
+    fiat: [],
+    cryptocurrencies: [],
+  });
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarType, setSnackbarType] = useState<MessageType>('success');
+  const [snackbarMessage, setSnackbarMessage] = useState('');
 
   const { account } = settings;
 
-  const roundCrypto = (value) => Math.round(value * 100000) / 100000;
+  const roundCrypto = (value: number) => Math.round(value * 100000) / 100000;
 
   useEffect(() => {
     storage.assets.getAll().then((currencies) => {
       setAssets({
-        fiat: currencies.filter((asset) => asset.isFiat === 1),
-        cryptocurrencies: currencies.filter((asset) => asset.isFiat === 2),
+        fiat: currencies.filter((asset: CoinedaAsset) => asset.isFiat === 1),
+        cryptocurrencies: currencies.filter(
+          (asset: CoinedaAsset) => asset.isFiat === 2
+        ),
       });
     });
   }, []);
 
   const getAssetSymbol = useCallback(
-    (assetId) => {
+    (assetId: string) => {
       const { cryptocurrencies, fiat } = assets;
-      return [...cryptocurrencies, ...fiat]
-        .find((asset) => asset.id.toLowerCase() === assetId.toLowerCase())
-        .symbol.toUpperCase();
+      const assetList = [...cryptocurrencies, ...fiat];
+      const asset = assetList.find(
+        (asset) => asset.id.toLowerCase() === assetId.toLowerCase()
+      );
+
+      if (asset) {
+        return asset.symbol.toUpperCase();
+      } else {
+        return 'UNKNOWN';
+      }
     },
     [assets]
   );
@@ -120,14 +97,14 @@ const Tracking = () => {
     storage.transactions
       .getAllFromAccount(account.id)
       .then((response) => {
-        const formatDateTime = (timestamp) => {
+        const formatDateTime = (timestamp: number) => {
           const date = new Date(timestamp);
           return `${
             date.toISOString().split('T')[0]
           } ${date.toLocaleTimeString()}`;
         };
 
-        const data = response.map((transaction) => ({
+        const data = response.map((transaction: Transaction) => ({
           ...transaction,
           fromSymbol: getAssetSymbol(transaction.fromCurrency),
           toSymbol: getAssetSymbol(transaction.toCurrency),
@@ -135,8 +112,7 @@ const Tracking = () => {
           feeCurrency: transaction.feeCurrency.toLowerCase(),
           fromCurrency: transaction.fromCurrency.toLowerCase(),
           toCurrency: transaction.toCurrency.toLowerCase(),
-          date: formatDateTime(transaction.date),
-          key: transaction.id,
+          formattedDate: formatDateTime(transaction.date),
         }));
 
         const transactions = data.filter(
@@ -153,32 +129,35 @@ const Tracking = () => {
         storage.transfers
           .getAllFromAccount(account.id)
           .then((response) => {
-            const transfers = response.map((transfer) => ({
+            const transfers = response.map((transfer: Transaction) => ({
               ...transfer,
-              type: 'transfer',
+              type: 'transfer' as TransactionType,
               valueCurrency: transfer.currency,
               currency: getAssetSymbol(transfer.currency),
-              key: transfer.id + '-transfer',
               fee: `${transfer.feeValue} ${getAssetSymbol(
                 transfer.feeCurrency
               )}`,
-              date: formatDateTime(transfer.date),
+              formattedDate: formatDateTime(transfer.date),
               exchange: `${transfer.fromExchange}, ${transfer.toExchange}`,
             }));
 
             setDataSource([...transactions, ...transfers]);
           })
           .catch((error) => {
-            message.error(
+            setSnackbarMessage(
               'Coineda backend is not available. Please restart the application.'
             );
+            setSnackbarOpen(true);
+            setSnackbarType('warning');
             console.warn(error);
           });
       })
       .catch((error) => {
-        message.error(
+        setSnackbarMessage(
           'Coineda backend is not available. Please restart the application.'
         );
+        setSnackbarOpen(true);
+        setSnackbarType('warning');
         console.warn(error);
       });
   }, [assets, account, getAssetSymbol]);
@@ -208,7 +187,7 @@ const Tracking = () => {
   const openAddTransactionDialog = () => setAddTransactionDialogVisible(true);
   const openImportDialog = () => setImportDialogVisible(true);
 
-  const deleteEntry = async (entry) => {
+  const deleteEntry = async (entry: Transaction) => {
     if (entry.type === 'transfer') {
       await storage.transfers.delete(entry.id);
     } else {
@@ -224,7 +203,7 @@ const Tracking = () => {
     fetchExchanges();
   };
 
-  const editEntry = (entry) => {
+  const editEntry = (entry: Transaction) => {
     if (entry.type === 'transfer') {
       setTransferOverrides(entry);
       setAddTransferDialogVisible(true);
@@ -234,7 +213,7 @@ const Tracking = () => {
     }
   };
 
-  const buckets = [
+  const buckets: Array<TransactionBucket> = [
     { label: 'Today', days: 0, operations: [] },
     { label: 'Yesterday', days: 1, operations: [] },
     { label: 'A few days ago', days: 6, operations: [] },
@@ -252,7 +231,7 @@ const Tracking = () => {
   );
 
   for (const operation of dataSource) {
-    const daysSinceNow = now.diff(moment(operation.date), 'days');
+    const daysSinceNow = now.diff(moment(operation.formattedDate), 'days');
 
     for (const bucket of buckets) {
       if (daysSinceNow <= bucket.days) {
@@ -265,62 +244,71 @@ const Tracking = () => {
     }
   }
 
-  return (
-    <div className={classes.page}>
-      <Space className={classes.actions}>
-        <Tooltip title={t('Add Transaction')}>
-          <Button
-            size="large"
-            type="primary"
-            shape="circle"
-            icon={<PlusOutlined />}
-            onClick={openAddTransactionDialog}
-          />
-        </Tooltip>
-        <Tooltip title={t('Add Transfer')}>
-          <Button
-            size="large"
-            type="primary"
-            shape="circle"
-            icon={<SwapOutlined />}
-            onClick={openAddTransferDialog}
-          />
-        </Tooltip>
-        {!isMobileDevice && (
-          <Tooltip title={t('Export')}>
-            <Button
-              size="large"
-              type="primary"
-              shape="circle"
-              icon={<ExportOutlined />}
-              onClick={() => exportData(account.id)}
-            />
-          </Tooltip>
-        )}
-        {!isMobileDevice && (
-          <Tooltip title={t('Import')}>
-            <Button
-              size="large"
-              type="primary"
-              shape="circle"
-              icon={<ImportOutlined />}
-              onClick={openImportDialog}
-            />
-          </Tooltip>
-        )}
-      </Space>
+  const handleSnackbarClose = (
+    event?: React.SyntheticEvent | Event,
+    reason?: string
+  ) => {
+    if (reason === 'clickaway') {
+      return;
+    }
 
-      <div className={classes.container}>
+    setSnackbarOpen(false);
+  };
+
+  return (
+    <div>
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
+      >
+        <Alert
+          onClose={handleSnackbarClose}
+          severity={snackbarType}
+          sx={{ width: '100%' }}
+        >
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
+
+      <div>
+        <Tooltip title={t('Add Transaction') as string}>
+          <IconButton onClick={openAddTransactionDialog}>
+            <AddCircleOutlineIcon />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title={t('Add Transfer') as string}>
+          <IconButton onClick={openAddTransferDialog}>
+            <SwapHorizIcon />
+          </IconButton>
+        </Tooltip>
+        {!isMobileDevice && (
+          <Tooltip title={t('Export') as string}>
+            <IconButton onClick={() => exportData(account.id)}>
+              <FileDownloadIcon />
+            </IconButton>
+          </Tooltip>
+        )}
+        {!isMobileDevice && (
+          <Tooltip title={t('Import') as string}>
+            <IconButton onClick={openImportDialog}>
+              <UploadIcon />
+            </IconButton>
+          </Tooltip>
+        )}
+      </div>
+
+      <div>
         {buckets.map((bucket) => {
           if (bucket.operations.length === 0) {
             return null;
           } else {
             return (
-              <div className={classes.bucket} key={bucket.label}>
+              <div key={bucket.label}>
                 <h2>{bucket.label}</h2>
                 <div>
                   {bucket.operations.map((operation) => {
-                    const content = {};
+                    const content: TransactionCardContent = {};
 
                     if (operation.type === 'transfer') {
                       content.title = `Transfer`;
@@ -329,12 +317,7 @@ const Tracking = () => {
                       } from ${operation.fromExchange} to ${
                         operation.toExchange
                       }`;
-                      content.symbol = (
-                        <SwapOutlined
-                          className={classes.operation}
-                          style={{ backgroundColor: '#2498E9' }}
-                        />
-                      );
+                      content.symbol = <SendIcon />;
                     } else if (operation.type === 'buy') {
                       content.title = `Buy`;
                       content.description = `${roundCrypto(
@@ -342,12 +325,7 @@ const Tracking = () => {
                       )} ${operation.toSymbol} for ${operation.fromValue} ${
                         operation.fromSymbol
                       }`;
-                      content.symbol = (
-                        <ShoppingCartOutlined
-                          className={classes.operation}
-                          style={{ backgroundColor: '#03a678' }}
-                        />
-                      );
+                      content.symbol = <ShoppingCartIcon />;
                     } else if (operation.type === 'sell') {
                       content.title = `Sell`;
                       content.description = `${roundCrypto(
@@ -355,12 +333,7 @@ const Tracking = () => {
                       )} ${operation.toSymbol} for ${operation.fromValue} ${
                         operation.fromSymbol
                       }`;
-                      content.symbol = (
-                        <DollarCircleOutlined
-                          className={classes.operation}
-                          style={{ backgroundColor: '#E4E986' }}
-                        />
-                      );
+                      content.symbol = <MonetizationOnIcon />;
                     } else if (operation.type === 'swap') {
                       content.title = `Swap`;
                       content.description = `${roundCrypto(
@@ -368,35 +341,35 @@ const Tracking = () => {
                       )} ${operation.fromSymbol} into ${roundCrypto(
                         operation.toValue
                       )} ${operation.toSymbol}`;
-                      content.symbol = (
-                        <InteractionOutlined
-                          className={classes.operation}
-                          style={{ backgroundColor: '#E66F4A' }}
-                        />
-                      );
+                      content.symbol = <SwapHorizontalCircleIcon />;
                     }
 
                     return (
-                      <Card
-                        key={operation.id}
-                        className={classes.card}
-                        actions={[
-                          <EditOutlined
-                            onClick={() => editEntry(operation)}
-                            key="edit"
-                          />,
-                          <DeleteOutlined
-                            onClick={() => deleteEntry(operation)}
-                            key="delete"
-                          />,
-                        ]}
-                      >
-                        <Meta
+                      <Card sx={{ maxWidth: 345 }} key={operation.id}>
+                        <CardHeader
                           avatar={content.symbol}
-                          description={content.description}
                           title={content.title}
-                          extra={<span>{operation.date}</span>}
+                          subheader={content.description}
                         />
+                        <CardContent>
+                          <Typography variant="body2" color="text.secondary">
+                            {operation.formattedDate}
+                          </Typography>
+                        </CardContent>
+                        <CardActions disableSpacing>
+                          <IconButton
+                            aria-label="edit transaction"
+                            onClick={() => editEntry(operation)}
+                          >
+                            <EditIcon />
+                          </IconButton>
+                          <IconButton
+                            aria-label="delete transaction"
+                            onClick={() => deleteEntry(operation)}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </CardActions>
                       </Card>
                     );
                   })}
@@ -408,9 +381,9 @@ const Tracking = () => {
       </div>
 
       <AddTransactionDialog
-        visible={addTransactionDialogVisible}
-        onClose={closeAddTransactionDialog}
-        overrides={transactionOverrides}
+      //visible={addTransactionDialogVisible}
+      //onClose={closeAddTransactionDialog}
+      //overrides={transactionOverrides}
       />
       <AddTransferDialog
         visible={addTransferDialogVisible}
