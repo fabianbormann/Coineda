@@ -6,7 +6,7 @@ const defaultSettings = {
   account: {
     id: 1,
     name: 'Coineda',
-    pattern: 0,
+    pattern: 6858,
   },
 };
 

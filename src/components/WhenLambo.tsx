@@ -1,8 +1,9 @@
 import React from 'react';
 
-const WhenLambo = (props: { value: number }) => {
+// props: { value: number }
+const WhenLambo = () => {
   const goal = 219000;
-  const percent = Math.min(Math.round((props.value / goal) * 10000) / 100, 100);
+  //const percent = Math.min(Math.round((props.value / goal) * 10000) / 100, 100);
 
   /*return (
     <div>

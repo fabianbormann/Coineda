@@ -1,32 +1,70 @@
+import React from 'react';
 import { useState, useContext } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 import { SettingsContext } from '../SettingsContext';
 import { importFiles } from '../helper/import';
-import React from 'react';
+import { useDropzone, ErrorCode } from 'react-dropzone';
+import {
+  Alert,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  Snackbar,
+} from '@mui/material';
+import { ImportDialogProps, MessageType } from '../global/types';
 
-const ImportDialog = () => {
+const Dropzone = () => {
+  const { acceptedFiles, getRootProps, getInputProps } = useDropzone({
+    disabled: true,
+    validator: (file) => {
+      if (
+        !file.name.endsWith('.cnd') ||
+        file.name.endsWith('.xlsx') ||
+        file.name.endsWith('.csv')
+      ) {
+        return {
+          message: '',
+          code: ErrorCode.FileInvalidType,
+        };
+      } else {
+        return null;
+      }
+    },
+  });
+
+  const files = acceptedFiles.map((file) => (
+    <li key={file.name}>
+      {file.name} - {file.size} bytes
+    </li>
+  ));
+
+  return (
+    <section className="container">
+      <div {...getRootProps({ className: 'dropzone disabled' })}>
+        <input {...getInputProps()} />
+        <Trans i18nKey="UploadFieldText">
+          Click or drag file to this area to upload
+        </Trans>
+      </div>
+      <aside>
+        <h4>Files</h4>
+        <ul>{files}</ul>
+      </aside>
+    </section>
+  );
+};
+
+const ImportDialog = (props: ImportDialogProps) => {
   const { t } = useTranslation();
   const [files, setFiles] = useState([]);
   const { settings } = useContext(SettingsContext);
   const { account } = settings;
   const [uploading, setUploading] = useState(false);
-
-  /*const addFile = (file) => {
-    if (
-      file.name.endsWith('.cnd') ||
-      file.name.endsWith('.xlsx') ||
-      file.name.endsWith('.csv')
-    ) {
-      setFiles([...files, file]);
-    } else {
-      const parts = file.name.split('.');
-      message.error(
-        t('File type is not supported', { fileType: parts[parts.length - 1] })
-      );
-    }
-
-    return false;
-  };
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarType, setSnackbarType] = useState<MessageType>('success');
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const { visible, onClose } = props;
 
   const handleUpload = async () => {
     try {
@@ -36,19 +74,31 @@ const ImportDialog = () => {
       );
 
       if (duplicates === 0 && errors === 0 && inserts > 0) {
-        message.success(
-          t('Transactions successfully uploaded', { inserts: inserts })
+        setSnackbarMessage(
+          t('Transactions successfully uploaded', {
+            inserts: inserts,
+          }) as string
         );
+        setSnackbarType('success');
+        setSnackbarOpen(true);
       } else {
-        message.warning(
-          t('Transactions partially uploaded', { inserts, duplicates, errors })
+        setSnackbarMessage(
+          t('Transactions partially uploaded', {
+            inserts,
+            duplicates,
+            errors,
+          }) as string
         );
+        setSnackbarType('warning');
+        setSnackbarOpen(true);
       }
 
       setFiles([]);
-      props.onClose();
+      onClose();
     } catch (error) {
-      message.error('upload failed.');
+      setSnackbarMessage('Upload failed. Please try again.');
+      setSnackbarType('error');
+      setSnackbarOpen(true);
     } finally {
       setUploading(false);
     }
@@ -61,41 +111,44 @@ const ImportDialog = () => {
     }
   };
 
+  const handleSnackbarClose = (
+    event?: React.SyntheticEvent | Event,
+    reason?: string
+  ) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setSnackbarOpen(false);
+  };
+
   return (
-    <Modal
-      visible={props.visible}
-      onOk={submit}
-      okButtonProps={{
-        disabled: files.length < 1 || uploading,
-        loading: uploading,
-      }}
-      onCancel={() => props.onClose()}
-    >
-      <Dragger
-        multiple={true}
-        onRemove={(file) =>
-          setFiles(files.filter((element) => element !== file))
-        }
-        beforeUpload={addFile}
-        fileList={files}
+    <>
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
       >
-        <p className="ant-upload-drag-icon">
-          <InboxOutlined />
-        </p>
-        <p className="ant-upload-text">
-          <Trans i18nKey="UploadFieldText">
-            Click or drag file to this area to upload
-          </Trans>
-        </p>
-        <p className="ant-upload-hint">
-          <Trans i18nKey="UploadFieldHint">
-            Support for a single or bulk upload
-          </Trans>
-        </p>
-      </Dragger>
-    </Modal>
-  );*/
-  return <div></div>;
+        <Alert
+          onClose={handleSnackbarClose}
+          severity={snackbarType}
+          sx={{ width: '100%' }}
+        >
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
+      <Dialog onClose={() => onClose()} open={visible}>
+        <DialogContent>
+          <Dropzone />
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={files.length < 1 || uploading} onClick={submit}>
+            Cancel
+          </Button>
+          <Button onClick={() => onClose()}>OK</Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
 };
 
 export default ImportDialog;

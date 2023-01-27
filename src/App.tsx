@@ -202,7 +202,7 @@ const Main = () => {
             }}
           >
             <div style={{ minWidth: 56 }}>
-              <Jazzicon seed={Math.random() * 100} diameter={32} />
+              <Jazzicon seed={settings.account.pattern} diameter={32} />
             </div>
             <div>
               <Typography>{account.name}</Typography>

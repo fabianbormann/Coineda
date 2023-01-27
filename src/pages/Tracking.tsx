@@ -1,8 +1,7 @@
 import { useEffect, useState, useCallback, useContext } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AddTransactionDialog, AddTransferDialog } from '../dialogs';
+import { AddTransactionDialog, ImportDialog } from '../dialogs';
 import { exportData } from '../helper/export';
-import { ImportDialog } from '../dialogs';
 import { SettingsContext } from '../SettingsContext';
 import storage from '../persistence/storage';
 import moment from 'moment';
@@ -30,7 +29,6 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import UploadIcon from '@mui/icons-material/Upload';
 import SwapHorizontalCircleIcon from '@mui/icons-material/SwapHorizontalCircle';
@@ -43,13 +41,10 @@ const Tracking = () => {
   const { settings } = useContext(SettingsContext);
   const [addTransactionDialogVisible, setAddTransactionDialogVisible] =
     useState(false);
-  const [addTransferDialogVisible, setAddTransferDialogVisible] =
-    useState(false);
   const [importDialogVisible, setImportDialogVisible] = useState(false);
   const [dataSource, setDataSource] = useState<Array<Transaction>>([]);
   const [transactionOverrides, setTransactionOverrides] =
     useState<Transaction>();
-  const [transferOverrides, setTransferOverrides] = useState<Transaction>();
   const [assets, setAssets] = useState<CoinedaAssets>({
     fiat: [],
     cryptocurrencies: [],
@@ -172,18 +167,11 @@ const Tracking = () => {
     setTransactionOverrides(undefined);
   };
 
-  const closeAddTransferDialog = () => {
-    fetchExchanges();
-    setAddTransferDialogVisible(false);
-    setTransferOverrides(undefined);
-  };
-
   const closeImportDialog = () => {
     setImportDialogVisible(false);
     fetchExchanges();
   };
 
-  const openAddTransferDialog = () => setAddTransferDialogVisible(true);
   const openAddTransactionDialog = () => setAddTransactionDialogVisible(true);
   const openImportDialog = () => setImportDialogVisible(true);
 
@@ -204,13 +192,8 @@ const Tracking = () => {
   };
 
   const editEntry = (entry: Transaction) => {
-    if (entry.type === 'transfer') {
-      setTransferOverrides(entry);
-      setAddTransferDialogVisible(true);
-    } else {
-      setTransactionOverrides(entry);
-      setAddTransactionDialogVisible(true);
-    }
+    setTransactionOverrides(entry);
+    setAddTransactionDialogVisible(true);
   };
 
   const buckets: Array<TransactionBucket> = [
@@ -275,11 +258,6 @@ const Tracking = () => {
         <Tooltip title={t('Add Transaction') as string}>
           <IconButton onClick={openAddTransactionDialog}>
             <AddCircleOutlineIcon />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title={t('Add Transfer') as string}>
-          <IconButton onClick={openAddTransferDialog}>
-            <SwapHorizIcon />
           </IconButton>
         </Tooltip>
         {!isMobileDevice && (
@@ -381,14 +359,9 @@ const Tracking = () => {
       </div>
 
       <AddTransactionDialog
-      //visible={addTransactionDialogVisible}
-      //onClose={closeAddTransactionDialog}
-      //overrides={transactionOverrides}
-      />
-      <AddTransferDialog
-        visible={addTransferDialogVisible}
-        onClose={closeAddTransferDialog}
-        overrides={transferOverrides}
+        visible={addTransactionDialogVisible}
+        onClose={closeAddTransactionDialog}
+        overrides={transactionOverrides}
       />
       <ImportDialog visible={importDialogVisible} onClose={closeImportDialog} />
     </div>

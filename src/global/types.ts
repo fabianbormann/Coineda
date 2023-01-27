@@ -52,6 +52,7 @@ export type Transaction = {
   value: number;
   symbol: string;
   currency: string;
+  exchange: string;
   fromExchange: string;
   toExchange: string;
   fromSymbol: string;
@@ -67,6 +68,7 @@ export type Transaction = {
   formattedDate: string;
   children: Array<Transaction>;
   parent: number;
+  key: number;
 };
 
 export type CoinedaAsset = {
@@ -93,3 +95,36 @@ export type TransactionCardContent = {
 };
 
 export type MessageType = 'success' | 'error' | 'warning' | 'info';
+export type AccountDialogMode = 'add' | 'edit';
+
+export type TokenCache = { entries: any; age: number };
+export type Token = {
+  id: string;
+  symbol: string;
+  name: string;
+};
+export type CoinGekoCoinList = Array<Token>;
+export type TransactionDialogProps = {
+  overrides?: Transaction;
+  visible: boolean;
+  onClose: () => void;
+};
+
+export type ExchangeManagerProps = {
+  onExchangeSelected: (exchange: string | null) => void;
+  defaultSelectionIndex?: number;
+  label?: string;
+  showAddExchangeButton?: boolean;
+  refreshExchanges?: number;
+  forceRefreshExchanges?: () => void;
+};
+
+export type Exchange = {
+  id: number;
+  name: string;
+};
+
+export type ImportDialogProps = {
+  visible: boolean;
+  onClose: () => void;
+};

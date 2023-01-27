@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect, useCallback } from 'react';
-import FloatingLabel from '../components/FloatingLabel';
 import storage from '../persistence/storage';
 import React from 'react';
 

@@ -204,7 +204,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div>
+    <Grid container justifyContent="center" alignItems="center">
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={6000}
@@ -236,7 +236,7 @@ const Dashboard = () => {
           <Grid>
             <Grid sm={24} md={18} lg={12}>
               <Paper>
-                <HistoryChart currencies={currencies} />
+                <HistoryChart />
               </Paper>
             </Grid>
             <Grid sm={24} md={18} lg={12}>
@@ -285,19 +285,25 @@ const Dashboard = () => {
           </Grid>
           <Grid>
             <Grid sm={24} md={12} style={{ width: '100%' }}>
-              <WhenLambo value={summary.crypto_total_in_euro} />
+              {/* <WhenLambo value={summary.crypto_total_in_euro} /> */}
+              <WhenLambo />
             </Grid>
           </Grid>
         </>
       ) : (
         !loading && (
-          <>
-            <InfoIcon />
+          <Grid
+            container
+            direction="column"
+            justifyContent="center"
+            alignItems="center"
+          >
+            <InfoIcon sx={{ mt: 2 }} />
             <p>{t('No Transactions') as string}</p>
-          </>
+          </Grid>
         )
       )}
-    </div>
+    </Grid>
   );
 };
 

@@ -1,39 +1,36 @@
 import React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Exchange, ExchangeManagerProps } from '../global/types';
 import storage from '../persistence/storage';
+import { Button, Grid, MenuItem, TextField } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
 
-const ExchangeManger = () => {
-  const [exchanges, setExchanges] = useState([]);
-  const [newExchangeName, setNewExchangeName] = useState(undefined);
-  const [selectedExchange, setSelectedExchange] = useState(undefined);
+const ExchangeManger = ({
+  onExchangeSelected,
+  showAddExchangeButton = true,
+  defaultSelectionIndex = 0,
+  forceRefreshExchanges = () => {},
+  refreshExchanges = 0,
+  label,
+}: ExchangeManagerProps) => {
+  const [exchanges, setExchanges] = useState<Array<Exchange>>([]);
+  const [newExchangeName, setNewExchangeName] = useState<string>();
+  const [selectedExchange, setSelectedExchange] = useState<Exchange | null>(
+    null
+  );
   const [inputVisible, setInputVisible] = useState(false);
   const { t } = useTranslation();
-  /*
-  const {
-    onExchangeSelected,
-    defaultSelectionIndex,
-    label,
-    showAddExchangeButton,
-    refreshExchanges,
-    forceRefreshExchanges,
-  } = props;
 
-  const fetchExchanges = useCallback((defaultSelectionIndex) => {
+  const fetchExchanges = useCallback((defaultSelectionIndex: number) => {
     storage.exchanges
       .getAll()
       .then((results) => {
         setExchanges(results);
         if (results.length > defaultSelectionIndex) {
-          setSelectedExchange({
-            value: results[defaultSelectionIndex].id,
-            label: results[defaultSelectionIndex].name,
-          });
+          setSelectedExchange(results[defaultSelectionIndex]);
         } else if (results.length > 0) {
-          setSelectedExchange({
-            value: results[0].id,
-            label: results[0].name,
-          });
+          setSelectedExchange(results[0]);
         }
       })
       .catch((error) => {
@@ -47,7 +44,7 @@ const ExchangeManger = () => {
 
   useEffect(() => {
     if (typeof selectedExchange !== 'undefined') {
-      onExchangeSelected(selectedExchange.label);
+      onExchangeSelected(selectedExchange?.name || null);
     }
   }, [selectedExchange, onExchangeSelected]);
 
@@ -56,10 +53,9 @@ const ExchangeManger = () => {
       .add({ name: newExchangeName })
       .then(() => {
         forceRefreshExchanges();
-        fetchExchanges();
+        fetchExchanges(defaultSelectionIndex);
       })
       .catch((error) => {
-        message.error('Failed to add exchange/wallet');
         console.warn(error);
       })
       .finally(() => {
@@ -68,67 +64,52 @@ const ExchangeManger = () => {
       });
   };
 
-  const text = label ? <span>{label}:</span> : null;
-
   return (
-    <Space direction="vertical" className={classes.grow}>
-      <div className={classes.wrapper}>
-        {text}
-        <Select
-          labelInValue
-          placeholder={t('Select an exchange or a wallet')}
-          value={selectedExchange}
-          disabled={exchanges.length === 0}
-          className={classes.grow}
-          onChange={(option) => {
-            onExchangeSelected(option.label);
-            setSelectedExchange(option);
-          }}
-        >
-          {exchanges.map((exchange) => (
-            <Option key={exchange.id} value={exchange.id}>
-              {exchange.name}
-            </Option>
-          ))}
-        </Select>
-      </div>
+    <Grid container direction="column" sx={{ p: 2 }}>
+      <TextField
+        select
+        InputLabelProps={{ shrink: true }}
+        variant="standard"
+        label={label || t('Select an exchange or a wallet')}
+        value={selectedExchange?.name || null}
+        disabled={exchanges.length === 0}
+        onChange={(event) => {
+          onExchangeSelected(event.target.value);
+          setSelectedExchange(
+            exchanges.find(
+              (exchange) => exchange.name === event.target.value
+            ) || null
+          );
+        }}
+      >
+        {exchanges.map((exchange) => (
+          <MenuItem key={exchange.id} value={exchange.name}>
+            {exchange.name}
+          </MenuItem>
+        ))}
+      </TextField>
+
       {inputVisible ? (
-        <div className={classes.wrapper}>
-          <Input
-            className={classes.input}
-            value={newExchangeName}
-            onChange={(event) => setNewExchangeName(event.target.value)}
-            placeholder="Exchange/Wallet name"
-            suffix={
-              <Button type="primary" onClick={addExchange}>
+        <TextField
+          value={newExchangeName}
+          sx={{ mt: 2 }}
+          onChange={(event) => setNewExchangeName(event.target.value)}
+          placeholder="Exchange/Wallet name"
+          InputProps={{
+            endAdornment: (
+              <Button variant="contained" onClick={addExchange}>
                 Add
               </Button>
-            }
-          />
-        </div>
+            ),
+          }}
+        />
       ) : showAddExchangeButton ? (
-        <Button
-          onClick={() => setInputVisible(true)}
-          type="primary"
-          shape="round"
-          icon={<PlusCircleOutlined />}
-        >
+        <Button onClick={() => setInputVisible(true)} startIcon={<AddIcon />}>
           {t('Add new exchange or wallet')}
         </Button>
       ) : null}
-    </Space>
-  );*/
-  return <div></div>;
-};
-
-ExchangeManger.defaultProps = {
-  onExchangeSelected: () => {
-    console.warn('onExchangeSelected not implemented yet.');
-  },
-  showAddExchangeButton: true,
-  defaultSelectionIndex: 0,
-  forceRefreshExchanges: () => {},
-  refreshExchanges: 0,
+    </Grid>
+  );
 };
 
 export default ExchangeManger;
