@@ -5,29 +5,55 @@ import moment from 'moment';
 import GainSummary from '../components/GainSummary';
 import { calculateTax } from '../helper/tax';
 import React from 'react';
+import {
+  MessageType,
+  TaxSummary,
+  TaxTransaction,
+  Transaction,
+} from '../global/types';
+import {
+  Alert,
+  AlertTitle,
+  Button,
+  CircularProgress,
+  Divider,
+  Snackbar,
+  TextField,
+  Typography,
+} from '@mui/material';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import DownloadIcon from '@mui/icons-material/Download';
+import dayjs, { Dayjs } from 'dayjs';
 
 const TaxReports = () => {
   const { t } = useTranslation();
   const { settings } = useContext(SettingsContext);
-  const [summary, setSummary] = useState({
+  const [summary, setSummary] = useState<TaxSummary>({
     realizedGains: {},
     unrealizedGains: {},
   });
-  const [selectedYear, setSelectedYear] = useState(new Date());
+  const [selectedYear, setSelectedYear] = useState<Dayjs>(dayjs());
   const [loading, setLoading] = useState(false);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarType, setSnackbarType] = useState<MessageType>('success');
+  const [snackbarMessage, setSnackbarMessage] = useState('');
 
   const { account } = settings;
 
-  /*const fetchSummary = useCallback(() => {
+  const fetchSummary = useCallback(() => {
     setLoading(true);
     calculateTax(account.id)
       .then((tax) => {
         setSummary(tax);
       })
       .catch((error) => {
-        message.error(
+        setSnackbarType('error');
+        setSnackbarMessage(
           'Tax calculation failed. Please restart the application.'
         );
+        setSnackbarOpen(true);
         console.warn(error);
       })
       .finally(() => setLoading(false));
@@ -37,25 +63,23 @@ const TaxReports = () => {
     fetchSummary();
   }, [fetchSummary]);
 
-  const roundFiat = (value) => Math.round(value * 100) / 100;
+  const roundFiat = (value: number) => Math.round(value * 100) / 100;
 
-  const realizedWithinTaxYear = {};
+  const realizedWithinTaxYear: { [key: string]: Array<TaxTransaction> } = {};
   for (const coin of Object.keys(summary.realizedGains)) {
     realizedWithinTaxYear[coin] = summary.realizedGains[coin].filter(
       (transaction) =>
-        new Date(transaction.date) >
-          new Date(selectedYear.getFullYear(), 0, 1) &&
-        new Date(transaction.date) <
-          new Date(selectedYear.getFullYear(), 11, 31)
+        new Date(transaction.date) > new Date(selectedYear.year(), 0, 1) &&
+        new Date(transaction.date) < new Date(selectedYear.year(), 11, 31)
     );
   }
 
-  const unrealizedAfterTaxYear = {};
+  const unrealizedAfterTaxYear: { [key: string]: Array<TaxTransaction> } = {};
   for (const coin of Object.keys(summary.unrealizedGains)) {
     unrealizedAfterTaxYear[coin] = summary.unrealizedGains[coin].filter(
       (transaction) =>
         new Date(new Date(transaction.date).getFullYear(), 0, 1) <=
-        new Date(selectedYear.getFullYear(), 0, 1)
+        new Date(selectedYear.year(), 0, 1)
     );
   }
 
@@ -78,73 +102,102 @@ const TaxReports = () => {
     disclaimerVisible = false;
   }
 
+  const handleSnackbarClose = (
+    event?: React.SyntheticEvent | Event,
+    reason?: string
+  ) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+
+    setSnackbarOpen(false);
+  };
+
   return (
-    <div className={classes.page}>
+    <div>
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
+      >
+        <Alert
+          onClose={handleSnackbarClose}
+          severity={snackbarType}
+          sx={{ width: '100%' }}
+        >
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
       {loading ? (
-        <div className={classes.loading}>
-          <Spin />
+        <div>
+          <CircularProgress />
         </div>
       ) : (
         <>
           {' '}
           {disclaimerVisible && (
             <Alert
-              message={t('Disclaimer')}
-              showIcon
-              description={t('Disclaimer Text')}
-              type="warning"
-              closeText={t('Got it')}
-              onClose={() => {
-                localStorage.setItem('coineda.show.discalimer', false);
-              }}
-            />
+              action={
+                <Button
+                  onClick={() => {
+                    localStorage.setItem('coineda.show.discalimer', 'false');
+                  }}
+                >
+                  {t('Got it')}
+                </Button>
+              }
+              severity="warning"
+            >
+              <AlertTitle>{t('Disclaimer')}</AlertTitle>
+              {t('Disclaimer Text')}
+            </Alert>
           )}
-          <p className={classes.headline}>{t('Tax Year')}</p>
-          <DatePicker
-            style={{ maxWidth: 200, marginBottom: 16 }}
-            value={moment(selectedYear)}
-            onChange={(date, dateString) => {
-              setSelectedYear(new Date(dateString));
-            }}
-            picker="year"
-          />
+          <Typography>{t('Tax Year')}</Typography>
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <DatePicker
+              label={t('Date')}
+              views={['year']}
+              value={selectedYear}
+              onChange={(date) => {
+                if (date) {
+                  setSelectedYear(date);
+                }
+              }}
+              renderInput={(params) => <TextField {...params} />}
+            />
+          </LocalizationProvider>
         </>
       )}
 
       {Object.keys(realizedWithinTaxYear).length > 0 ||
       Object.keys(unrealizedAfterTaxYear).length > 0 ? (
         <div>
-          <p className={classes.headline}>{t('Taxable gains and losses')}</p>
+          <p>{t('Taxable gains and losses')}</p>
           <span
             style={hasLoss ? { color: '#C36491' } : { color: '#03A678' }}
-            className={classes.summary}
           >{`${hasLoss ? '-' : '+'}${roundFiat(
             Math.abs(totalGain)
           )} EUR`}</span>
 
           <Alert
-            style={{ marginBottom: 24, marginTop: 16, maxWidth: 600 }}
-            message={
+            severity={isBelowLimit ? 'info' : 'warning'}
+            sx={{ mb: 24, mt: 16, maxWidth: 600 }}
+          >
+            <span>
+              {t('You need to pay', {
+                approx: isBelowLimit ? ' ' : ` ${t('approx')} `,
+              })}
               <span>
-                {t('You need to pay', {
-                  approx: isBelowLimit ? ' ' : ` ${t('approx')} `,
-                })}
-                <span
-                  className={isBelowLimit ? classes.positive : classes.negative}
-                >
-                  {isBelowLimit ? '' : '~'} {roundFiat(tax)} €
-                </span>
-                {t('Tax this year', { year: selectedYear.getFullYear() })}
+                {isBelowLimit ? '' : '~'} {roundFiat(tax)} €
               </span>
-            }
-            type={isBelowLimit ? 'info' : 'warning'}
-            showIcon
-          />
+              {t('Tax this year', { year: selectedYear.year })}
+            </span>
+          </Alert>
 
-          <Button disabled={true} icon={<DownloadOutlined />}>
+          <Button disabled={true} startIcon={<DownloadIcon />}>
             {t('Download Report')}
           </Button>
-          <Divider className={classes.divider} />
+          <Divider />
           <GainSummary
             showUnrealizedGains={false}
             gains={realizedWithinTaxYear}
@@ -156,14 +209,13 @@ const TaxReports = () => {
         </div>
       ) : (
         !loading && (
-          <Empty
-            description={t('No Transactions in ' + selectedYear.getFullYear())}
-          />
+          <Typography>
+            {t('No Transactions in ' + selectedYear.year)}
+          </Typography>
         )
       )}
     </div>
-  );*/
-  return <div></div>;
+  );
 };
 
 export default TaxReports;

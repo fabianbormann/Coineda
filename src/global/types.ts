@@ -128,3 +128,17 @@ export type ImportDialogProps = {
   visible: boolean;
   onClose: () => void;
 };
+
+export interface TaxTransaction extends Transaction {
+  gain: number;
+}
+
+export type TaxSummary = {
+  realizedGains: { [key: string]: Array<TaxTransaction> };
+  unrealizedGains: { [key: string]: Array<TaxTransaction> };
+};
+
+export type GainSummaryProps = {
+  gains: { [key: string]: Array<TaxTransaction> };
+  showUnrealizedGains: boolean;
+};

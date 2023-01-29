@@ -77,6 +77,13 @@ const Drawer = styled(MuiDrawer, {
   },
 }));
 
+const Logo = styled('div')(() => ({
+  background: 'url("./logo192.png")',
+  width: 32,
+  height: 32,
+  backgroundSize: 'contain',
+}));
+
 const Content = styled('main')(({ theme }) => ({
   backgroundColor:
     theme.palette.mode === 'light'
@@ -202,7 +209,7 @@ const Main = () => {
             }}
           >
             <div style={{ minWidth: 56 }}>
-              <Jazzicon seed={settings.account.pattern} diameter={32} />
+              <Logo />
             </div>
             <div>
               <Typography>{account.name}</Typography>

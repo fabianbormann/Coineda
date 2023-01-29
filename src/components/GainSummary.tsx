@@ -1,11 +1,8 @@
-import { useTranslation } from 'react-i18next';
-import moment from 'moment';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { GainSummaryProps } from '../global/types';
 
-const GainSummary = (props: {
-  gains: Array<any>;
-  showUnrealizedGains: boolean;
-}) => {
+const GainSummary = (props: GainSummaryProps) => {
   const { gains, showUnrealizedGains } = props;
   const { t } = useTranslation();
 
@@ -14,7 +11,7 @@ const GainSummary = (props: {
     title = t('Unrealized Gains');
   }
 
-  if (typeof gains === 'undefined' || gains.length === 0) {
+  if (typeof gains === 'undefined' || Object.keys(gains).length === 0) {
     return null;
   }
 
