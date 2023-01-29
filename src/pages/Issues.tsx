@@ -7,7 +7,7 @@ const Issues = () => {
   const { t } = useTranslation();
 
   return (
-    <Grid container direction="column" sx={{ alignItems: 'center' }}>
+    <Grid container direction="column" sx={{ p: 2, alignItems: 'center' }}>
       <GppGoodIcon sx={{ mt: 2, fontSize: 40 }} />
       <Typography sx={{ mt: 1 }}>No issues detected</Typography>
     </Grid>

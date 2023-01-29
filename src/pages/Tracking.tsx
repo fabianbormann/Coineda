@@ -21,6 +21,7 @@ import {
   CardActions,
   CardContent,
   CardHeader,
+  Grid,
   IconButton,
   Snackbar,
   Tooltip,
@@ -239,7 +240,7 @@ const Tracking = () => {
   };
 
   return (
-    <div>
+    <Grid sx={{ p: 2 }}>
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={6000}
@@ -364,7 +365,7 @@ const Tracking = () => {
         overrides={transactionOverrides}
       />
       <ImportDialog visible={importDialogVisible} onClose={closeImportDialog} />
-    </div>
+    </Grid>
   );
 };
 

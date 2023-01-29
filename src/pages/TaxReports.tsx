@@ -17,6 +17,7 @@ import {
   Button,
   CircularProgress,
   Divider,
+  Grid,
   Snackbar,
   TextField,
   Typography,
@@ -114,7 +115,7 @@ const TaxReports = () => {
   };
 
   return (
-    <div>
+    <Grid sx={{ p: 2 }}>
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={6000}
@@ -152,7 +153,7 @@ const TaxReports = () => {
               {t('Disclaimer Text')}
             </Alert>
           )}
-          <Typography>{t('Tax Year')}</Typography>
+          <Typography sx={{ mb: 1 }}>{t('Tax Year')}</Typography>
           <LocalizationProvider dateAdapter={AdapterDayjs}>
             <DatePicker
               label={t('Date')}
@@ -209,12 +210,12 @@ const TaxReports = () => {
         </div>
       ) : (
         !loading && (
-          <Typography>
-            {t('No Transactions in ' + selectedYear.year)}
+          <Typography sx={{ mt: 1 }}>
+            {t('No Transactions in ' + selectedYear.year())}
           </Typography>
         )
       )}
-    </div>
+    </Grid>
   );
 };
 
