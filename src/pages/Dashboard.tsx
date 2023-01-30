@@ -236,7 +236,7 @@ const Dashboard = () => {
           <Grid>
             <Grid sm={24} md={18} lg={12}>
               <Paper>
-                <HistoryChart />
+                <HistoryChart currencies={currencies} />
               </Paper>
             </Grid>
             <Grid sm={24} md={18} lg={12}>
@@ -285,8 +285,7 @@ const Dashboard = () => {
           </Grid>
           <Grid>
             <Grid sm={24} md={12} style={{ width: '100%' }}>
-              {/* <WhenLambo value={summary.crypto_total_in_euro} /> */}
-              <WhenLambo />
+              <WhenLambo value={summary?.crypto_total_in_euro || 0} />
             </Grid>
           </Grid>
         </>

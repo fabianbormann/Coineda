@@ -130,6 +130,8 @@ export type ImportDialogProps = {
 };
 
 export interface TaxTransaction extends Transaction {
+  daysFromPurchase: number;
+  amount: number;
   gain: number;
 }
 
@@ -141,4 +143,19 @@ export type TaxSummary = {
 export type GainSummaryProps = {
   gains: { [key: string]: Array<TaxTransaction> };
   showUnrealizedGains: boolean;
+};
+
+export type HistoryChartProps = {
+  currencies: Array<string>;
+};
+
+export type MarketPriceData = {
+  name: string;
+  short: string;
+  unit: string;
+  Value: number;
+};
+
+export type WhenLamboProps = {
+  value: number;
 };

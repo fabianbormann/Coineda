@@ -1,26 +1,21 @@
+import { LinearProgress } from '@mui/material';
 import React from 'react';
+import { WhenLamboProps } from '../global/types';
 
-// props: { value: number }
-const WhenLambo = () => {
+const WhenLambo = (props: WhenLamboProps) => {
   const goal = 219000;
-  //const percent = Math.min(Math.round((props.value / goal) * 10000) / 100, 100);
+  const percent = Math.min(Math.round((props.value / goal) * 10000) / 100, 100);
 
-  /*return (
+  return (
     <div>
       <span>When Lambo?</span>
       <div>
-        <Progress percent={percent} />
+        <LinearProgress value={percent} />
         <div />
-        <Image
-          preview={false}
-          style={{ maxWidth: 100 }}
-          src={'assets/lamborghini.svg'}
-        />
+        <img style={{ maxWidth: 100 }} src={'assets/lamborghini.svg'} />
       </div>
     </div>
-  );*/
-
-  return <div></div>;
+  );
 };
 
 export default WhenLambo;

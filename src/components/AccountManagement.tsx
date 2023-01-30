@@ -159,7 +159,7 @@ const AccountManagement = () => {
     setSnackbarOpen(false);
   };
 
-  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+  const showPopconfirm = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorElement(event.currentTarget);
   };
 
@@ -221,7 +221,7 @@ const AccountManagement = () => {
             <EditIcon />
           </IconButton>
 
-          <IconButton onClick={editAccount}>
+          <IconButton onClick={showPopconfirm}>
             <DeleteIcon />
           </IconButton>
           <Popover

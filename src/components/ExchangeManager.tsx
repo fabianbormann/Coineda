@@ -71,7 +71,7 @@ const ExchangeManger = ({
         InputLabelProps={{ shrink: true }}
         variant="standard"
         label={label || t('Select an exchange or a wallet')}
-        value={selectedExchange?.name || null}
+        value={selectedExchange?.name || ''}
         disabled={exchanges.length === 0}
         onChange={(event) => {
           onExchangeSelected(event.target.value);

@@ -245,7 +245,7 @@ const getCoinCount = async (currency, date, account) => {
   return count;
 };
 
-const fetchPrice = async (currency, date = null) => {
+const fetchPrice = async (currency, date) => {
   let fetchSingle = true;
   if (typeof currency !== 'string') {
     currency = currency.join(',');

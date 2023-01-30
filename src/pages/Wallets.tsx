@@ -23,7 +23,9 @@ import SaveIcon from '@mui/icons-material/Save';
 
 const Wallets = () => {
   const { t } = useTranslation();
-  const [selectedExchange, setSelectedExchange] = useState<Exchange>();
+  const [selectedExchange, setSelectedExchange] = useState<Exchange | null>(
+    null
+  );
   const [walletType, setWalletType] = useState<string>();
   const [exchanges, setExchanges] = useState<Array<Exchange>>([]);
   const [walletName, setWalletName] = useState('');
@@ -201,15 +203,17 @@ const Wallets = () => {
         <TextField
           select
           label={t('Select an exchange or a wallet')}
-          value={selectedExchange?.id}
+          value={selectedExchange?.id || ''}
           disabled={exchanges.length === 0}
           sx={{ mt: 1, mb: 1 }}
           onChange={(event) => {
-            setSelectedExchange(
-              exchanges.find(
-                (exchange) => exchange.id === Number(event.target.value)
-              )
+            const exchange = exchanges.find(
+              (exchange) => exchange.id === Number(event.target.value)
             );
+
+            if (exchange) {
+              setSelectedExchange(exchange);
+            }
           }}
         >
           {exchanges.map((exchange) => (

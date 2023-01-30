@@ -100,6 +100,7 @@ const AssetManagement = () => {
               `${asset.name} (${asset.symbol}) has already been added to your asset list`
             ) as string
           );
+
           setSnackbarType('info');
           setSnackbarOpen(true);
         } else {

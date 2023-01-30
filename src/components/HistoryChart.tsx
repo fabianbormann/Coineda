@@ -1,3 +1,4 @@
+import { Alert, AlertTitle, CircularProgress } from '@mui/material';
 import React from 'react';
 import { useEffect, useState, useContext } from 'react';
 import {
@@ -9,19 +10,20 @@ import {
   ReferenceLine,
   Tooltip,
 } from 'recharts';
+import { HistoryChartProps, MarketPriceData } from '../global/types';
 import { fetchPrice, getCoinCount, getPurchaseValue } from '../helper/common';
 import { SettingsContext } from '../SettingsContext';
 
-const HistoryChart = () => {
-  //const { currencies } = props;
+const HistoryChart = (props: HistoryChartProps) => {
+  const { currencies } = props;
   const { settings } = useContext(SettingsContext);
-  const [data, setData] = useState([]);
+  const [data, setData] = useState<Array<MarketPriceData>>([]);
   const [purchasePrice, setPurchasePrice] = useState(0);
   const [state, setState] = useState('LOADING');
 
   const { account } = settings;
 
-  /*useEffect(() => {
+  useEffect(() => {
     const calculatePurchasePrice = async () => {
       let value = 0;
       for (const currency of currencies) {
@@ -48,12 +50,12 @@ const HistoryChart = () => {
       const today = new Date();
 
       try {
-        let marketPrices = [];
+        let marketPrices: Array<MarketPriceData> = [];
         for (var i = 6; i >= 0; i -= 1) {
           const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
           const month = monthNames[date.getMonth()];
 
-          let values = {};
+          let values: { [key: string]: number } = {};
 
           if (i === 0) {
             values = await fetchPrice(currencies);
@@ -90,17 +92,16 @@ const HistoryChart = () => {
   }, [currencies, account]);
 
   let content = (
-    <div className={classes.wrapper}>
-      <Spin />
+    <div>
+      <CircularProgress />
     </div>
   );
   if (state === 'ERROR') {
     content = (
-      <div className={classes.wrapper}>
-        <Result
-          status="warning"
-          title="Error while fetching historical data."
-        />
+      <div>
+        <Alert severity="warning">
+          <AlertTitle>Error while fetching historical data.</AlertTitle>
+        </Alert>
       </div>
     );
   } else if (state === 'READY') {
@@ -109,13 +110,10 @@ const HistoryChart = () => {
         <XAxis dataKey="short" />
         <YAxis domain={['auto', 'auto']} />
         <Tooltip
-          labelFormatter={(label, payload) => {
-            if (payload.length > 0) {
-              return payload[0].payload.name;
-            }
+          labelFormatter={(label: string) => {
             return label;
           }}
-          formatter={(value, name, props) => value + ' €'}
+          formatter={(value) => value + ' €'}
         />
         <Line
           type="monotone"
@@ -133,9 +131,7 @@ const HistoryChart = () => {
     <ResponsiveContainer debounce={1} maxHeight={300} width="100%" aspect={1.4}>
       {content}
     </ResponsiveContainer>
-  );*/
-
-  return <div></div>;
+  );
 };
 
 export default HistoryChart;
