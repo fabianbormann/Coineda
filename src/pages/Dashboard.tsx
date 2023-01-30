@@ -15,11 +15,16 @@ import { CoinedaSummary, MessageType, Transaction } from '../global/types';
 import {
   Alert,
   AlertTitle,
+  Box,
   CircularProgress,
   Grid,
   Paper,
   Snackbar,
+  Typography,
 } from '@mui/material';
+
+import ArrowCircleDownIcon from '@mui/icons-material/ArrowCircleDown';
+import ArrowCircleUpIcon from '@mui/icons-material/ArrowCircleUp';
 
 const Dashboard = () => {
   const { t } = useTranslation();
@@ -148,11 +153,8 @@ const Dashboard = () => {
       for (const coin in data) {
         coins.cryptocurrencies[coin].price_in_euro =
           data[coin] * coins.cryptocurrencies[coin].value;
-
         coins.cryptocurrencies[coin].current_price = data[coin];
-
         coins['crypto_total_in_euro'] = coins['crypto_total_in_euro'] || 0;
-
         coins['crypto_total_in_euro'] +=
           coins.cryptocurrencies[coin].price_in_euro;
       }
@@ -204,7 +206,7 @@ const Dashboard = () => {
   };
 
   return (
-    <Grid container justifyContent="center" alignItems="center">
+    <Grid container justifyContent="center" alignItems="center" sx={{ p: 2 }}>
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={6000}
@@ -233,13 +235,13 @@ const Dashboard = () => {
         ))}
       {summary.hasOwnProperty('crypto_total_in_euro') ? (
         <>
-          <Grid>
-            <Grid sm={24} md={18} lg={12}>
+          <Grid container spacing={2}>
+            <Grid item sm={12} md={9} lg={6}>
               <Paper>
                 <HistoryChart currencies={currencies} />
               </Paper>
             </Grid>
-            <Grid sm={24} md={18} lg={12}>
+            <Grid item sm={24} md={9} lg={6}>
               <Paper>
                 <DoughnutChart
                   label={`${Math.round(total * 100) / 100} €`}
@@ -248,7 +250,7 @@ const Dashboard = () => {
               </Paper>
             </Grid>
           </Grid>
-          <Grid>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
             {Object.keys(summary.cryptocurrencies).map((account) => {
               const change =
                 summary.cryptocurrencies[account].price_in_euro /
@@ -256,35 +258,43 @@ const Dashboard = () => {
                     summary.cryptocurrencies[account].value) -
                 1;
               return (
-                <Grid
-                  sm={12}
-                  md={6}
-                  lg={4}
-                  key={account}
-                  style={{ width: '50%' }}
-                >
-                  <Paper>
-                    <h2
+                <Grid item sm={6} md={3} lg={2} key={account}>
+                  <Paper sx={{ p: 2 }}>
+                    <Typography
                       style={{
                         textTransform: 'capitalize',
                         fontFamily: 'PTSerif',
                       }}
                     >
                       {account.replace('-', ' ')}
-                    </h2>
-                    <h3
-                      style={{
-                        fontSize: '1rem',
+                    </Typography>
+                    <Box
+                      sx={{
+                        display: 'flex',
                         color: change > 0 ? '#03A678' : '#C36491',
                       }}
-                    >{`${Math.round(change * 10000) / 100}%`}</h3>
+                    >
+                      <>
+                        {change > 0 ? (
+                          ArrowCircleUpIcon
+                        ) : (
+                          <ArrowCircleDownIcon />
+                        )}
+                        <Typography
+                          sx={{
+                            ml: 1,
+                            fontSize: '1rem',
+                          }}
+                        >{`${Math.round(change * 10000) / 100}%`}</Typography>
+                      </>
+                    </Box>
                   </Paper>
                 </Grid>
               );
             })}
           </Grid>
-          <Grid>
-            <Grid sm={24} md={12} style={{ width: '100%' }}>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item sm={12} md={6}>
               <WhenLambo value={summary?.crypto_total_in_euro || 0} />
             </Grid>
           </Grid>

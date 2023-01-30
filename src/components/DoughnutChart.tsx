@@ -25,7 +25,14 @@ const DoughnutChart = (props: { data: Array<any>; label: string }) => {
           outerRadius="95%"
           fill="#197396"
         >
-          <Label value={label} position="center" />
+          <Label
+            value={label}
+            position="center"
+            style={{
+              fontWeight: 'bold',
+              fill: '#03A678',
+            }}
+          />
         </Pie>
         <Legend />
         <Tooltip />

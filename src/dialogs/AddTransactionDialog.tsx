@@ -22,6 +22,18 @@ import {
 } from '@mui/material';
 import { Token, TransactionDialogProps } from '../global/types';
 
+const bitcoin: Token = {
+  id: 'bitcoin',
+  symbol: 'BTC',
+  name: 'Bitcoin',
+};
+
+const euro: Token = {
+  id: 'euro',
+  symbol: 'EUR',
+  name: 'Euro',
+};
+
 const AddTransactionsDialog = (props: TransactionDialogProps) => {
   const [selectedExchange, setSelectedExchange] = useState<string | null>(null);
   const [fromExchange, setFromExchange] = useState<string | null>(null);
@@ -29,22 +41,22 @@ const AddTransactionsDialog = (props: TransactionDialogProps) => {
   const [feeValue, setFeeValue] = useState('0.0');
   const [toValue, setToValue] = useState('0.0');
   const [fromValue, setFromValue] = useState('0.0');
-  const [feeCurrency, setFeeCurrency] = useState('EUR');
-  const [toCurrency, setToCurrency] = useState('BTC');
-  const [fromCurrency, setFromCurrency] = useState('EUR');
+  const [feeCurrency, setFeeCurrency] = useState(euro);
+  const [toCurrency, setToCurrency] = useState(bitcoin);
+  const [fromCurrency, setFromCurrency] = useState(euro);
   const [isTransfer, setIsTransfer] = useState(false);
-  const [date, setDate] = useState<Dayjs | null>();
+  const [date, setDate] = useState<Dayjs>(dayjs());
   const [updateKey, setUpdateKey] = useState<number>();
   const [refreshExchanges, setRefreshExchanges] = useState(0);
   const { settings } = useContext(SettingsContext);
-  const [assets, setAssets] = useState([]);
+  const [assets, setAssets] = useState<Array<Token>>([]);
   const { t } = useTranslation();
   const { account } = settings;
   const { overrides, visible, onClose } = props;
   const closeDialog = () => {
-    setFeeCurrency('bitcoin');
-    setToCurrency('bitcoin');
-    setFromCurrency('euro');
+    setFeeCurrency(bitcoin);
+    setToCurrency(bitcoin);
+    setFromCurrency(euro);
     setSelectedExchange(null);
     onClose();
   };
@@ -63,16 +75,29 @@ const AddTransactionsDialog = (props: TransactionDialogProps) => {
       } else {
         setSelectedExchange(overrides.exchange);
         setToValue(overrides.toValue.toString());
-        setToCurrency(overrides.toCurrency);
+        const overrideToCurrency = assets.find(
+          (asset) => asset.id === overrides.toCurrency
+        );
+        if (overrideToCurrency) {
+          setToCurrency(overrideToCurrency);
+        }
       }
 
       setFeeValue(overrides.feeValue.toString());
-      setFeeCurrency(overrides.feeCurrency);
+      const overrideFeeCurrency = assets.find(
+        (asset) => asset.id === overrides.feeCurrency
+      );
+      if (overrideFeeCurrency) {
+        setFeeCurrency(overrideFeeCurrency);
+      }
       setFromValue(overrides.fromValue.toString());
-      setFromCurrency(overrides.fromCurrency);
+      const overrideFromCurrency = assets.find(
+        (asset) => asset.id === overrides.fromCurrency
+      );
+      if (overrideFromCurrency) {
+        setFromCurrency(overrideFromCurrency);
+      }
       setDate(dayjs(overrides.date));
-      setFromCurrency(overrides.fromCurrency);
-      setSelectedExchange(overrides.exchange);
       setUpdateKey(overrides.key);
     }
   }, [overrides]);
@@ -83,10 +108,10 @@ const AddTransactionsDialog = (props: TransactionDialogProps) => {
         fromExchange: fromExchange,
         toExchange: toExchange,
         value: fromValue,
-        currency: fromCurrency,
+        currency: fromCurrency.id,
         feeValue: feeValue,
-        feeCurrency: feeCurrency,
-        date: date,
+        feeCurrency: feeCurrency.id,
+        date: date?.unix() * 1000,
         account: account.id,
       };
 
@@ -105,12 +130,12 @@ const AddTransactionsDialog = (props: TransactionDialogProps) => {
       const data = {
         exchange: selectedExchange,
         fromValue: fromValue,
-        fromCurrency: fromCurrency,
+        fromCurrency: fromCurrency.id,
         toValue: toValue,
-        toCurrency: toCurrency,
+        toCurrency: toCurrency.id,
         feeValue: feeValue,
-        feeCurrency: feeCurrency,
-        date: date,
+        feeCurrency: feeCurrency.id,
+        date: date?.unix() * 1000,
         account: account.id,
       };
 
@@ -197,7 +222,9 @@ const AddTransactionsDialog = (props: TransactionDialogProps) => {
               label={t('Date')}
               value={date}
               onChange={(newValue) => {
-                setDate(newValue);
+                if (newValue) {
+                  setDate(newValue);
+                }
               }}
               renderInput={(params) => <TextField {...params} />}
             />
@@ -216,8 +243,9 @@ const AddTransactionsDialog = (props: TransactionDialogProps) => {
                   value={fromCurrency}
                   disablePortal
                   disableClearable
-                  options={assets.map((asset: Token) => asset.symbol)}
-                  onChange={(event, value) => setFromCurrency(value || 'euro')}
+                  options={assets}
+                  getOptionLabel={(option: Token) => option.symbol}
+                  onChange={(event, value) => setFromCurrency(value || euro)}
                   renderInput={(params) => (
                     <TextField
                       {...params}
@@ -244,8 +272,9 @@ const AddTransactionsDialog = (props: TransactionDialogProps) => {
                     value={toCurrency}
                     disablePortal
                     disableClearable
-                    options={assets.map((asset: Token) => asset.symbol)}
-                    onChange={(event, value) => setToCurrency(value || 'euro')}
+                    options={assets}
+                    getOptionLabel={(option: Token) => option.symbol}
+                    onChange={(event, value) => setToCurrency(value || bitcoin)}
                     renderInput={(params) => (
                       <TextField
                         {...params}
@@ -272,8 +301,9 @@ const AddTransactionsDialog = (props: TransactionDialogProps) => {
                   value={feeCurrency}
                   disablePortal
                   disableClearable
-                  options={assets.map((asset: Token) => asset.symbol)}
-                  onChange={(event, value) => setFeeCurrency(value || 'euro')}
+                  options={assets}
+                  getOptionLabel={(option: Token) => option.symbol}
+                  onChange={(event, value) => setFeeCurrency(value || bitcoin)}
                   renderInput={(params) => (
                     <TextField
                       {...params}

@@ -15,7 +15,7 @@ const ExchangeManger = ({
   label,
 }: ExchangeManagerProps) => {
   const [exchanges, setExchanges] = useState<Array<Exchange>>([]);
-  const [newExchangeName, setNewExchangeName] = useState<string>();
+  const [newExchangeName, setNewExchangeName] = useState<string>('');
   const [selectedExchange, setSelectedExchange] = useState<Exchange | null>(
     null
   );
@@ -59,7 +59,7 @@ const ExchangeManger = ({
         console.warn(error);
       })
       .finally(() => {
-        setNewExchangeName(undefined);
+        setNewExchangeName('');
         setInputVisible(false);
       });
   };

@@ -94,6 +94,7 @@ const Tracking = () => {
       .getAllFromAccount(account.id)
       .then((response) => {
         const formatDateTime = (timestamp: number) => {
+          console.log(timestamp);
           const date = new Date(timestamp);
           return `${
             date.toISOString().split('T')[0]
@@ -140,21 +141,21 @@ const Tracking = () => {
             setDataSource([...transactions, ...transfers]);
           })
           .catch((error) => {
+            console.log(error);
             setSnackbarMessage(
-              'Coineda backend is not available. Please restart the application.'
+              'Failed to fetch the transfers from the local storage. Please try it again. If the error persits consider to open an issue: https://github.com/fabianbormann/Coineda/issues'
             );
             setSnackbarOpen(true);
             setSnackbarType('warning');
-            console.warn(error);
           });
       })
       .catch((error) => {
+        console.log(error);
         setSnackbarMessage(
-          'Coineda backend is not available. Please restart the application.'
+          'Failed to fetch the transactions from the local storage. Please try it again. If the error persits consider to open an issue: https://github.com/fabianbormann/Coineda/issues'
         );
         setSnackbarOpen(true);
         setSnackbarType('warning');
-        console.warn(error);
       });
   }, [assets, account, getAssetSymbol]);
 

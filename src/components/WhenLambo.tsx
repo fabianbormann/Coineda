@@ -1,4 +1,4 @@
-import { LinearProgress } from '@mui/material';
+import { Grid, LinearProgress, Paper, Typography } from '@mui/material';
 import React from 'react';
 import { WhenLamboProps } from '../global/types';
 
@@ -7,14 +7,22 @@ const WhenLambo = (props: WhenLamboProps) => {
   const percent = Math.min(Math.round((props.value / goal) * 10000) / 100, 100);
 
   return (
-    <div>
-      <span>When Lambo?</span>
-      <div>
-        <LinearProgress value={percent} />
-        <div />
-        <img style={{ maxWidth: 100 }} src={'assets/lamborghini.svg'} />
-      </div>
-    </div>
+    <Paper sx={{ p: 2 }}>
+      <Grid container>
+        <Grid item xs={12}>
+          <Typography>When Lambo?</Typography>
+        </Grid>
+        <Grid item xs={12} container alignItems="center">
+          <LinearProgress
+            sx={{ flexGrow: 1, mr: 1 }}
+            variant="determinate"
+            value={percent}
+          />
+          <Typography variant="body2" sx={{ p: 1 }}>{`${percent}%`}</Typography>
+          <img style={{ maxWidth: 100 }} src={'assets/lamborghini.svg'} />
+        </Grid>
+      </Grid>
+    </Paper>
   );
 };
 
