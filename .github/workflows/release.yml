@@ -1,0 +1,20 @@
+name: Create a new Coineda Release
+
+on:
+  push:
+    branches: ['main']
+  pull_request:
+    branches: ['main']
+
+  workflow_dispatch:
+
+jobs:
+  create_release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: release-please-action
+        uses: google-github-actions/release-please-action@v3
+        with:
+          release-type: node
+          versioning-strategy: always-bump-patch
