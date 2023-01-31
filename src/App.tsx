@@ -1,11 +1,5 @@
 import React, { useState, useContext, useEffect } from 'react';
-import {
-  HashRouter as Router,
-  Routes,
-  Route,
-  Link,
-  useLocation,
-} from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import {
   Dashboard,
   Tracking,
@@ -17,7 +11,6 @@ import {
 import { useTranslation } from 'react-i18next';
 import { SettingsContext, defaultSettings } from './SettingsContext';
 import storage from './persistence/storage';
-import Jazzicon from 'react-jazzicon';
 import MuiDrawer from '@mui/material/Drawer';
 import { styled } from '@mui/material/styles';
 import Footer from './components/Footer';
@@ -126,7 +119,6 @@ const NavigationItem = (props: NavigationItemProps) => (
 );
 
 const Main = () => {
-  const location = useLocation();
   const { t } = useTranslation();
   const [drawerOpen, setDrawerOpen] = useState(true);
   const { settings, setSettings } = useContext(SettingsContext);
@@ -155,10 +147,13 @@ const Main = () => {
           selectedAccount;
       }
 
-      setSettings({
-        ...settings,
-        account: selectedAccount,
-      });
+      setSettings(
+        (previousSettings: CoinedaSettings) =>
+          ({
+            ...previousSettings,
+            account: selectedAccount,
+          } as CoinedaSettings)
+      );
     });
   }, [setSettings]);
 
@@ -209,7 +204,7 @@ const Main = () => {
             }}
           >
             <div style={{ minWidth: 56 }}>
-              <Logo />
+              <Logo sx={{ filter: `hue-rotate(${account.pattern}deg)` }} />
             </div>
             <div>
               <Typography>{account.name}</Typography>

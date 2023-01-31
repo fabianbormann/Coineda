@@ -1,4 +1,4 @@
-import { Divider, Grid, MenuItem, TextField, Typography } from '@mui/material';
+import { Grid, MenuItem, TextField, Typography } from '@mui/material';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import AccountManagement from '../components/AccountManagement';

@@ -164,7 +164,7 @@ const AssetManagement = () => {
       </Typography>
       <TextField
         placeholder={t('Asset input placeholder') as string}
-        label="Search field"
+        label="Asset name"
         type="search"
         value={searchText}
         onKeyDown={(event) => {

@@ -100,7 +100,7 @@ const AddTransactionsDialog = (props: TransactionDialogProps) => {
       setDate(dayjs(overrides.date));
       setUpdateKey(overrides.key);
     }
-  }, [overrides]);
+  }, [overrides, assets]);
 
   const addTransaction = async () => {
     if (isTransfer) {

@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import { ApplicationSettings, CoinedaSettings } from './global/types';
+import { ApplicationSettings } from './global/types';
 
 const defaultSettings = {
   backendUrl: 'http://localhost:5208',
@@ -12,7 +12,7 @@ const defaultSettings = {
 
 const applicationSettings: ApplicationSettings = {
   settings: defaultSettings,
-  setSettings: () => {},
+  setSettings: Function,
 };
 
 const SettingsContext = createContext<ApplicationSettings>(applicationSettings);

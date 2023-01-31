@@ -11,10 +11,10 @@
     "@mui/icons-material": "^5.11.0",
     "@mui/lab": "^5.0.0-alpha.117",
     "@mui/material": "^5.11.5",
-    "@mui/x-date-pickers": "^5.0.15",
+    "@mui/x-date-pickers": "^5.0.16",
     "@types/react": "^18.0.27",
     "@types/react-dom": "^18.0.10",
-    "axios": "^0.26.0",
+    "axios": "^1.2.6",
     "concurrently": "^7.0.0",
     "dayjs": "^1.11.7",
     "electron-is-dev": "^2.0.0",
@@ -23,19 +23,17 @@
     "i18next-browser-languagedetector": "^7.0.1",
     "i18next-localstorage-cache": "^1.1.1",
     "idb": "^7.1.1",
-    "moment": "^2.29.4",
     "prettier": "^2.8.3",
     "react": "^18.2.0",
     "react-blockies": "^1.4.1",
     "react-dom": "^18.2.0",
     "react-dropzone": "^14.2.3",
     "react-i18next": "^12.1.4",
-    "react-jazzicon": "^1.0.4",
-    "react-router-dom": "^6.7.0",
+    "react-router-dom": "^6.8.0",
     "react-scripts": "^5.0.1",
     "recharts": "^2.3.2",
-    "tslib": "^2.4.1",
-    "typescript": "^4.9.4",
+    "tslib": "^2.5.0",
+    "typescript": "^4.9.5",
     "wait-on": "^7.0.1",
     "web-vitals": "^3.1.1",
     "workbox-background-sync": "^6.5.4",
@@ -81,15 +79,8 @@
     ]
   },
   "devDependencies": {
-    "electron": "^22.0.3",
-    "electron-builder": "^23.6.0",
-    "extend": ">=2.0.2",
-    "immer": "^9.0.18",
-    "nth-check": "^2.1.1",
-    "set-value": ">=4.0.1"
-  },
-  "resolutions": {
-    "react-error-overlay": "6.0.9"
+    "electron": "^22.1.0",
+    "electron-builder": "^23.6.0"
   },
   "build": {
     "appId": "io.coineda.app",

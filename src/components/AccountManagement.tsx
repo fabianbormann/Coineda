@@ -1,5 +1,4 @@
 import { useState, useEffect, useContext } from 'react';
-import Jazzicon from 'react-jazzicon';
 import { useTranslation } from 'react-i18next';
 import { SettingsContext } from '../SettingsContext';
 import storage from '../persistence/storage';
@@ -15,7 +14,9 @@ import {
   IconButton,
   MenuItem,
   Popover,
+  Slider,
   Snackbar,
+  styled,
   TextField,
   Typography,
 } from '@mui/material';
@@ -26,7 +27,13 @@ import {
 } from '../global/types';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import ReplayIcon from '@mui/icons-material/Replay';
+
+const Logo = styled('div')(() => ({
+  background: 'url("./logo192.png")',
+  width: 32,
+  height: 32,
+  backgroundSize: 'contain',
+}));
 
 const AccountManagement = () => {
   const { settings, setSettings } = useContext(SettingsContext);
@@ -210,7 +217,7 @@ const AccountManagement = () => {
             {accounts.map((account) => (
               <MenuItem key={account.name} value={account.name}>
                 <Grid container>
-                  <Jazzicon seed={account.pattern} />
+                  <Logo sx={{ filter: `hue-rotate(${account.pattern}deg)` }} />
                   <Typography sx={{ ml: 1 }}>{account.name}</Typography>
                 </Grid>
               </MenuItem>
@@ -242,26 +249,39 @@ const AccountManagement = () => {
       </Grid>
       <Dialog open={dialogOpen}>
         <DialogTitle>{dialogTitle}</DialogTitle>
-        <DialogContent>
-          <div>
-            <span>{t('Pattern:')}</span>
-            <Jazzicon seed={pattern} />
-            <IconButton
-              onClick={() => {
-                setPattern(Math.random() * 1000);
-              }}
-            >
-              <ReplayIcon />
-            </IconButton>
-          </div>
-          <div>
-            <span>Name:</span>
-            <TextField
-              placeholder="Account Name"
-              value={accountName}
-              onChange={(event) => setAccountName(event.target.value)}
-            />
-          </div>
+        <DialogContent sx={{ zIndex: 100 }}>
+          <TextField
+            autoComplete="off"
+            sx={{ mb: 2, mt: 1 }}
+            placeholder="Account Name"
+            label="Name"
+            value={accountName}
+            onChange={(event) => setAccountName(event.target.value)}
+          />
+          <Grid container direction="row">
+            <Grid item xs={12}>
+              <Typography>{t('Color:')}</Typography>
+            </Grid>
+            <Grid item>
+              <Logo sx={{ filter: `hue-rotate(${pattern}deg)` }} />
+            </Grid>
+            <Grid sx={{ ml: 1, mr: 1 }} flexGrow={1}>
+              <Slider
+                aria-label="Hue rotation for new account"
+                value={pattern}
+                onChange={(_event, value) => {
+                  if (typeof value === 'number') {
+                    setPattern(value);
+                  }
+                }}
+                step={1}
+                sx={{ ml: 1 }}
+                min={0}
+                max={360}
+                valueLabelDisplay="auto"
+              />
+            </Grid>
+          </Grid>
         </DialogContent>
         <DialogActions>
           <Button autoFocus onClick={() => setDialogOpen(false)}>
@@ -272,7 +292,6 @@ const AccountManagement = () => {
       </Dialog>
     </>
   );
-  return <div></div>;
 };
 
 export default AccountManagement;

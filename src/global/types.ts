@@ -17,7 +17,7 @@ export type CoinedaSettings = {
 
 export type ApplicationSettings = {
   settings: CoinedaSettings;
-  setSettings: (settings: CoinedaSettings) => void;
+  setSettings: Function;
 };
 
 export type CoinSummary = {

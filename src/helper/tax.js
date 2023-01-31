@@ -1,6 +1,6 @@
-import moment from 'moment';
 import storage from '../persistence/storage';
 import { TransactionType, getAssetSymbol, fetchPrice } from './common';
+import dayjs from 'dayjs';
 
 const calculateTax = async (account) => {
   const transactions = await storage.transactions.getAllFromAccount(account);
@@ -74,7 +74,7 @@ const calculateTax = async (account) => {
             symbol: await getAssetSymbol(transaction.fromCurrency),
             amount: amount,
             gain: amount * gainInEuro,
-            daysFromPurchase: moment(transaction.date).diff(
+            daysFromPurchase: dayjs(transaction.date).diff(
               target[i].date,
               'days'
             ),
@@ -87,7 +87,7 @@ const calculateTax = async (account) => {
             symbol: await getAssetSymbol(transaction.fromCurrency),
             amount: amount + target[i].value,
             gain: (amount + target[i].value) * gainInEuro,
-            daysFromPurchase: moment(transaction.date).diff(
+            daysFromPurchase: dayjs(transaction.date).diff(
               target[i].date,
               'days'
             ),
@@ -122,7 +122,7 @@ const calculateTax = async (account) => {
           ...transaction,
           amount: transaction.value,
           gain: transaction.value * gainInEuro,
-          daysFromPurchase: moment().diff(moment(transaction.date), 'days'),
+          daysFromPurchase: dayjs().diff(dayjs(transaction.date), 'days'),
         });
       }
     }

@@ -1,16 +1,10 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useContext, useCallback, useEffect } from 'react';
 import { SettingsContext } from '../SettingsContext';
-import moment from 'moment';
 import GainSummary from '../components/GainSummary';
 import { calculateTax } from '../helper/tax';
 import React from 'react';
-import {
-  MessageType,
-  TaxSummary,
-  TaxTransaction,
-  Transaction,
-} from '../global/types';
+import { MessageType, TaxSummary, TaxTransaction } from '../global/types';
 import {
   Alert,
   AlertTitle,

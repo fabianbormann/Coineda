@@ -19,7 +19,11 @@ const WhenLambo = (props: WhenLamboProps) => {
             value={percent}
           />
           <Typography variant="body2" sx={{ p: 1 }}>{`${percent}%`}</Typography>
-          <img style={{ maxWidth: 100 }} src={'assets/lamborghini.svg'} />
+          <img
+            alt="Lamborghini"
+            style={{ maxWidth: 100 }}
+            src={'assets/lamborghini.svg'}
+          />
         </Grid>
       </Grid>
     </Paper>

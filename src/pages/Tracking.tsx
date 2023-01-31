@@ -4,7 +4,6 @@ import { AddTransactionDialog, ImportDialog } from '../dialogs';
 import { exportData } from '../helper/export';
 import { SettingsContext } from '../SettingsContext';
 import storage from '../persistence/storage';
-import moment from 'moment';
 import React from 'react';
 import {
   CoinedaAsset,
@@ -36,6 +35,7 @@ import SwapHorizontalCircleIcon from '@mui/icons-material/SwapHorizontalCircle';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import SendIcon from '@mui/icons-material/Send';
+import dayjs from 'dayjs';
 
 const Tracking = () => {
   const { t } = useTranslation();
@@ -94,7 +94,6 @@ const Tracking = () => {
       .getAllFromAccount(account.id)
       .then((response) => {
         const formatDateTime = (timestamp: number) => {
-          console.log(timestamp);
           const date = new Date(timestamp);
           return `${
             date.toISOString().split('T')[0]
@@ -210,13 +209,13 @@ const Tracking = () => {
     { label: 'Even longer ago', days: 730, operations: [] },
   ];
 
-  const now = moment();
+  const now = dayjs();
   const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|Opera Mini/i.test(
     navigator.userAgent
   );
 
   for (const operation of dataSource) {
-    const daysSinceNow = now.diff(moment(operation.formattedDate), 'days');
+    const daysSinceNow = now.diff(dayjs(operation.formattedDate), 'days');
 
     for (const bucket of buckets) {
       if (daysSinceNow <= bucket.days) {

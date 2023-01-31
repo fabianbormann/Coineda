@@ -62,8 +62,6 @@ const createTransaction = async (transaction, account) => {
       return;
     }
 
-    console.log(date);
-
     const sellTransaction = {
       type: transactionType,
       exchange: exchange,
