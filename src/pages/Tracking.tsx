@@ -16,6 +16,7 @@ import {
 } from '../global/types';
 import {
   Alert,
+  Box,
   Card,
   CardActions,
   CardContent,
@@ -23,8 +24,10 @@ import {
   Grid,
   IconButton,
   Snackbar,
+  styled,
   Tooltip,
   Typography,
+  useTheme,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -36,6 +39,17 @@ import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import SendIcon from '@mui/icons-material/Send';
 import dayjs from 'dayjs';
+
+const TransactionIcon = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'color',
+})(({ color }: { color: string }) => ({
+  backgroundColor: color,
+  color: 'white',
+  borderRadius: '50%',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+}));
 
 const Tracking = () => {
   const { t } = useTranslation();
@@ -53,6 +67,7 @@ const Tracking = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarType, setSnackbarType] = useState<MessageType>('success');
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const theme = useTheme();
 
   const { account } = settings;
 
@@ -283,10 +298,12 @@ const Tracking = () => {
             return null;
           } else {
             return (
-              <div key={bucket.label}>
-                <h2>{bucket.label}</h2>
-                <div>
-                  {bucket.operations.map((operation) => {
+              <Grid key={bucket.label}>
+                <Typography sx={{ mb: 1, mt: 1 }} variant="h6">
+                  {bucket.label}
+                </Typography>
+                <Grid container spacing={2}>
+                  {bucket.operations.map((operation, OperationIndex) => {
                     const content: TransactionCardContent = {};
 
                     if (operation.type === 'transfer') {
@@ -296,7 +313,14 @@ const Tracking = () => {
                       } from ${operation.fromExchange} to ${
                         operation.toExchange
                       }`;
-                      content.symbol = <SendIcon />;
+                      content.symbol = (
+                        <TransactionIcon
+                          sx={{ p: 1 }}
+                          color={theme.palette.info.light}
+                        >
+                          <SendIcon />
+                        </TransactionIcon>
+                      );
                     } else if (operation.type === 'buy') {
                       content.title = `Buy`;
                       content.description = `${roundCrypto(
@@ -304,7 +328,14 @@ const Tracking = () => {
                       )} ${operation.toSymbol} for ${operation.fromValue} ${
                         operation.fromSymbol
                       }`;
-                      content.symbol = <ShoppingCartIcon />;
+                      content.symbol = (
+                        <TransactionIcon
+                          sx={{ p: 1 }}
+                          color={theme.palette.success.light}
+                        >
+                          <ShoppingCartIcon />
+                        </TransactionIcon>
+                      );
                     } else if (operation.type === 'sell') {
                       content.title = `Sell`;
                       content.description = `${roundCrypto(
@@ -312,7 +343,14 @@ const Tracking = () => {
                       )} ${operation.toSymbol} for ${operation.fromValue} ${
                         operation.fromSymbol
                       }`;
-                      content.symbol = <MonetizationOnIcon />;
+                      content.symbol = (
+                        <TransactionIcon
+                          sx={{ p: 1 }}
+                          color={theme.palette.error.light}
+                        >
+                          <MonetizationOnIcon />
+                        </TransactionIcon>
+                      );
                     } else if (operation.type === 'swap') {
                       content.title = `Swap`;
                       content.description = `${roundCrypto(
@@ -320,40 +358,71 @@ const Tracking = () => {
                       )} ${operation.fromSymbol} into ${roundCrypto(
                         operation.toValue
                       )} ${operation.toSymbol}`;
-                      content.symbol = <SwapHorizontalCircleIcon />;
+                      content.symbol = (
+                        <TransactionIcon
+                          sx={{ p: 1 }}
+                          color={theme.palette.warning.light}
+                        >
+                          <SwapHorizontalCircleIcon />
+                        </TransactionIcon>
+                      );
                     }
 
                     return (
-                      <Card sx={{ maxWidth: 345 }} key={operation.id}>
-                        <CardHeader
-                          avatar={content.symbol}
-                          title={content.title}
-                          subheader={content.description}
-                        />
-                        <CardContent>
-                          <Typography variant="body2" color="text.secondary">
-                            {operation.formattedDate}
-                          </Typography>
-                        </CardContent>
-                        <CardActions disableSpacing>
-                          <IconButton
-                            aria-label="edit transaction"
-                            onClick={() => editEntry(operation)}
+                      <Grid item key={OperationIndex}>
+                        <Card sx={{ maxWidth: 345 }} key={operation.id}>
+                          <CardHeader
+                            avatar={content.symbol}
+                            title={content.title}
+                            subheader={dayjs(operation.formattedDate).format(
+                              'DD.MM.YYYY'
+                            )}
+                          />
+                          <CardContent sx={{ p: 1, textAlign: 'center' }}>
+                            <Typography variant="body2" color="text.secondary">
+                              {content.description}
+                            </Typography>
+                          </CardContent>
+                          <CardActions
+                            sx={{ display: 'flex', justifyContent: 'center' }}
                           >
-                            <EditIcon />
-                          </IconButton>
-                          <IconButton
-                            aria-label="delete transaction"
-                            onClick={() => deleteEntry(operation)}
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </CardActions>
-                      </Card>
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                flexGrow: 1,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <IconButton
+                                aria-label="edit transaction"
+                                onClick={() => editEntry(operation)}
+                              >
+                                <EditIcon />
+                              </IconButton>
+                            </Box>
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                flexGrow: 1,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <IconButton
+                                aria-label="delete transaction"
+                                onClick={() => deleteEntry(operation)}
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </Box>
+                          </CardActions>
+                        </Card>
+                      </Grid>
                     );
                   })}
-                </div>
-              </div>
+                </Grid>
+              </Grid>
             );
           }
         })}

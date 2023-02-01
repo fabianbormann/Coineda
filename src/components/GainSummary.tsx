@@ -4,21 +4,23 @@ import {
   Grid,
   LinearProgress,
   Typography,
+  useTheme,
 } from '@mui/material';
 import React, { SyntheticEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GainSummaryProps } from '../global/types';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Timeline from '@mui/lab/Timeline';
-import TimelineItem from '@mui/lab/TimelineItem';
+import TimelineItem, { timelineItemClasses } from '@mui/lab/TimelineItem';
 import TimelineSeparator from '@mui/lab/TimelineSeparator';
 import TimelineConnector from '@mui/lab/TimelineConnector';
 import TimelineContent from '@mui/lab/TimelineContent';
-import TimelineDot from '@mui/lab/TimelineDot';
+import TimelineDot, { timelineDotClasses } from '@mui/lab/TimelineDot';
 import dayjs from 'dayjs';
 
 const GainSummary = (props: GainSummaryProps) => {
   const [expanded, setExpanded] = useState<string | false>(false);
+  const theme = useTheme();
 
   const { gains, showUnrealizedGains } = props;
   const { t } = useTranslation();
@@ -41,9 +43,9 @@ const GainSummary = (props: GainSummaryProps) => {
     };
 
   return (
-    <>
+    <Grid sx={{ pt: 1, pb: 1 }}>
       {title && <Typography>{title}</Typography>}
-      <Grid>
+      <Grid sx={{ mt: 2, mb: 2 }}>
         {Object.keys(gains).map((coin, key) => {
           if (gains[coin].length === 0) {
             return null;
@@ -65,6 +67,7 @@ const GainSummary = (props: GainSummaryProps) => {
 
           return (
             <Accordion
+              key={key}
               expanded={expanded === `panel-${coin}`}
               onChange={handleChange(`panel-${coin}`)}
             >
@@ -84,7 +87,18 @@ const GainSummary = (props: GainSummaryProps) => {
                 </span>
               </AccordionSummary>
               {showUnrealizedGains ? (
-                <Timeline>
+                <Timeline
+                  sx={{
+                    [`& .${timelineItemClasses.root}:before`]: {
+                      flex: 0,
+                      padding: 0,
+                    },
+                    [`& .${timelineDotClasses.root}`]: {
+                      margin: '2px 0',
+                      background: theme.palette.primary.main,
+                    },
+                  }}
+                >
                   {gains[coin].map((transaction, key) =>
                     transaction.value > 0 ? (
                       <TimelineItem key={key}>
@@ -162,7 +176,7 @@ const GainSummary = (props: GainSummaryProps) => {
           );
         })}
       </Grid>
-    </>
+    </Grid>
   );
 };
 

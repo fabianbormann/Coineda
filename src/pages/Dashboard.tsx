@@ -241,7 +241,7 @@ const Dashboard = () => {
                 <HistoryChart currencies={currencies} />
               </Paper>
             </Grid>
-            <Grid item sm={24} md={9} lg={6}>
+            <Grid item sm={12} md={9} lg={6}>
               <Paper>
                 <DoughnutChart
                   label={`${Math.round(total * 100) / 100} €`}

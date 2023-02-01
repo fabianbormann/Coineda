@@ -166,7 +166,7 @@ const TaxReports = () => {
 
       {Object.keys(realizedWithinTaxYear).length > 0 ||
       Object.keys(unrealizedAfterTaxYear).length > 0 ? (
-        <div>
+        <Grid sx={{ mt: 1, mb: 1 }}>
           <p>{t('Taxable gains and losses')}</p>
           <span
             style={hasLoss ? { color: '#C36491' } : { color: '#03A678' }}
@@ -175,8 +175,8 @@ const TaxReports = () => {
           )} EUR`}</span>
 
           <Alert
-            severity={isBelowLimit ? 'info' : 'warning'}
-            sx={{ mb: 24, mt: 16, maxWidth: 600 }}
+            severity={isBelowLimit ? 'success' : 'warning'}
+            sx={{ mb: 1, mt: 1, maxWidth: 600 }}
           >
             <span>
               {t('You need to pay', {
@@ -185,11 +185,16 @@ const TaxReports = () => {
               <span>
                 {isBelowLimit ? '' : '~'} {roundFiat(tax)} €
               </span>
-              {t('Tax this year', { year: selectedYear.year })}
+              {t('Tax this year', { year: selectedYear.year() })}
             </span>
           </Alert>
 
-          <Button disabled={true} startIcon={<DownloadIcon />}>
+          <Button
+            variant="contained"
+            sx={{ mt: 1, mb: 2 }}
+            disabled={true}
+            startIcon={<DownloadIcon />}
+          >
             {t('Download Report')}
           </Button>
           <Divider />
@@ -197,11 +202,12 @@ const TaxReports = () => {
             showUnrealizedGains={false}
             gains={realizedWithinTaxYear}
           />
+          <Divider />
           <GainSummary
             showUnrealizedGains={true}
             gains={unrealizedAfterTaxYear}
           />
-        </div>
+        </Grid>
       ) : (
         !loading && (
           <Typography sx={{ mt: 1 }}>
