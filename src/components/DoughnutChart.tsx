@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   PieChart,
   Pie,
@@ -7,28 +8,9 @@ import {
   Legend,
 } from 'recharts';
 import { colors } from '../helper/common';
-import { createUseStyles } from 'react-jss';
 
-const useStyles = createUseStyles({
-  pie: {
-    fontWeight: 'bold',
-    fontSize: '0.5rem',
-    fill: '#03A678',
-    '@media screen and (min-width: 360px)': {
-      fontSize: '0.75rem',
-    },
-    '@media screen and (min-width: 420px)': {
-      fontSize: '1rem',
-    },
-    '@media screen and (min-width: 800px)': {
-      fontSize: '1.5rem',
-    },
-  },
-});
-
-const DoughnutChart = (props) => {
+const DoughnutChart = (props: { data: Array<any>; label: string }) => {
   const { data, label } = props;
-  const classes = useStyles();
   data.map((segment, i) => (segment.fill = colors[i]));
 
   return (
@@ -43,7 +25,14 @@ const DoughnutChart = (props) => {
           outerRadius="95%"
           fill="#197396"
         >
-          <Label value={label} position="center" className={classes.pie} />
+          <Label
+            value={label}
+            position="center"
+            style={{
+              fontWeight: 'bold',
+              fill: '#03A678',
+            }}
+          />
         </Pie>
         <Legend />
         <Tooltip />
