@@ -1,9 +1,10 @@
-name: Release
-
-on: [push, pull_request]
-
+name: Build Electron Applications
+on:
+  pull_request:
+    branches: ['main']
 jobs:
   release:
+    if: "contains(github.event.head_commit.message, 'release-please--branches--main')"
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -11,15 +12,15 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
-      - name: Check out Git repository
-        uses: actions/checkout@v1
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v2
 
-      - name: Install Node.js, NPM and Yarn
+      - name: 🫡 Setup node
         uses: actions/setup-node@v1
         with:
-          node-version: 14
+          node-version: 16
 
-      - name: Build/release Electron app
+      - name: 🔨 Build application
         uses: samuelmeuli/action-electron-builder@v1
         with:
           github_token: ${{ secrets.github_token }}

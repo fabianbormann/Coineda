@@ -15,7 +15,7 @@ const isFiat = async (assetId) => {
   return currency.isFiat === 1;
 };
 
-const createTransaction = async (transaction, account, message) => {
+const createTransaction = async (transaction, account) => {
   let {
     exchange,
     fromValue,
@@ -59,15 +59,8 @@ const createTransaction = async (transaction, account, message) => {
       price = response.data.prices[0][1];
     } catch (error) {
       console.log(error);
-      if (typeof message !== 'undefined') {
-        message.error(
-          'Failed to fetch price from CoinGeckoApi. Please try again later.'
-        );
-      }
       return;
     }
-
-    console.log(date);
 
     const sellTransaction = {
       type: transactionType,
@@ -250,7 +243,7 @@ const getCoinCount = async (currency, date, account) => {
   return count;
 };
 
-const fetchPrice = async (currency, date = null) => {
+const fetchPrice = async (currency, date) => {
   let fetchSingle = true;
   if (typeof currency !== 'string') {
     currency = currency.join(',');
