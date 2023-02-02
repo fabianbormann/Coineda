@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState, useContext } from 'react';
-import { useTranslation, Trans } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
 import { SettingsContext } from '../SettingsContext';
 import { importFiles } from '../helper/import';
 import { useDropzone, ErrorCode } from 'react-dropzone';
@@ -10,13 +10,29 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
+  Paper,
   Snackbar,
+  Typography,
 } from '@mui/material';
 import { ImportDialogProps, MessageType } from '../global/types';
 
-const Dropzone = () => {
-  const { acceptedFiles, getRootProps, getInputProps } = useDropzone({
-    disabled: true,
+const ImportDialog = (props: ImportDialogProps) => {
+  const { t } = useTranslation();
+  const { settings } = useContext(SettingsContext);
+  const { account } = settings;
+  const [uploading, setUploading] = useState(false);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarType, setSnackbarType] = useState<MessageType>('success');
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const { visible, onClose } = props;
+  const { acceptedFiles, getRootProps, getInputProps, open } = useDropzone({
+    accept: {
+      'text/plain': ['.cnd'],
+      'text/csv': ['.csv'],
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': [
+        '.xlsx',
+      ],
+    },
     validator: (file) => {
       if (
         !file.name.endsWith('.cnd') ||
@@ -33,43 +49,12 @@ const Dropzone = () => {
     },
   });
 
-  const files = acceptedFiles.map((file) => (
-    <li key={file.name}>
-      {file.name} - {file.size} bytes
-    </li>
-  ));
-
-  return (
-    <section className="container">
-      <div {...getRootProps({ className: 'dropzone disabled' })}>
-        <input {...getInputProps()} />
-        <Trans i18nKey="UploadFieldText">
-          Click or drag file to this area to upload
-        </Trans>
-      </div>
-      <aside>
-        <h4>Files</h4>
-        <ul>{files}</ul>
-      </aside>
-    </section>
-  );
-};
-
-const ImportDialog = (props: ImportDialogProps) => {
-  const { t } = useTranslation();
-  const [files, setFiles] = useState([]);
-  const { settings } = useContext(SettingsContext);
-  const { account } = settings;
-  const [uploading, setUploading] = useState(false);
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarType, setSnackbarType] = useState<MessageType>('success');
-  const [snackbarMessage, setSnackbarMessage] = useState('');
-  const { visible, onClose } = props;
+  const { ref, ...rootProps } = getRootProps();
 
   const handleUpload = async () => {
     try {
       const { inserts, duplicates, errors } = await importFiles(
-        files,
+        acceptedFiles,
         account.id
       );
 
@@ -93,7 +78,6 @@ const ImportDialog = (props: ImportDialogProps) => {
         setSnackbarOpen(true);
       }
 
-      setFiles([]);
       onClose();
     } catch (error) {
       setSnackbarMessage('Upload failed. Please try again.');
@@ -138,13 +122,36 @@ const ImportDialog = (props: ImportDialogProps) => {
       </Snackbar>
       <Dialog onClose={() => onClose()} open={visible}>
         <DialogContent>
-          <Dropzone />
+          <Paper
+            onClick={open}
+            variant="outlined"
+            sx={{ p: 4 }}
+            {...rootProps}
+            ref={ref}
+          >
+            <input {...getInputProps()} />
+            <Typography>
+              {t('Click or drag files to this area to upload')}
+            </Typography>
+            <aside>
+              <ul>
+                {acceptedFiles.map((file) => (
+                  <li key={file.name}>
+                    {file.name} - {file.size} bytes
+                  </li>
+                ))}
+              </ul>
+            </aside>
+          </Paper>
         </DialogContent>
         <DialogActions>
-          <Button disabled={files.length < 1 || uploading} onClick={submit}>
-            Cancel
+          <Button onClick={() => onClose()}>Cancel</Button>
+          <Button
+            disabled={acceptedFiles.length < 1 || uploading}
+            onClick={submit}
+          >
+            OK
           </Button>
-          <Button onClick={() => onClose()}>OK</Button>
         </DialogActions>
       </Dialog>
     </>

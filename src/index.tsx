@@ -18,6 +18,10 @@ const theme = createTheme({
       light: '#5da7ff',
       dark: '#004ea0',
     },
+    error: { light: '#FFAA98', main: '#E5796A', dark: '#9A382F' },
+    warning: { light: '#F9C842', main: '#F0C039', dark: '#906D00' },
+    info: { light: '#5DA3CD', main: '#0088A3', dark: '#00486D' },
+    success: { light: '#69C784', main: '#00B389', dark: '#006D49' },
   },
   typography: {
     fontFamily: ['PTSerif', 'serif'].join(','),

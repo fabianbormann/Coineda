@@ -78,11 +78,12 @@ const GainSummary = (props: GainSummaryProps) => {
               >
                 <span>
                   <div style={{ display: 'flex' }}>
-                    <span>{`${roundCrypto(amount)} ${gains[
+                    <Typography>{`${roundCrypto(amount)} ${gains[
                       coin
-                    ][0].symbol.toUpperCase()}`}</span>
-                    <span style={{ flexGrow: 1 }}></span>
-                    <span>{`${roundFiat(gain)} EUR`}</span>
+                    ][0].symbol.toUpperCase()}`}</Typography>
+                    <Typography sx={{ ml: 1 }}>{`${roundFiat(
+                      gain
+                    )} EUR`}</Typography>
                   </div>
                 </span>
               </AccordionSummary>

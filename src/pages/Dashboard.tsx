@@ -21,6 +21,7 @@ import {
   Paper,
   Snackbar,
   Typography,
+  useTheme,
 } from '@mui/material';
 
 import ArrowCircleDownIcon from '@mui/icons-material/ArrowCircleDown';
@@ -28,6 +29,7 @@ import ArrowCircleUpIcon from '@mui/icons-material/ArrowCircleUp';
 
 const Dashboard = () => {
   const { t } = useTranslation();
+  const theme = useTheme();
   const { settings } = useContext(SettingsContext);
   const [summary, setSummary] = useState<CoinedaSummary>({
     cryptocurrencies: {},
@@ -263,7 +265,6 @@ const Dashboard = () => {
                     <Typography
                       style={{
                         textTransform: 'capitalize',
-                        fontFamily: 'PTSerif',
                       }}
                     >
                       {account.replace('-', ' ')}
@@ -271,12 +272,15 @@ const Dashboard = () => {
                     <Box
                       sx={{
                         display: 'flex',
-                        color: change > 0 ? '#03A678' : '#C36491',
+                        color:
+                          change > 0
+                            ? theme.palette.success.main
+                            : theme.palette.error.main,
                       }}
                     >
                       <>
                         {change > 0 ? (
-                          ArrowCircleUpIcon
+                          <ArrowCircleUpIcon />
                         ) : (
                           <ArrowCircleDownIcon />
                         )}

@@ -1,13 +1,6 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import {
-  Dashboard,
-  Tracking,
-  TaxReports,
-  Settings,
-  Wallets,
-  Issues,
-} from './pages';
+import { Dashboard, Tracking, TaxReports, Settings, Wallets } from './pages';
 import { useTranslation } from 'react-i18next';
 import { SettingsContext, defaultSettings } from './SettingsContext';
 import storage from './persistence/storage';
@@ -20,7 +13,6 @@ import { ChevronLeft } from '@mui/icons-material';
 import NoteAddIcon from '@mui/icons-material/NoteAdd';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
-import BugReportIcon from '@mui/icons-material/BugReport';
 import SettingsIcon from '@mui/icons-material/Settings';
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -242,11 +234,6 @@ const Main = () => {
             location="/settings"
             icon={<SettingsIcon />}
           />
-          <NavigationItem
-            title={t('Issues')}
-            location="/issues"
-            icon={<BugReportIcon />}
-          />
         </List>
       </Drawer>
       <Content>
@@ -259,7 +246,6 @@ const Main = () => {
               <Route path="/reports/*" element={<TaxReports />} />
               <Route path="/wallets/*" element={<Wallets />} />
               <Route path="/settings/*" element={<Settings />} />
-              <Route path="/issues/*" element={<Issues />} />
             </Routes>
           </Grid>
         </Container>
