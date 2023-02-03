@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/fabianbormann/Coineda/compare/v0.2.1...v0.2.2) (2023-02-03)
+
+
+### Bug Fixes
+
+* repair mobile view closes [#54](https://github.com/fabianbormann/Coineda/issues/54) ([f2af18a](https://github.com/fabianbormann/Coineda/commit/f2af18a91e13cfae2a09e14374a2d450864ef199))
+
 ## [0.2.1](https://github.com/fabianbormann/Coineda/compare/v0.2.0...v0.2.1) (2023-02-02)
 
 
