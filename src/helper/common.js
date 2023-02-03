@@ -261,7 +261,7 @@ const fetchPrice = async (currency, date) => {
       localStorage.getItem(`${fromTimestamp}-${toTimestamp}-${currency}`)
     );
 
-    if (price && new Date().getTime() - price.age < 15 * 60 * 1000) {
+    if (price) {
       return price.data;
     } else {
       const response = await axios.get(

@@ -1,11 +1,18 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import {
+  HashRouter as Router,
+  Routes,
+  Route,
+  Link,
+  useLocation,
+} from 'react-router-dom';
 import { Dashboard, Tracking, TaxReports, Settings, Wallets } from './pages';
 import { useTranslation } from 'react-i18next';
 import { SettingsContext, defaultSettings } from './SettingsContext';
 import storage from './persistence/storage';
 import MuiDrawer from '@mui/material/Drawer';
-import { styled } from '@mui/material/styles';
+import SwipeableDrawer from '@mui/material/SwipeableDrawer';
+import { styled, useTheme } from '@mui/material/styles';
 import Footer from './components/Footer';
 import Toolbar from '@mui/material/Toolbar';
 import IconButton from '@mui/material/IconButton';
@@ -19,7 +26,6 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import MuiAppBar, { AppBarProps as MuiAppBarProps } from '@mui/material/AppBar';
 import {
   Box,
-  Container,
   Divider,
   Grid,
   List,
@@ -27,6 +33,7 @@ import {
   ListItemIcon,
   ListItemText,
   Typography,
+  useMediaQuery,
 } from '@mui/material';
 import {
   CoinedaAccount,
@@ -36,7 +43,7 @@ import {
 
 const drawerWidth: number = 240;
 
-const Drawer = styled(MuiDrawer, {
+const DesktopDrawer = styled(MuiDrawer, {
   shouldForwardProp: (prop) => prop !== 'open',
 })(({ theme, open }) => ({
   '& .MuiDrawer-paper': {
@@ -94,8 +101,6 @@ const AppBar = styled(MuiAppBar, {
     duration: theme.transitions.duration.leavingScreen,
   }),
   ...(open && {
-    marginLeft: drawerWidth,
-    width: `calc(100% - ${drawerWidth}px)`,
     transition: theme.transitions.create(['width', 'margin'], {
       easing: theme.transitions.easing.sharp,
       duration: theme.transitions.duration.enteringScreen,
@@ -103,18 +108,44 @@ const AppBar = styled(MuiAppBar, {
   }),
 }));
 
-const NavigationItem = (props: NavigationItemProps) => (
-  <ListItemButton component={Link} to={props.location}>
-    <ListItemIcon>{props.icon}</ListItemIcon>
-    <ListItemText primary={props.title} />
-  </ListItemButton>
-);
-
 const Main = () => {
   const { t } = useTranslation();
-  const [drawerOpen, setDrawerOpen] = useState(true);
+  const theme = useTheme();
+  const isMobileView = useMediaQuery(theme.breakpoints.down('sm'));
+  const [drawerOpen, setDrawerOpen] = useState(!isMobileView);
   const { settings, setSettings } = useContext(SettingsContext);
   const { account } = settings;
+  const location = useLocation();
+
+  const getPageTitle = () => {
+    if (location.pathname === '/' || location.pathname === '/dashboard') {
+      return t('Dashboard');
+    } else if (location.pathname === '/tracking') {
+      return t('Tracking');
+    } else if (location.pathname === '/reports') {
+      return t('Tax Reports');
+    } else if (location.pathname === '/wallets') {
+      return t('Wallets');
+    } else if (location.pathname === '/settings') {
+      return t('Settings');
+    }
+    return 'Coineda';
+  };
+
+  const NavigationItem = (props: NavigationItemProps) => (
+    <ListItemButton
+      onClick={() => {
+        if (isMobileView) {
+          toggleDrawer();
+        }
+      }}
+      component={Link}
+      to={props.location}
+    >
+      <ListItemIcon>{props.icon}</ListItemIcon>
+      <ListItemText primary={props.title} />
+    </ListItemButton>
+  );
 
   useEffect(() => {
     storage.accounts.getAll().then((accounts: Array<CoinedaAccount>) => {
@@ -153,9 +184,79 @@ const Main = () => {
     setDrawerOpen(!drawerOpen);
   };
 
+  const drawer = (
+    <>
+      <Toolbar
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          px: [1],
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            padding: 8,
+          }}
+        >
+          <div style={{ minWidth: 56 }}>
+            <Logo sx={{ filter: `hue-rotate(${account.pattern}deg)` }} />
+          </div>
+          <div>
+            <Typography>{account.name}</Typography>
+          </div>
+        </div>
+        <div style={{ flexGrow: 1 }} />
+        <IconButton onClick={toggleDrawer}>
+          <ChevronLeft />
+        </IconButton>
+      </Toolbar>
+      <Divider />
+      <List component="nav">
+        <NavigationItem
+          title={t('Dashboard')}
+          location="/"
+          icon={<DashboardIcon />}
+        />
+        <NavigationItem
+          title={t('Tracking')}
+          location="/tracking"
+          icon={<NoteAddIcon />}
+        />
+        <NavigationItem
+          title={t('Tax Reports')}
+          location="/reports"
+          icon={<AccountBalanceIcon />}
+        />
+        <NavigationItem
+          title={t('Wallets')}
+          location="/wallets"
+          icon={<AccountBalanceWalletIcon />}
+        />
+        <NavigationItem
+          title={t('Settings')}
+          location="/settings"
+          icon={<SettingsIcon />}
+        />
+      </List>
+    </>
+  );
+
   return (
     <Box sx={{ display: 'flex' }}>
-      <AppBar position="absolute" open={drawerOpen}>
+      <AppBar
+        sx={{
+          marginLeft: { xs: 0, sm: drawerWidth },
+          zIndex: { xs: 1, sm: 1201 },
+          width:
+            drawerOpen && !isMobileView
+              ? `calc(100% - ${drawerWidth}px)`
+              : '100%',
+        }}
+        position="absolute"
+        open={drawerOpen}
+      >
         <Toolbar sx={{ pr: '24px' }}>
           <IconButton
             edge="start"
@@ -174,81 +275,49 @@ const Main = () => {
             variant="h6"
             color="inherit"
             noWrap
-            sx={{ flexGrow: 1 }}
+            sx={{
+              flexGrow: 1,
+              textAlign: 'center',
+              ...(!drawerOpen && isMobileView && { marginLeft: '-28px' }),
+            }}
           >
-            Dashboard
+            {getPageTitle()}
           </Typography>
         </Toolbar>
       </AppBar>
-      <Drawer variant="permanent" open={drawerOpen}>
-        <Toolbar
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            px: [1],
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              padding: 8,
-            }}
-          >
-            <div style={{ minWidth: 56 }}>
-              <Logo sx={{ filter: `hue-rotate(${account.pattern}deg)` }} />
-            </div>
-            <div>
-              <Typography>{account.name}</Typography>
-            </div>
-          </div>
-          <div style={{ flexGrow: 1 }} />
-          <IconButton onClick={toggleDrawer}>
-            <ChevronLeft />
-          </IconButton>
-        </Toolbar>
-        <Divider />
-        <List component="nav">
-          <NavigationItem
-            title={t('Dashboard')}
-            location="/"
-            icon={<DashboardIcon />}
-          />
-          <NavigationItem
-            title={t('Tracking')}
-            location="/tracking"
-            icon={<NoteAddIcon />}
-          />
-          <NavigationItem
-            title={t('Tax Reports')}
-            location="/reports"
-            icon={<AccountBalanceIcon />}
-          />
-          <NavigationItem
-            title={t('Wallets')}
-            location="/wallets"
-            icon={<AccountBalanceWalletIcon />}
-          />
-          <NavigationItem
-            title={t('Settings')}
-            location="/settings"
-            icon={<SettingsIcon />}
-          />
-        </List>
-      </Drawer>
+      <DesktopDrawer
+        variant="permanent"
+        open={drawerOpen}
+        sx={{ display: { xs: 'none', sm: 'block' } }}
+      >
+        {drawer}
+      </DesktopDrawer>
+      <SwipeableDrawer
+        open={drawerOpen}
+        onClose={toggleDrawer}
+        onOpen={toggleDrawer}
+        sx={{
+          '& .MuiDrawer-paper': {
+            width: drawerWidth,
+          },
+          display: { xs: 'block', sm: 'none' },
+        }}
+      >
+        {drawer}
+      </SwipeableDrawer>
       <Content>
         <Toolbar />
-        <Container maxWidth="lg" sx={{ mt: 4, mb: 4, flexGrow: 1 }}>
-          <Grid container spacing={3}>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/tracking/*" element={<Tracking />} />
-              <Route path="/reports/*" element={<TaxReports />} />
-              <Route path="/wallets/*" element={<Wallets />} />
-              <Route path="/settings/*" element={<Settings />} />
-            </Routes>
-          </Grid>
-        </Container>
+
+        <Grid container sx={{ flexGrow: 1 }}>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/tracking/*" element={<Tracking />} />
+            <Route path="/reports/*" element={<TaxReports />} />
+            <Route path="/wallets/*" element={<Wallets />} />
+            <Route path="/settings/*" element={<Settings />} />
+          </Routes>
+        </Grid>
+
         <Footer />
       </Content>
     </Box>
