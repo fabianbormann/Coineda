@@ -1,6 +1,7 @@
 import { Alert, AlertTitle, CircularProgress } from '@mui/material';
 import React, { ReactNode } from 'react';
 import { useEffect, useState, useContext } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ResponsiveContainer,
   Line,
@@ -20,6 +21,7 @@ const HistoryChart = (props: HistoryChartProps) => {
   const [data, setData] = useState<Array<MarketPriceData>>([]);
   const [purchasePrice, setPurchasePrice] = useState(0);
   const [state, setState] = useState('LOADING');
+  const { t } = useTranslation();
 
   const { account } = settings;
 
@@ -34,18 +36,18 @@ const HistoryChart = (props: HistoryChartProps) => {
 
     const collectData = async () => {
       const monthNames = [
-        'January',
-        'February',
-        'March',
-        'April',
-        'May',
-        'June',
-        'July',
-        'August',
-        'September',
-        'October',
-        'November',
-        'December',
+        t('January'),
+        t('February'),
+        t('March'),
+        t('April'),
+        t('May'),
+        t('June'),
+        t('July'),
+        t('August'),
+        t('September'),
+        t('October'),
+        t('November'),
+        t('December'),
       ];
       const today = new Date();
 
@@ -89,7 +91,7 @@ const HistoryChart = (props: HistoryChartProps) => {
 
     collectData();
     calculatePurchasePrice();
-  }, [currencies, account]);
+  }, [currencies, account, t]);
 
   let content = (
     <div>
@@ -125,7 +127,10 @@ const HistoryChart = (props: HistoryChartProps) => {
           stroke="#03A678"
           strokeWidth={2}
         />
-        <ReferenceLine y={purchasePrice} stroke="#4C75A9"></ReferenceLine>
+        <ReferenceLine
+          y={purchasePrice}
+          stroke="#rgba(0, 0, 0, 0.87)"
+        ></ReferenceLine>
       </LineChart>
     );
   }
