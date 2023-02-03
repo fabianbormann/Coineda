@@ -270,7 +270,7 @@ const Tracking = () => {
         </Alert>
       </Snackbar>
 
-      <div>
+      <Grid>
         <Tooltip title={t('Add Transaction') as string}>
           <IconButton onClick={openAddTransactionDialog}>
             <AddCircleOutlineIcon />
@@ -290,19 +290,29 @@ const Tracking = () => {
             </IconButton>
           </Tooltip>
         )}
-      </div>
+      </Grid>
 
-      <div>
+      <Grid sx={{ pb: 2 }}>
         {buckets.map((bucket) => {
           if (bucket.operations.length === 0) {
             return null;
           } else {
             return (
-              <Grid key={bucket.label}>
-                <Typography sx={{ mb: 1, mt: 1 }} variant="h6">
+              <Grid
+                container
+                key={bucket.label}
+                sx={{
+                  justifyContent: { xs: 'center', sm: 'flex-start' },
+                }}
+              >
+                <Typography sx={{ pb: 2, pt: 2 }} variant="h6">
                   {bucket.label}
                 </Typography>
-                <Grid container spacing={2}>
+                <Grid
+                  container
+                  spacing={2}
+                  sx={{ justifyContent: { xs: 'center', sm: 'flex-start' } }}
+                >
                   {bucket.operations.map((operation, OperationIndex) => {
                     const content: TransactionCardContent = {};
 
@@ -370,7 +380,7 @@ const Tracking = () => {
 
                     return (
                       <Grid item key={OperationIndex}>
-                        <Card sx={{ maxWidth: 345 }} key={operation.id}>
+                        <Card sx={{ width: { xs: 200 } }} key={operation.id}>
                           <CardHeader
                             avatar={content.symbol}
                             title={content.title}
@@ -426,7 +436,7 @@ const Tracking = () => {
             );
           }
         })}
-      </div>
+      </Grid>
 
       <AddTransactionDialog
         visible={addTransactionDialogVisible}

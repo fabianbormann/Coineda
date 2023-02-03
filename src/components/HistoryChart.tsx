@@ -1,5 +1,5 @@
 import { Alert, AlertTitle, CircularProgress } from '@mui/material';
-import React from 'react';
+import React, { ReactNode } from 'react';
 import { useEffect, useState, useContext } from 'react';
 import {
   ResponsiveContainer,
@@ -110,8 +110,11 @@ const HistoryChart = (props: HistoryChartProps) => {
         <XAxis dataKey="short" />
         <YAxis domain={['auto', 'auto']} />
         <Tooltip
-          labelFormatter={(label: string) => {
-            return label;
+          labelFormatter={(label: any, payload) => {
+            if (payload.length > 0) {
+              return payload[0].payload.name as ReactNode;
+            }
+            return label as ReactNode;
           }}
           formatter={(value) => value + ' €'}
         />

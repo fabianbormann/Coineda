@@ -208,7 +208,10 @@ const Dashboard = () => {
   };
 
   return (
-    <Grid container justifyContent="center" alignItems="center" sx={{ p: 2 }}>
+    <Grid
+      container
+      sx={{ p: 2, justifyContent: 'center', alignItems: 'center' }}
+    >
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={6000}
@@ -238,12 +241,12 @@ const Dashboard = () => {
       {summary.hasOwnProperty('crypto_total_in_euro') ? (
         <>
           <Grid container spacing={2}>
-            <Grid item sm={12} md={9} lg={6}>
+            <Grid item xs={12} sm={6}>
               <Paper>
                 <HistoryChart currencies={currencies} />
               </Paper>
             </Grid>
-            <Grid item sm={12} md={9} lg={6}>
+            <Grid item xs={12} sm={6}>
               <Paper>
                 <DoughnutChart
                   label={`${Math.round(total * 100) / 100} €`}
@@ -298,7 +301,7 @@ const Dashboard = () => {
             })}
           </Grid>
           <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item sm={12} md={6}>
+            <Grid item xs={12} sm={6}>
               <WhenLambo value={summary?.crypto_total_in_euro || 0} />
             </Grid>
           </Grid>
