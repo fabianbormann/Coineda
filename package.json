@@ -1,7 +1,7 @@
 {
   "name": "coineda",
   "description": "Coineda aims to be a free to use, open source and local running crypto track and tax tool",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "author": "Fabian Bormann <fabian.bormann@coineda.io>",
   "homepage": "./",
   "license": "GPL-3.0",
