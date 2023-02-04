@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/fabianbormann/Coineda/compare/v0.2.3...v0.2.4) (2023-02-04)
+
+
+### Bug Fixes
+
+* github actions pipeline for pwa and electron builds ([104bb4c](https://github.com/fabianbormann/Coineda/commit/104bb4c78f1a5bcff5d2f648e33894d91189695d))
+
 ## [0.2.3](https://github.com/fabianbormann/Coineda/compare/v0.2.2...v0.2.3) (2023-02-04)
 
 
