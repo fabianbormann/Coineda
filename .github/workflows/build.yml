@@ -1,16 +1,21 @@
 name: Build Electron Applications
+
 on:
+  push:
+    branches: ['main']
   pull_request:
     branches: ['main']
+
+  workflow_dispatch:
+
 jobs:
   release:
-    if: "contains(github.event.head_commit.message, 'release-please--branches--main')"
-    runs-on: ${{ matrix.os }}
-
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
+    runs-on: ${{ matrix.os }}
+    if: "contains(github.event.head_commit.message, 'release-please--branches--main')"
     steps:
       - name: ⬇️ Checkout repository
         uses: actions/checkout@v2
