@@ -127,9 +127,7 @@ const AccountManagement = () => {
   const deleteAccount = async () => {
     if (settings.account.id === 1) {
       setSnackbarMessage(
-        t(
-          'This account is protected by default and cannot be removed'
-        ) as string
+        t('The last account is protected and cannot be removed') as string
       );
       setSnackbarOpen(true);
       setSnackbarType('warning');
@@ -140,6 +138,21 @@ const AccountManagement = () => {
     try {
       await storage.accounts.delete(settings.account.id);
       const updatedAccounts = await storage.accounts.getAll();
+      const transactions = await storage.transactions.getAllFromAccount(
+        settings.account.id
+      );
+      const transfers = await storage.transfers.getAllFromAccount(
+        settings.account.id
+      );
+
+      for (const transaction of transactions) {
+        await storage.transactions.delete(transaction.id);
+      }
+
+      for (const transfer of transfers) {
+        await storage.transactions.delete(transfer.id);
+      }
+
       setAccounts(updatedAccounts);
       setSettings({
         ...settings,
@@ -147,11 +160,15 @@ const AccountManagement = () => {
       });
     } catch (error) {
       setSnackbarMessage(
-        'Failed to delete the account. Please try again or contact the support.'
+        t(
+          'Failed to delete the account. Please try again or contact the support'
+        ) as string
       );
       setSnackbarOpen(true);
       setSnackbarType('error');
       console.warn(error);
+    } finally {
+      handleClose();
     }
   };
 
@@ -236,11 +253,23 @@ const AccountManagement = () => {
             anchorEl={anchorElement}
             onClose={handleClose}
           >
-            <Typography sx={{ p: 2 }}>
-              {t('Are you sure to delete this account?')}
-            </Typography>
-            <Button onClick={deleteAccount}>Delete</Button>
-            <Button onClick={deleteAccount}>Cancel</Button>
+            <Grid sx={{ p: 2 }}>
+              <Typography sx={{ p: 2 }}>
+                {t('Are you sure to delete this account?')}
+              </Typography>
+              <Grid container sx={{ justifyContent: 'flex-end' }}>
+                <Button sx={{ mr: 2 }} onClick={handleClose}>
+                  {t('Cancel')}
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={deleteAccount}
+                >
+                  {t('Delete')}
+                </Button>
+              </Grid>
+            </Grid>
           </Popover>
         </Grid>
         <Button sx={{ mt: 2 }} variant="contained" onClick={addAccount}>
@@ -253,7 +282,7 @@ const AccountManagement = () => {
           <TextField
             autoComplete="off"
             sx={{ mb: 2, mt: 1 }}
-            placeholder="Account Name"
+            placeholder={t('Account Name') as string}
             label="Name"
             value={accountName}
             onChange={(event) => setAccountName(event.target.value)}
@@ -285,7 +314,7 @@ const AccountManagement = () => {
         </DialogContent>
         <DialogActions>
           <Button autoFocus onClick={() => setDialogOpen(false)}>
-            Cancel
+            {t('Cancel')}
           </Button>
           <Button onClick={submit}>Ok</Button>
         </DialogActions>

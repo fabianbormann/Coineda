@@ -64,8 +64,7 @@ const HistoryChart = (props: HistoryChartProps) => {
             values = await fetchPrice(currencies);
           } else {
             for (const currency of currencies) {
-              console.log('fetch price of ' + currency);
-              let currencyPrice = await fetchPrice(currency, date);
+              const currencyPrice = await fetchPrice(currency, date);
               values[currency] = currencyPrice;
             }
           }
