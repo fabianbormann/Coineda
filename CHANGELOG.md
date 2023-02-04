@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.3](https://github.com/fabianbormann/Coineda/compare/v0.2.2...v0.2.3) (2023-02-04)
+
+
+### Features
+
+* add more translations ([0c2ad6d](https://github.com/fabianbormann/Coineda/commit/0c2ad6dded9564610bf071e9d8ab534120cf32d6))
+* improve histroy caching and fetching ([aa73927](https://github.com/fabianbormann/Coineda/commit/aa73927fd6a1e136e4c22bd806cb3032e3cad15c))
+* remove all transactions and transfers after removing the account. solves [#25](https://github.com/fabianbormann/Coineda/issues/25) ([c2d1f18](https://github.com/fabianbormann/Coineda/commit/c2d1f1893ddf7c90e882cd51b61f8f4548188d6b))
+
 ## [0.2.2](https://github.com/fabianbormann/Coineda/compare/v0.2.1...v0.2.2) (2023-02-03)
 
 
