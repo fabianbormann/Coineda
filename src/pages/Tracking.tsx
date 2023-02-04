@@ -213,15 +213,15 @@ const Tracking = () => {
   };
 
   const buckets: Array<TransactionBucket> = [
-    { label: 'Today', days: 0, operations: [] },
-    { label: 'Yesterday', days: 1, operations: [] },
-    { label: 'A few days ago', days: 6, operations: [] },
-    { label: 'More than a week ago', days: 14, operations: [] },
-    { label: 'Last Month', days: 30, operations: [] },
-    { label: 'A few months ago', days: 182, operations: [] },
-    { label: 'Over a half year ago', days: 365, operations: [] },
-    { label: 'More than a year ago', days: 430, operations: [] },
-    { label: 'Even longer ago', days: 730, operations: [] },
+    { label: t('Today'), days: 0, operations: [] },
+    { label: t('Yesterday'), days: 1, operations: [] },
+    { label: t('A few days ago'), days: 6, operations: [] },
+    { label: t('More than a week ago'), days: 14, operations: [] },
+    { label: t('Last Month'), days: 30, operations: [] },
+    { label: t('A few months ago'), days: 182, operations: [] },
+    { label: t('Over a half year ago'), days: 365, operations: [] },
+    { label: t('More than a year ago'), days: 430, operations: [] },
+    { label: t('Even longer ago'), days: 730, operations: [] },
   ];
 
   const now = dayjs();
@@ -317,12 +317,13 @@ const Tracking = () => {
                     const content: TransactionCardContent = {};
 
                     if (operation.type === 'transfer') {
-                      content.title = `Transfer`;
-                      content.description = `${roundCrypto(operation.value)} ${
-                        operation.symbol
-                      } from ${operation.fromExchange} to ${
-                        operation.toExchange
-                      }`;
+                      content.title = t('Transfer') as string;
+                      content.description = t('Card transfer text', {
+                        cryptoValue: roundCrypto(operation.toValue),
+                        cryptoSymbol: operation.toSymbol,
+                        fromExchange: operation.fromExchange,
+                        toExchange: operation.toExchange,
+                      }) as string;
                       content.symbol = (
                         <TransactionIcon
                           sx={{ p: 1 }}
@@ -332,12 +333,13 @@ const Tracking = () => {
                         </TransactionIcon>
                       );
                     } else if (operation.type === 'buy') {
-                      content.title = `Buy`;
-                      content.description = `${roundCrypto(
-                        operation.toValue
-                      )} ${operation.toSymbol} for ${operation.fromValue} ${
-                        operation.fromSymbol
-                      }`;
+                      content.title = t('Buy') as string;
+                      content.description = t('Card buy or sell text', {
+                        cryptoValue: roundCrypto(operation.toValue),
+                        cryptoSymbol: operation.toSymbol,
+                        fiatValue: operation.fromValue,
+                        fiatSymbol: operation.fromSymbol,
+                      }) as string;
                       content.symbol = (
                         <TransactionIcon
                           sx={{ p: 1 }}
@@ -347,12 +349,14 @@ const Tracking = () => {
                         </TransactionIcon>
                       );
                     } else if (operation.type === 'sell') {
-                      content.title = `Sell`;
-                      content.description = `${roundCrypto(
-                        operation.toValue
-                      )} ${operation.toSymbol} for ${operation.fromValue} ${
-                        operation.fromSymbol
-                      }`;
+                      content.title = t('Sell') as string;
+                      content.description = t('Card buy or sell text', {
+                        cryptoValue: roundCrypto(operation.toValue),
+                        cryptoSymbol: operation.toSymbol,
+                        fiatValue: operation.fromValue,
+                        fiatSymbol: operation.fromSymbol,
+                      }) as string;
+
                       content.symbol = (
                         <TransactionIcon
                           sx={{ p: 1 }}
@@ -362,12 +366,14 @@ const Tracking = () => {
                         </TransactionIcon>
                       );
                     } else if (operation.type === 'swap') {
-                      content.title = `Swap`;
-                      content.description = `${roundCrypto(
-                        operation.fromValue
-                      )} ${operation.fromSymbol} into ${roundCrypto(
-                        operation.toValue
-                      )} ${operation.toSymbol}`;
+                      content.title = t('Swap') as string;
+                      content.description = t('Card swap text', {
+                        fromValue: roundCrypto(operation.fromValue),
+                        fromSymbol: operation.fromSymbol,
+                        toValue: roundCrypto(operation.toValue),
+                        toSymbol: operation.toSymbol,
+                      }) as string;
+
                       content.symbol = (
                         <TransactionIcon
                           sx={{ p: 1 }}

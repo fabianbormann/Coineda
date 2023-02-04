@@ -1,6 +1,7 @@
-import { Alert, AlertTitle, CircularProgress } from '@mui/material';
-import React, { ReactNode } from 'react';
+import { Alert, AlertTitle, CircularProgress, Grid } from '@mui/material';
+import React, { ReactNode, useRef } from 'react';
 import { useEffect, useState, useContext } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ResponsiveContainer,
   Line,
@@ -20,6 +21,8 @@ const HistoryChart = (props: HistoryChartProps) => {
   const [data, setData] = useState<Array<MarketPriceData>>([]);
   const [purchasePrice, setPurchasePrice] = useState(0);
   const [state, setState] = useState('LOADING');
+  const fetchQueue = useRef<NodeJS.Timeout | null>(null);
+  const { t } = useTranslation();
 
   const { account } = settings;
 
@@ -34,18 +37,18 @@ const HistoryChart = (props: HistoryChartProps) => {
 
     const collectData = async () => {
       const monthNames = [
-        'January',
-        'February',
-        'March',
-        'April',
-        'May',
-        'June',
-        'July',
-        'August',
-        'September',
-        'October',
-        'November',
-        'December',
+        t('January'),
+        t('February'),
+        t('March'),
+        t('April'),
+        t('May'),
+        t('June'),
+        t('July'),
+        t('August'),
+        t('September'),
+        t('October'),
+        t('November'),
+        t('December'),
       ];
       const today = new Date();
 
@@ -61,7 +64,7 @@ const HistoryChart = (props: HistoryChartProps) => {
             values = await fetchPrice(currencies);
           } else {
             for (const currency of currencies) {
-              let currencyPrice = await fetchPrice(currency, date);
+              const currencyPrice = await fetchPrice(currency, date);
               values[currency] = currencyPrice;
             }
           }
@@ -87,22 +90,39 @@ const HistoryChart = (props: HistoryChartProps) => {
       }
     };
 
-    collectData();
+    if (fetchQueue.current !== null) {
+      clearTimeout(fetchQueue.current);
+    }
+    fetchQueue.current = setTimeout(collectData, 1000);
     calculatePurchasePrice();
-  }, [currencies, account]);
+  }, [currencies, account, t]);
 
   let content = (
-    <div>
+    <Grid container sx={{ alignItems: 'center', justifyContent: 'center' }}>
       <CircularProgress />
-    </div>
+    </Grid>
   );
   if (state === 'ERROR') {
     content = (
-      <div>
-        <Alert severity="warning">
-          <AlertTitle>Error while fetching historical data.</AlertTitle>
+      <Grid container>
+        <Alert
+          severity="warning"
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexGrow: 1,
+            flexDirection: 'column',
+            '& 	.MuiAlert-icon': {
+              fontSize: '3.5rem',
+            },
+          }}
+        >
+          <AlertTitle sx={{ mb: 0, textAlign: 'center' }}>
+            {t('Error while fetching historical data')}
+          </AlertTitle>
         </Alert>
-      </div>
+      </Grid>
     );
   } else if (state === 'READY') {
     content = (
@@ -125,7 +145,10 @@ const HistoryChart = (props: HistoryChartProps) => {
           stroke="#03A678"
           strokeWidth={2}
         />
-        <ReferenceLine y={purchasePrice} stroke="#4C75A9"></ReferenceLine>
+        <ReferenceLine
+          y={purchasePrice}
+          stroke="#rgba(0, 0, 0, 0.87)"
+        ></ReferenceLine>
       </LineChart>
     );
   }
