@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.5](https://github.com/fabianbormann/Coineda/compare/v0.2.4...v0.2.5) (2023-02-05)
+
+
+### Features
+
+* add version+license info and github issue link. closes [#42](https://github.com/fabianbormann/Coineda/issues/42) ([78b59a9](https://github.com/fabianbormann/Coineda/commit/78b59a9b6896d9b67d1bb1b7d5dfa38b39ea56ec))
+
 ## [0.2.4](https://github.com/fabianbormann/Coineda/compare/v0.2.3...v0.2.4) (2023-02-04)
 
 
