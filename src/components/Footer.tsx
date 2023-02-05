@@ -2,6 +2,7 @@ import React from 'react';
 import { createSvgIcon, Grid, IconButton, useTheme } from '@mui/material';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import EmailIcon from '@mui/icons-material/Email';
+import GitHubIcon from '@mui/icons-material/GitHub';
 
 const Footer = () => {
   const theme = useTheme();
@@ -34,10 +35,25 @@ const Footer = () => {
         }}
       >
         <Grid sx={{ mt: 1 }}>
-          <IconButton href="https://discord.gg/anryt23SB3" target="_blank">
+          <IconButton
+            href="https://discord.gg/anryt23SB3"
+            target="_blank"
+            rel="noreferrer"
+          >
             <DiscordIcon />
           </IconButton>
-          <IconButton href="mailto:contact@coineda.io" target="_blank">
+          <IconButton
+            href="https://github.com/fabianbormann/Coineda"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <GitHubIcon sx={{ color: 'white' }} />
+          </IconButton>
+          <IconButton
+            href="mailto:contact@coineda.io"
+            target="_blank"
+            rel="noreferrer"
+          >
             <EmailIcon sx={{ color: 'white' }} />
           </IconButton>
         </Grid>

@@ -18,6 +18,7 @@ import Toolbar from '@mui/material/Toolbar';
 import IconButton from '@mui/material/IconButton';
 import { ChevronLeft } from '@mui/icons-material';
 import NoteAddIcon from '@mui/icons-material/NoteAdd';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -32,8 +33,11 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  Popover,
   Typography,
   useMediaQuery,
+  Link as MuiLink,
+  Chip,
 } from '@mui/material';
 import {
   CoinedaAccount,
@@ -116,6 +120,15 @@ const Main = () => {
   const { settings, setSettings } = useContext(SettingsContext);
   const { account } = settings;
   const location = useLocation();
+  const [anchorElement, setAnchorElement] = useState<HTMLElement | null>(null);
+
+  const handleInfoPopoverOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorElement(event.currentTarget);
+  };
+
+  const handleInfoPopoverClose = () => {
+    setAnchorElement(null);
+  };
 
   const getPageTitle = () => {
     if (location.pathname === '/' || location.pathname === '/dashboard') {
@@ -240,6 +253,55 @@ const Main = () => {
           icon={<SettingsIcon />}
         />
       </List>
+      <Grid container sx={{ padding: 2, alignItems: 'flex-end', flexGrow: 1 }}>
+        <IconButton aria-haspopup="true" onMouseEnter={handleInfoPopoverOpen}>
+          <HelpOutlineIcon
+            sx={{
+              fontSize: '1.5rem',
+              color: 'rgba(0, 0, 0, 0.54)',
+              '&:hover': {
+                color: theme.palette.primary.main,
+              },
+            }}
+          />
+        </IconButton>
+        <Popover
+          open={Boolean(anchorElement)}
+          onClose={handleInfoPopoverClose}
+          PaperProps={{ onMouseLeave: handleInfoPopoverClose }}
+          anchorEl={anchorElement}
+          disableRestoreFocus
+        >
+          <Grid sx={{ p: 2 }}>
+            <Grid container sx={{ alignItems: 'center' }}>
+              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{`${t(
+                'Coineda Version'
+              )} ${process.env.REACT_APP_VERSION}`}</Typography>
+              <Chip
+                sx={{ ml: 1 }}
+                size="small"
+                label={t('GPLv3 License')}
+                color="secondary"
+                clickable
+                component="a"
+                target="_blank"
+                rel="noreferrer"
+                href="https://github.com/fabianbormann/Coineda/blob/main/LICENSE"
+              />
+            </Grid>
+            <Typography sx={{ mt: 1 }} variant="body2">
+              {t('If you find any bug open a')}
+              <MuiLink
+                target="_blank"
+                rel="noreferrer"
+                href="https://github.com/fabianbormann/Coineda/issues/new"
+              >
+                {t('new issue on GitHub')}
+              </MuiLink>
+            </Typography>
+          </Grid>
+        </Popover>
+      </Grid>
     </>
   );
 

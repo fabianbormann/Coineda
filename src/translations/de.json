@@ -88,6 +88,10 @@
     "Disclaimer": "Haftungsausschluss",
     "Disclaimer Text": "Coineda bietet keine Steuer- oder Rechtsberatung. Das bereitgestellte Dashboard und die rudimentären Steuerberechnungen können Fehler enthalten, für Ihr Land falsch sein oder nicht alle steuerrelevanten Vorschriften abdecken. Diese Berechnungen werden nach bestem Wissen und Gewissen erstellt, aber ich bin kein Steuerberater oder Steuerexperte und übernehme keine Verantwortung für fehlerhafte Berechnungen.",
     "Got it": "Verstanden",
-    "Tax Year": "Steuerjahr"
+    "Tax Year": "Steuerjahr",
+    "If you find any bug open a": "Falls du einen Fehler findest erstelle bitte ",
+    "new issue on GitHub": "ein neues Issue auf GitHub",
+    "Coineda Version": "Coineda Version",
+    "GPLv3 License": "GPLv3 Lizenz"
   }
 }
