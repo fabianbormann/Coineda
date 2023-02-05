@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.6](https://github.com/fabianbormann/Coineda/compare/v0.2.5...v0.2.6) (2023-02-05)
+
+
+### Bug Fixes
+
+* publish field for electron builder misses a provider ([a36c68b](https://github.com/fabianbormann/Coineda/commit/a36c68b204107765af51a3a457adb728c7c48c6f))
+
 ## [0.2.5](https://github.com/fabianbormann/Coineda/compare/v0.2.4...v0.2.5) (2023-02-05)
 
 
