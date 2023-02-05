@@ -17,7 +17,7 @@ As a crypto trader, I understand the importance of tracking my investments and m
 
 ## ❗️ Disclaimer ❗️
 
-Coineda does not provide tax, legal or accounting advices. The provided dashboard and rudimentary tax calculations may contain errors, are incorrect for your country or doesn't cover all tax relevant regulations. Those calculations are developed to the best of my knowledge but I'm not a tax export and I do not take any responsibility for incorrect calculations.
+Coineda does not provide tax, legal or accounting advices. The provided dashboard and rudimentary tax calculations may contain errors, are incorrect for your country or doesn't cover all tax relevant regulations. Those calculations are developed to the best of my knowledge but I'm not a tax expert and I do not take any responsibility for incorrect calculations.
 
 ## 💪 Contributing
 
