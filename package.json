@@ -104,6 +104,9 @@
         "AppImage",
         "deb"
       ]
+    },
+    "publish": {
+      "releaseType": "release"
     }
   }
 }
