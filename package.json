@@ -82,6 +82,7 @@
     ]
   },
   "devDependencies": {
+    "@vitest/coverage-c8": "^0.28.4",
     "electron": "^22.1.0",
     "electron-builder": "^23.6.0",
     "fake-indexeddb": "^4.0.1",
