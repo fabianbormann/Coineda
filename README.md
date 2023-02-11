@@ -2,9 +2,10 @@
 
 <p align="center">
 
-<img alt="Release" src="https://github.com/fabianbormann/Coineda/actions/workflows/release.yml/badge.svg?branch=main" />
-<img alt="semantic-release: angular" src="https://img.shields.io/badge/semantic--release-angular-e10079?logo=semantic-release" />
-
+<img alt="Release" src="https://img.shields.io/github/actions/workflow/status/fabianbormann/Coineda/release.yml?label=Release&style=for-the-badge" />
+<img alt="Test" src="https://img.shields.io/github/actions/workflow/status/fabianbormann/Coineda/test.yml?label=tests&style=for-the-badge" />
+<a href="https://discord.gg/anryt23SB3"><img alt="Discord" src="https://img.shields.io/discord/1066798434671141056?label=Discord%20Chat&style=for-the-badge" /></a>
+<a href="https://conventionalcommits.org"><img alt="conventionalcommits" src="https://img.shields.io/badge/Conventional%20Commits-1.0.0-%23FE5196?logo=conventionalcommits&style=for-the-badge" /></a>
 </p>
 
 Coineda aims to be a free to use, open source and local running crypto tracking and tax tool
@@ -21,4 +22,8 @@ Coineda does not provide tax, legal or accounting advices. The provided dashboar
 
 ## 💪 Contributing
 
-Thanks for considering contributing to Coineda! Your help is greatly appreciated! 🙏 Please take a look at our [contributing guidelines](./CONTRIBUTING.md).
+Thanks for considering contributing to Coineda! Your help is greatly appreciated!
+
+We're always looking for contributors to help us with the project's [translations](./src/translations/) and [import sources](./src/import/sources/). The great news is that both are modularized, so you can get started without needing a deep understanding of the codebase.
+
+🙏 For more information, please checkout our [contributing guidelines](./CONTRIBUTING.md).

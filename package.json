@@ -12,6 +12,7 @@
     "@mui/lab": "^5.0.0-alpha.117",
     "@mui/material": "^5.11.5",
     "@mui/x-date-pickers": "^5.0.16",
+    "@testing-library/jest-dom": "^5.16.5",
     "@types/react": "^18.0.27",
     "@types/react-dom": "^18.0.10",
     "axios": "^1.2.6",
@@ -55,6 +56,8 @@
     "start": "react-scripts start",
     "frontend": "react-scripts start",
     "build": "react-scripts build",
+    "test": "vitest",
+    "coverage": "vitest run --coverage",
     "eject": "react-scripts eject",
     "electron-dev": "concurrently \"BROWSER=none npm start\" \"wait-on http://localhost:3000 && electron .\"",
     "pack": "electron-builder --dir",
@@ -79,8 +82,12 @@
     ]
   },
   "devDependencies": {
+    "@vitest/coverage-c8": "^0.28.4",
     "electron": "^22.1.0",
-    "electron-builder": "^23.6.0"
+    "electron-builder": "^23.6.0",
+    "fake-indexeddb": "^4.0.1",
+    "jsdom": "^21.1.0",
+    "vitest": "^0.28.4"
   },
   "build": {
     "appId": "io.coineda.app",
