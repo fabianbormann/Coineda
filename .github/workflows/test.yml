@@ -8,17 +8,16 @@ jobs:
     runs-on: ubuntu-latest
 
   steps:
-    steps:
-      - name: ⬇️ Checkout repository
-        uses: actions/checkout@v2
+    - name: ⬇️ Checkout repository
+      uses: actions/checkout@v2
 
-      - name: 🫡 Setup node
-        uses: actions/setup-node@v1
-        with:
-          node-version: 16
+    - name: 🫡 Setup node
+      uses: actions/setup-node@v1
+      with:
+        node-version: 16
 
-      - name: 🧘‍♀️ Download dependencies
-        run: npm ci
+    - name: 🧘‍♀️ Download dependencies
+      run: npm ci
 
-      - name: 🎳 Run tests
-        run: npm test
+    - name: 🎳 Run tests
+      run: npm test
