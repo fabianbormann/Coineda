@@ -58,8 +58,7 @@ const createTransaction = async (transaction, account) => {
       );
       price = response.data.prices[0][1];
     } catch (error) {
-      console.log(error);
-      return;
+      throw error;
     }
 
     const sellTransaction = {

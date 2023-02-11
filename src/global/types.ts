@@ -48,7 +48,8 @@ export type TransactionType =
   | 'transfer';
 
 export type Transaction = {
-  id: number;
+  account?: number;
+  id?: number;
   value: number;
   symbol: string;
   currency: string;
@@ -69,6 +70,8 @@ export type Transaction = {
   children: Array<Transaction>;
   parent: number;
   key: number;
+  isComposed: '0' | '1';
+  composedKeys: string;
 };
 
 export type CoinedaAsset = {
@@ -158,4 +161,22 @@ export type MarketPriceData = {
 
 export type WhenLamboProps = {
   value: number;
+};
+
+export interface CoinedaFile extends File {
+  data?: string | ArrayBuffer | null;
+}
+
+export type ImportErrorType =
+  | 'UnknownToken'
+  | 'BrokenFile'
+  | 'EmptyFile'
+  | 'UnexpectedContent'
+  | 'DatabaseError';
+
+export type ImportError = {
+  transaction?: Transaction;
+  filename?: string;
+  type: ImportErrorType;
+  source: string;
 };

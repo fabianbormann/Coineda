@@ -54,11 +54,11 @@ const ImportDialog = (props: ImportDialogProps) => {
   const handleUpload = async () => {
     try {
       const { inserts, duplicates, errors } = await importFiles(
-        acceptedFiles,
+        acceptedFiles.map((acceptedFile) => ({ ...acceptedFile, data: null })),
         account.id
       );
 
-      if (duplicates === 0 && errors === 0 && inserts > 0) {
+      if (duplicates === 0 && errors.length === 0 && inserts > 0) {
         setSnackbarMessage(
           t('Transactions successfully uploaded', {
             inserts: inserts,
