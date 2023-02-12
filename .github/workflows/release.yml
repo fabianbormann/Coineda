@@ -21,7 +21,6 @@ jobs:
           running-workflow-name: 'Run Tests'
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 20
-          allowed-conclusions: success
 
       - name: release-please-action
         uses: google-github-actions/release-please-action@v3
