@@ -14,7 +14,7 @@ import {
   Snackbar,
   Typography,
 } from '@mui/material';
-import { ImportDialogProps, MessageType } from '../global/types';
+import { CoinedaFile, ImportDialogProps, MessageType } from '../global/types';
 
 const ImportDialog = (props: ImportDialogProps) => {
   const { t } = useTranslation();
@@ -35,16 +35,22 @@ const ImportDialog = (props: ImportDialogProps) => {
     },
     validator: (file) => {
       if (
-        !file.name.endsWith('.cnd') ||
+        file.name.endsWith('.cnd') ||
         file.name.endsWith('.xlsx') ||
         file.name.endsWith('.csv')
       ) {
+        return null;
+      } else {
+        const [extension] = file.name.split('.').slice(-1);
+        setSnackbarMessage(
+          t('File type is not supported', { fileType: extension }) as string
+        );
+        setSnackbarType('warning');
+        setSnackbarOpen(true);
         return {
           message: '',
           code: ErrorCode.FileInvalidType,
         };
-      } else {
-        return null;
       }
     },
   });
@@ -54,7 +60,7 @@ const ImportDialog = (props: ImportDialogProps) => {
   const handleUpload = async () => {
     try {
       const { inserts, duplicates, errors } = await importFiles(
-        acceptedFiles.map((acceptedFile) => ({ ...acceptedFile, data: null })),
+        acceptedFiles as CoinedaFile[],
         account.id
       );
 
@@ -69,9 +75,9 @@ const ImportDialog = (props: ImportDialogProps) => {
       } else {
         setSnackbarMessage(
           t('Transactions partially uploaded', {
-            inserts,
-            duplicates,
-            errors,
+            inserts: inserts,
+            dublicates: duplicates,
+            errors: errors.length,
           }) as string
         );
         setSnackbarType('warning');
@@ -80,7 +86,8 @@ const ImportDialog = (props: ImportDialogProps) => {
 
       onClose();
     } catch (error) {
-      setSnackbarMessage('Upload failed. Please try again.');
+      console.warn(error);
+      setSnackbarMessage(t('Upload failed. Please try again') as string);
       setSnackbarType('error');
       setSnackbarOpen(true);
     } finally {

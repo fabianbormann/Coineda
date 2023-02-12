@@ -319,8 +319,8 @@ const Tracking = () => {
                     if (operation.type === 'transfer') {
                       content.title = t('Transfer') as string;
                       content.description = t('Card transfer text', {
-                        cryptoValue: roundCrypto(operation.toValue),
-                        cryptoSymbol: operation.toSymbol,
+                        value: roundCrypto(operation.value),
+                        symbol: operation.symbol,
                         fromExchange: operation.fromExchange,
                         toExchange: operation.toExchange,
                       }) as string;
