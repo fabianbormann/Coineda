@@ -10,18 +10,21 @@ jobs:
   create_release:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Start release action on branch $GITHUB_REF"
-      - uses: actions/checkout@v3
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v3
 
-      - name: ⏰ Wait for tests to succeed
-        uses: lewagon/wait-on-check-action@v1.2.0
+      - name: 🫡 Setup node
+        uses: actions/setup-node@v1
         with:
-          ref: ${{ github.ref }}
-          running-workflow-name: 'Run Tests'
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 20
+          node-version: 16
 
-      - name: release-please-action
+      - name: 🧘‍♀️ Download dependencies
+        run: npm ci
+
+      - name: 🎳 Run tests
+        run: npm test
+
+      - name: 🚀 release-please-action
         uses: google-github-actions/release-please-action@v3
         with:
           release-type: node
