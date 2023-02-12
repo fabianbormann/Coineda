@@ -3,8 +3,6 @@ name: Create a new Coineda Release
 on:
   push:
     branches: ['main']
-  pull_request:
-    branches: ['main']
 
   workflow_dispatch:
 
@@ -17,8 +15,8 @@ jobs:
       - name: ⏰ Wait for tests to succeed
         uses: lewagon/wait-on-check-action@v1.2.0
         with:
-          ref: main
-          check-name: 'Run Tests'
+          ref: ${{ github.ref }}
+          running-workflow-name: 'Run Tests'
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 20
 
