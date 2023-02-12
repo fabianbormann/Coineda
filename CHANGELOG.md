@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.7](https://github.com/fabianbormann/Coineda/compare/v0.2.6...v0.2.7) (2023-02-12)
+
+
+### Features
+
+* modularize imports and add tests for them ([24ac157](https://github.com/fabianbormann/Coineda/commit/24ac157e69fafcddc39b13dc6ebaa618ace8377d))
+
+
+### Bug Fixes
+
+* repair workflow that waits for creating the release ([d551d5e](https://github.com/fabianbormann/Coineda/commit/d551d5ec813c29b3e048e5f193c62c935ae7a884))
+
 ## [0.2.6](https://github.com/fabianbormann/Coineda/compare/v0.2.5...v0.2.6) (2023-02-05)
 
 
