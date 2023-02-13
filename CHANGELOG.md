@@ -10,7 +10,7 @@
 
 ### Bug Fixes
 
-* reapir import dialog ([b194068](https://github.com/fabianbormann/Coineda/commit/b19406887295f4b00df955e29d45477775bf936f))
+* repair import dialog ([b194068](https://github.com/fabianbormann/Coineda/commit/b19406887295f4b00df955e29d45477775bf936f))
 
 ## [0.2.7](https://github.com/fabianbormann/Coineda/compare/v0.2.6...v0.2.7) (2023-02-12)
 
