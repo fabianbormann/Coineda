@@ -14,6 +14,7 @@
     "November": "November",
     "December": "December",
     "Error while fetching historical data": "Error while fetching historical data",
+    "CoinGecko's API limit has been reached": "CoinGecko's API limit has been reached. The historical data that has been retrieved so far has been saved, and we'll continue retrieving data in {{countdown}} seconds.",
     "No Transactions": "No Transactions",
     "Account Balance (EUR)": "Account Balance (EUR)",
     "Tracking": "Tracking",
