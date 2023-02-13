@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.8](https://github.com/fabianbormann/Coineda/compare/v0.2.7...v0.2.8) (2023-02-13)
+
+
+### Features
+
+* restart fetching of coingecko data after a certain time ([027db8d](https://github.com/fabianbormann/Coineda/commit/027db8d19821343cc2d39a146b133a5194a439ca))
+
+
+### Bug Fixes
+
+* repair import dialog ([b194068](https://github.com/fabianbormann/Coineda/commit/b19406887295f4b00df955e29d45477775bf936f))
+
 ## [0.2.7](https://github.com/fabianbormann/Coineda/compare/v0.2.6...v0.2.7) (2023-02-12)
 
 
