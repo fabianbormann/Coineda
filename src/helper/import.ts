@@ -47,7 +47,7 @@ const readFileContent = (file: File): Promise<string | ArrayBuffer | null> =>
       return reject(error);
     };
 
-    if (['text/csv', 'text/plain'].includes(file.type)) {
+    if (file.name.endsWith('.csv') || file.name.endsWith('.cnd')) {
       reader.readAsText(file);
     } else {
       reader.readAsArrayBuffer(file);
@@ -67,17 +67,26 @@ const importFiles = async (files: Array<CoinedaFile>, account: number) => {
   ];
 
   for (const file of files) {
-    file.data = await readFileContent(file);
+    try {
+      file.data = await readFileContent(file);
 
-    for (const importSource of importSources) {
-      if (importSource.canImport(file)) {
-        const source = new importSource();
-        await source.deserialize(file);
-        transactions = [...transactions, ...source.transactions];
-        transfers = [...transfers, ...source.transfers];
-        errors = [...errors, ...source.errors];
-        break;
+      for (const importSource of importSources) {
+        if (importSource.canImport(file)) {
+          const source = new importSource();
+          await source.deserialize(file);
+          transactions = [...transactions, ...source.transactions];
+          transfers = [...transfers, ...source.transfers];
+          errors = [...errors, ...source.errors];
+          break;
+        }
       }
+    } catch (error) {
+      console.warn(error);
+      errors.push({
+        type: 'DeserializationFailed',
+        filename: file.name,
+        source: 'MainImport',
+      });
     }
   }
 

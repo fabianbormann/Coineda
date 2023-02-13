@@ -172,7 +172,8 @@ export type ImportErrorType =
   | 'BrokenFile'
   | 'EmptyFile'
   | 'UnexpectedContent'
-  | 'DatabaseError';
+  | 'DatabaseError'
+  | 'DeserializationFailed';
 
 export type ImportError = {
   transaction?: Transaction;
