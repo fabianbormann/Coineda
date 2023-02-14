@@ -89,7 +89,6 @@ const HistoryChart = (props: HistoryChartProps) => {
       setState('ready');
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        console.log(error);
         if (!error.response && error.code === 'ERR_NETWORK') {
           setState('waiting');
           setCountdown(90);

@@ -71,7 +71,6 @@ export class KrakenImport extends ImportSource {
             formattedDate: '',
             children: [],
             parent: 0,
-            key: 0,
             composedKeys: '',
             value: Number(0),
             currency: '',
