@@ -60,25 +60,51 @@ const AccountManagement = () => {
     fetchAccounts();
   }, []);
 
+  const updateAccount = (account: CoinedaAccount) => {
+    setSettings({
+      ...settings,
+      account: account,
+    });
+    localStorage.setItem('activeAccount', account.name);
+  };
+
   const submit = async () => {
     if (dialogMode === 'add') {
+      if (accountName === '') {
+        setSnackbarMessage(t('The account name cannot be empty') as string);
+        setSnackbarOpen(true);
+        setSnackbarType('warning');
+        return;
+      }
+
       try {
         await storage.accounts.add(accountName, pattern);
-        const updatedAccounts = await storage.accounts.getAll();
+        const updatedAccounts: Array<CoinedaAccount> =
+          await storage.accounts.getAll();
         setAccounts(updatedAccounts);
-        setSettings({
-          ...settings,
-          account: updatedAccounts[updatedAccounts.length - 1],
-        });
-      } catch (error) {
-        setSnackbarMessage(
-          'Failed to save the account. Please restart the application.'
+
+        const updatedAccount = updatedAccounts.find(
+          (account) => account.name === accountName
         );
-        setSnackbarOpen(true);
-        setSnackbarType('error');
-        console.warn(error);
-      } finally {
+        if (updatedAccount) {
+          updateAccount(updatedAccount);
+        }
+
         setDialogOpen(false);
+      } catch (error) {
+        if ((error as Error).name === 'ConstraintError') {
+          setSnackbarMessage(
+            t('The account name you have chosen is already in use') as string
+          );
+          setSnackbarOpen(true);
+          setSnackbarType('warning');
+        } else {
+          console.warn(error);
+          setSnackbarMessage(t('Failed to save the account') as string);
+          setSnackbarOpen(true);
+          setSnackbarType('error');
+          setDialogOpen(false);
+        }
       }
     } else {
       try {
@@ -87,18 +113,18 @@ const AccountManagement = () => {
           name: accountName,
           pattern: pattern,
         });
-        const updatedAccounts = await storage.accounts.getAll();
+        const updatedAccounts: Array<CoinedaAccount> =
+          await storage.accounts.getAll();
         setAccounts(updatedAccounts);
-        setSettings({
-          ...settings,
-          account: updatedAccounts.find(
-            (account: CoinedaAccount) => account.id === settings.account.id
-          ),
-        });
-      } catch (error) {
-        setSnackbarMessage(
-          'Failed to save the account. Please restart the application.'
+
+        const updatedAccount = updatedAccounts.find(
+          (account) => account.id === settings.account.id
         );
+        if (updatedAccount) {
+          updateAccount(updatedAccount);
+        }
+      } catch (error) {
+        setSnackbarMessage(t('Failed to update the account') as string);
         setSnackbarOpen(true);
         setSnackbarType('error');
         console.warn(error);
@@ -154,10 +180,7 @@ const AccountManagement = () => {
       }
 
       setAccounts(updatedAccounts);
-      setSettings({
-        ...settings,
-        account: updatedAccounts[0],
-      });
+      updateAccount(updatedAccounts[0]);
     } catch (error) {
       setSnackbarMessage(
         t(
@@ -223,11 +246,7 @@ const AccountManagement = () => {
               );
 
               if (selectedAccount) {
-                setSettings({
-                  ...settings,
-                  account: selectedAccount,
-                });
-                localStorage.setItem('activeAccount', event.target.value);
+                updateAccount(selectedAccount);
               }
             }}
           >
