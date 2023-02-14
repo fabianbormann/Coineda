@@ -69,7 +69,6 @@ export class BinanceImport extends ImportSource {
             formattedDate: '',
             children: [],
             parent: 0,
-            key: 0,
             composedKeys: '',
           });
           skipFeeRows = false;

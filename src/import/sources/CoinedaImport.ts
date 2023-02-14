@@ -62,7 +62,6 @@ export class CoinedaImport extends ImportSource {
           formattedDate: '',
           children: [],
           parent: 0,
-          key: 0,
           isComposed: '0',
           composedKeys: '',
         });
@@ -91,7 +90,6 @@ export class CoinedaImport extends ImportSource {
           toSymbol: '',
           formattedDate: '',
           children: [],
-          key: 0,
         });
       }
     }

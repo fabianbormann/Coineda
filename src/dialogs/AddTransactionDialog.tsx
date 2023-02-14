@@ -98,7 +98,7 @@ const AddTransactionsDialog = (props: TransactionDialogProps) => {
         setFromCurrency(overrideFromCurrency);
       }
       setDate(dayjs(overrides.date));
-      setUpdateKey(overrides.key);
+      setUpdateKey(overrides.id);
     }
   }, [overrides, assets]);
 

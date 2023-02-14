@@ -69,7 +69,6 @@ export type Transaction = {
   formattedDate: string;
   children: Array<Transaction>;
   parent: number;
-  key: number;
   isComposed: '0' | '1';
   composedKeys: string;
 };
