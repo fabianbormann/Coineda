@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.9](https://github.com/fabianbormann/Coineda/compare/v0.2.8...v0.2.9) (2023-02-14)
+
+
+### Bug Fixes
+
+* account creation triggers a local storage update, add translation for error messages ([3f59b55](https://github.com/fabianbormann/Coineda/commit/3f59b556c920b811351177f39ee6e9e0ee49d304))
+* prevent transaction editing to create a new transaction ([f747999](https://github.com/fabianbormann/Coineda/commit/f747999c1a912be73d40d7b45c17274335f17b0e))
+
 ## [0.2.8](https://github.com/fabianbormann/Coineda/compare/v0.2.7...v0.2.8) (2023-02-13)
 
 
