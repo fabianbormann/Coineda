@@ -1,6 +1,6 @@
 import { CoinedaFile, ImportError, Transaction } from '../global/types';
 
-export abstract class ImportSource {
+export abstract class FileInputSource {
   abstract name: string;
   errors: Array<ImportError> = [];
   transactions: Array<Transaction> = [];

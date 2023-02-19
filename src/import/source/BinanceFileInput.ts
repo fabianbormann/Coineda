@@ -1,11 +1,11 @@
 import { CoinedaFile, TransactionType } from '../../global/types';
-import { ImportSource } from '../ImportSource';
+import { FileInputSource } from '../FileInputSource';
 import * as XLSX from 'xlsx';
 import { getAssetId, isFiat } from '../../helper/common';
 import axios from 'axios';
 
-export class BinanceImport extends ImportSource {
-  name: string = 'BinanceImport';
+export class BinanceFileInput extends FileInputSource {
+  name: string = 'BinanceFileInput';
 
   static canImport(file: CoinedaFile) {
     return file.name.toLowerCase().endsWith('.xlsx');

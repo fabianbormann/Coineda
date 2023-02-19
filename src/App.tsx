@@ -274,9 +274,18 @@ const Main = () => {
         >
           <Grid sx={{ p: 2 }}>
             <Grid container sx={{ alignItems: 'center' }}>
-              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{`${t(
-                'Coineda Version'
-              )} ${process.env.REACT_APP_VERSION}`}</Typography>
+              <MuiLink
+                target="_blank"
+                rel="noreferrer"
+                href={`https://github.com/fabianbormann/Coineda/releases/tag/v${process.env.REACT_APP_VERSION}`}
+                sx={{
+                  fontWeight: 'bold',
+                  textDecoration: 'none',
+                  fontSize: '0.8rem',
+                }}
+              >{`${t('Coineda Version')} ${
+                process.env.REACT_APP_VERSION
+              }`}</MuiLink>
               <Chip
                 sx={{ ml: 1 }}
                 size="small"

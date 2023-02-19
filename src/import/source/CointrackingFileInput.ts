@@ -1,9 +1,9 @@
 import { CoinedaFile } from '../../global/types';
 import { getAssetId } from '../../helper/common';
-import { ImportSource } from '../ImportSource';
+import { FileInputSource } from '../FileInputSource';
 
-export class CointrackingImport extends ImportSource {
-  name: string = 'CointrackingImport';
+export class CointrackingFileInput extends FileInputSource {
+  name: string = 'CointrackingFileInput';
 
   static canImport(file: CoinedaFile) {
     if (!file.data) {

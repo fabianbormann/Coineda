@@ -1,9 +1,9 @@
 import { CoinedaFile, Transaction } from '../../global/types';
 import { getAssetId } from '../../helper/common';
-import { ImportSource } from '../ImportSource';
+import { FileInputSource } from '../FileInputSource';
 
-export class KrakenImport extends ImportSource {
-  name: string = 'KrakenImport';
+export class KrakenFileInput extends FileInputSource {
+  name: string = 'KrakenFileInput';
 
   static canImport(file: CoinedaFile) {
     if (!file.data) {

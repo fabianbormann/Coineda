@@ -2,7 +2,7 @@ import React from 'react';
 import { useState, useContext } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SettingsContext } from '../SettingsContext';
-import { importFiles } from '../helper/import';
+import { importFiles } from '../import';
 import { useDropzone, ErrorCode } from 'react-dropzone';
 import {
   Alert,
