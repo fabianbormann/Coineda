@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.10](https://github.com/fabianbormann/Coineda/compare/v0.2.9...v0.2.10) (2023-02-19)
+
+
+### Features
+
+* modularize api syncing and add Binance API sync as example ([e123f5e](https://github.com/fabianbormann/Coineda/commit/e123f5e4db7b75e706c856ccb41709df69cf5f07))
+
+
+### Bug Fixes
+
+* change path to repair tests ([e39d4cf](https://github.com/fabianbormann/Coineda/commit/e39d4cfc0dafbec5783263782a1cbf3535ee5e24))
+
 ## [0.2.9](https://github.com/fabianbormann/Coineda/compare/v0.2.8...v0.2.9) (2023-02-14)
 
 
