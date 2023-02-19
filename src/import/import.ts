@@ -1,15 +1,15 @@
 import storage from '../persistence/storage';
-import { createTransaction } from './common';
+import { createTransaction } from '../helper/common';
 import {
   CoinedaFile,
   Exchange,
   ImportError,
   Transaction,
 } from '../global/types';
-import { CoinedaImport } from '../import/sources/CoinedaImport';
-import { BinanceImport } from '../import/sources/BinanceImport';
-import { KrakenImport } from '../import/sources/KrakenImport';
-import { CointrackingImport } from '../import/sources/CointrackingImport';
+import { CoinedaFileInput } from './source/CoinedaFileInput';
+import { BinanceFileInput } from './source/BinanceFileInput';
+import { KrakenFileInput } from './source/KrakenFileInput';
+import { CointrackingFileInput } from './source/CointrackingFileInput';
 
 const removeDuplicateObjects = async (
   transactions: Array<Transaction>,
@@ -60,10 +60,10 @@ const importFiles = async (files: Array<CoinedaFile>, account: number) => {
   let transfers: Array<Transaction> = [];
 
   const importSources = [
-    BinanceImport,
-    KrakenImport,
-    CointrackingImport,
-    CoinedaImport,
+    BinanceFileInput,
+    KrakenFileInput,
+    CointrackingFileInput,
+    CoinedaFileInput,
   ];
 
   for (const file of files) {

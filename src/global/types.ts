@@ -124,6 +124,7 @@ export type ExchangeManagerProps = {
 export type Exchange = {
   id: number;
   name: string;
+  type: string;
 };
 
 export type ImportDialogProps = {
@@ -179,4 +180,10 @@ export type ImportError = {
   filename?: string;
   type: ImportErrorType;
   source: string;
+};
+
+export type MandatoryImportField = {
+  name: string;
+  label: string;
+  description: string;
 };

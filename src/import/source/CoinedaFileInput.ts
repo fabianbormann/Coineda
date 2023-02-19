@@ -1,8 +1,8 @@
 import { CoinedaFile, Transaction, TransactionType } from '../../global/types';
-import { ImportSource } from '../ImportSource';
+import { FileInputSource } from '../FileInputSource';
 
-export class CoinedaImport extends ImportSource {
-  name: string = 'CoinedaImport';
+export class CoinedaFileInput extends FileInputSource {
+  name: string = 'CoinedaFileInput';
 
   static canImport(file: CoinedaFile) {
     return file.name.toLowerCase().endsWith('.cnd');

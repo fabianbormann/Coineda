@@ -2,7 +2,7 @@ import { openDB } from 'idb';
 import defaultAssets from './assets.json';
 
 const setup = () => {
-  const database = openDB('Coineda', 1, {
+  const database = openDB('Coineda', 2, {
     async upgrade(db, oldVersion, _newVersion, transaction) {
       if (oldVersion < 1) {
         const accountStorage = db.createObjectStore('accounts', {
@@ -38,6 +38,7 @@ const setup = () => {
           autoIncrement: true,
         });
         exchangeStore.createIndex('name', 'name', { unique: true });
+        exchangeStore.createIndex('type', 'type');
 
         for (const asset of [
           ...defaultAssets.fiat,
