@@ -3,7 +3,7 @@ import 'fake-indexeddb/auto';
 
 import path from 'path';
 import fs from 'fs';
-import { importFiles } from '../src/helper/import';
+import { importFiles } from '../src/import';
 import axios from 'axios';
 
 vi.mock('axios');
