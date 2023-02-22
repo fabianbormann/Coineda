@@ -76,30 +76,62 @@ export default abstract class TaxCalculator {
           const gainInEuro = sellingPrice - purchasePrice;
 
           if (buyTransaction.value > 0) {
-            this.realizedGains[transaction.fromCurrency].push({
-              ...transaction,
-              currency: transaction.fromCurrency,
-              symbol: await getAssetSymbol(transaction.fromCurrency),
-              amount: amount,
-              gain: amount * gainInEuro,
-              daysFromPurchase: dayjs(transaction.date).diff(
-                buyTransaction.date,
-                'days'
-              ),
-            });
+            if (this.realizedGains[transaction.fromCurrency]) {
+              this.realizedGains[transaction.fromCurrency].push({
+                ...transaction,
+                currency: transaction.fromCurrency,
+                symbol: await getAssetSymbol(transaction.fromCurrency),
+                amount: amount,
+                gain: amount * gainInEuro,
+                daysFromPurchase: dayjs(transaction.date).diff(
+                  buyTransaction.date,
+                  'days'
+                ),
+              });
+            } else {
+              this.realizedGains[transaction.fromCurrency] = [
+                {
+                  ...transaction,
+                  currency: transaction.fromCurrency,
+                  symbol: await getAssetSymbol(transaction.fromCurrency),
+                  amount: amount,
+                  gain: amount * gainInEuro,
+                  daysFromPurchase: dayjs(transaction.date).diff(
+                    buyTransaction.date,
+                    'days'
+                  ),
+                },
+              ];
+            }
             amount = 0;
           } else {
-            this.realizedGains[transaction.fromCurrency].push({
-              ...transaction,
-              currency: transaction.fromCurrency,
-              symbol: await getAssetSymbol(transaction.fromCurrency),
-              amount: amount + buyTransaction.value,
-              gain: (amount + buyTransaction.value) * gainInEuro,
-              daysFromPurchase: dayjs(transaction.date).diff(
-                buyTransaction.date,
-                'days'
-              ),
-            });
+            if (this.realizedGains[transaction.fromCurrency]) {
+              this.realizedGains[transaction.fromCurrency].push({
+                ...transaction,
+                currency: transaction.fromCurrency,
+                symbol: await getAssetSymbol(transaction.fromCurrency),
+                amount: amount + buyTransaction.value,
+                gain: (amount + buyTransaction.value) * gainInEuro,
+                daysFromPurchase: dayjs(transaction.date).diff(
+                  buyTransaction.date,
+                  'days'
+                ),
+              });
+            } else {
+              this.realizedGains[transaction.fromCurrency] = [
+                {
+                  ...transaction,
+                  currency: transaction.fromCurrency,
+                  symbol: await getAssetSymbol(transaction.fromCurrency),
+                  amount: amount + buyTransaction.value,
+                  gain: (amount + buyTransaction.value) * gainInEuro,
+                  daysFromPurchase: dayjs(transaction.date).diff(
+                    buyTransaction.date,
+                    'days'
+                  ),
+                },
+              ];
+            }
 
             amount = Math.abs(buyTransaction.value);
             buyTransaction.value = 0;

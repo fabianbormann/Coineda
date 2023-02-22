@@ -42,10 +42,8 @@ const TaxReports = () => {
 
   useEffect(() => {
     const calculateTax = async (account: CoinedaAccount, year: number) => {
-      setLoading(true);
       try {
         const result = await calculator.calculate(account, year);
-        console.log(result);
         setTaxResult(result);
       } catch (error) {
         console.log(error);
@@ -58,7 +56,14 @@ const TaxReports = () => {
         setLoading(false);
       }
     };
-    calculateTax(account, selectedYear.year());
+
+    setLoading(true);
+    setTaxResult(null);
+    const timeout = setTimeout(
+      () => calculateTax(account, selectedYear.year()),
+      1000
+    );
+    return () => clearTimeout(timeout);
   }, [account, calculator, selectedYear]);
 
   let disclaimerVisible =
@@ -80,7 +85,10 @@ const TaxReports = () => {
   };
 
   return (
-    <Grid sx={{ p: 2 }}>
+    <Grid
+      container={loading}
+      sx={loading ? { p: 6, justifyContent: 'center' } : { p: 2 }}
+    >
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={6000}
@@ -95,14 +103,17 @@ const TaxReports = () => {
         </Alert>
       </Snackbar>
       {loading ? (
-        <div>
-          <CircularProgress />
-        </div>
+        <CircularProgress />
       ) : (
-        <>
-          {' '}
+        <Grid container sx={{ flexDirection: 'column' }}>
           {disclaimerVisible && (
             <Alert
+              sx={{
+                mb: 2,
+                '	.MuiAlert-action': {
+                  alignItems: 'center',
+                },
+              }}
               action={
                 <Button
                   onClick={() => {
@@ -118,50 +129,49 @@ const TaxReports = () => {
               {t('Disclaimer Text')}
             </Alert>
           )}
-          <Grid container sx={{ flexDirection: 'column' }}>
-            <Grid item sx={{ mb: 2, mt: 1 }}>
-              <TextField
-                select
-                label={t('Tax Calculator')}
-                value={t(calculator?.name) || ''}
-                onChange={(event) => {
-                  const taxCalculator = taxCalculators.find(
-                    (taxCalculator) => taxCalculator.name === event.target.value
-                  );
-                  if (taxCalculator) {
-                    setCalculator(taxCalculator);
+          <Grid item sx={{ mb: 2, mt: 1 }}>
+            <TextField
+              select
+              label={t('Tax Calculator')}
+              value={t(calculator?.name) || ''}
+              onChange={(event) => {
+                const taxCalculator = taxCalculators.find(
+                  (taxCalculator) => taxCalculator.name === event.target.value
+                );
+                if (taxCalculator) {
+                  setCalculator(taxCalculator);
+                }
+              }}
+            >
+              {taxCalculators.map((taxCalculator) => (
+                <MenuItem key={taxCalculator.name} value={taxCalculator.name}>
+                  {t(taxCalculator.label)}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+          <Grid item>
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+              <DatePicker
+                label={t('Tax Year')}
+                views={['year']}
+                value={selectedYear}
+                onChange={(date) => {
+                  if (date) {
+                    setSelectedYear(date);
                   }
                 }}
-              >
-                {taxCalculators.map((taxCalculator) => (
-                  <MenuItem key={taxCalculator.name} value={taxCalculator.name}>
-                    {t(taxCalculator.label)}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid item>
-              <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <DatePicker
-                  label={t('Tax Year')}
-                  views={['year']}
-                  value={selectedYear}
-                  onChange={(date) => {
-                    if (date) {
-                      setSelectedYear(date);
-                    }
-                  }}
-                  renderInput={(params) => <TextField {...params} />}
-                />
-              </LocalizationProvider>
-            </Grid>
+                renderInput={(params) => <TextField {...params} />}
+              />
+            </LocalizationProvider>
           </Grid>
-        </>
+        </Grid>
       )}
 
       {taxResult &&
       (Object.keys(taxResult.realizedGains).length > 0 ||
-        Object.keys(taxResult.unrealizedGains).length > 0) ? (
+        (Object.keys(taxResult.unrealizedGains).length > 0 &&
+          selectedYear.year() === new Date().getFullYear())) ? (
         <Grid sx={{ mt: 1, mb: 1 }}>
           <p>{t('Taxable gains and losses')}</p>
           <span
@@ -201,15 +211,19 @@ const TaxReports = () => {
             gains={taxResult.realizedGains}
           />
           <Divider />
-          <GainSummary
-            showUnrealizedGains={true}
-            gains={taxResult.unrealizedGains}
-          />
+          {selectedYear.year() === new Date().getFullYear() && (
+            <GainSummary
+              showUnrealizedGains={true}
+              gains={taxResult.unrealizedGains}
+            />
+          )}
         </Grid>
       ) : (
         !loading && (
           <Typography sx={{ mt: 1 }}>
-            {t('No Transactions in ' + selectedYear.year())}
+            {t('No tax-relevant Transactions in', {
+              year: selectedYear.year(),
+            })}
           </Typography>
         )
       )}
