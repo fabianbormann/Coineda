@@ -138,11 +138,6 @@ export interface TaxTransaction extends Transaction {
   gain: number;
 }
 
-export type TaxSummary = {
-  realizedGains: { [key: string]: Array<TaxTransaction> };
-  unrealizedGains: { [key: string]: Array<TaxTransaction> };
-};
-
 export type GainSummaryProps = {
   gains: { [key: string]: Array<TaxTransaction> };
   showUnrealizedGains: boolean;
@@ -186,4 +181,13 @@ export type MandatoryImportField = {
   name: string;
   label: string;
   description: string;
+};
+
+export type TaxResult = {
+  realizedGains: { [key: string]: Array<TaxTransaction> };
+  unrealizedGains: { [key: string]: Array<TaxTransaction> };
+  hasLoss: boolean;
+  isBelowLimit: boolean;
+  totalGain: number;
+  tax: number;
 };

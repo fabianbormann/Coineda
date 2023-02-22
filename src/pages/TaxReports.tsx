@@ -1,10 +1,9 @@
 import { useTranslation } from 'react-i18next';
-import { useState, useContext, useCallback, useEffect } from 'react';
+import { useState, useContext, useEffect, useMemo } from 'react';
 import { SettingsContext } from '../SettingsContext';
 import GainSummary from '../components/GainSummary';
-import { calculateTax } from '../helper/tax';
 import React from 'react';
-import { MessageType, TaxSummary, TaxTransaction } from '../global/types';
+import { CoinedaAccount, MessageType, TaxResult } from '../global/types';
 import {
   Alert,
   AlertTitle,
@@ -12,6 +11,7 @@ import {
   CircularProgress,
   Divider,
   Grid,
+  MenuItem,
   Snackbar,
   TextField,
   Typography,
@@ -21,74 +21,50 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import DownloadIcon from '@mui/icons-material/Download';
 import dayjs, { Dayjs } from 'dayjs';
+import GermanTaxCalculator from '../tax/calculator/GermanTaxCalculator';
+import TaxCalculator from '../tax/TaxCalculator';
 
 const TaxReports = () => {
   const { t } = useTranslation();
   const { settings } = useContext(SettingsContext);
-  const [summary, setSummary] = useState<TaxSummary>({
-    realizedGains: {},
-    unrealizedGains: {},
-  });
   const [selectedYear, setSelectedYear] = useState<Dayjs>(dayjs());
   const [loading, setLoading] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarType, setSnackbarType] = useState<MessageType>('success');
   const [snackbarMessage, setSnackbarMessage] = useState('');
-
+  const taxCalculators: Array<TaxCalculator> = useMemo(
+    () => [new GermanTaxCalculator()],
+    []
+  );
+  const [calculator, setCalculator] = useState(taxCalculators[0]);
+  const [taxResult, setTaxResult] = useState<TaxResult | null>(null);
   const { account } = settings;
 
-  const fetchSummary = useCallback(() => {
-    setLoading(true);
-    calculateTax(account.id)
-      .then((tax) => {
-        setSummary(tax);
-      })
-      .catch((error) => {
+  useEffect(() => {
+    const calculateTax = async (account: CoinedaAccount, year: number) => {
+      try {
+        const result = await calculator.calculate(account, year);
+        setTaxResult(result);
+      } catch (error) {
+        console.log(error);
         setSnackbarType('error');
         setSnackbarMessage(
           'Tax calculation failed. Please restart the application.'
         );
         setSnackbarOpen(true);
-        console.warn(error);
-      })
-      .finally(() => setLoading(false));
-  }, [account]);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  useEffect(() => {
-    fetchSummary();
-  }, [fetchSummary]);
-
-  const roundFiat = (value: number) => Math.round(value * 100) / 100;
-
-  const realizedWithinTaxYear: { [key: string]: Array<TaxTransaction> } = {};
-  for (const coin of Object.keys(summary.realizedGains)) {
-    realizedWithinTaxYear[coin] = summary.realizedGains[coin].filter(
-      (transaction) =>
-        new Date(transaction.date) > new Date(selectedYear.year(), 0, 1) &&
-        new Date(transaction.date) < new Date(selectedYear.year(), 11, 31)
+    setLoading(true);
+    setTaxResult(null);
+    const timeout = setTimeout(
+      () => calculateTax(account, selectedYear.year()),
+      1000
     );
-  }
-
-  const unrealizedAfterTaxYear: { [key: string]: Array<TaxTransaction> } = {};
-  for (const coin of Object.keys(summary.unrealizedGains)) {
-    unrealizedAfterTaxYear[coin] = summary.unrealizedGains[coin].filter(
-      (transaction) =>
-        new Date(new Date(transaction.date).getFullYear(), 0, 1) <=
-        new Date(selectedYear.year(), 0, 1)
-    );
-  }
-
-  let totalGain = 0;
-  for (const coin of Object.keys(realizedWithinTaxYear)) {
-    totalGain += realizedWithinTaxYear[coin].reduce(
-      (previous, current) => previous + current.gain,
-      0
-    );
-  }
-
-  const hasLoss = totalGain < 0;
-  const isBelowLimit = totalGain < 600;
-  const tax = isBelowLimit ? 0 : totalGain * 0.5;
+    return () => clearTimeout(timeout);
+  }, [account, calculator, selectedYear]);
 
   let disclaimerVisible =
     localStorage.getItem('coineda.show.discalimer') || true;
@@ -109,7 +85,10 @@ const TaxReports = () => {
   };
 
   return (
-    <Grid sx={{ p: 2 }}>
+    <Grid
+      container={loading}
+      sx={loading ? { p: 6, justifyContent: 'center' } : { p: 2 }}
+    >
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={6000}
@@ -124,14 +103,17 @@ const TaxReports = () => {
         </Alert>
       </Snackbar>
       {loading ? (
-        <div>
-          <CircularProgress />
-        </div>
+        <CircularProgress />
       ) : (
-        <>
-          {' '}
+        <Grid container sx={{ flexDirection: 'column' }}>
           {disclaimerVisible && (
             <Alert
+              sx={{
+                mb: 2,
+                '	.MuiAlert-action': {
+                  alignItems: 'center',
+                },
+              }}
               action={
                 <Button
                   onClick={() => {
@@ -147,43 +129,69 @@ const TaxReports = () => {
               {t('Disclaimer Text')}
             </Alert>
           )}
-          <Typography sx={{ mb: 1 }}>{t('Tax Year')}</Typography>
-          <LocalizationProvider dateAdapter={AdapterDayjs}>
-            <DatePicker
-              label={t('Date')}
-              views={['year']}
-              value={selectedYear}
-              onChange={(date) => {
-                if (date) {
-                  setSelectedYear(date);
+          <Grid item sx={{ mb: 2, mt: 1 }}>
+            <TextField
+              select
+              label={t('Tax Calculator')}
+              value={t(calculator?.name) || ''}
+              onChange={(event) => {
+                const taxCalculator = taxCalculators.find(
+                  (taxCalculator) => taxCalculator.name === event.target.value
+                );
+                if (taxCalculator) {
+                  setCalculator(taxCalculator);
                 }
               }}
-              renderInput={(params) => <TextField {...params} />}
-            />
-          </LocalizationProvider>
-        </>
+            >
+              {taxCalculators.map((taxCalculator) => (
+                <MenuItem key={taxCalculator.name} value={taxCalculator.name}>
+                  {t(taxCalculator.label)}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+          <Grid item>
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+              <DatePicker
+                label={t('Tax Year')}
+                views={['year']}
+                value={selectedYear}
+                onChange={(date) => {
+                  if (date) {
+                    setSelectedYear(date);
+                  }
+                }}
+                renderInput={(params) => <TextField {...params} />}
+              />
+            </LocalizationProvider>
+          </Grid>
+        </Grid>
       )}
 
-      {Object.keys(realizedWithinTaxYear).length > 0 ||
-      Object.keys(unrealizedAfterTaxYear).length > 0 ? (
+      {taxResult &&
+      (Object.keys(taxResult.realizedGains).length > 0 ||
+        (Object.keys(taxResult.unrealizedGains).length > 0 &&
+          selectedYear.year() === new Date().getFullYear())) ? (
         <Grid sx={{ mt: 1, mb: 1 }}>
           <p>{t('Taxable gains and losses')}</p>
           <span
-            style={hasLoss ? { color: '#C36491' } : { color: '#03A678' }}
-          >{`${hasLoss ? '-' : '+'}${roundFiat(
-            Math.abs(totalGain)
+            style={
+              taxResult.hasLoss ? { color: '#C36491' } : { color: '#03A678' }
+            }
+          >{`${taxResult.hasLoss ? '-' : '+'}${Math.abs(
+            taxResult.totalGain
           )} EUR`}</span>
 
           <Alert
-            severity={isBelowLimit ? 'success' : 'warning'}
+            severity={taxResult.isBelowLimit ? 'success' : 'warning'}
             sx={{ mb: 1, mt: 1, maxWidth: 600 }}
           >
             <span>
               {t('You need to pay', {
-                approx: isBelowLimit ? ' ' : ` ${t('approx')} `,
+                approx: taxResult.isBelowLimit ? ' ' : ` ${t('approx')} `,
               })}
               <span>
-                {isBelowLimit ? '' : '~'} {roundFiat(tax)} €
+                {taxResult.isBelowLimit ? '' : '~'} {taxResult.tax} €
               </span>
               {t('Tax this year', { year: selectedYear.year() })}
             </span>
@@ -200,18 +208,22 @@ const TaxReports = () => {
           <Divider />
           <GainSummary
             showUnrealizedGains={false}
-            gains={realizedWithinTaxYear}
+            gains={taxResult.realizedGains}
           />
           <Divider />
-          <GainSummary
-            showUnrealizedGains={true}
-            gains={unrealizedAfterTaxYear}
-          />
+          {selectedYear.year() === new Date().getFullYear() && (
+            <GainSummary
+              showUnrealizedGains={true}
+              gains={taxResult.unrealizedGains}
+            />
+          )}
         </Grid>
       ) : (
         !loading && (
           <Typography sx={{ mt: 1 }}>
-            {t('No Transactions in ' + selectedYear.year())}
+            {t('No tax-relevant Transactions in', {
+              year: selectedYear.year(),
+            })}
           </Typography>
         )
       )}

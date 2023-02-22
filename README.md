@@ -24,6 +24,6 @@ Coineda does not provide tax, legal or accounting advices. The provided dashboar
 
 Thanks for considering contributing to Coineda! Your help is greatly appreciated!
 
-We're always looking for contributors to help us with the project's [translations](./src/translations/) and [import sources](./src/import/sources/). The great news is that both are modularized, so you can get started without needing a deep understanding of the codebase.
+We're always looking for contributors to help us with the project's [translations](./src/translations/) and [import sources](./src/import/source/). The great news is that both are modularized, so you can get started without needing a deep understanding of the codebase.
 
 🙏 For more information, please checkout our [contributing guidelines](./CONTRIBUTING.md).

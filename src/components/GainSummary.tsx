@@ -95,7 +95,7 @@ const GainSummary = (props: GainSummaryProps) => {
                       padding: 0,
                     },
                     [`& .${timelineDotClasses.root}`]: {
-                      margin: '2px 0',
+                      margin: '4px 0',
                       background: theme.palette.primary.main,
                     },
                   }}
@@ -105,34 +105,79 @@ const GainSummary = (props: GainSummaryProps) => {
                       <TimelineItem key={key}>
                         <TimelineSeparator>
                           <TimelineDot />
-                          <TimelineConnector />
+                          {key < gains[coin].length - 1 && (
+                            <TimelineConnector />
+                          )}
                         </TimelineSeparator>
-                        <TimelineContent>
-                          <LinearProgress
-                            variant="determinate"
-                            value={Math.min(
-                              100,
-                              (transaction.daysFromPurchase / 366) * 100
-                            )}
-                          />
-                          <p>
-                            {t('Asset becomes tax free', {
-                              value: roundCrypto(transaction.value),
-                              symbol: transaction.symbol.toUpperCase(),
-                              days: Math.max(
-                                0,
-                                366 - transaction.daysFromPurchase
-                              ),
-                              gain: `${roundFiat(transaction.gain)} EUR`,
-                            })}
-                          </p>
+                        <TimelineContent
+                          sx={{
+                            pt:
+                              Math.max(0, 366 - transaction.daysFromPurchase) >
+                              0
+                                ? 0.5
+                                : 0,
+                          }}
+                        >
+                          {Math.max(0, 366 - transaction.daysFromPurchase) >
+                          0 ? (
+                            <>
+                              <LinearProgress
+                                sx={{ pb: 1 }}
+                                variant="determinate"
+                                value={Math.min(
+                                  100,
+                                  (transaction.daysFromPurchase / 366) * 100
+                                )}
+                              />
+                              <p>
+                                {t('Asset becomes tax free', {
+                                  value: roundCrypto(transaction.value),
+                                  symbol: transaction.symbol.toUpperCase(),
+                                  days: Math.max(
+                                    0,
+                                    366 - transaction.daysFromPurchase
+                                  ),
+                                  gain: `${roundFiat(transaction.gain)} EUR`,
+                                })}
+                              </p>
+                            </>
+                          ) : (
+                            <Typography>
+                              {roundFiat(transaction.gain) > 0
+                                ? t(
+                                    'You can sell the asset tax free with a total gain of',
+                                    {
+                                      gain: roundFiat(transaction.gain),
+                                      currency: 'EUR',
+                                    }
+                                  )
+                                : t(
+                                    'You can sell the asset tax free with a total loss of',
+                                    {
+                                      gain: roundFiat(transaction.gain),
+                                      currency: 'EUR',
+                                    }
+                                  )}
+                            </Typography>
+                          )}
                         </TimelineContent>
                       </TimelineItem>
                     ) : null
                   )}
                 </Timeline>
               ) : (
-                <Timeline>
+                <Timeline
+                  sx={{
+                    [`& .${timelineItemClasses.root}:before`]: {
+                      flex: 0,
+                      padding: 0,
+                    },
+                    [`& .${timelineDotClasses.root}`]: {
+                      margin: '4px 0',
+                      background: theme.palette.primary.main,
+                    },
+                  }}
+                >
                   {gains[coin].map((transaction, key) => (
                     <TimelineItem
                       key={key}
@@ -140,11 +185,11 @@ const GainSummary = (props: GainSummaryProps) => {
                     >
                       <TimelineSeparator>
                         <TimelineDot />
-                        <TimelineConnector />
+                        {key < gains[coin].length - 1 && <TimelineConnector />}
                       </TimelineSeparator>
-                      <TimelineContent>
+                      <TimelineContent sx={{ pt: 0 }}>
                         {transaction.type === 'buy' ? (
-                          <p>
+                          <Typography>
                             {t('Bought asset summary', {
                               value: roundCrypto(transaction.toValue),
                               symbol: transaction.symbol.toUpperCase(),
@@ -153,9 +198,9 @@ const GainSummary = (props: GainSummaryProps) => {
                               ),
                               fiat: `${roundFiat(transaction.fromValue)} EUR`,
                             })}
-                          </p>
+                          </Typography>
                         ) : (
-                          <p>
+                          <Typography>
                             {t('Selled asset summary', {
                               value: roundCrypto(transaction.fromValue),
                               symbol: transaction.symbol.toUpperCase(),
@@ -166,7 +211,7 @@ const GainSummary = (props: GainSummaryProps) => {
                               days: transaction.daysFromPurchase,
                               gains: `${roundFiat(transaction.gain)} EUR`,
                             })}
-                          </p>
+                          </Typography>
                         )}
                       </TimelineContent>
                     </TimelineItem>
