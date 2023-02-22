@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.11](https://github.com/fabianbormann/Coineda/compare/v0.2.10...v0.2.11) (2023-02-22)
+
+
+### Features
+
+* modularize tax calculation ([d3145b3](https://github.com/fabianbormann/Coineda/commit/d3145b3ee246e5409a085ba64bf3ae1ed5e48d05))
+
+
+### Bug Fixes
+
+* repair tax view and wait with calculation to make sure the actual account has been selected ([c9f8cb8](https://github.com/fabianbormann/Coineda/commit/c9f8cb8c6fa0eecaa76a1c95da035266e3b26948))
+
 ## [0.2.10](https://github.com/fabianbormann/Coineda/compare/v0.2.9...v0.2.10) (2023-02-19)
 
 
