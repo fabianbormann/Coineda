@@ -3,8 +3,8 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './i18n';
 import './index.css';
-import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 import { createTheme, ThemeProvider } from '@mui/material';
+import { registerSW } from 'virtual:pwa-register';
 
 const theme = createTheme({
   palette: {
@@ -29,17 +29,20 @@ const theme = createTheme({
 });
 
 const root = ReactDOM.createRoot(
-  document.getElementById('root') as HTMLElement
+  document.getElementById('root') as HTMLElement,
 );
 
 root.render(
   <ThemeProvider theme={theme}>
     <App />
-  </ThemeProvider>
+  </ThemeProvider>,
 );
 
-if (process.env.REACT_APP_TARGET === 'SINGLE_PAGE_APPLICATION') {
-  serviceWorkerRegistration.register();
-} else {
-  serviceWorkerRegistration.unregister();
+// Only register the service worker over http/https. Production Electron
+// serves the build over the privileged `coineda://` scheme (registered as
+// secure/standard, so it is a valid SW origin) - but the app there is
+// already local, so a service worker would add nothing except a second,
+// harder-to-clear cache layer in front of it.
+if (location.protocol === 'http:' || location.protocol === 'https:') {
+  registerSW({ immediate: true });
 }

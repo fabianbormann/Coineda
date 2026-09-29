@@ -12,7 +12,7 @@ const defaultSettings = {
 
 const applicationSettings: ApplicationSettings = {
   settings: defaultSettings,
-  setSettings: Function,
+  setSettings: () => {},
 };
 
 const SettingsContext = createContext<ApplicationSettings>(applicationSettings);

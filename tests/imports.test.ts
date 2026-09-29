@@ -19,7 +19,7 @@ describe('import tests', () => {
 
     const { inserts, duplicates, errors } = await importFiles(
       [importedFile],
-      0
+      0,
     );
 
     expect(inserts).toBe(9);
@@ -31,7 +31,7 @@ describe('import tests', () => {
     const filePath = path.join(
       __dirname,
       'assets',
-      'Export Order History-2021-10-01 22_52_47.xlsx'
+      'Export Order History-2021-10-01 22_52_47.xlsx',
     );
 
     (axios as Mocked<typeof axios>).get.mockImplementation(async (url) => {
@@ -61,12 +61,12 @@ describe('import tests', () => {
       'Export Order History-2021-10-01 22_52_47.xlsx',
       {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      }
+      },
     );
 
     const { inserts, duplicates, errors } = await importFiles(
       [importedFile],
-      0
+      0,
     );
 
     expect(inserts).toBe(25);
@@ -78,7 +78,7 @@ describe('import tests', () => {
     const filePath = path.join(
       __dirname,
       'assets',
-      'KrakenExport-2021-10-05.csv'
+      'KrakenExport-2021-10-05.csv',
     );
 
     const blob = fs.readFileSync(filePath);
@@ -88,7 +88,7 @@ describe('import tests', () => {
 
     const { inserts, duplicates, errors } = await importFiles(
       [importedFile],
-      0
+      0,
     );
 
     expect(inserts).toBe(25);

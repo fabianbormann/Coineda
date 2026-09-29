@@ -59,9 +59,7 @@ export default class BinanceApiSync extends ApiSyncSource {
     ];
   }
 
-  getDescription(
-    t: TFunction<'translation', undefined, 'translation'>
-  ): JSX.Element {
+  getDescription(t: TFunction<'translation', undefined>): JSX.Element {
     return (
       <Grid>
         <Typography>
@@ -92,21 +90,21 @@ export default class BinanceApiSync extends ApiSyncSource {
           <ListItem>
             <ListItemText>
               {t(
-                '2. Enter a label/name for your API key (e.g. CoinedaApiKey) and click [Create API].'
+                '2. Enter a label/name for your API key (e.g. CoinedaApiKey) and click [Create API].',
               )}
             </ListItemText>
           </ListItem>
           <ListItem>
             <ListItemText>
               {t(
-                '3. You only need to check "Enable Reading" within the "API restrictions" section'
+                '3. You only need to check "Enable Reading" within the "API restrictions" section',
               )}
             </ListItemText>
           </ListItem>
           <ListItem>
             <ListItemText>
               {t(
-                '4. Complete the security verification with your registered 2FA devices.'
+                '4. Complete the security verification with your registered 2FA devices.',
               )}
             </ListItemText>
           </ListItem>

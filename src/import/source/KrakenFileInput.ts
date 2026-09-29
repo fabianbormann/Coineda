@@ -31,7 +31,7 @@ export class KrakenFileInput extends FileInputSource {
 
     const rows = file.data.toString().split('\n');
     rows.shift();
-    let transactionReferences: { [key: string]: Transaction } = {};
+    const transactionReferences: { [key: string]: Transaction } = {};
 
     for (const row of rows) {
       if (row === '') {

@@ -27,26 +27,26 @@ import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 const Wallets = () => {
   const { t } = useTranslation();
   const [selectedExchange, setSelectedExchange] = useState<Exchange | null>(
-    null
+    null,
   );
   const [defaultSelectionIndex, setDefaultSelectionIndex] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [refreshExchanges, setRefreshExchanges] = useState(0);
   const mandatoryFieldRefs = useRef<{ [key: string]: HTMLInputElement | null }>(
-    {}
+    {},
   );
   const [walletType, setWalletType] = useState('');
   const [exchanges, setExchanges] = useState<Array<Exchange>>([]);
   const [walletName, setWalletName] = useState('');
   const [anchorElement, setAnchorElement] = useState<HTMLButtonElement | null>(
-    null
+    null,
   );
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarType, setSnackbarType] = useState<MessageType>('success');
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const availableApiSources: Array<ApiSyncSource> = useMemo(
     () => [new BinanceApiSync()],
-    []
+    [],
   );
 
   const fetchExchanges = useCallback(() => {
@@ -59,8 +59,8 @@ const Wallets = () => {
         setSnackbarType('error');
         setSnackbarMessage(
           t(
-            'Unable to fetch exchanges from database. Please try again or contact the support'
-          ) as string
+            'Unable to fetch exchanges from database. Please try again or contact the support',
+          ) as string,
         );
         setSnackbarOpen(true);
         console.warn(error);
@@ -73,11 +73,15 @@ const Wallets = () => {
 
   useEffect(() => {
     if (selectedExchange) {
+      // Pre-fills the wallet edit form from the selected exchange; the
+      // fields stay editable afterwards, so this is a one-time sync, not
+      // derived state.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setWalletName(selectedExchange.name);
       setWalletType(selectedExchange.type || 'other');
       const exchangeSyncSource = availableApiSources.find(
         (availableApiSource) =>
-          availableApiSource.name === selectedExchange.type
+          availableApiSource.name === selectedExchange.type,
       );
       if (exchangeSyncSource) {
         for (const mandatoryField of exchangeSyncSource.getMandatoryFields()) {
@@ -86,7 +90,7 @@ const Wallets = () => {
           if (mandatoryFieldRef) {
             mandatoryFieldRef.value =
               localStorage.getItem(
-                `${selectedExchange.id}-${selectedExchange.name}-${mandatoryField.name}`
+                `${selectedExchange.id}-${selectedExchange.name}-${mandatoryField.name}`,
               ) || '';
           }
         }
@@ -105,7 +109,7 @@ const Wallets = () => {
 
         const exchangeSyncSource = availableApiSources.find(
           (availableApiSource) =>
-            availableApiSource.name === selectedExchange.type
+            availableApiSource.name === selectedExchange.type,
         );
         if (exchangeSyncSource) {
           for (const mandatoryField of exchangeSyncSource.getMandatoryFields()) {
@@ -114,11 +118,11 @@ const Wallets = () => {
             if (mandatoryFieldRef) {
               localStorage.setItem(
                 `${selectedExchange.id}-${walletName}-${mandatoryField.name}`,
-                mandatoryFieldRef.value || ''
+                mandatoryFieldRef.value || '',
               );
 
               localStorage.removeItem(
-                `${selectedExchange.id}-${selectedExchange.name}-${mandatoryField.name}`
+                `${selectedExchange.id}-${selectedExchange.name}-${mandatoryField.name}`,
               );
             }
           }
@@ -130,8 +134,8 @@ const Wallets = () => {
         fetchExchanges();
         setDefaultSelectionIndex(
           exchanges.findIndex(
-            (exchange) => exchange.name === selectedExchange.name
-          ) || 0
+            (exchange) => exchange.name === selectedExchange.name,
+          ) || 0,
         );
         setRefreshExchanges((value) => 1 - value);
       } catch (error) {
@@ -150,7 +154,7 @@ const Wallets = () => {
 
         const exchangeSyncSource = availableApiSources.find(
           (availableApiSource) =>
-            availableApiSource.name === selectedExchange.type
+            availableApiSource.name === selectedExchange.type,
         );
         if (exchangeSyncSource) {
           for (const mandatoryField of exchangeSyncSource.getMandatoryFields()) {
@@ -158,7 +162,7 @@ const Wallets = () => {
               mandatoryFieldRefs.current[mandatoryField.name];
             if (mandatoryFieldRef) {
               localStorage.removeItem(
-                `${selectedExchange.id}-${selectedExchange.name}-${mandatoryField.name}`
+                `${selectedExchange.id}-${selectedExchange.name}-${mandatoryField.name}`,
               );
             }
           }
@@ -184,7 +188,7 @@ const Wallets = () => {
 
   const handleSnackbarClose = (
     event?: React.SyntheticEvent | Event,
-    reason?: string
+    reason?: string,
   ) => {
     if (reason === 'clickaway') {
       return;
@@ -195,7 +199,7 @@ const Wallets = () => {
 
   const renderImportSource = () => {
     const importSource = availableApiSources.find(
-      (availableApiSource) => availableApiSource.name === walletType
+      (availableApiSource) => availableApiSource.name === walletType,
     );
     if (importSource) {
       return (
@@ -206,7 +210,7 @@ const Wallets = () => {
               key={mandatoryField.name}
               defaultValue={
                 localStorage.getItem(
-                  `${selectedExchange?.id}-${selectedExchange?.name}-${mandatoryField.name}`
+                  `${selectedExchange?.id}-${selectedExchange?.name}-${mandatoryField.name}`,
                 ) || ''
               }
               placeholder={t(mandatoryField.description) as string}
@@ -239,10 +243,10 @@ const Wallets = () => {
                         (prev, fieldName) => ({
                           ...prev,
                           [fieldName]: localStorage.getItem(
-                            `${selectedExchange?.id}-${selectedExchange?.name}-${fieldName}`
+                            `${selectedExchange?.id}-${selectedExchange?.name}-${fieldName}`,
                           ),
                         }),
-                        {}
+                        {},
                       );
 
                     await importSource.fetch(config);
@@ -277,7 +281,7 @@ const Wallets = () => {
             {importSource.name === 'BinanceApiSync' && (
               <Alert severity="warning">
                 {t(
-                  'The Binance API does currently not allow client side requests.'
+                  'The Binance API does currently not allow client side requests.',
                 )}
                 <Link
                   target="_blank"
@@ -330,7 +334,7 @@ const Wallets = () => {
             }
 
             const exchange = exchanges.find(
-              (exchange) => exchange.name === exchangeName
+              (exchange) => exchange.name === exchangeName,
             );
 
             if (exchange) {

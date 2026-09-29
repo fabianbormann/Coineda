@@ -41,7 +41,7 @@ const calculateTax = async (account) => {
 
   for (const coin of Object.keys(coins)) {
     coins[coin].sort((a, b) =>
-      a.date < b.date ? -1 : Number(a.date > b.date)
+      a.date < b.date ? -1 : Number(a.date > b.date),
     );
 
     tax.realizedGains[coin] = [...coins[coin]];
@@ -58,11 +58,11 @@ const calculateTax = async (account) => {
 
         const purchasePrice = await fetchPrice(
           transaction.fromCurrency,
-          target[i].date
+          target[i].date,
         );
         const sellingPrice = await fetchPrice(
           transaction.fromCurrency,
-          transaction.date
+          transaction.date,
         );
 
         const gainInEuro = sellingPrice - purchasePrice;
@@ -76,7 +76,7 @@ const calculateTax = async (account) => {
             gain: amount * gainInEuro,
             daysFromPurchase: dayjs(transaction.date).diff(
               target[i].date,
-              'days'
+              'days',
             ),
           });
           amount = 0;
@@ -89,7 +89,7 @@ const calculateTax = async (account) => {
             gain: (amount + target[i].value) * gainInEuro,
             daysFromPurchase: dayjs(transaction.date).diff(
               target[i].date,
-              'days'
+              'days',
             ),
           });
 
@@ -103,7 +103,7 @@ const calculateTax = async (account) => {
       }
 
       coins[transaction.fromCurrency] = coins[transaction.fromCurrency].filter(
-        (coin) => coin.value > 0
+        (coin) => coin.value > 0,
       );
     }
   }

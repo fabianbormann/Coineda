@@ -45,7 +45,7 @@ const AssetManagement = () => {
         new Date().getTime() - tokenCache.age < 1000 * 60 * 15
       ) {
         results = tokenCache.entries.filter(
-          (token: Token) => token.symbol.toLowerCase() === value.toLowerCase()
+          (token: Token) => token.symbol.toLowerCase() === value.toLowerCase(),
         );
       } else {
         try {
@@ -58,10 +58,10 @@ const AssetManagement = () => {
             JSON.stringify({
               entries: tokenList,
               age: new Date().getTime(),
-            })
+            }),
           );
           results = tokenList.filter(
-            (token) => token.symbol.toLowerCase() === value.toLowerCase()
+            (token) => token.symbol.toLowerCase() === value.toLowerCase(),
           );
         } catch (error) {
           console.log(error);
@@ -74,7 +74,7 @@ const AssetManagement = () => {
       } else {
         setSelectedAsset('');
         setSnackbarMessage(
-          `Could not fetch any token or coin having the symbol ${value}`
+          `Could not fetch any token or coin having the symbol ${value}`,
         );
         setSnackbarType('warning');
         setSnackbarOpen(true);
@@ -84,7 +84,7 @@ const AssetManagement = () => {
   };
 
   const selectAsset = (
-    event: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>
+    event: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>,
   ) => {
     setSelectedAsset(event.target.value);
   };
@@ -97,8 +97,8 @@ const AssetManagement = () => {
         if (existingAsset) {
           setSnackbarMessage(
             t(
-              `${asset.name} (${asset.symbol}) has already been added to your asset list`
-            ) as string
+              `${asset.name} (${asset.symbol}) has already been added to your asset list`,
+            ) as string,
           );
 
           setSnackbarType('info');
@@ -107,8 +107,8 @@ const AssetManagement = () => {
           await storage.assets.add(asset);
           setSnackbarMessage(
             t(
-              `Successfully added ${asset.name} (${asset.symbol}) to your asset list`
-            ) as string
+              `Successfully added ${asset.name} (${asset.symbol}) to your asset list`,
+            ) as string,
           );
           setSnackbarType('info');
           setSnackbarOpen(true);
@@ -116,8 +116,8 @@ const AssetManagement = () => {
       } catch (error) {
         setSnackbarMessage(
           t(
-            'Asset persistence failed. Please restart the application.'
-          ) as string
+            'Asset persistence failed. Please restart the application.',
+          ) as string,
         );
         setSnackbarType('error');
         setSnackbarOpen(true);
@@ -132,7 +132,7 @@ const AssetManagement = () => {
 
   const handleSnackbarClose = (
     event?: React.SyntheticEvent | Event,
-    reason?: string
+    reason?: string,
   ) => {
     if (reason === 'clickaway') {
       return;

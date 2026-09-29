@@ -47,7 +47,7 @@ const setup = () => {
           await transaction.objectStore('assets').add({
             ...asset,
             symbol: asset.symbol.toUpperCase(),
-            isFiat: asset.hasOwnProperty('roughly_estimated_in_euro') ? 1 : 2,
+            isFiat: Object.hasOwn(asset, 'roughly_estimated_in_euro') ? 1 : 2,
           });
         }
       }
@@ -88,7 +88,7 @@ const setup = () => {
         return (await database).getAllFromIndex(
           'transfers',
           'account',
-          IDBKeyRange.only(account)
+          IDBKeyRange.only(account),
         );
       },
     },
@@ -107,7 +107,7 @@ const setup = () => {
         return (await database).getAllFromIndex(
           'transactions',
           'account',
-          IDBKeyRange.only(account)
+          IDBKeyRange.only(account),
         );
       },
     },
@@ -117,14 +117,14 @@ const setup = () => {
         return (await database).getAllFromIndex(
           'assets',
           'isFiat',
-          IDBKeyRange.only(1)
+          IDBKeyRange.only(1),
         );
       },
       async getAllCrypto() {
         return (await database).getAllFromIndex(
           'assets',
           'isFiat',
-          IDBKeyRange.only(2)
+          IDBKeyRange.only(2),
         );
       },
       async add(asset) {
@@ -132,14 +132,14 @@ const setup = () => {
           ...asset,
           symbol: asset.symbol.toUpperCase(),
           id: asset.id.toLowerCase(),
-          isFiat: asset.hasOwnProperty('roughly_estimated_in_euro') ? 1 : 2,
+          isFiat: Object.hasOwn(asset, 'roughly_estimated_in_euro') ? 1 : 2,
         });
       },
       async getBySymbol(symbol) {
         return (await database).getAllFromIndex(
           'assets',
           'symbol',
-          IDBKeyRange.only(symbol)
+          IDBKeyRange.only(symbol),
         );
       },
     },

@@ -1,8 +1,45 @@
 import { CoinedaFile, TransactionType } from '../../global/types';
 import { FileInputSource } from '../FileInputSource';
-import * as XLSX from 'xlsx';
+import { readSheet } from 'read-excel-file/universal';
 import { getAssetId, isFiat } from '../../helper/common';
 import axios from 'axios';
+
+type SheetRow = { [key: string]: any };
+
+/**
+ * Replicates the one `XLSX.utils.sheet_to_json` behaviour this importer
+ * depends on. read-excel-file returns raw cell arrays, so the first row has
+ * to supply the keys — and critically, an empty cell must produce an ABSENT
+ * key rather than null, because the Binance fee-row branch below detects fee
+ * rows via `typeof row['Date(UTC)'] === 'undefined'`. Fully empty rows are
+ * dropped, matching sheet_to_json.
+ */
+const toKeyedRows = (sheet: Array<Array<unknown>>): Array<SheetRow> => {
+  const [header, ...dataRows] = sheet;
+  if (!header) {
+    return [];
+  }
+
+  const keys = header.map((cell) => String(cell ?? '').trim());
+
+  return dataRows
+    .map((cells) => {
+      const row: SheetRow = {};
+      keys.forEach((key, index) => {
+        const value = cells[index];
+        if (
+          key !== '' &&
+          value !== null &&
+          value !== undefined &&
+          value !== ''
+        ) {
+          row[key] = value;
+        }
+      });
+      return row;
+    })
+    .filter((row) => Object.keys(row).length > 0);
+};
 
 export class BinanceFileInput extends FileInputSource {
   name: string = 'BinanceFileInput';
@@ -21,18 +58,15 @@ export class BinanceFileInput extends FileInputSource {
       return;
     }
 
-    const workbook = XLSX.read(new Uint8Array(file.data), { type: 'array' });
-    const sheetNameList = workbook.SheetNames;
-    const rows: Array<{ [key: string]: any }> = XLSX.utils.sheet_to_json(
-      workbook.Sheets[sheetNameList[0]]
-    );
+    const sheet = (await readSheet(file.data)) as Array<Array<unknown>>;
+    const rows = toKeyedRows(sheet);
 
     let skipFeeRows = false;
 
     for (const row of rows) {
       if (typeof row['Date(UTC)'] !== 'undefined') {
         let { fromCurrency, toCurrency } = await this.getBinanceTokenPair(
-          row['Pair']
+          row['Pair'],
         );
 
         try {
@@ -82,31 +116,30 @@ export class BinanceFileInput extends FileInputSource {
         }
       } else if (
         typeof row['Date(UTC)'] === 'undefined' &&
-        row['AvgTrading Price'] !== 'Fee' &&
+        String(row['AvgTrading Price'] ?? '') !== 'Fee' &&
         !skipFeeRows
       ) {
         const target = this.transactions.length - 1;
+        // read-excel-file may hand back a number where xlsx gave a string; the
+        // comparisons below are all string operations.
+        const avgTradingPrice = String(row['AvgTrading Price'] ?? '');
         let feeCurrency = null;
         let feeValue = null;
 
-        if (
-          row['AvgTrading Price'].endsWith(
-            this.transactions[target].fromCurrency
-          )
-        ) {
-          feeValue = row['AvgTrading Price'].split(
-            this.transactions[target].fromCurrency
+        if (avgTradingPrice.endsWith(this.transactions[target].fromCurrency)) {
+          feeValue = avgTradingPrice.split(
+            this.transactions[target].fromCurrency,
           )[0];
           feeCurrency = this.transactions[target].fromCurrency;
         } else if (
-          row['AvgTrading Price'].endsWith(this.transactions[target].toCurrency)
+          avgTradingPrice.endsWith(this.transactions[target].toCurrency)
         ) {
-          feeValue = row['AvgTrading Price'].split(
-            this.transactions[target].toCurrency
+          feeValue = avgTradingPrice.split(
+            this.transactions[target].toCurrency,
           )[0];
           feeCurrency = this.transactions[target].toCurrency;
-        } else if (row['AvgTrading Price'].endsWith('BNB')) {
-          feeValue = row['AvgTrading Price'].split('BNB')[0];
+        } else if (avgTradingPrice.endsWith('BNB')) {
+          feeValue = avgTradingPrice.split('BNB')[0];
           feeCurrency = 'BNB';
         }
 
@@ -124,7 +157,7 @@ export class BinanceFileInput extends FileInputSource {
           ...transaction,
           feeCurrency: await getAssetId(transaction.feeCurrency),
         });
-      } catch (error) {
+      } catch {
         this.errors.push({
           type: 'UnknownToken',
           filename: file.name,
@@ -137,7 +170,7 @@ export class BinanceFileInput extends FileInputSource {
 
   private async getBinanceTokenPair(binanceSymbol: string) {
     const cachedTokenPair = localStorage.getItem(
-      `binance-pair-${binanceSymbol.toLowerCase()}`
+      `binance-pair-${binanceSymbol.toLowerCase()}`,
     );
 
     const pair = cachedTokenPair ? JSON.parse(cachedTokenPair) : null;
@@ -145,7 +178,7 @@ export class BinanceFileInput extends FileInputSource {
     if (!pair || new Date().getTime() - pair.age > 365 * 24 * 60 * 60 * 1000) {
       try {
         const response = await axios.get(
-          'https://api.binance.com/api/v3/exchangeInfo?symbol=' + binanceSymbol
+          'https://api.binance.com/api/v3/exchangeInfo?symbol=' + binanceSymbol,
         );
 
         const fromCurrency = response.data.symbols[0].baseAsset;
@@ -156,7 +189,7 @@ export class BinanceFileInput extends FileInputSource {
           JSON.stringify({
             data: { fromCurrency, toCurrency },
             age: new Date().getTime(),
-          })
+          }),
         );
 
         return { fromCurrency, toCurrency };
@@ -174,7 +207,7 @@ export class BinanceFileInput extends FileInputSource {
 
   private async estimateTransactionType(
     fromCurrency: string,
-    toCurrency: string
+    toCurrency: string,
   ) {
     let transactionType: TransactionType = 'buy';
     const fromCurrencyIsFiat = await isFiat(fromCurrency);

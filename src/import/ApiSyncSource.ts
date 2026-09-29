@@ -1,4 +1,3 @@
-import { ReactJSXElement } from '@emotion/react/types/jsx-namespace';
 import { TFunction } from 'i18next';
 import {
   ImportError,
@@ -18,7 +17,5 @@ export abstract class ApiSyncSource {
 
   abstract fetch(config?: { [key: string]: string }): Promise<void>;
   abstract getMandatoryFields(): Array<MandatoryImportField>;
-  abstract getDescription(
-    t: TFunction<'translation', undefined, 'translation'>
-  ): ReactJSXElement;
+  abstract getDescription(t: TFunction<'translation', undefined>): JSX.Element;
 }

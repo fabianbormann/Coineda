@@ -78,7 +78,7 @@ const Tracking = () => {
       setAssets({
         fiat: currencies.filter((asset: CoinedaAsset) => asset.isFiat === 1),
         cryptocurrencies: currencies.filter(
-          (asset: CoinedaAsset) => asset.isFiat === 2
+          (asset: CoinedaAsset) => asset.isFiat === 2,
         ),
       });
     });
@@ -89,7 +89,7 @@ const Tracking = () => {
       const { cryptocurrencies, fiat } = assets;
       const assetList = [...cryptocurrencies, ...fiat];
       const asset = assetList.find(
-        (asset) => asset.id.toLowerCase() === assetId.toLowerCase()
+        (asset) => asset.id.toLowerCase() === assetId.toLowerCase(),
       );
 
       if (asset) {
@@ -98,7 +98,7 @@ const Tracking = () => {
         return 'UNKNOWN';
       }
     },
-    [assets]
+    [assets],
   );
 
   const fetchExchanges = useCallback(() => {
@@ -127,7 +127,7 @@ const Tracking = () => {
         }));
 
         const transactions = data.filter(
-          (transaction) => typeof transaction.parent === 'undefined'
+          (transaction) => typeof transaction.parent === 'undefined',
         );
 
         for (const transaction of transactions) {
@@ -146,7 +146,7 @@ const Tracking = () => {
               valueCurrency: transfer.currency,
               currency: getAssetSymbol(transfer.currency),
               fee: `${transfer.feeValue} ${getAssetSymbol(
-                transfer.feeCurrency
+                transfer.feeCurrency,
               )}`,
               formattedDate: formatDateTime(transfer.date),
               exchange: `${transfer.fromExchange}, ${transfer.toExchange}`,
@@ -157,7 +157,7 @@ const Tracking = () => {
           .catch((error) => {
             console.log(error);
             setSnackbarMessage(
-              'Failed to fetch the transfers from the local storage. Please try it again. If the error persits consider to open an issue: https://github.com/fabianbormann/Coineda/issues'
+              'Failed to fetch the transfers from the local storage. Please try it again. If the error persits consider to open an issue: https://github.com/fabianbormann/Coineda/issues',
             );
             setSnackbarOpen(true);
             setSnackbarType('warning');
@@ -166,7 +166,7 @@ const Tracking = () => {
       .catch((error) => {
         console.log(error);
         setSnackbarMessage(
-          'Failed to fetch the transactions from the local storage. Please try it again. If the error persits consider to open an issue: https://github.com/fabianbormann/Coineda/issues'
+          'Failed to fetch the transactions from the local storage. Please try it again. If the error persits consider to open an issue: https://github.com/fabianbormann/Coineda/issues',
         );
         setSnackbarOpen(true);
         setSnackbarType('warning');
@@ -196,7 +196,7 @@ const Tracking = () => {
       await storage.transfers.delete(entry.id);
     } else {
       let entries = [entry];
-      if (entry.hasOwnProperty('children')) {
+      if (Object.hasOwn(entry, 'children')) {
         entries = [...entries, ...entry.children];
       }
 
@@ -226,7 +226,7 @@ const Tracking = () => {
 
   const now = dayjs();
   const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|Opera Mini/i.test(
-    navigator.userAgent
+    navigator.userAgent,
   );
 
   for (const operation of dataSource) {
@@ -245,7 +245,7 @@ const Tracking = () => {
 
   const handleSnackbarClose = (
     event?: React.SyntheticEvent | Event,
-    reason?: string
+    reason?: string,
   ) => {
     if (reason === 'clickaway') {
       return;
@@ -391,7 +391,7 @@ const Tracking = () => {
                             avatar={content.symbol}
                             title={content.title}
                             subheader={dayjs(operation.formattedDate).format(
-                              'DD.MM.YYYY'
+                              'DD.MM.YYYY',
                             )}
                           />
                           <CardContent sx={{ p: 1, textAlign: 'center' }}>

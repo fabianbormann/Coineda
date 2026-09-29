@@ -22,7 +22,7 @@ const HistoryChart = (props: HistoryChartProps) => {
   const [data, setData] = useState<Array<MarketPriceData>>([]);
   const [purchasePrice, setPurchasePrice] = useState(0);
   const [state, setState] = useState<'loading' | 'ready' | 'waiting' | 'error'>(
-    'loading'
+    'loading',
   );
   const [progress, setProgress] = useState(0);
   const [countdown, setCountdown] = useState(-1);
@@ -52,8 +52,8 @@ const HistoryChart = (props: HistoryChartProps) => {
     let finishedRequests = 0;
 
     try {
-      let marketPrices: Array<MarketPriceData> = [];
-      for (var i = 6; i >= 0; i -= 1) {
+      const marketPrices: Array<MarketPriceData> = [];
+      for (let i = 6; i >= 0; i -= 1) {
         const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
         const month = monthNames[date.getMonth()];
 
@@ -74,7 +74,7 @@ const HistoryChart = (props: HistoryChartProps) => {
 
         let marketPrice = 0;
         for (const currency in values) {
-          let currencyCount = await getCoinCount(currency, date, account.id);
+          const currencyCount = await getCoinCount(currency, date, account.id);
           marketPrice += values[currency] * currencyCount;
         }
 
@@ -103,6 +103,10 @@ const HistoryChart = (props: HistoryChartProps) => {
 
   useEffect(() => {
     if (countdown === 0) {
+      // This drives the CoinGecko rate-limit backoff: once the countdown
+      // reaches 0 the retry fires. Moving this out of the effect would
+      // require a different mechanism to resume the countdown-driven retry.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCountdown(-1);
       setState('loading');
       collectData();

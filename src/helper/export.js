@@ -39,7 +39,7 @@ const exportData = async (account) => {
   const element = document.createElement('a');
   element.setAttribute(
     'href',
-    'data:text/plain;charset=utf-8,' + encodeURIComponent(data)
+    'data:text/plain;charset=utf-8,' + encodeURIComponent(data),
   );
   element.setAttribute('download', filename);
   element.style.display = 'none';

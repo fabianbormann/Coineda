@@ -46,7 +46,7 @@ const Dashboard = () => {
     setLoading(true);
 
     const transactions = await storage.transactions.getAllFromAccount(
-      account.id
+      account.id,
     );
 
     const coins: CoinedaSummary = { cryptocurrencies: {}, fiat: {} };
@@ -54,14 +54,14 @@ const Dashboard = () => {
     const calculateBalance = async (
       currency: string,
       value: number,
-      add: boolean
+      add: boolean,
     ) => {
       currency = currency.toLowerCase();
       const target = (await isFiat(currency)) ? 'fiat' : 'cryptocurrencies';
 
       coins[target][currency] = coins[target][currency] || {};
 
-      if (coins[target][currency].hasOwnProperty('value')) {
+      if (Object.hasOwn(coins[target][currency], 'value')) {
         if (add) {
           coins[target][currency].value += value;
         } else {
@@ -84,7 +84,8 @@ const Dashboard = () => {
         let purchasePrice = transaction.fromValue / transaction.toValue;
         if (transaction.fromCurrency.toLowerCase() !== 'euro') {
           const fiat = assets.find(
-            (currency) => currency.id === transaction.fromCurrency.toLowerCase()
+            (currency) =>
+              currency.id === transaction.fromCurrency.toLowerCase(),
           );
           purchasePrice =
             (transaction.fromValue * fiat['roughlyEstimatedInEuro']) /
@@ -92,12 +93,13 @@ const Dashboard = () => {
         }
 
         if (
-          coins.cryptocurrencies[targetCurrency].hasOwnProperty(
-            'purchase_price'
+          Object.hasOwn(
+            coins.cryptocurrencies[targetCurrency],
+            'purchase_price',
           )
         ) {
           coins.cryptocurrencies[targetCurrency].purchase_prices.push(
-            purchasePrice
+            purchasePrice,
           );
         } else {
           coins.cryptocurrencies[targetCurrency].purchase_prices = [
@@ -143,7 +145,7 @@ const Dashboard = () => {
         coins.cryptocurrencies[coin].avg_purchase_price =
           coins.cryptocurrencies[coin].purchase_prices.reduce(
             (previous, current) => current + previous,
-            0
+            0,
           ) / coins.cryptocurrencies[coin].purchase_prices.length;
       }
     }
@@ -174,14 +176,18 @@ const Dashboard = () => {
   }, [account]);
 
   useEffect(() => {
+    // calculateSummary sets loading=true synchronously before its first
+    // await; this is the standard "fetch on mount/account change" gate and
+    // changing it risks the loading indicator no longer covering the fetch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     calculateSummary();
   }, [calculateSummary]);
 
   const data = [];
   let total = 0;
-  let currencies = [];
+  const currencies = [];
 
-  if (summary.hasOwnProperty('crypto_total_in_euro')) {
+  if (Object.hasOwn(summary, 'crypto_total_in_euro')) {
     for (const account of Object.keys(summary.cryptocurrencies)) {
       currencies.push(account);
       data.push({
@@ -198,7 +204,7 @@ const Dashboard = () => {
 
   const handleSnackbarClose = (
     event?: React.SyntheticEvent | Event,
-    reason?: string
+    reason?: string,
   ) => {
     if (reason === 'clickaway') {
       return;
@@ -231,14 +237,14 @@ const Dashboard = () => {
           <CircularProgress />
         </div>
       )}
-      {summary.hasOwnProperty('inconsistency') &&
+      {Object.hasOwn(summary, 'inconsistency') &&
         summary.inconsistency?.negativeValue.map((coin) => (
           <Alert severity="warning">
             <AlertTitle>Inconsistency warning</AlertTitle>
             {`You have a negative ${coin.name} value of ${coin.value}. Please check your transactions.`}
           </Alert>
         ))}
-      {summary.hasOwnProperty('crypto_total_in_euro') ? (
+      {Object.hasOwn(summary, 'crypto_total_in_euro') ? (
         <>
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>

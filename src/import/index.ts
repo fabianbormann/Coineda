@@ -13,7 +13,7 @@ import { CointrackingFileInput } from './source/CointrackingFileInput';
 
 const removeDuplicateObjects = async (
   transactions: Array<Transaction>,
-  objectStore: string
+  objectStore: string,
 ) => {
   const filteredTransactions: Array<Transaction> = [];
   const savedTransactions: Array<Transaction> = await (storage as any)[
@@ -21,13 +21,13 @@ const removeDuplicateObjects = async (
   ].getAll();
 
   const comparableTransactions = savedTransactions.map((transaction) =>
-    JSON.stringify({ ...transaction, id: 0 })
+    JSON.stringify({ ...transaction, id: 0 }),
   );
 
   for (const transaction of transactions) {
     if (
       !comparableTransactions.includes(
-        JSON.stringify({ ...transaction, id: 0 })
+        JSON.stringify({ ...transaction, id: 0 }),
       )
     ) {
       filteredTransactions.push(transaction);
@@ -90,7 +90,7 @@ const importFiles = async (files: Array<CoinedaFile>, account: number) => {
     }
   }
 
-  let totalTransfers = transfers.length;
+  const totalTransfers = transfers.length;
   transfers = await removeDuplicateObjects(transfers, 'transfers');
   let duplicates = totalTransfers - transfers.length;
 
@@ -100,10 +100,10 @@ const importFiles = async (files: Array<CoinedaFile>, account: number) => {
   totalTransactions += errors.length;
 
   transactions = transactions.filter(
-    (transaction) => transaction.isComposed !== '1'
+    (transaction) => transaction.isComposed !== '1',
   );
 
-  let exchanges = await storage.exchanges.getAll();
+  const exchanges = await storage.exchanges.getAll();
 
   const addExchangeIfNotExists = async (name: string) => {
     if (!exchanges.find((exchange: Exchange) => exchange.name === name)) {
@@ -145,7 +145,7 @@ const importFiles = async (files: Array<CoinedaFile>, account: number) => {
   return {
     inserts: Math.max(
       0,
-      totalTransactions + totalTransfers - duplicates - errors.length
+      totalTransactions + totalTransfers - duplicates - errors.length,
     ),
     duplicates: duplicates,
     errors: errors,

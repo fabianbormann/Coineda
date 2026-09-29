@@ -43,7 +43,7 @@ const ImportDialog = (props: ImportDialogProps) => {
       } else {
         const [extension] = file.name.split('.').slice(-1);
         setSnackbarMessage(
-          t('File type is not supported', { fileType: extension }) as string
+          t('File type is not supported', { fileType: extension }) as string,
         );
         setSnackbarType('warning');
         setSnackbarOpen(true);
@@ -61,14 +61,14 @@ const ImportDialog = (props: ImportDialogProps) => {
     try {
       const { inserts, duplicates, errors } = await importFiles(
         acceptedFiles as CoinedaFile[],
-        account.id
+        account.id,
       );
 
       if (duplicates === 0 && errors.length === 0 && inserts > 0) {
         setSnackbarMessage(
           t('Transactions successfully uploaded', {
             inserts: inserts,
-          }) as string
+          }) as string,
         );
         setSnackbarType('success');
         setSnackbarOpen(true);
@@ -78,7 +78,7 @@ const ImportDialog = (props: ImportDialogProps) => {
             inserts: inserts,
             dublicates: duplicates,
             errors: errors.length,
-          }) as string
+          }) as string,
         );
         setSnackbarType('warning');
         setSnackbarOpen(true);
@@ -104,7 +104,7 @@ const ImportDialog = (props: ImportDialogProps) => {
 
   const handleSnackbarClose = (
     event?: React.SyntheticEvent | Event,
-    reason?: string
+    reason?: string,
   ) => {
     if (reason === 'clickaway') {
       return;

@@ -12,18 +12,19 @@ jobs:
     if: "${{ !contains(github.event.head_commit.message, 'release-please--branches--main') }}"
     steps:
       - name: ⬇️ Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: 🫡 Setup node
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v4
         with:
-          node-version: 16
+          node-version: 22
+          cache: npm
 
       - name: 🧘‍♀️ Download dependencies
         run: npm ci
 
       - name: 🎳 Run tests
-        run: npm test
+        run: npx vitest run
 
       - name: 🚀 release-please-action
         uses: google-github-actions/release-please-action@v3

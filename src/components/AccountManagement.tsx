@@ -43,9 +43,10 @@ const AccountManagement = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarType, setSnackbarType] = useState<MessageType>('success');
   const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [pattern, setPattern] = useState(Math.random() * 1000);
+  // Lazy initializer: Math.random() runs once at mount instead of on every render.
+  const [pattern, setPattern] = useState(() => Math.random() * 1000);
   const [anchorElement, setAnchorElement] = useState<HTMLButtonElement | null>(
-    null
+    null,
   );
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -84,7 +85,7 @@ const AccountManagement = () => {
         setAccounts(updatedAccounts);
 
         const updatedAccount = updatedAccounts.find(
-          (account) => account.name === accountName
+          (account) => account.name === accountName,
         );
         if (updatedAccount) {
           updateAccount(updatedAccount);
@@ -94,7 +95,7 @@ const AccountManagement = () => {
       } catch (error) {
         if ((error as Error).name === 'ConstraintError') {
           setSnackbarMessage(
-            t('The account name you have chosen is already in use') as string
+            t('The account name you have chosen is already in use') as string,
           );
           setSnackbarOpen(true);
           setSnackbarType('warning');
@@ -118,7 +119,7 @@ const AccountManagement = () => {
         setAccounts(updatedAccounts);
 
         const updatedAccount = updatedAccounts.find(
-          (account) => account.id === settings.account.id
+          (account) => account.id === settings.account.id,
         );
         if (updatedAccount) {
           updateAccount(updatedAccount);
@@ -153,7 +154,7 @@ const AccountManagement = () => {
   const deleteAccount = async () => {
     if (settings.account.id === 1) {
       setSnackbarMessage(
-        t('The last account is protected and cannot be removed') as string
+        t('The last account is protected and cannot be removed') as string,
       );
       setSnackbarOpen(true);
       setSnackbarType('warning');
@@ -165,10 +166,10 @@ const AccountManagement = () => {
       await storage.accounts.delete(settings.account.id);
       const updatedAccounts = await storage.accounts.getAll();
       const transactions = await storage.transactions.getAllFromAccount(
-        settings.account.id
+        settings.account.id,
       );
       const transfers = await storage.transfers.getAllFromAccount(
-        settings.account.id
+        settings.account.id,
       );
 
       for (const transaction of transactions) {
@@ -184,8 +185,8 @@ const AccountManagement = () => {
     } catch (error) {
       setSnackbarMessage(
         t(
-          'Failed to delete the account. Please try again or contact the support'
-        ) as string
+          'Failed to delete the account. Please try again or contact the support',
+        ) as string,
       );
       setSnackbarOpen(true);
       setSnackbarType('error');
@@ -197,7 +198,7 @@ const AccountManagement = () => {
 
   const handleSnackbarClose = (
     event?: React.SyntheticEvent | Event,
-    reason?: string
+    reason?: string,
   ) => {
     if (reason === 'clickaway') {
       return;
@@ -239,10 +240,10 @@ const AccountManagement = () => {
             value={settings.account.name}
             variant="standard"
             onChange={(
-              event: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>
+              event: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>,
             ) => {
               const selectedAccount = accounts.find(
-                (account) => account.name === event.target.value
+                (account) => account.name === event.target.value,
               );
 
               if (selectedAccount) {

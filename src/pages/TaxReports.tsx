@@ -34,7 +34,7 @@ const TaxReports = () => {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const taxCalculators: Array<TaxCalculator> = useMemo(
     () => [new GermanTaxCalculator()],
-    []
+    [],
   );
   const [calculator, setCalculator] = useState(taxCalculators[0]);
   const [taxResult, setTaxResult] = useState<TaxResult | null>(null);
@@ -49,7 +49,7 @@ const TaxReports = () => {
         console.log(error);
         setSnackbarType('error');
         setSnackbarMessage(
-          'Tax calculation failed. Please restart the application.'
+          'Tax calculation failed. Please restart the application.',
         );
         setSnackbarOpen(true);
       } finally {
@@ -57,11 +57,16 @@ const TaxReports = () => {
       }
     };
 
+    // This is a deliberate 1s debounce before recalculating tax (see
+    // calculateTax above), which hits the rate-limited CoinGecko API once per
+    // buy/sell pair; restructuring away from an effect would risk request
+    // storms on rapid selector changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setTaxResult(null);
     const timeout = setTimeout(
       () => calculateTax(account, selectedYear.year()),
-      1000
+      1000,
     );
     return () => clearTimeout(timeout);
   }, [account, calculator, selectedYear]);
@@ -75,7 +80,7 @@ const TaxReports = () => {
 
   const handleSnackbarClose = (
     event?: React.SyntheticEvent | Event,
-    reason?: string
+    reason?: string,
   ) => {
     if (reason === 'clickaway') {
       return;
@@ -136,7 +141,7 @@ const TaxReports = () => {
               value={t(calculator?.name) || ''}
               onChange={(event) => {
                 const taxCalculator = taxCalculators.find(
-                  (taxCalculator) => taxCalculator.name === event.target.value
+                  (taxCalculator) => taxCalculator.name === event.target.value,
                 );
                 if (taxCalculator) {
                   setCalculator(taxCalculator);
@@ -179,7 +184,7 @@ const TaxReports = () => {
               taxResult.hasLoss ? { color: '#C36491' } : { color: '#03A678' }
             }
           >{`${taxResult.hasLoss ? '-' : '+'}${Math.abs(
-            taxResult.totalGain
+            taxResult.totalGain,
           )} EUR`}</span>
 
           <Alert

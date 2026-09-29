@@ -1,7 +1,11 @@
+import { Dispatch, SetStateAction } from 'react';
+
 export type NavigationItemProps = {
   title: string;
   location: string;
   icon: JSX.Element;
+  isMobileView: boolean;
+  onNavigate: () => void;
 };
 
 export type CoinedaAccount = {
@@ -17,7 +21,7 @@ export type CoinedaSettings = {
 
 export type ApplicationSettings = {
   settings: CoinedaSettings;
-  setSettings: Function;
+  setSettings: Dispatch<SetStateAction<CoinedaSettings>>;
 };
 
 export type CoinSummary = {
@@ -39,13 +43,7 @@ export type CoinedaSummary = {
 };
 
 export type TransactionType =
-  | 'buy'
-  | 'sell'
-  | 'send'
-  | 'receive'
-  | 'rewards'
-  | 'swap'
-  | 'transfer';
+  'buy' | 'sell' | 'send' | 'receive' | 'rewards' | 'swap' | 'transfer';
 
 export type Transaction = {
   account?: number;

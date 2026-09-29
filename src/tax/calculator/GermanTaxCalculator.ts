@@ -19,7 +19,7 @@ export default class GermanTaxCalculator extends TaxCalculator {
       const gains = this.realizedGains[coin].filter(
         (transaction) =>
           new Date(transaction.date) > new Date(year, 0, 1) &&
-          new Date(transaction.date) < new Date(year, 11, 31)
+          new Date(transaction.date) < new Date(year, 11, 31),
       );
       if (gains.length > 0) {
         realizedWithinTaxYear[coin] = gains;
@@ -31,7 +31,7 @@ export default class GermanTaxCalculator extends TaxCalculator {
       const unrealizedGains = this.unrealizedGains[coin].filter(
         (transaction) =>
           new Date(new Date(transaction.date).getFullYear(), 0, 1) <=
-          new Date(year, 0, 1)
+          new Date(year, 0, 1),
       );
 
       if (unrealizedGains.length > 0) {
@@ -43,7 +43,7 @@ export default class GermanTaxCalculator extends TaxCalculator {
     for (const coin of Object.keys(realizedWithinTaxYear)) {
       totalGain += realizedWithinTaxYear[coin].reduce(
         (previous, current) => previous + current.gain,
-        0
+        0,
       );
     }
 

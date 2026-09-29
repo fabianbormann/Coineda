@@ -10,13 +10,24 @@ import React, { SyntheticEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GainSummaryProps } from '../global/types';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import Timeline from '@mui/lab/Timeline';
+import TimelineUnsafe from '@mui/lab/Timeline';
+import type { TimelineProps } from '@mui/lab/Timeline';
 import TimelineItem, { timelineItemClasses } from '@mui/lab/TimelineItem';
 import TimelineSeparator from '@mui/lab/TimelineSeparator';
 import TimelineConnector from '@mui/lab/TimelineConnector';
 import TimelineContent from '@mui/lab/TimelineContent';
 import TimelineDot, { timelineDotClasses } from '@mui/lab/TimelineDot';
 import dayjs from 'dayjs';
+
+// `@mui/lab@5.0.0-alpha.117` bakes a static list of HTMLAttributes keys into
+// Timeline's generated .d.ts, and newer `@types/react` releases removed a
+// few of those keys (e.g. `onResize`, `placeholder`) from the generic
+// attribute set. That makes the emitted prop type falsely require them.
+// Re-type locally against `@mui/lab`'s own `TimelineProps` (rather than a
+// hand-rolled two-prop shape) so `position`, `className`, `classes` and ref
+// fidelity are preserved; runtime is unaffected either way.
+const Timeline =
+  TimelineUnsafe as unknown as React.ComponentType<TimelineProps>;
 
 const GainSummary = (props: GainSummaryProps) => {
   const [expanded, setExpanded] = useState<string | false>(false);
@@ -53,7 +64,7 @@ const GainSummary = (props: GainSummaryProps) => {
 
           const amount = gains[coin].reduce(
             (previous, current) => previous + (current.amount || 0),
-            0
+            0,
           );
 
           if (amount === 0) {
@@ -62,7 +73,7 @@ const GainSummary = (props: GainSummaryProps) => {
 
           const gain = gains[coin].reduce(
             (previous, current) => previous + current.gain,
-            0
+            0,
           );
 
           return (
@@ -82,7 +93,7 @@ const GainSummary = (props: GainSummaryProps) => {
                       coin
                     ][0].symbol.toUpperCase()}`}</Typography>
                     <Typography sx={{ ml: 1 }}>{`${roundFiat(
-                      gain
+                      gain,
                     )} EUR`}</Typography>
                   </div>
                 </span>
@@ -126,7 +137,7 @@ const GainSummary = (props: GainSummaryProps) => {
                                 variant="determinate"
                                 value={Math.min(
                                   100,
-                                  (transaction.daysFromPurchase / 366) * 100
+                                  (transaction.daysFromPurchase / 366) * 100,
                                 )}
                               />
                               <p>
@@ -135,7 +146,7 @@ const GainSummary = (props: GainSummaryProps) => {
                                   symbol: transaction.symbol.toUpperCase(),
                                   days: Math.max(
                                     0,
-                                    366 - transaction.daysFromPurchase
+                                    366 - transaction.daysFromPurchase,
                                   ),
                                   gain: `${roundFiat(transaction.gain)} EUR`,
                                 })}
@@ -149,20 +160,20 @@ const GainSummary = (props: GainSummaryProps) => {
                                     {
                                       gain: roundFiat(transaction.gain),
                                       currency: 'EUR',
-                                    }
+                                    },
                                   )
                                 : t(
                                     'You can sell the asset tax free with a total loss of',
                                     {
                                       gain: roundFiat(transaction.gain),
                                       currency: 'EUR',
-                                    }
+                                    },
                                   )}
                             </Typography>
                           )}
                         </TimelineContent>
                       </TimelineItem>
-                    ) : null
+                    ) : null,
                   )}
                 </Timeline>
               ) : (
@@ -194,7 +205,7 @@ const GainSummary = (props: GainSummaryProps) => {
                               value: roundCrypto(transaction.toValue),
                               symbol: transaction.symbol.toUpperCase(),
                               date: dayjs(transaction.date).format(
-                                'DD.MM.YYYY'
+                                'DD.MM.YYYY',
                               ),
                               fiat: `${roundFiat(transaction.fromValue)} EUR`,
                             })}
@@ -205,7 +216,7 @@ const GainSummary = (props: GainSummaryProps) => {
                               value: roundCrypto(transaction.fromValue),
                               symbol: transaction.symbol.toUpperCase(),
                               date: dayjs(transaction.date).format(
-                                'DD.MM.YYYY'
+                                'DD.MM.YYYY',
                               ),
                               fiat: `${roundFiat(transaction.toValue)} EUR`,
                               days: transaction.daysFromPurchase,

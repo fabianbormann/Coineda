@@ -70,13 +70,17 @@ const AddTransactionsDialog = (props: TransactionDialogProps) => {
   useEffect(() => {
     if (typeof overrides !== 'undefined') {
       if (overrides.type === 'transfer') {
+        // Pre-fills the edit form from the `overrides` prop when the dialog
+        // opens for an existing transaction; the fields below stay editable
+        // afterwards, so this is intentionally a one-time sync, not derived state.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setFromExchange(overrides.fromExchange);
         setToExchange(overrides.toExchange);
       } else {
         setSelectedExchange(overrides.exchange);
         setToValue(overrides.toValue.toString());
         const overrideToCurrency = assets.find(
-          (asset) => asset.id === overrides.toCurrency
+          (asset) => asset.id === overrides.toCurrency,
         );
         if (overrideToCurrency) {
           setToCurrency(overrideToCurrency);
@@ -85,14 +89,14 @@ const AddTransactionsDialog = (props: TransactionDialogProps) => {
 
       setFeeValue(overrides.feeValue.toString());
       const overrideFeeCurrency = assets.find(
-        (asset) => asset.id === overrides.feeCurrency
+        (asset) => asset.id === overrides.feeCurrency,
       );
       if (overrideFeeCurrency) {
         setFeeCurrency(overrideFeeCurrency);
       }
       setFromValue(overrides.fromValue.toString());
       const overrideFromCurrency = assets.find(
-        (asset) => asset.id === overrides.fromCurrency
+        (asset) => asset.id === overrides.fromCurrency,
       );
       if (overrideFromCurrency) {
         setFromCurrency(overrideFromCurrency);

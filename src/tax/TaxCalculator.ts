@@ -19,7 +19,7 @@ export default abstract class TaxCalculator {
   protected roundFiat = (value: number) => Math.round(value * 100) / 100;
 
   protected async getSortedTransactions(
-    account: CoinedaAccount
+    account: CoinedaAccount,
   ): Promise<Array<Transaction>> {
     const transactions: Array<Transaction> =
       await storage.transactions.getAllFromAccount(account.id);
@@ -58,19 +58,19 @@ export default abstract class TaxCalculator {
         }
       } else if (transaction.type === 'sell') {
         let amount = transaction.fromValue;
-        let buyTransactions = coins[transaction.fromCurrency];
+        const buyTransactions = coins[transaction.fromCurrency];
 
         for (const buyTransaction of buyTransactions) {
           buyTransaction.value -= amount;
 
           const purchasePrice = await fetchPrice(
             transaction.fromCurrency,
-            buyTransaction.date
+            buyTransaction.date,
           );
 
           const sellingPrice = await fetchPrice(
             transaction.fromCurrency,
-            transaction.date
+            transaction.date,
           );
 
           const gainInEuro = sellingPrice - purchasePrice;
@@ -85,7 +85,7 @@ export default abstract class TaxCalculator {
                 gain: amount * gainInEuro,
                 daysFromPurchase: dayjs(transaction.date).diff(
                   buyTransaction.date,
-                  'days'
+                  'days',
                 ),
               });
             } else {
@@ -98,7 +98,7 @@ export default abstract class TaxCalculator {
                   gain: amount * gainInEuro,
                   daysFromPurchase: dayjs(transaction.date).diff(
                     buyTransaction.date,
-                    'days'
+                    'days',
                   ),
                 },
               ];
@@ -114,7 +114,7 @@ export default abstract class TaxCalculator {
                 gain: (amount + buyTransaction.value) * gainInEuro,
                 daysFromPurchase: dayjs(transaction.date).diff(
                   buyTransaction.date,
-                  'days'
+                  'days',
                 ),
               });
             } else {
@@ -127,7 +127,7 @@ export default abstract class TaxCalculator {
                   gain: (amount + buyTransaction.value) * gainInEuro,
                   daysFromPurchase: dayjs(transaction.date).diff(
                     buyTransaction.date,
-                    'days'
+                    'days',
                   ),
                 },
               ];

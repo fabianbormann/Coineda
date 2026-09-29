@@ -1,33 +1,71 @@
-name: Deploy PWA to Firebase Hosting
+name: Deploy PWA to GitHub Pages
 
 on:
   push:
     branches: ['main']
-  pull_request:
-    branches: ['main']
-
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
-  build_and_deploy:
+  build:
     runs-on: ubuntu-latest
-    if: "contains(github.event.head_commit.message, 'release-please--branches--main')"
+    # Deploy only when release-please merges its release PR, so the live site
+    # always equals a tagged release. workflow_dispatch has no head_commit, so
+    # it is allowed through explicitly for manual redeploys.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.head_commit.message, 'release-please--branches--main')
     steps:
       - name: ⬇️ Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: 🫡 Setup node
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v4
         with:
-          node-version: 16
+          node-version: 22
+          cache: npm
 
-      - name: 🔨 Download dependencies and build hosting
-        run: npm ci && npm run build
+      - name: 🧘‍♀️ Download dependencies
+        run: npm ci
 
-      - uses: FirebaseExtended/action-hosting-deploy@v0
-        name: 🚀 Deploy to Firebase
+      - name: 🔍 Lint
+        run: npm run lint
+
+      - name: 💅 Check formatting
+        run: npm run format:check
+
+      - name: 🧮 Typecheck
+        run: npx tsc --noEmit
+
+      - name: 🎳 Run tests
+        run: npx vitest run
+
+      - name: 🔨 Build
+        run: npm run build
+
+      - name: 📄 Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: ⬆️ Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_COINEDA_4FCA0 }}'
-          projectId: coineda-4fca0
-          channelId: live
+          path: build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 🚀 Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

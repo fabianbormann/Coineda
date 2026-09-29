@@ -46,20 +46,15 @@ const createTransaction = async (transaction, account) => {
   } else if (!fromCurrencyIsFiat && !toCurrencyIsFiat) {
     isSwap = true;
     transactionType = TransactionType.SELL;
-    let price = 0;
     const toTimestamp = Math.floor(new Date(date).getTime() / 1000);
     const fromTimestamp = Math.floor(
-      (new Date(date).getTime() - 1000 * 60 * 60 * 5) / 1000
+      (new Date(date).getTime() - 1000 * 60 * 60 * 5) / 1000,
     );
 
-    try {
-      const response = await axios.get(
-        `https://api.coingecko.com/api/v3/coins/${fromCurrency.toLowerCase()}/market_chart/range?vs_currency=eur&from=${fromTimestamp}&to=${toTimestamp}`
-      );
-      price = response.data.prices[0][1];
-    } catch (error) {
-      throw error;
-    }
+    const response = await axios.get(
+      `https://api.coingecko.com/api/v3/coins/${fromCurrency.toLowerCase()}/market_chart/range?vs_currency=eur&from=${fromTimestamp}&to=${toTimestamp}`,
+    );
+    const price = response.data.prices[0][1];
 
     const sellTransaction = {
       type: transactionType,
@@ -172,14 +167,14 @@ const getPurchaseValue = async (currency, account) => {
     (transaction) =>
       (transaction.fromCurrency === currency.toUpperCase() ||
         transaction.toCurrency === currency.toUpperCase()) &&
-      transaction.type !== TransactionType.SWAP
+      transaction.type !== TransactionType.SWAP,
   );
 
   let buyTransactions = transactions.filter(
-    (transaction) => transaction.type === TransactionType.BUY
+    (transaction) => transaction.type === TransactionType.BUY,
   );
   let sellTransactions = transactions.filter(
-    (transaction) => transaction.type === TransactionType.SELL
+    (transaction) => transaction.type === TransactionType.SELL,
   );
 
   buyTransactions = buyTransactions.map((transaction) => ({
@@ -227,7 +222,7 @@ const getCoinCount = async (currency, date, account) => {
       (transaction.fromCurrency === currency.toUpperCase() ||
         transaction.toCurrency === currency.toUpperCase()) &&
       transaction.type !== TransactionType.SWAP &&
-      transaction.date <= date.getTime()
+      transaction.date <= date.getTime(),
   );
 
   let count = 0;
@@ -253,18 +248,18 @@ const fetchPrice = async (currency, date) => {
   if (date) {
     const toTimestamp = Math.floor(new Date(date).getTime() / 1000);
     const fromTimestamp = Math.floor(
-      (new Date(date).getTime() - 1000 * 60 * 60 * 5) / 1000
+      (new Date(date).getTime() - 1000 * 60 * 60 * 5) / 1000,
     );
 
     let price = JSON.parse(
-      localStorage.getItem(`${fromTimestamp}-${toTimestamp}-${currency}`)
+      localStorage.getItem(`${fromTimestamp}-${toTimestamp}-${currency}`),
     );
 
     if (price) {
       return price.data;
     } else {
       const response = await axios.get(
-        `https://api.coingecko.com/api/v3/coins/${currency}/market_chart/range?vs_currency=eur&from=${fromTimestamp}&to=${toTimestamp}`
+        `https://api.coingecko.com/api/v3/coins/${currency}/market_chart/range?vs_currency=eur&from=${fromTimestamp}&to=${toTimestamp}`,
       );
       price = response.data.prices[0][1];
 
@@ -273,7 +268,7 @@ const fetchPrice = async (currency, date) => {
         JSON.stringify({
           data: price,
           age: new Date().getTime(),
-        })
+        }),
       );
 
       return price;
@@ -285,7 +280,7 @@ const fetchPrice = async (currency, date) => {
       return price.data;
     } else {
       const response = await axios.get(
-        `https://api.coingecko.com/api/v3/simple/price?ids=${currency}&vs_currencies=eur`
+        `https://api.coingecko.com/api/v3/simple/price?ids=${currency}&vs_currencies=eur`,
       );
 
       if (fetchSingle) {
@@ -296,7 +291,7 @@ const fetchPrice = async (currency, date) => {
           JSON.stringify({
             data: price,
             age: new Date().getTime(),
-          })
+          }),
         );
         return price;
       } else {
@@ -310,7 +305,7 @@ const fetchPrice = async (currency, date) => {
           JSON.stringify({
             data: prices,
             age: new Date().getTime(),
-          })
+          }),
         );
         return prices;
       }

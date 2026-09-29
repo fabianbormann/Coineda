@@ -17,7 +17,7 @@ const ExchangeManger = ({
   const [exchanges, setExchanges] = useState<Array<Exchange>>([]);
   const [newExchangeName, setNewExchangeName] = useState<string>('');
   const [selectedExchange, setSelectedExchange] = useState<Exchange | null>(
-    null
+    null,
   );
   const [inputVisible, setInputVisible] = useState(false);
   const { t } = useTranslation();
@@ -77,8 +77,8 @@ const ExchangeManger = ({
           onExchangeSelected(event.target.value);
           setSelectedExchange(
             exchanges.find(
-              (exchange) => exchange.name === event.target.value
-            ) || null
+              (exchange) => exchange.name === event.target.value,
+            ) || null,
           );
         }}
       >

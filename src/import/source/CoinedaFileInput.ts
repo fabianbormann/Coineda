@@ -116,10 +116,10 @@ export class CoinedaFileInput extends FileInputSource {
     const version = this.readHeader(text);
     if (version) {
       const transactionsText = text.match(
-        /<transactions>\n((.|\n)*?)\n<\/transactions>/
+        /<transactions>\n((.|\n)*?)\n<\/transactions>/,
       );
       const transfersText = text.match(
-        /<transfers>\n((.|\n)*?)\n<\/transfers>/
+        /<transfers>\n((.|\n)*?)\n<\/transfers>/,
       );
 
       return {

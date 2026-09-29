@@ -14,6 +14,7 @@ import MuiDrawer from '@mui/material/Drawer';
 import SwipeableDrawer from '@mui/material/SwipeableDrawer';
 import { styled, useTheme } from '@mui/material/styles';
 import Footer from './components/Footer';
+import { APP_VERSION } from './global/version';
 import Toolbar from '@mui/material/Toolbar';
 import IconButton from '@mui/material/IconButton';
 import { ChevronLeft } from '@mui/icons-material';
@@ -112,6 +113,21 @@ const AppBar = styled(MuiAppBar, {
   }),
 }));
 
+const NavigationItem = (props: NavigationItemProps) => (
+  <ListItemButton
+    onClick={() => {
+      if (props.isMobileView) {
+        props.onNavigate();
+      }
+    }}
+    component={Link}
+    to={props.location}
+  >
+    <ListItemIcon>{props.icon}</ListItemIcon>
+    <ListItemText primary={props.title} />
+  </ListItemButton>
+);
+
 const Main = () => {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -145,21 +161,6 @@ const Main = () => {
     return 'Coineda';
   };
 
-  const NavigationItem = (props: NavigationItemProps) => (
-    <ListItemButton
-      onClick={() => {
-        if (isMobileView) {
-          toggleDrawer();
-        }
-      }}
-      component={Link}
-      to={props.location}
-    >
-      <ListItemIcon>{props.icon}</ListItemIcon>
-      <ListItemText primary={props.title} />
-    </ListItemButton>
-  );
-
   useEffect(() => {
     storage.accounts.getAll().then((accounts: Array<CoinedaAccount>) => {
       if (accounts.length === 0) {
@@ -174,7 +175,7 @@ const Main = () => {
         storage.accounts.add(accounts[0].name, accounts[0].pattern);
       }
 
-      let activeAccount = localStorage.getItem('activeAccount');
+      const activeAccount = localStorage.getItem('activeAccount');
       let selectedAccount = accounts[0];
 
       if (typeof activeAccount !== 'undefined') {
@@ -188,7 +189,7 @@ const Main = () => {
           ({
             ...previousSettings,
             account: selectedAccount,
-          } as CoinedaSettings)
+          }) as CoinedaSettings,
       );
     });
   }, [setSettings]);
@@ -231,26 +232,36 @@ const Main = () => {
           title={t('Dashboard')}
           location="/"
           icon={<DashboardIcon />}
+          isMobileView={isMobileView}
+          onNavigate={toggleDrawer}
         />
         <NavigationItem
           title={t('Tracking')}
           location="/tracking"
           icon={<NoteAddIcon />}
+          isMobileView={isMobileView}
+          onNavigate={toggleDrawer}
         />
         <NavigationItem
           title={t('Tax Reports')}
           location="/reports"
           icon={<AccountBalanceIcon />}
+          isMobileView={isMobileView}
+          onNavigate={toggleDrawer}
         />
         <NavigationItem
           title={t('Wallets')}
           location="/wallets"
           icon={<AccountBalanceWalletIcon />}
+          isMobileView={isMobileView}
+          onNavigate={toggleDrawer}
         />
         <NavigationItem
           title={t('Settings')}
           location="/settings"
           icon={<SettingsIcon />}
+          isMobileView={isMobileView}
+          onNavigate={toggleDrawer}
         />
       </List>
       <Grid container sx={{ padding: 2, alignItems: 'flex-end', flexGrow: 1 }}>
@@ -277,15 +288,13 @@ const Main = () => {
               <MuiLink
                 target="_blank"
                 rel="noreferrer"
-                href={`https://github.com/fabianbormann/Coineda/releases/tag/v${process.env.REACT_APP_VERSION}`}
+                href={`https://github.com/fabianbormann/Coineda/releases/tag/v${APP_VERSION}`}
                 sx={{
                   fontWeight: 'bold',
                   textDecoration: 'none',
                   fontSize: '0.8rem',
                 }}
-              >{`${t('Coineda Version')} ${
-                process.env.REACT_APP_VERSION
-              }`}</MuiLink>
+              >{`${t('Coineda Version')} ${APP_VERSION}`}</MuiLink>
               <Chip
                 sx={{ ml: 1 }}
                 size="small"

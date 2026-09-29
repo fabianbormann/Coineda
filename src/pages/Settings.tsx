@@ -8,7 +8,7 @@ const Settings = () => {
   const { t, i18n } = useTranslation();
 
   const changeLanguage = (
-    event: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>
+    event: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>,
   ) => {
     i18n.changeLanguage(event.target.value);
   };
