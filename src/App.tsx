@@ -5,6 +5,9 @@ import { SettingsContext, defaultSettings } from './SettingsContext';
 import storage from './persistence/storage';
 import Footer from './components/Footer';
 import { AppShell } from '@/components/layout/AppShell';
+import { StorageDataProvider } from '@/components/data/StorageDataProvider';
+import { ConfirmProvider } from '@/components/confirm/ConfirmProvider';
+import { Toaster } from '@/components/ui/sonner';
 import { CoinedaAccount, CoinedaSettings } from './global/types';
 
 const Main = () => {
@@ -55,9 +58,20 @@ const App = () => {
 
   return (
     <SettingsContext.Provider value={{ settings, setSettings }}>
-      <Router>
-        <Main />
-      </Router>
+      <StorageDataProvider>
+        <ConfirmProvider>
+          <Router>
+            <Main />
+          </Router>
+          {/*
+            A sibling of Router, not a descendant of AppShell: sonner drops
+            messages when no Toaster is mounted, and a future error boundary
+            or any pre-shell path needs notify.* to work unconditionally,
+            not only once a route has rendered AppShell.
+          */}
+          <Toaster />
+        </ConfirmProvider>
+      </StorageDataProvider>
     </SettingsContext.Provider>
   );
 };

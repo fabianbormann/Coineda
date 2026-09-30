@@ -104,6 +104,7 @@
     "Asset input placeholder": "input a symbol e.g. btc",
     "Other": "Other",
     "Cancel": "Cancel",
+    "Continue": "Continue",
     "Pattern:": "Pattern:",
     "New Pattern": "New pattern",
     "Edit Account": "Edit account",
@@ -128,6 +129,8 @@
     "Theme": "Theme",
     "Light": "Light",
     "Dark": "Dark",
-    "System": "System"
+    "System": "System",
+    "Gain of": "Gain of",
+    "Loss of": "Loss of"
   }
 }

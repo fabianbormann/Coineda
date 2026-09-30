@@ -104,6 +104,7 @@
     "Ethereum Wallet": "Non-Custodial Ethereum Wallet (z.B. MetaMask)",
     "Other": "Andere",
     "Cancel": "Abbrechen",
+    "Continue": "Weiter",
     "Pattern:": "Muster:",
     "New Pattern": "Neues Muster",
     "Edit Account": "Account bearbeiten",
@@ -128,6 +129,8 @@
     "Theme": "Erscheinungsbild",
     "Light": "Hell",
     "Dark": "Dunkel",
-    "System": "System"
+    "System": "System",
+    "Gain of": "Gewinn von",
+    "Loss of": "Verlust von"
   }
 }

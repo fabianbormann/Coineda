@@ -5,6 +5,7 @@ import App from '../src/App';
 import storage from '../src/persistence/storage';
 import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import { ROUTES } from '@/lib/routes';
+import { notify } from '@/lib/notify';
 
 // Mirrors the provider nesting src/index.tsx renders App with (this file
 // cannot import index.tsx directly - it calls ReactDOM.createRoot().render()
@@ -59,5 +60,17 @@ describe('App', () => {
       expect(accounts).toHaveLength(1);
       expect(accounts[0].name).toBe('Coineda');
     });
+  });
+
+  it('mounts a Toaster subscribed to notify.*, unconditionally rather than nested inside a route', async () => {
+    // sonner silently drops a message when no Toaster is mounted to
+    // receive it. The Toaster used to live inside AppShell, nested under
+    // a route; asserting the message actually appears - not just that
+    // some element exists - is what would have caught that.
+    renderApp();
+    notify.info('app-toaster-mount-check');
+    expect(
+      await screen.findByText('app-toaster-mount-check'),
+    ).toBeInTheDocument();
   });
 });
