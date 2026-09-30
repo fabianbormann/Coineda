@@ -12,3 +12,21 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   globalThis.ResizeObserver =
     ResizeObserverPolyfill as unknown as typeof ResizeObserver;
 }
+
+// jsdom doesn't implement the Pointer Events capture methods or
+// scrollIntoView. Radix UI's Select calls hasPointerCapture/
+// setPointerCapture/releasePointerCapture from its pointer handlers
+// unconditionally (not feature-detected), so a click on a SelectItem
+// throws instead of selecting it unless these exist.
+if (typeof window.HTMLElement.prototype.hasPointerCapture === 'undefined') {
+  window.HTMLElement.prototype.hasPointerCapture = () => false;
+}
+if (typeof window.HTMLElement.prototype.setPointerCapture === 'undefined') {
+  window.HTMLElement.prototype.setPointerCapture = () => {};
+}
+if (typeof window.HTMLElement.prototype.releasePointerCapture === 'undefined') {
+  window.HTMLElement.prototype.releasePointerCapture = () => {};
+}
+if (typeof window.HTMLElement.prototype.scrollIntoView === 'undefined') {
+  window.HTMLElement.prototype.scrollIntoView = () => {};
+}

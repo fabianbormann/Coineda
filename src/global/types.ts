@@ -66,6 +66,10 @@ export type Transaction = {
 export type CoinedaAsset = {
   id: string;
   symbol: string;
+  // Every one of the 107 rows seeded from persistence/assets.json carries a
+  // human-readable name, so a user-added asset should too - optional only
+  // because rows written before this existed do not have one.
+  name?: string;
   isFiat: number;
 };
 

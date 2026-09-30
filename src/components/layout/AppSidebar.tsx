@@ -1,6 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useContext } from 'react';
 import {
   Sidebar,
   SidebarContent,
@@ -14,29 +13,19 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { ROUTES, matchRoute } from '@/lib/routes';
-import { SettingsContext } from '@/SettingsContext';
+import { AccountSwitcher } from '@/components/accounts/AccountSwitcher';
 import { APP_VERSION } from '@/global/version';
 
 export const AppSidebar = () => {
   const { t } = useTranslation();
   const location = useLocation();
-  const { settings } = useContext(SettingsContext);
   const { isMobile, setOpenMobile } = useSidebar();
   const active = matchRoute(location.pathname);
 
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 py-1.5">
-          <div
-            className="size-7 shrink-0 rounded-md bg-primary"
-            style={{ filter: `hue-rotate(${settings.account.pattern}deg)` }}
-            aria-hidden="true"
-          />
-          <span className="truncate font-medium group-data-[collapsible=icon]:hidden">
-            {settings.account.name}
-          </span>
-        </div>
+        <AccountSwitcher />
       </SidebarHeader>
 
       <SidebarContent>

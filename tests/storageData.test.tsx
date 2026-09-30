@@ -137,6 +137,33 @@ const PutExchangeConsumer = () => {
   );
 };
 
+const DeleteExchangeConsumer = () => {
+  const { exchanges, addExchange, deleteExchange } = useStorageData();
+  return (
+    <div>
+      <ul data-testid="delete-list">
+        {exchanges.map((e) => (
+          <li key={e.id}>{e.name}</li>
+        ))}
+      </ul>
+      <button type="button" onClick={() => addExchange('removable')}>
+        seed
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          const target = exchanges.find((e) => e.name === 'removable');
+          if (target) {
+            deleteExchange(target.id);
+          }
+        }}
+      >
+        delete
+      </button>
+    </div>
+  );
+};
+
 describe('shared storage data', () => {
   it('lets one consumer see what another added, with no refresh prop', async () => {
     // This is the bug ExchangeManager's `refreshExchanges` /
@@ -375,9 +402,11 @@ describe('putExchange', () => {
     );
 
     await userEvent.click(screen.getByRole('button', { name: 'seed' }));
+    // Exchange.type is a required field, so addExchange writes 'Other' for
+    // a wallet the user hasn't given a sync type to yet - not nothing.
     await waitFor(() =>
       expect(
-        within(screen.getByTestId('put-list')).getByText('renameable:none'),
+        within(screen.getByTestId('put-list')).getByText('renameable:Other'),
       ).toBeInTheDocument(),
     );
 
@@ -389,7 +418,41 @@ describe('putExchange', () => {
       ).toBeInTheDocument(),
     );
     expect(
-      within(screen.getByTestId('put-list')).queryByText('renameable:none'),
+      within(screen.getByTestId('put-list')).queryByText('renameable:Other'),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('deleteExchange', () => {
+  it('removes an exchange from storage and every consumer sees it disappear', async () => {
+    // WalletRow used to bypass this provider entirely - a direct
+    // storage.exchanges.delete() plus its own reloadExchanges() call -
+    // which is exactly the kind of drift this provider exists to prevent
+    // (see the module doc comment). deleteExchange follows addExchange/
+    // putExchange's own shape: write, then reload.
+    render(
+      <StorageDataProvider>
+        <DeleteExchangeConsumer />
+      </StorageDataProvider>,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'seed' }));
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId('delete-list')).getByText('removable'),
+      ).toBeInTheDocument(),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'delete' }));
+
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId('delete-list')).queryByText('removable'),
+      ).not.toBeInTheDocument(),
+    );
+
+    const storage = (await import('@/persistence/storage')).default;
+    const remaining: Exchange[] = await storage.exchanges.getAll();
+    expect(remaining.some((e) => e.name === 'removable')).toBe(false);
   });
 });

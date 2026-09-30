@@ -1,10 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+// AppSidebar now renders AccountSwitcher, which reads storage.accounts -
+// jsdom has no IndexedDB, so this shell test needs the same fake as
+// tests/accounts.test.tsx.
+import 'fake-indexeddb/auto';
 import { MemoryRouter } from 'react-router-dom';
 import { ROUTES, matchRoute } from '@/lib/routes';
 import { AppShell } from '@/components/layout/AppShell';
 import { ThemeProvider } from '@/components/theme/ThemeProvider';
+// AccountSwitcher reads the account list from the shared storage store
+// rather than fetching its own copy, so the shell needs the provider its
+// sidebar's switcher consumes.
+import { StorageDataProvider } from '@/components/data/StorageDataProvider';
 
 beforeEach(() => {
   localStorage.clear();
@@ -31,9 +39,11 @@ const renderShell = (initial = '/') =>
   render(
     <MemoryRouter initialEntries={[initial]}>
       <ThemeProvider>
-        <AppShell>
-          <div data-testid="page" />
-        </AppShell>
+        <StorageDataProvider>
+          <AppShell>
+            <div data-testid="page" />
+          </AppShell>
+        </StorageDataProvider>
       </ThemeProvider>
     </MemoryRouter>,
   );

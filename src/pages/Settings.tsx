@@ -1,39 +1,35 @@
-import { Grid, MenuItem, TextField, Typography } from '@mui/material';
-import React from 'react';
 import { useTranslation } from 'react-i18next';
-import AccountManagement from '../components/AccountManagement';
-import AssetManagement from '../components/AssetManagement';
+import { AssetSearch } from '@/components/assets/AssetSearch';
+import { SettingsSection } from '@/components/settings/SettingsSection';
+import { LanguageSetting } from '@/components/settings/LanguageSetting';
+import { AccountList } from '@/components/accounts/AccountList';
 
 const Settings = () => {
-  const { t, i18n } = useTranslation();
-
-  const changeLanguage = (
-    event: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>,
-  ) => {
-    i18n.changeLanguage(event.target.value);
-  };
-
-  let { language } = i18n;
-  language = language.split('-')[0];
+  const { t } = useTranslation();
 
   return (
-    <Grid sx={{ p: 2 }}>
-      <Typography variant="h6">{t('General') as string}</Typography>
-
-      <TextField
-        sx={{ mt: 2, mb: 2, minWidth: 200 }}
-        label={t('Language') as string}
-        select
-        variant="standard"
-        onChange={changeLanguage}
-        value={language}
+    <div className="mx-auto grid w-full max-w-3xl gap-6 p-4 md:p-6">
+      <SettingsSection
+        title={t('General')}
+        description={t('Language and regional preferences')}
       >
-        <MenuItem value="de">Deutsch</MenuItem>
-        <MenuItem value="en">English</MenuItem>
-      </TextField>
-      <AccountManagement />
-      <AssetManagement />
-    </Grid>
+        <LanguageSetting />
+      </SettingsSection>
+
+      <SettingsSection
+        title={t('Account Management')}
+        description={t('Add, rename or remove the portfolios you track')}
+      >
+        <AccountList />
+      </SettingsSection>
+
+      <SettingsSection
+        title={t('Asset Management')}
+        description={t('Search for a coin and add it to your tracked assets')}
+      >
+        <AssetSearch />
+      </SettingsSection>
+    </div>
   );
 };
 
