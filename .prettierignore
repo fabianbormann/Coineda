@@ -23,3 +23,8 @@ docs/
 
 # Local Claude Code project directory
 .claude/
+
+# shadcn CLI output, vendored via components.json; re-run the CLI to
+# update rather than reformatting or hand-editing it directly
+src/components/ui/
+src/hooks/use-mobile.ts

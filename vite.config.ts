@@ -1,6 +1,8 @@
 /// <reference types="vitest/config" />
+import path from 'node:path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
@@ -10,6 +12,7 @@ export default defineConfig({
   base: './',
   plugins: [
     react(),
+    tailwindcss(),
     VitePWA({
       // autoUpdate + skipWaiting: a returning user must never be pinned to a
       // stale app shell, because there is no in-app update prompt to rescue them.
@@ -48,7 +51,7 @@ export default defineConfig({
         // are already precached once via includeAssets above. Workbox only
         // tolerated that duplication because both copies happened to share
         // the same revision hash.
-        globPatterns: ['assets/**/*.{js,css,ttf,svg}', 'index.html'],
+        globPatterns: ['assets/**/*.{js,css,ttf,woff2,svg}', 'index.html'],
         // CoinGecko is deliberately absent from runtimeCaching. fetchPrice in
         // src/helper/common.js already owns price caching in localStorage, with
         // a 15-minute TTL for spot prices and indefinite retention for
@@ -63,6 +66,11 @@ export default defineConfig({
     // script waits on that port.
     port: 3000,
   },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
   build: {
     // Kept as `build` (not Vite's default `dist`) so electron-builder's
     // files: ["build/**/*"] and .gitignore need no changes.
@@ -71,5 +79,6 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    setupFiles: ['./tests/setup.ts'],
   },
 });

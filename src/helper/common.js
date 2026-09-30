@@ -240,6 +240,14 @@ const getCoinCount = async (currency, date, account) => {
 const fetchPrice = async (currency, date) => {
   let fetchSingle = true;
   if (typeof currency !== 'string') {
+    // An empty id list (e.g. a brand-new account with no crypto
+    // transactions yet) would otherwise build a request like
+    // '?ids=&vs_currencies=eur', which CoinGecko rejects. Every caller of
+    // the array overload already expects a keyed map back, so an empty
+    // map is a shape they can consume without a network round trip.
+    if (currency.length === 0) {
+      return {};
+    }
     currency = currency.join(',');
     fetchSingle = false;
   }

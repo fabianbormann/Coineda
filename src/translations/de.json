@@ -1,6 +1,7 @@
 {
   "translation": {
     "Dashboard": "Übersicht",
+    "Toggle navigation": "Navigation umschalten",
     "January": "Januar",
     "February": "Februar",
     "March": "März",
@@ -123,6 +124,10 @@
     "If you find any bug open a": "Falls du einen Fehler findest erstelle bitte ",
     "new issue on GitHub": "ein neues Issue auf GitHub",
     "Coineda Version": "Coineda Version",
-    "GPLv3 License": "GPLv3 Lizenz"
+    "GPLv3 License": "GPLv3 Lizenz",
+    "Theme": "Erscheinungsbild",
+    "Light": "Hell",
+    "Dark": "Dunkel",
+    "System": "System"
   }
 }

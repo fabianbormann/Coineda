@@ -108,6 +108,15 @@ describe('generated service worker', () => {
     expect(sw).not.toContain('api.coingecko.com');
   });
 
+  it('precaches a font, so self-hosted Inter still renders offline', () => {
+    // A prior fix restored fonts to the precache after a glob change
+    // (globPatterns missing the woff2 format) silently dropped them again,
+    // falling back to a system font offline. Without this assertion that
+    // regression is invisible to the test suite.
+    const sw = fs.readFileSync(path.join(buildDir, 'sw.js'), 'utf8');
+    expect(sw).toMatch(/\.woff2/);
+  });
+
   it('identifies itself as Coineda rather than the create-react-app default', () => {
     const manifest = JSON.parse(
       fs.readFileSync(path.join(buildDir, 'manifest.webmanifest'), 'utf8'),

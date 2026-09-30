@@ -1,13 +1,5 @@
 import { Dispatch, SetStateAction } from 'react';
 
-export type NavigationItemProps = {
-  title: string;
-  location: string;
-  icon: JSX.Element;
-  isMobileView: boolean;
-  onNavigate: () => void;
-};
-
 export type CoinedaAccount = {
   id: number;
   name: string;

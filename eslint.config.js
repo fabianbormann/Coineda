@@ -24,6 +24,19 @@ export default tseslint.config(
     },
   },
   {
+    // shadcn CLI output (src/components/ui/** and its use-mobile hook) is
+    // vendored via components.json and intentionally not hand-edited here -
+    // a later phase re-adds/updates primitives through the CLI itself. Its
+    // patterns predate eslint-plugin-react-hooks' newer, React Compiler-
+    // oriented purity rules, which this project doesn't otherwise need since
+    // it stays on React 18 without the compiler.
+    files: ['src/components/ui/**/*.{ts,tsx}', 'src/hooks/use-mobile.ts'],
+    rules: {
+      'react-hooks/purity': 'off',
+      'react-hooks/set-state-in-effect': 'off',
+    },
+  },
+  {
     // public/electron.js is CommonJS and runs in Electron's main process.
     files: ['public/electron.js'],
     languageOptions: {
