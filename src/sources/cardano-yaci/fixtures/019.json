@@ -1,0 +1,166 @@
+{
+  "call": 19,
+  "url": "https://yaci-store.preprod.colo2.cf-systems.org/api/v1/txs/e7204620163ed79868cc52136e2c2fc4085e764044f64d4b510beaace523e56c/utxos",
+  "status": 200,
+  "body": {
+    "hash": "e7204620163ed79868cc52136e2c2fc4085e764044f64d4b510beaace523e56c",
+    "inputs": [
+      {
+        "tx_hash": "35dcd60313f5c3821fdd68d52265391aa7e130e015a3ed330d73480a8e073981",
+        "output_index": 1,
+        "address": "addr_test1qrfevesruxmael3rc44d27s08xzud9ph9f0lytr7mxc8lpejdmtq36xfp696zs34qpfnuw356nhwvwdr8pzk5npd496syz6knm",
+        "stake_address": "stake_test1uqexa4sgarysazapgg6sq5e78g6dfmhx8x3ns3t2fsk6jagkccvfk",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "policy_id": null,
+            "asset_name": "lovelace",
+            "quantity": "9979111931"
+          },
+          {
+            "unit": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b55534472",
+            "policy_id": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b",
+            "asset_name": "USDr",
+            "quantity": "1995497"
+          },
+          {
+            "unit": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea45553444378",
+            "policy_id": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea4",
+            "asset_name": "USDCx",
+            "quantity": "9982000000"
+          }
+        ],
+        "data_hash": null,
+        "inline_datum": null,
+        "script_ref": null,
+        "reference_script_hash": null,
+        "inline_datum_json": null
+      }
+    ],
+    "outputs": [
+      {
+        "tx_hash": "e7204620163ed79868cc52136e2c2fc4085e764044f64d4b510beaace523e56c",
+        "output_index": 0,
+        "address": "addr_test1wrcvmxdpu8naxaagcx7mut0gtw2zrvrfzuu8egu3pckem5su3zrqt",
+        "stake_address": null,
+        "amount": [
+          {
+            "unit": "lovelace",
+            "policy_id": null,
+            "asset_name": "lovelace",
+            "quantity": "2000000"
+          },
+          {
+            "unit": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b55534472",
+            "policy_id": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b",
+            "asset_name": "USDr",
+            "quantity": "1000000"
+          }
+        ],
+        "data_hash": null,
+        "inline_datum": "d8799fd8799f581cd3966603e1b7dcfe23c56ad57a0f3985c694372a5ff22c7ed9b07f87ffd8799fd8799fd8799f581cd3966603e1b7dcfe23c56ad57a0f3985c694372a5ff22c7ed9b07f87ffd8799fd8799fd8799f581c326ed608e8c90e8ba1423500533e3a34d4eee639a338456a4c2da975ffffffffd87980ffd87d9f1a000f42401a000ed0edffd87980ff",
+        "script_ref": null,
+        "reference_script_hash": null,
+        "inline_datum_json": {
+          "constructor": 0,
+          "fields": [
+            {
+              "constructor": 0,
+              "fields": [
+                {
+                  "bytes": "d3966603e1b7dcfe23c56ad57a0f3985c694372a5ff22c7ed9b07f87"
+                }
+              ]
+            },
+            {
+              "constructor": 0,
+              "fields": [
+                {
+                  "constructor": 0,
+                  "fields": [
+                    {
+                      "constructor": 0,
+                      "fields": [
+                        {
+                          "bytes": "d3966603e1b7dcfe23c56ad57a0f3985c694372a5ff22c7ed9b07f87"
+                        }
+                      ]
+                    },
+                    {
+                      "constructor": 0,
+                      "fields": [
+                        {
+                          "constructor": 0,
+                          "fields": [
+                            {
+                              "constructor": 0,
+                              "fields": [
+                                {
+                                  "bytes": "326ed608e8c90e8ba1423500533e3a34d4eee639a338456a4c2da975"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "constructor": 0,
+                  "fields": []
+                }
+              ]
+            },
+            {
+              "constructor": 4,
+              "fields": [
+                {
+                  "int": 1000000
+                },
+                {
+                  "int": 970989
+                }
+              ]
+            },
+            {
+              "constructor": 0,
+              "fields": []
+            }
+          ]
+        }
+      },
+      {
+        "tx_hash": "e7204620163ed79868cc52136e2c2fc4085e764044f64d4b510beaace523e56c",
+        "output_index": 1,
+        "address": "addr_test1qrfevesruxmael3rc44d27s08xzud9ph9f0lytr7mxc8lpejdmtq36xfp696zs34qpfnuw356nhwvwdr8pzk5npd496syz6knm",
+        "stake_address": "stake_test1uqexa4sgarysazapgg6sq5e78g6dfmhx8x3ns3t2fsk6jagkccvfk",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "policy_id": null,
+            "asset_name": "lovelace",
+            "quantity": "9976928918"
+          },
+          {
+            "unit": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b55534472",
+            "policy_id": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b",
+            "asset_name": "USDr",
+            "quantity": "995497"
+          },
+          {
+            "unit": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea45553444378",
+            "policy_id": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea4",
+            "asset_name": "USDCx",
+            "quantity": "9982000000"
+          }
+        ],
+        "data_hash": null,
+        "inline_datum": null,
+        "script_ref": null,
+        "reference_script_hash": null,
+        "inline_datum_json": null
+      }
+    ]
+  }
+}

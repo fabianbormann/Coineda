@@ -1,78 +1,70 @@
-import { useState, useContext, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route } from 'react-router-dom';
-import { Dashboard, Tracking, TaxReports, Settings, Wallets } from './pages';
-import { SettingsContext, defaultSettings } from './SettingsContext';
-import storage from './persistence/storage';
-import Footer from './components/Footer';
-import { AppShell } from '@/components/layout/AppShell';
-import { StorageDataProvider } from '@/components/data/StorageDataProvider';
+import { useEffect, useState } from 'react';
+import { HashRouter, Route, Routes } from 'react-router-dom';
+import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import { ConfirmProvider } from '@/components/confirm/ConfirmProvider';
+import { AppShell } from '@/components/layout/AppShell';
 import { Toaster } from '@/components/ui/sonner';
-import { CoinedaAccount, CoinedaSettings } from './global/types';
+import { Skeleton } from '@/components/ui/skeleton';
+import { OnboardingFlow } from '@/onboarding/OnboardingFlow';
+import { MainScreen } from '@/screens/MainScreen';
+import { isOnboarded } from '@/settings/settingsStore';
 
-const Main = () => {
-  const { setSettings } = useContext(SettingsContext);
+type OnboardState = 'checking' | 'pending' | 'onboarded';
+
+/**
+ * Gates the whole app on `isOnboarded()`. Three states, not two: while the
+ * IndexedDB read is in flight there is deliberately no shell and no
+ * onboarding flow, only a Skeleton - rendering either of those optimistically
+ * would flash it and then immediately swap to the other for every single
+ * load, onboarded or not.
+ */
+const App = () => {
+  const [state, setState] = useState<OnboardState>('checking');
 
   useEffect(() => {
-    storage.accounts.getAll().then((accounts: Array<CoinedaAccount>) => {
-      if (accounts.length === 0) {
-        accounts = [{ id: 1, name: 'Coineda', pattern: 0 }];
-        storage.accounts.add(accounts[0].name, accounts[0].pattern);
+    let active = true;
+    void isOnboarded().then((done) => {
+      if (active) {
+        setState(done ? 'onboarded' : 'pending');
       }
-
-      const activeAccount = localStorage.getItem('activeAccount');
-      let selectedAccount = accounts[0];
-
-      if (typeof activeAccount !== 'undefined') {
-        selectedAccount =
-          accounts.find((account) => account.name === activeAccount) ||
-          selectedAccount;
-      }
-
-      setSettings(
-        (previousSettings: CoinedaSettings) =>
-          ({
-            ...previousSettings,
-            account: selectedAccount,
-          }) as CoinedaSettings,
-      );
     });
-  }, [setSettings]);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (state === 'checking') {
+    return (
+      <ThemeProvider>
+        <div className="flex min-h-svh items-center justify-center p-6">
+          <Skeleton className="h-48 w-full max-w-md" />
+        </div>
+      </ThemeProvider>
+    );
+  }
+
+  if (state === 'pending') {
+    return (
+      <ThemeProvider>
+        <OnboardingFlow onComplete={() => setState('onboarded')} />
+        <Toaster />
+      </ThemeProvider>
+    );
+  }
 
   return (
-    <AppShell>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/tracking/*" element={<Tracking />} />
-        <Route path="/reports/*" element={<TaxReports />} />
-        <Route path="/wallets/*" element={<Wallets />} />
-        <Route path="/settings/*" element={<Settings />} />
-      </Routes>
-      <Footer />
-    </AppShell>
-  );
-};
-
-const App = () => {
-  const [settings, setSettings] = useState<CoinedaSettings>(defaultSettings);
-
-  return (
-    <SettingsContext.Provider value={{ settings, setSettings }}>
-      <StorageDataProvider>
-        <ConfirmProvider>
-          <Router>
-            <Main />
-          </Router>
-          {/*
-            A sibling of Router, not a descendant of AppShell: sonner drops
-            messages when no Toaster is mounted, and a future error boundary
-            or any pre-shell path needs notify.* to work unconditionally,
-            not only once a route has rendered AppShell.
-          */}
-          <Toaster />
-        </ConfirmProvider>
-      </StorageDataProvider>
-    </SettingsContext.Provider>
+    <ThemeProvider>
+      <ConfirmProvider>
+        <HashRouter>
+          <AppShell>
+            <Routes>
+              <Route path="/" element={<MainScreen />} />
+            </Routes>
+          </AppShell>
+        </HashRouter>
+        <Toaster />
+      </ConfirmProvider>
+    </ThemeProvider>
   );
 };
 

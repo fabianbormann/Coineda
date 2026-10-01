@@ -31,3 +31,6 @@ yarn-error.log*
 .vscode/
 
 docs/
+
+# Local Claude Code settings (machine-specific permission grants)
+.claude/settings.local.json

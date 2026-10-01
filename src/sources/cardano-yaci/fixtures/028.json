@@ -1,0 +1,62 @@
+{
+  "call": 28,
+  "url": "https://yaci-store.preprod.colo2.cf-systems.org/api/v1/txs/1310f700db18a10795d7f9d5e0d933b8bc2b36c4a9fae6a560acfcfd2d73b8b0/utxos",
+  "status": 200,
+  "body": {
+    "hash": "1310f700db18a10795d7f9d5e0d933b8bc2b36c4a9fae6a560acfcfd2d73b8b0",
+    "inputs": [
+      {
+        "tx_hash": "0aa53f00f70815ae128f4546dcd82593b90ed2a25a2ba9a9798e172ef93818a9",
+        "output_index": 3,
+        "address": "addr_test1zzvcwffkummh3jwzm9v8c2d7a3e6rdhvek3v7f6lx4prkvpjdmtq36xfp696zs34qpfnuw356nhwvwdr8pzk5npd496sv67ne5",
+        "stake_address": "stake_test1uqexa4sgarysazapgg6sq5e78g6dfmhx8x3ns3t2fsk6jagkccvfk",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "policy_id": null,
+            "asset_name": "lovelace",
+            "quantity": "2000000"
+          },
+          {
+            "unit": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b55534472",
+            "policy_id": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b",
+            "asset_name": "USDr",
+            "quantity": "1025921"
+          }
+        ],
+        "data_hash": null,
+        "inline_datum": null,
+        "script_ref": null,
+        "reference_script_hash": null,
+        "inline_datum_json": null
+      }
+    ],
+    "outputs": [
+      {
+        "tx_hash": "1310f700db18a10795d7f9d5e0d933b8bc2b36c4a9fae6a560acfcfd2d73b8b0",
+        "output_index": 0,
+        "address": "addr_test1qrfevesruxmael3rc44d27s08xzud9ph9f0lytr7mxc8lpejdmtq36xfp696zs34qpfnuw356nhwvwdr8pzk5npd496syz6knm",
+        "stake_address": "stake_test1uqexa4sgarysazapgg6sq5e78g6dfmhx8x3ns3t2fsk6jagkccvfk",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "policy_id": null,
+            "asset_name": "lovelace",
+            "quantity": "1823631"
+          },
+          {
+            "unit": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b55534472",
+            "policy_id": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b",
+            "asset_name": "USDr",
+            "quantity": "1025921"
+          }
+        ],
+        "data_hash": null,
+        "inline_datum": null,
+        "script_ref": null,
+        "reference_script_hash": null,
+        "inline_datum_json": null
+      }
+    ]
+  }
+}

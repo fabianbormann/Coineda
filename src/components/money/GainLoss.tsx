@@ -34,9 +34,12 @@ import { formatFiat } from './format';
  */
 export const GainLoss = ({
   value,
+  currency,
   className,
 }: {
   value: number;
+  /** Lowercase code from `settings.baseCurrency` - see Money. */
+  currency: string;
   className?: string;
 }) => {
   const { t, i18n } = useTranslation();
@@ -68,7 +71,7 @@ export const GainLoss = ({
       {isGain && <span className="sr-only">{t('Gain of')} </span>}
       {isLoss && <span className="sr-only">{t('Loss of')} </span>}
       <span aria-hidden="true">{sign}</span>
-      {formatFiat(Math.abs(value), i18n.language)}
+      {formatFiat(Math.abs(value), i18n.language, currency)}
     </span>
   );
 };

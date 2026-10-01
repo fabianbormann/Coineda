@@ -79,13 +79,42 @@ describe('electron production load', () => {
 });
 
 describe('app version', () => {
-  it('is a bare semver, so the .cnd export header stays parseable on re-import', () => {
+  it('is a bare semver, so the release link in the sidebar resolves', () => {
+    // Rewritten: this test used to assert that
+    // `'version:1.2.3'.split(':')[1] === '1.2.3'`, which is a property of
+    // String.prototype.split and can never fail, and it documented v1's
+    // exportData/CoinedaFileInput .cnd header, neither of which exists any
+    // more. The real invariant APP_VERSION still has to satisfy is this:
+    // AppSidebar builds a GitHub release URL as `v${APP_VERSION}` and
+    // release-please tags releases as `v<semver>`, so a leading 'v', a
+    // 'v'-prefixed package version or a prerelease suffix would link to a
+    // tag that does not exist.
     expect(APP_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(APP_VERSION.startsWith('v')).toBe(false);
 
-    // exportData writes 'version:' + APP_VERSION into the <header> block, and
-    // CoinedaFileInput.readHeader recovers it with versionString.split(':')[1].
-    const headerLine = `version:${APP_VERSION}`;
-    expect(headerLine.split(':')[1]).toBe(APP_VERSION);
+    // And that it is genuinely package.json's version, not a value that
+    // drifted: release-please bumps package.json only.
+    const packageJson = JSON.parse(
+      fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'),
+    ) as { version: string };
+    expect(APP_VERSION).toBe(packageJson.version);
+  });
+
+  it('is the version the sidebar actually links to', () => {
+    // Pins the `v`-prefixed tag shape at the one call site that depends on
+    // it, so a change there has to be a deliberate one.
+    const sidebar = fs.readFileSync(
+      path.join(
+        __dirname,
+        '..',
+        'src',
+        'components',
+        'layout',
+        'AppSidebar.tsx',
+      ),
+      'utf8',
+    );
+    expect(sidebar).toContain('releases/tag/v${APP_VERSION}');
   });
 });
 

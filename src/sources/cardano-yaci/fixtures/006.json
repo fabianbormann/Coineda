@@ -1,0 +1,1027 @@
+{
+  "call": 6,
+  "url": "https://yaci-store.preprod.colo2.cf-systems.org/api/v1/txs/bb417ec606c135e707dfcffde5382efb5a5a28e2671424aacb6d4afe80d8cbb3/utxos",
+  "status": 200,
+  "body": {
+    "hash": "bb417ec606c135e707dfcffde5382efb5a5a28e2671424aacb6d4afe80d8cbb3",
+    "inputs": [
+      {
+        "tx_hash": "094a11a6295677a635cdf0bbdbfcd893c3e2fd9e7d69b83cd9c5368a3cb67bfd",
+        "output_index": 3,
+        "address": "addr_test1vzuzpk9e839vfk2d4r6hmetcu53xctexlyfwhkf28xh79agkv6lwu",
+        "stake_address": null,
+        "amount": [
+          {
+            "unit": "lovelace",
+            "policy_id": null,
+            "asset_name": "lovelace",
+            "quantity": "8755775739"
+          }
+        ],
+        "data_hash": null,
+        "inline_datum": null,
+        "script_ref": null,
+        "reference_script_hash": null,
+        "inline_datum_json": null
+      },
+      {
+        "tx_hash": "403857bbadf2e7b7f47091bf89ac20d46e416fb7a11a35dd6d68d82ab8750def",
+        "output_index": 0,
+        "address": "addr_test1zrhlt0sdg7nt9x2hezedpu4cu307dy76wcgqndupq9trck0z45h54tzexa9qjp45wf02tezxeaswunus2e03na68z6uq70aqyq",
+        "stake_address": "stake_test1ur326t6243vnwjsfq668yh49u3rv7c8wf7g9vhce7ar3dwq2r643n",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "policy_id": null,
+            "asset_name": "lovelace",
+            "quantity": "2600000"
+          },
+          {
+            "unit": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea45553444378",
+            "policy_id": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea4",
+            "asset_name": "USDCx",
+            "quantity": "9000000"
+          }
+        ],
+        "data_hash": null,
+        "inline_datum": "d8799fd8799f581c728fa14d1290b3656a9e75cd00a24ad787b234584b04cfa0fb6534aaffd8799f581ce2ad2f4aac59374a0906b4725ea5e446cf60ee4f90565f19f74716b8ff1a000927c0d8799fd8799fd8799f581c5af716723a6d370a1cf866a561c304ae009a0acb4fb88802ae868e80ffd8799fd8799fd8799f581ce2ad2f4aac59374a0906b4725ea5e446cf60ee4f90565f19f74716b8ffffffffd87980ffd87a9f9f581cd8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea44555534443781a00895440ff9f581c0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b44555344721a00852482ffff43d87980ff",
+        "script_ref": null,
+        "reference_script_hash": null,
+        "inline_datum_json": {
+          "constructor": 0,
+          "fields": [
+            {
+              "constructor": 0,
+              "fields": [
+                {
+                  "bytes": "728fa14d1290b3656a9e75cd00a24ad787b234584b04cfa0fb6534aa"
+                }
+              ]
+            },
+            {
+              "constructor": 0,
+              "fields": [
+                {
+                  "bytes": "e2ad2f4aac59374a0906b4725ea5e446cf60ee4f90565f19f74716b8"
+                }
+              ]
+            },
+            {
+              "int": 600000
+            },
+            {
+              "constructor": 0,
+              "fields": [
+                {
+                  "constructor": 0,
+                  "fields": [
+                    {
+                      "constructor": 0,
+                      "fields": [
+                        {
+                          "bytes": "5af716723a6d370a1cf866a561c304ae009a0acb4fb88802ae868e80"
+                        }
+                      ]
+                    },
+                    {
+                      "constructor": 0,
+                      "fields": [
+                        {
+                          "constructor": 0,
+                          "fields": [
+                            {
+                              "constructor": 0,
+                              "fields": [
+                                {
+                                  "bytes": "e2ad2f4aac59374a0906b4725ea5e446cf60ee4f90565f19f74716b8"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "constructor": 0,
+                  "fields": []
+                }
+              ]
+            },
+            {
+              "constructor": 1,
+              "fields": [
+                {
+                  "list": [
+                    {
+                      "bytes": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea4"
+                    },
+                    {
+                      "bytes": "5553444378"
+                    },
+                    {
+                      "int": 9000000
+                    }
+                  ]
+                },
+                {
+                  "list": [
+                    {
+                      "bytes": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b"
+                    },
+                    {
+                      "bytes": "55534472"
+                    },
+                    {
+                      "int": 8725634
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "bytes": "d87980"
+            }
+          ]
+        }
+      },
+      {
+        "tx_hash": "0a43e6f1b77428c2a09abb7be5692663918cabc1a756c8378ff8e7a2da78a9b6",
+        "output_index": 0,
+        "address": "addr_test1zrhlt0sdg7nt9x2hezedpu4cu307dy76wcgqndupq9trckfjdmtq36xfp696zs34qpfnuw356nhwvwdr8pzk5npd496sxy9y50",
+        "stake_address": "stake_test1uqexa4sgarysazapgg6sq5e78g6dfmhx8x3ns3t2fsk6jagkccvfk",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "policy_id": null,
+            "asset_name": "lovelace",
+            "quantity": "2600000"
+          },
+          {
+            "unit": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea45553444378",
+            "policy_id": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea4",
+            "asset_name": "USDCx",
+            "quantity": "9000000"
+          }
+        ],
+        "data_hash": null,
+        "inline_datum": "d8799fd8799f581c728fa14d1290b3656a9e75cd00a24ad787b234584b04cfa0fb6534aaffd8799f581c326ed608e8c90e8ba1423500533e3a34d4eee639a338456a4c2da975ff1a000927c0d8799fd8799fd8799f581cd3966603e1b7dcfe23c56ad57a0f3985c694372a5ff22c7ed9b07f87ffd8799fd8799fd8799f581c326ed608e8c90e8ba1423500533e3a34d4eee639a338456a4c2da975ffffffffd87980ffd87a9f9f581cd8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea44555534443781a00895440ff9f581c0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b44555344721a00852482ffff43d87980ff",
+        "script_ref": null,
+        "reference_script_hash": null,
+        "inline_datum_json": {
+          "constructor": 0,
+          "fields": [
+            {
+              "constructor": 0,
+              "fields": [
+                {
+                  "bytes": "728fa14d1290b3656a9e75cd00a24ad787b234584b04cfa0fb6534aa"
+                }
+              ]
+            },
+            {
+              "constructor": 0,
+              "fields": [
+                {
+                  "bytes": "326ed608e8c90e8ba1423500533e3a34d4eee639a338456a4c2da975"
+                }
+              ]
+            },
+            {
+              "int": 600000
+            },
+            {
+              "constructor": 0,
+              "fields": [
+                {
+                  "constructor": 0,
+                  "fields": [
+                    {
+                      "constructor": 0,
+                      "fields": [
+                        {
+                          "bytes": "d3966603e1b7dcfe23c56ad57a0f3985c694372a5ff22c7ed9b07f87"
+                        }
+                      ]
+                    },
+                    {
+                      "constructor": 0,
+                      "fields": [
+                        {
+                          "constructor": 0,
+                          "fields": [
+                            {
+                              "constructor": 0,
+                              "fields": [
+                                {
+                                  "bytes": "326ed608e8c90e8ba1423500533e3a34d4eee639a338456a4c2da975"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "constructor": 0,
+                  "fields": []
+                }
+              ]
+            },
+            {
+              "constructor": 1,
+              "fields": [
+                {
+                  "list": [
+                    {
+                      "bytes": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea4"
+                    },
+                    {
+                      "bytes": "5553444378"
+                    },
+                    {
+                      "int": 9000000
+                    }
+                  ]
+                },
+                {
+                  "list": [
+                    {
+                      "bytes": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b"
+                    },
+                    {
+                      "bytes": "55534472"
+                    },
+                    {
+                      "int": 8725634
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "bytes": "d87980"
+            }
+          ]
+        }
+      },
+      {
+        "tx_hash": "879aa27006c7b02dbc1d3759185e323f211bb362d929088d81995b3645de2520",
+        "output_index": 0,
+        "address": "addr_test1zrhlt0sdg7nt9x2hezedpu4cu307dy76wcgqndupq9trckfjet02dcxms09ggjdsrlxu8vq7dhclv0v28vagkm9p2hcq2qhsav",
+        "stake_address": "stake_test1uqev4h4xurdc8j5yfxcplnwrkq0xmu0k8k9rkw5tdjs4tuqhph45e",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "policy_id": null,
+            "asset_name": "lovelace",
+            "quantity": "2600000"
+          },
+          {
+            "unit": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea45553444378",
+            "policy_id": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea4",
+            "asset_name": "USDCx",
+            "quantity": "9000000"
+          }
+        ],
+        "data_hash": null,
+        "inline_datum": "d8799fd8799f581c728fa14d1290b3656a9e75cd00a24ad787b234584b04cfa0fb6534aaffd8799f581c32cadea6e0db83ca8449b01fcdc3b01e6df1f63d8a3b3a8b6ca155f0ff1a000927c0d8799fd8799fd8799f581cb8391026e2799a3c1c650c49b0fefdf45dc03214eb8d9bd0efe8c5c3ffd8799fd8799fd8799f581c32cadea6e0db83ca8449b01fcdc3b01e6df1f63d8a3b3a8b6ca155f0ffffffffd87980ffd87a9f9f581cd8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea44555534443781a00895440ff9f581c0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b44555344721a00852482ffff43d87980ff",
+        "script_ref": null,
+        "reference_script_hash": null,
+        "inline_datum_json": {
+          "constructor": 0,
+          "fields": [
+            {
+              "constructor": 0,
+              "fields": [
+                {
+                  "bytes": "728fa14d1290b3656a9e75cd00a24ad787b234584b04cfa0fb6534aa"
+                }
+              ]
+            },
+            {
+              "constructor": 0,
+              "fields": [
+                {
+                  "bytes": "32cadea6e0db83ca8449b01fcdc3b01e6df1f63d8a3b3a8b6ca155f0"
+                }
+              ]
+            },
+            {
+              "int": 600000
+            },
+            {
+              "constructor": 0,
+              "fields": [
+                {
+                  "constructor": 0,
+                  "fields": [
+                    {
+                      "constructor": 0,
+                      "fields": [
+                        {
+                          "bytes": "b8391026e2799a3c1c650c49b0fefdf45dc03214eb8d9bd0efe8c5c3"
+                        }
+                      ]
+                    },
+                    {
+                      "constructor": 0,
+                      "fields": [
+                        {
+                          "constructor": 0,
+                          "fields": [
+                            {
+                              "constructor": 0,
+                              "fields": [
+                                {
+                                  "bytes": "32cadea6e0db83ca8449b01fcdc3b01e6df1f63d8a3b3a8b6ca155f0"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "constructor": 0,
+                  "fields": []
+                }
+              ]
+            },
+            {
+              "constructor": 1,
+              "fields": [
+                {
+                  "list": [
+                    {
+                      "bytes": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea4"
+                    },
+                    {
+                      "bytes": "5553444378"
+                    },
+                    {
+                      "int": 9000000
+                    }
+                  ]
+                },
+                {
+                  "list": [
+                    {
+                      "bytes": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b"
+                    },
+                    {
+                      "bytes": "55534472"
+                    },
+                    {
+                      "int": 8725634
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "bytes": "d87980"
+            }
+          ]
+        }
+      },
+      {
+        "tx_hash": "57db6ac767513930322a288c440bd5bbfc526ba254769b9d21742edd88bd2b25",
+        "output_index": 0,
+        "address": "addr_test1zrhlt0sdg7nt9x2hezedpu4cu307dy76wcgqndupq9trckwwuwnz7fphfzgv7mxe6z7kjajgt0p5lawrjnn9qfyqmy2qq8v0ls",
+        "stake_address": "stake_test1ur8w8f30ysm53yx0dnvap0tfwey9hs607hpefejsyjqdj9qm8uwek",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "policy_id": null,
+            "asset_name": "lovelace",
+            "quantity": "2600000"
+          },
+          {
+            "unit": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea45553444378",
+            "policy_id": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea4",
+            "asset_name": "USDCx",
+            "quantity": "7000000"
+          }
+        ],
+        "data_hash": null,
+        "inline_datum": "d8799fd8799f581c728fa14d1290b3656a9e75cd00a24ad787b234584b04cfa0fb6534aaffd8799f581ccee3a62f24374890cf6cd9d0bd6976485bc34ff5c394e6502480d914ff1a000927c0d8799fd8799fd8799f581c20bcf2827b1c1ebb3fe761f1206a7dd35502d6210201d3c09a12c4f6ffd8799fd8799fd8799f581ccee3a62f24374890cf6cd9d0bd6976485bc34ff5c394e6502480d914ffffffffd87980ffd87a9f9f581cd8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea44555534443781a006acfc0ff9f581c0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b44555344721a00678e2cffff43d87980ff",
+        "script_ref": null,
+        "reference_script_hash": null,
+        "inline_datum_json": {
+          "constructor": 0,
+          "fields": [
+            {
+              "constructor": 0,
+              "fields": [
+                {
+                  "bytes": "728fa14d1290b3656a9e75cd00a24ad787b234584b04cfa0fb6534aa"
+                }
+              ]
+            },
+            {
+              "constructor": 0,
+              "fields": [
+                {
+                  "bytes": "cee3a62f24374890cf6cd9d0bd6976485bc34ff5c394e6502480d914"
+                }
+              ]
+            },
+            {
+              "int": 600000
+            },
+            {
+              "constructor": 0,
+              "fields": [
+                {
+                  "constructor": 0,
+                  "fields": [
+                    {
+                      "constructor": 0,
+                      "fields": [
+                        {
+                          "bytes": "20bcf2827b1c1ebb3fe761f1206a7dd35502d6210201d3c09a12c4f6"
+                        }
+                      ]
+                    },
+                    {
+                      "constructor": 0,
+                      "fields": [
+                        {
+                          "constructor": 0,
+                          "fields": [
+                            {
+                              "constructor": 0,
+                              "fields": [
+                                {
+                                  "bytes": "cee3a62f24374890cf6cd9d0bd6976485bc34ff5c394e6502480d914"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "constructor": 0,
+                  "fields": []
+                }
+              ]
+            },
+            {
+              "constructor": 1,
+              "fields": [
+                {
+                  "list": [
+                    {
+                      "bytes": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea4"
+                    },
+                    {
+                      "bytes": "5553444378"
+                    },
+                    {
+                      "int": 7000000
+                    }
+                  ]
+                },
+                {
+                  "list": [
+                    {
+                      "bytes": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b"
+                    },
+                    {
+                      "bytes": "55534472"
+                    },
+                    {
+                      "int": 6786604
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "bytes": "d87980"
+            }
+          ]
+        }
+      },
+      {
+        "tx_hash": "8fe18f4e9cd22dce644acf9ee0add2f78da89fd7be61ec41d04d2daaf420511c",
+        "output_index": 0,
+        "address": "addr_test1zrhlt0sdg7nt9x2hezedpu4cu307dy76wcgqndupq9trckv3mvw28j2ug4gklqaujkt8gk8l9pvqqmaxdcglqyvte8kqycxryt",
+        "stake_address": "stake_test1uzgak89re9wy25t0sw7ft9n5trljskqqd7nxuy0szx9unmqfs5et9",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "policy_id": null,
+            "asset_name": "lovelace",
+            "quantity": "2600000"
+          },
+          {
+            "unit": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea45553444378",
+            "policy_id": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea4",
+            "asset_name": "USDCx",
+            "quantity": "7000000"
+          }
+        ],
+        "data_hash": null,
+        "inline_datum": "d8799fd8799f581c728fa14d1290b3656a9e75cd00a24ad787b234584b04cfa0fb6534aaffd8799f581c91db1ca3c95c45516f83bc95967458ff2858006fa66e11f0118bc9ecff1a000927c0d8799fd8799fd8799f581c2ff55dae64ac8e7f0bbbc6c657350a7fcd62253d734cb3c9313caaa4ffd8799fd8799fd8799f581c91db1ca3c95c45516f83bc95967458ff2858006fa66e11f0118bc9ecffffffffd87980ffd87a9f9f581cd8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea44555534443781a006acfc0ff9f581c0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b44555344721a00678e2cffff43d87980ff",
+        "script_ref": null,
+        "reference_script_hash": null,
+        "inline_datum_json": {
+          "constructor": 0,
+          "fields": [
+            {
+              "constructor": 0,
+              "fields": [
+                {
+                  "bytes": "728fa14d1290b3656a9e75cd00a24ad787b234584b04cfa0fb6534aa"
+                }
+              ]
+            },
+            {
+              "constructor": 0,
+              "fields": [
+                {
+                  "bytes": "91db1ca3c95c45516f83bc95967458ff2858006fa66e11f0118bc9ec"
+                }
+              ]
+            },
+            {
+              "int": 600000
+            },
+            {
+              "constructor": 0,
+              "fields": [
+                {
+                  "constructor": 0,
+                  "fields": [
+                    {
+                      "constructor": 0,
+                      "fields": [
+                        {
+                          "bytes": "2ff55dae64ac8e7f0bbbc6c657350a7fcd62253d734cb3c9313caaa4"
+                        }
+                      ]
+                    },
+                    {
+                      "constructor": 0,
+                      "fields": [
+                        {
+                          "constructor": 0,
+                          "fields": [
+                            {
+                              "constructor": 0,
+                              "fields": [
+                                {
+                                  "bytes": "91db1ca3c95c45516f83bc95967458ff2858006fa66e11f0118bc9ec"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "constructor": 0,
+                  "fields": []
+                }
+              ]
+            },
+            {
+              "constructor": 1,
+              "fields": [
+                {
+                  "list": [
+                    {
+                      "bytes": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea4"
+                    },
+                    {
+                      "bytes": "5553444378"
+                    },
+                    {
+                      "int": 7000000
+                    }
+                  ]
+                },
+                {
+                  "list": [
+                    {
+                      "bytes": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b"
+                    },
+                    {
+                      "bytes": "55534472"
+                    },
+                    {
+                      "int": 6786604
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "bytes": "d87980"
+            }
+          ]
+        }
+      },
+      {
+        "tx_hash": "094a11a6295677a635cdf0bbdbfcd893c3e2fd9e7d69b83cd9c5368a3cb67bfd",
+        "output_index": 0,
+        "address": "addr_test1zzfw62t9pfvyzgxt67cp8vadcp90n8m35jqgk6snr4hfu4sjrlfzuz6h4ssxlm78v0utlgrhryvl2gvtgp53a6j9zngqa8pfnu",
+        "stake_address": "stake_test1uqfpl53wpdt6cgr0alrk879l5pm3jx04yx95q6g7afz3f5quuwrwt",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "policy_id": null,
+            "asset_name": "lovelace",
+            "quantity": "2319789719"
+          },
+          {
+            "unit": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b55534472",
+            "policy_id": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b",
+            "asset_name": "USDr",
+            "quantity": "5060655700383"
+          },
+          {
+            "unit": "92ed29650a584120cbd7b013b3adc04af99f71a4808b6a131d6e9e56000de140728fa14d1290b3656a9e75cd00a24ad787b234584b04cfa0fb6534aa",
+            "policy_id": "92ed29650a584120cbd7b013b3adc04af99f71a4808b6a131d6e9e56",
+            "asset_name": "asset1cgqzt6lwd3traanx5mrpdzezlv2mmysfdjtlu2",
+            "quantity": "1"
+          },
+          {
+            "unit": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea45553444378",
+            "policy_id": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea4",
+            "asset_name": "USDCx",
+            "quantity": "5061940782774"
+          }
+        ],
+        "data_hash": null,
+        "inline_datum": "d8799f581c728fa14d1290b3656a9e75cd00a24ad787b234584b04cfa0fb6534aa9f9f581c0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b4455534472ff9f581cd8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea4455553444378ffff1b000009184e72a0009f0505ff9f0000ffd87a80009f1a8a452e970000ff1901f4c24b085f8b0e0e6673f2004c8cd87a80ff",
+        "script_ref": null,
+        "reference_script_hash": null,
+        "inline_datum_json": {
+          "constructor": 0,
+          "fields": [
+            {
+              "bytes": "728fa14d1290b3656a9e75cd00a24ad787b234584b04cfa0fb6534aa"
+            },
+            {
+              "list": [
+                {
+                  "list": [
+                    {
+                      "bytes": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b"
+                    },
+                    {
+                      "bytes": "55534472"
+                    }
+                  ]
+                },
+                {
+                  "list": [
+                    {
+                      "bytes": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea4"
+                    },
+                    {
+                      "bytes": "5553444378"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "int": 10000000000000
+            },
+            {
+              "list": [
+                {
+                  "int": 5
+                },
+                {
+                  "int": 5
+                }
+              ]
+            },
+            {
+              "list": [
+                {
+                  "int": 0
+                },
+                {
+                  "int": 0
+                }
+              ]
+            },
+            {
+              "constructor": 1,
+              "fields": []
+            },
+            {
+              "int": 0
+            },
+            {
+              "list": [
+                {
+                  "int": 2319789719
+                },
+                {
+                  "int": 0
+                },
+                {
+                  "int": 0
+                }
+              ]
+            },
+            {
+              "int": 500
+            },
+            {
+              "int": 1.012259648307551e25
+            },
+            {
+              "constructor": 1,
+              "fields": []
+            }
+          ]
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "tx_hash": "bb417ec606c135e707dfcffde5382efb5a5a28e2671424aacb6d4afe80d8cbb3",
+        "output_index": 0,
+        "address": "addr_test1zzfw62t9pfvyzgxt67cp8vadcp90n8m35jqgk6snr4hfu4sjrlfzuz6h4ssxlm78v0utlgrhryvl2gvtgp53a6j9zngqa8pfnu",
+        "stake_address": "stake_test1uqfpl53wpdt6cgr0alrk879l5pm3jx04yx95q6g7afz3f5quuwrwt",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "policy_id": null,
+            "asset_name": "lovelace",
+            "quantity": "2320366420"
+          },
+          {
+            "unit": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b55534472",
+            "policy_id": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b",
+            "asset_name": "USDr",
+            "quantity": "5060614720896"
+          },
+          {
+            "unit": "92ed29650a584120cbd7b013b3adc04af99f71a4808b6a131d6e9e56000de140728fa14d1290b3656a9e75cd00a24ad787b234584b04cfa0fb6534aa",
+            "policy_id": "92ed29650a584120cbd7b013b3adc04af99f71a4808b6a131d6e9e56",
+            "asset_name": "asset1cgqzt6lwd3traanx5mrpdzezlv2mmysfdjtlu2",
+            "quantity": "1"
+          },
+          {
+            "unit": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea45553444378",
+            "policy_id": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea4",
+            "asset_name": "USDCx",
+            "quantity": "5061981782774"
+          }
+        ],
+        "data_hash": null,
+        "inline_datum": "d8799f581c728fa14d1290b3656a9e75cd00a24ad787b234584b04cfa0fb6534aa9f9f581c0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b4455534472ff9f581cd8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea4455553444378ffff1b000009184e72a0009f0505ff9f0000ffd87a80009f1a8a4dfb540000ff1901f4c24b085f8b0e573d28f90851a9d87a80ff",
+        "script_ref": null,
+        "reference_script_hash": null,
+        "inline_datum_json": {
+          "constructor": 0,
+          "fields": [
+            {
+              "bytes": "728fa14d1290b3656a9e75cd00a24ad787b234584b04cfa0fb6534aa"
+            },
+            {
+              "list": [
+                {
+                  "list": [
+                    {
+                      "bytes": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b"
+                    },
+                    {
+                      "bytes": "55534472"
+                    }
+                  ]
+                },
+                {
+                  "list": [
+                    {
+                      "bytes": "d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea4"
+                    },
+                    {
+                      "bytes": "5553444378"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "int": 10000000000000
+            },
+            {
+              "list": [
+                {
+                  "int": 5
+                },
+                {
+                  "int": 5
+                }
+              ]
+            },
+            {
+              "list": [
+                {
+                  "int": 0
+                },
+                {
+                  "int": 0
+                }
+              ]
+            },
+            {
+              "constructor": 1,
+              "fields": []
+            },
+            {
+              "int": 0
+            },
+            {
+              "list": [
+                {
+                  "int": 2320366420
+                },
+                {
+                  "int": 0
+                },
+                {
+                  "int": 0
+                }
+              ]
+            },
+            {
+              "int": 500
+            },
+            {
+              "int": 1.0122596503577781e25
+            },
+            {
+              "constructor": 1,
+              "fields": []
+            }
+          ]
+        }
+      },
+      {
+        "tx_hash": "bb417ec606c135e707dfcffde5382efb5a5a28e2671424aacb6d4afe80d8cbb3",
+        "output_index": 1,
+        "address": "addr_test1qpd0w9nj8fknwzsulpn22cwrqjhqpxs2ed8m3zqz46rgaq8z45h54tzexa9qjp45wf02tezxeaswunus2e03na68z6uq3ep78j",
+        "stake_address": "stake_test1ur326t6243vnwjsfq668yh49u3rv7c8wf7g9vhce7ar3dwq2r643n",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "policy_id": null,
+            "asset_name": "lovelace",
+            "quantity": "2345600"
+          },
+          {
+            "unit": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b55534472",
+            "policy_id": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b",
+            "asset_name": "USDr",
+            "quantity": "8995497"
+          }
+        ],
+        "data_hash": null,
+        "inline_datum": null,
+        "script_ref": null,
+        "reference_script_hash": null,
+        "inline_datum_json": null
+      },
+      {
+        "tx_hash": "bb417ec606c135e707dfcffde5382efb5a5a28e2671424aacb6d4afe80d8cbb3",
+        "output_index": 2,
+        "address": "addr_test1qrfevesruxmael3rc44d27s08xzud9ph9f0lytr7mxc8lpejdmtq36xfp696zs34qpfnuw356nhwvwdr8pzk5npd496syz6knm",
+        "stake_address": "stake_test1uqexa4sgarysazapgg6sq5e78g6dfmhx8x3ns3t2fsk6jagkccvfk",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "policy_id": null,
+            "asset_name": "lovelace",
+            "quantity": "2345600"
+          },
+          {
+            "unit": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b55534472",
+            "policy_id": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b",
+            "asset_name": "USDr",
+            "quantity": "8995497"
+          }
+        ],
+        "data_hash": null,
+        "inline_datum": null,
+        "script_ref": null,
+        "reference_script_hash": null,
+        "inline_datum_json": null
+      },
+      {
+        "tx_hash": "bb417ec606c135e707dfcffde5382efb5a5a28e2671424aacb6d4afe80d8cbb3",
+        "output_index": 3,
+        "address": "addr_test1qzurjypxufue50quv5xynv87lh69mspjzn4cmx7sal5vtsejet02dcxms09ggjdsrlxu8vq7dhclv0v28vagkm9p2hcqs6ayh8",
+        "stake_address": "stake_test1uqev4h4xurdc8j5yfxcplnwrkq0xmu0k8k9rkw5tdjs4tuqhph45e",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "policy_id": null,
+            "asset_name": "lovelace",
+            "quantity": "2345600"
+          },
+          {
+            "unit": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b55534472",
+            "policy_id": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b",
+            "asset_name": "USDr",
+            "quantity": "8995497"
+          }
+        ],
+        "data_hash": null,
+        "inline_datum": null,
+        "script_ref": null,
+        "reference_script_hash": null,
+        "inline_datum_json": null
+      },
+      {
+        "tx_hash": "bb417ec606c135e707dfcffde5382efb5a5a28e2671424aacb6d4afe80d8cbb3",
+        "output_index": 4,
+        "address": "addr_test1qqsteu5z0vwpaweluaslzgr20hf42qkkyypqr57qngfvfakwuwnz7fphfzgv7mxe6z7kjajgt0p5lawrjnn9qfyqmy2qjpypjv",
+        "stake_address": "stake_test1ur8w8f30ysm53yx0dnvap0tfwey9hs607hpefejsyjqdj9qm8uwek",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "policy_id": null,
+            "asset_name": "lovelace",
+            "quantity": "2345600"
+          },
+          {
+            "unit": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b55534472",
+            "policy_id": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b",
+            "asset_name": "USDr",
+            "quantity": "6996498"
+          }
+        ],
+        "data_hash": null,
+        "inline_datum": null,
+        "script_ref": null,
+        "reference_script_hash": null,
+        "inline_datum_json": null
+      },
+      {
+        "tx_hash": "bb417ec606c135e707dfcffde5382efb5a5a28e2671424aacb6d4afe80d8cbb3",
+        "output_index": 5,
+        "address": "addr_test1qqhl2hdwvjkgulcth0rvv4e4pflu6c3984e5ev7fxy724fy3mvw28j2ug4gklqaujkt8gk8l9pvqqmaxdcglqyvte8kq85h58n",
+        "stake_address": "stake_test1uzgak89re9wy25t0sw7ft9n5trljskqqd7nxuy0szx9unmqfs5et9",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "policy_id": null,
+            "asset_name": "lovelace",
+            "quantity": "2345600"
+          },
+          {
+            "unit": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b55534472",
+            "policy_id": "0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b",
+            "asset_name": "USDr",
+            "quantity": "6996498"
+          }
+        ],
+        "data_hash": null,
+        "inline_datum": null,
+        "script_ref": null,
+        "reference_script_hash": null,
+        "inline_datum_json": null
+      },
+      {
+        "tx_hash": "bb417ec606c135e707dfcffde5382efb5a5a28e2671424aacb6d4afe80d8cbb3",
+        "output_index": 6,
+        "address": "addr_test1vzuzpk9e839vfk2d4r6hmetcu53xctexlyfwhkf28xh79agkv6lwu",
+        "stake_address": null,
+        "amount": [
+          {
+            "unit": "lovelace",
+            "policy_id": null,
+            "asset_name": "lovelace",
+            "quantity": "8755775739"
+          }
+        ],
+        "data_hash": null,
+        "inline_datum": null,
+        "script_ref": null,
+        "reference_script_hash": null,
+        "inline_datum_json": null
+      }
+    ]
+  }
+}

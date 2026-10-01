@@ -8,7 +8,7 @@ export const CryptoAmount = ({
   symbol,
   className,
 }: {
-  value: number;
+  value: string;
   symbol: string;
   className?: string;
 }) => {

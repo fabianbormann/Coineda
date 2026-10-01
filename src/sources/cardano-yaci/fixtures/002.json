@@ -1,0 +1,50 @@
+{
+  "call": 2,
+  "url": "https://yaci-store.preprod.colo2.cf-systems.org/api/v1/txs/618b7733208f1c19545f7ac80f6902495ffc77af3609ec8e9fc15d095d3d25e9/utxos",
+  "status": 200,
+  "body": {
+    "hash": "618b7733208f1c19545f7ac80f6902495ffc77af3609ec8e9fc15d095d3d25e9",
+    "inputs": [
+      {
+        "tx_hash": "8419f602efd3f6714f8b6d9b5dbe562f7d6951dd78fb32d6f35b34305672dcd6",
+        "output_index": 95,
+        "address": "addr_test1vzpwq95z3xyum8vqndgdd9mdnmafh3djcxnc6jemlgdmswcve6tkw",
+        "stake_address": null,
+        "amount": [
+          {
+            "unit": "lovelace",
+            "policy_id": null,
+            "asset_name": "lovelace",
+            "quantity": "10000200000"
+          }
+        ],
+        "data_hash": null,
+        "inline_datum": null,
+        "script_ref": null,
+        "reference_script_hash": null,
+        "inline_datum_json": null
+      }
+    ],
+    "outputs": [
+      {
+        "tx_hash": "618b7733208f1c19545f7ac80f6902495ffc77af3609ec8e9fc15d095d3d25e9",
+        "output_index": 0,
+        "address": "addr_test1qrfevesruxmael3rc44d27s08xzud9ph9f0lytr7mxc8lpejdmtq36xfp696zs34qpfnuw356nhwvwdr8pzk5npd496syz6knm",
+        "stake_address": "stake_test1uqexa4sgarysazapgg6sq5e78g6dfmhx8x3ns3t2fsk6jagkccvfk",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "policy_id": null,
+            "asset_name": "lovelace",
+            "quantity": "10000000000"
+          }
+        ],
+        "data_hash": null,
+        "inline_datum": null,
+        "script_ref": null,
+        "reference_script_hash": null,
+        "inline_datum_json": null
+      }
+    ]
+  }
+}

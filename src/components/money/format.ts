@@ -1,14 +1,23 @@
 /**
- * Everything in Coineda is EUR-denominated - the transaction model
- * hardcodes euro as the fiat leg - so the fiat formatter takes no
- * currency argument.
+ * The currency is a parameter, never a constant: v2 stores
+ * `settings.baseCurrency` and prices every total in it, so a fixed 'EUR'
+ * here would stamp a euro sign on a dollar figure - and 'usd' is
+ * localeDefaults' fallback, i.e. what most users get.
+ *
+ * Settings store the code lowercased on purpose (see `normalizeSettings` -
+ * priceStore compares a holding's id against `fiat:${currency}` in
+ * lowercase), and this is the one place it is uppercased again. ECMA-402
+ * canonicalises a well-formed code itself, so lowercase would format
+ * identically; uppercasing here is to keep the ISO form explicit at the
+ * boundary rather than to work around an engine, and it belongs here
+ * rather than in any caller.
  */
-const FIAT_OPTIONS: Intl.NumberFormatOptions = {
+const fiatOptions = (currency: string): Intl.NumberFormatOptions => ({
   style: 'currency',
-  currency: 'EUR',
+  currency: currency.toUpperCase(),
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
-};
+});
 
 /**
  * Crypto quantities need far more precision than fiat, at both ends of
@@ -58,9 +67,29 @@ const safeFormat = (
  * broken value dressed up as a real one. Guarding here, rather than in
  * each caller, means every consumer (Money, CryptoAmount, GainLoss)
  * inherits the same total behaviour for free.
+ *
+ * `currency` is required rather than defaulted: a default is exactly how
+ * the euro sign ended up on dollar totals, and a caller that cannot name
+ * the currency does not know what the number means.
  */
-export const formatFiat = (value: number, language: string): string =>
-  Number.isFinite(value) ? safeFormat(value, language, FIAT_OPTIONS) : '—';
+export const formatFiat = (
+  value: number,
+  language: string,
+  currency: string,
+): string =>
+  Number.isFinite(value)
+    ? safeFormat(value, language, fiatOptions(currency))
+    : '—';
 
-export const formatCrypto = (value: number, language: string): string =>
-  Number.isFinite(value) ? safeFormat(value, language, CRYPTO_OPTIONS) : '—';
+/**
+ * Takes a decimal string, not a number: the ledger never converts amounts
+ * to numbers for arithmetic, and this function does none either -
+ * `Number(value)` here exists solely to hand `Intl.NumberFormat` something
+ * it can format.
+ */
+export const formatCrypto = (value: string, language: string): string => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric)
+    ? safeFormat(numeric, language, CRYPTO_OPTIONS)
+    : '—';
+};

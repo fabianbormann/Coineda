@@ -1,0 +1,550 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import 'fake-indexeddb/auto';
+import '@/i18n';
+import { ThemeProvider } from '@/components/theme/ThemeProvider';
+import { ConfirmProvider } from '@/components/confirm/ConfirmProvider';
+import { Toaster } from '@/components/ui/sonner';
+import { MainScreen } from '@/screens/MainScreen';
+import { openLedger, putSource, putEvents } from '@/ledger/db';
+import * as ledgerDb from '@/ledger/db';
+import { putSettings } from '@/settings/settingsStore';
+import { registry } from '@/sources/registry';
+import type { LedgerEvent } from '@/ledger/types';
+import type { ProbeResult } from '@/sources/types';
+
+// Typed explicitly against ProbeResult - inferring the mock's return type
+// from its first implementation alone would pin it to `{ ok: boolean;
+// readOnly: boolean }` and reject the later `mockResolvedValue({ ok: false,
+// message: ... })` calls below as an excess-property error, even though
+// those are exactly the shapes the real ProbeResult type allows.
+const probe = vi.fn<() => Promise<ProbeResult>>(async () => ({
+  ok: true,
+  readOnly: true,
+}));
+
+const testModule = {
+  manifest: {
+    id: 'test-exchange',
+    kind: 'exchange' as const,
+    label: 'Test Exchange',
+    fields: [
+      {
+        name: 'apiKey',
+        label: 'API Key',
+        type: 'apiKey' as const,
+        help: 'Your key',
+      },
+      {
+        name: 'apiSecret',
+        label: 'Secret Key',
+        type: 'secret' as const,
+        help: 'Your secret',
+      },
+    ],
+    requiredScopes: ['Read Info'],
+    needsRelay: true,
+    emits: ['trade' as const],
+    docsUrl: 'https://example.invalid/docs',
+  },
+  probe,
+  fetchEvents: vi.fn(async () => ({ events: [], cursor: null })),
+};
+
+/**
+ * A module with an OPTIONAL field, which the previous stub above did not
+ * have - the dialog had therefore never been rendered against a manifest
+ * carrying one, which is exactly why "leave this empty" fields were
+ * unsaveable. `baseUrl` here mirrors cardano-yaci's own optional field;
+ * `address` stays required so one stub covers both halves of the rule.
+ */
+const optionalFieldModule = {
+  manifest: {
+    id: 'test-chain',
+    kind: 'chain' as const,
+    label: 'Test Chain',
+    fields: [
+      {
+        name: 'baseUrl',
+        label: 'Instance URL',
+        type: 'text' as const,
+        help: 'Leave this empty to use the public instance',
+        optional: true,
+      },
+      {
+        name: 'address',
+        label: 'Chain address',
+        type: 'address' as const,
+        help: 'The address to track',
+      },
+    ],
+    needsRelay: false,
+    emits: ['transfer' as const],
+    docsUrl: 'https://example.invalid/chain-docs',
+  },
+  probe,
+  fetchEvents: vi.fn(async () => ({ events: [], cursor: null })),
+};
+
+const heldEvent = (): LedgerEvent => ({
+  id: crypto.randomUUID(),
+  sourceId: 'cfg-1',
+  externalId: 'tx1#0',
+  timestamp: 1_700_000_000_000,
+  kind: 'reward',
+  origin: 'derived',
+  legs: [
+    {
+      assetId: 'cardano:lovelace',
+      amount: '10',
+      direction: 'in',
+      venue: 'addr1',
+      role: 'principal',
+    },
+  ],
+});
+
+beforeEach(async () => {
+  const db = await openLedger();
+  for (const store of [
+    'events',
+    'sources',
+    'cursors',
+    'settings',
+    'prices',
+  ] as const) {
+    await db.clear(store);
+  }
+  await putSettings({ language: 'en', baseCurrency: 'eur' });
+  probe.mockClear();
+  probe.mockResolvedValue({ ok: true, readOnly: true });
+  registry.length = 0;
+  registry.push(testModule, optionalFieldModule);
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn().mockReturnValue({
+      matches: false,
+      media: '',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }),
+  );
+});
+
+const renderScreen = () =>
+  render(
+    <ThemeProvider>
+      <ConfirmProvider>
+        <MainScreen />
+        <Toaster />
+      </ConfirmProvider>
+    </ThemeProvider>,
+  );
+
+describe('with no sources', () => {
+  it('invites a first data source instead of showing a blank page', async () => {
+    renderScreen();
+    expect(await screen.findByText(/no data sources yet/i)).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: /add a data source/i }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('the balance', () => {
+  it('discloses an unpriced asset rather than quietly understating the total', async () => {
+    // A missing price counted as zero gives the user no way to notice the
+    // figure is wrong.
+    await putSource({
+      id: 'cfg-1',
+      moduleId: 'test-exchange',
+      label: 'Main',
+      config: {},
+    });
+    await putEvents([heldEvent()]);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('offline');
+      }),
+    );
+
+    renderScreen();
+
+    expect(
+      await screen.findByText(/1 asset has no price/i),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the total in the configured base currency, not always in euro', async () => {
+    // localeDefaults makes 'usd' the fallback for most users, so this is
+    // the DEFAULT path - the suite previously seeded 'eur' everywhere,
+    // which is why a hardcoded euro sign in the formatter stayed green.
+    await putSettings({ language: 'en', baseCurrency: 'usd' });
+    await putSource({
+      id: 'cfg-1',
+      moduleId: 'test-exchange',
+      label: 'Main',
+      config: {},
+    });
+    await putEvents([heldEvent()]);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ cardano: { usd: 20 } }), {
+            status: 200,
+          }),
+      ),
+    );
+
+    renderScreen();
+
+    const total = await screen.findByText(/200\.00/);
+    expect(total.textContent).toContain('$');
+    expect(total.textContent).not.toContain('\u20ac');
+  });
+});
+
+describe('the source list', () => {
+  it('shows a failed sync on its own row without blanking the others', async () => {
+    await putSource({
+      id: 'cfg-1',
+      moduleId: 'test-exchange',
+      label: 'Broken',
+      config: {},
+      lastError: 'provider refused the key',
+    });
+    await putSource({
+      id: 'cfg-2',
+      moduleId: 'test-exchange',
+      label: 'Healthy',
+      config: {},
+    });
+
+    renderScreen();
+
+    expect(
+      await screen.findByText(/provider refused the key/i),
+    ).toBeInTheDocument();
+    expect(await screen.findByText('Healthy')).toBeInTheDocument();
+  });
+
+  it('confirms a removal and says the synced events go with it', async () => {
+    await putSource({
+      id: 'cfg-1',
+      moduleId: 'test-exchange',
+      label: 'Main',
+      config: {},
+    });
+    renderScreen();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /remove Main/i }),
+    );
+
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent(/synced events/i);
+  });
+
+  it('actually deletes the synced events and drops them from the balance once confirmed', async () => {
+    await putSource({
+      id: 'cfg-1',
+      moduleId: 'test-exchange',
+      label: 'Main',
+      config: {},
+    });
+    await putEvents([heldEvent()]);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('offline');
+      }),
+    );
+
+    renderScreen();
+
+    // Before removal: the derived event's asset is held and unpriced - the
+    // same disclosure the balance test above exercises.
+    expect(
+      await screen.findByText(/1 asset has no price/i),
+    ).toBeInTheDocument();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /remove Main/i }),
+    );
+    const dialog = await screen.findByRole('alertdialog');
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: /^Remove$/ }),
+    );
+
+    // The source is gone, and so is the balance that depended on its
+    // events - a regression that silently dropped the cascade's event
+    // deletion would leave this disclosure (or a nonzero balance) behind.
+    expect(await screen.findByText(/no data sources yet/i)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.queryByText(/1 asset has no price/i),
+      ).not.toBeInTheDocument(),
+    );
+
+    const db = await openLedger();
+    expect(await db.getAll('events')).toHaveLength(0);
+    expect(await db.getAll('sources')).toHaveLength(0);
+    expect(await db.getAll('cursors')).toHaveLength(0);
+  });
+
+  it('disables remove and refresh on a row while a bulk sync is in flight', async () => {
+    // `syncAll` processes sources sequentially with no per-item progress
+    // callback, and captures `sources` by closure in MainScreen. Without
+    // gating, removing this source while its own page is still in flight
+    // would let `syncSource` finish by calling `putSource({ ...source,
+    // lastSyncedAt })` after the removal already ran, resurrecting the
+    // record (and whatever it just fetched) the user just deleted. Held
+    // open deliberately so the row is observably busy for this assertion.
+    let release: (() => void) | undefined;
+    testModule.fetchEvents.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ events: [], cursor: null });
+        }),
+    );
+
+    await putSource({
+      id: 'cfg-1',
+      moduleId: 'test-exchange',
+      label: 'Main',
+      config: {},
+    });
+
+    renderScreen();
+    await screen.findByText('Main');
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /^sync all$/i }),
+    );
+
+    const removeButton = await screen.findByRole('button', {
+      name: /remove Main/i,
+    });
+    const refreshButton = await screen.findByRole('button', {
+      name: /refresh Main/i,
+    });
+    await waitFor(() => {
+      expect(removeButton).toBeDisabled();
+      expect(refreshButton).toBeDisabled();
+    });
+
+    // A click against a disabled button fires no handler either way, but
+    // this also exercises the handler's own guard directly - belt and
+    // braces against a future change that relaxed the `disabled` attribute
+    // without also touching `handleRemove`.
+    await userEvent.click(removeButton);
+    const db = await openLedger();
+    expect(await db.getAll('sources')).toHaveLength(1);
+
+    release?.();
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /remove Main/i }),
+      ).not.toBeDisabled();
+    });
+    expect(await db.getAll('sources')).toHaveLength(1);
+  });
+
+  it('keeps the previously-loaded list on screen when a reload fails', async () => {
+    await putSource({
+      id: 'cfg-1',
+      moduleId: 'test-exchange',
+      label: 'Main',
+      config: {},
+    });
+
+    renderScreen();
+    expect(await screen.findByText('Main')).toBeInTheDocument();
+
+    // The initial load already succeeded and `sources` holds the correct
+    // list - only the NEXT reload, triggered by the refresh click below,
+    // fails.
+    const getSourcesSpy = vi
+      .spyOn(ledgerDb, 'getSources')
+      .mockRejectedValueOnce(new Error('offline'));
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /refresh Main/i }),
+    );
+
+    expect(
+      await screen.findByText(/could not load your data sources/i),
+    ).toBeInTheDocument();
+    // A transient reload failure must not blank the list that was already
+    // correctly on screen - only replace it when there is genuinely
+    // nothing to show.
+    expect(await screen.findByText('Main')).toBeInTheDocument();
+
+    getSourcesSpy.mockRestore();
+  });
+});
+
+describe('adding a source', () => {
+  it('renders the manifest fields, masks secrets, and names the required scopes', async () => {
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /add a data source/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /Test Exchange/i }),
+    );
+
+    // A credential must never render as a readable text input.
+    expect(await screen.findByLabelText(/API Key/i)).toHaveAttribute(
+      'type',
+      'password',
+    );
+    expect(await screen.findByLabelText(/Secret Key/i)).toHaveAttribute(
+      'type',
+      'password',
+    );
+    // The user should enable exactly these permissions and nothing wider.
+    expect(await screen.findByText(/Read Info/)).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /docs/i })).toHaveAttribute(
+      'href',
+      'https://example.invalid/docs',
+    );
+  });
+
+  it('probes before saving and refuses to save when the probe fails', async () => {
+    probe.mockResolvedValue({
+      ok: false,
+      message: 'Could not reach the provider',
+    });
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /add a data source/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /Test Exchange/i }),
+    );
+    await userEvent.type(await screen.findByLabelText(/API Key/i), 'k');
+    await userEvent.type(await screen.findByLabelText(/Secret Key/i), 's');
+    await userEvent.click(
+      await screen.findByRole('button', { name: /^Save$/ }),
+    );
+
+    expect(probe).toHaveBeenCalled();
+    expect(
+      await screen.findByText(/could not reach the provider/i),
+    ).toBeInTheDocument();
+    const db = await openLedger();
+    expect(await db.getAll('sources')).toHaveLength(0);
+  });
+
+  it('warns prominently when the key turns out to be writable', async () => {
+    // A writable exchange key is the user's largest risk in this whole app.
+    probe.mockResolvedValue({ ok: true, readOnly: false });
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /add a data source/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /Test Exchange/i }),
+    );
+    await userEvent.type(await screen.findByLabelText(/API Key/i), 'k');
+    await userEvent.type(await screen.findByLabelText(/Secret Key/i), 's');
+    await userEvent.click(
+      await screen.findByRole('button', { name: /^Save$/ }),
+    );
+
+    expect(
+      await screen.findByText(/more than read access/i),
+    ).toBeInTheDocument();
+  });
+
+  it('saves with an optional field left empty, as its own help text instructs', async () => {
+    // The regression this covers: every field was validated as required, so
+    // a field whose help text says "leave this empty" could never be saved
+    // at all - the primary flow of the milestone, blocked by the UI's own
+    // instruction.
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /add a data source/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /Test Chain/i }),
+    );
+    await userEvent.type(
+      await screen.findByLabelText(/Chain address/i),
+      'addr1',
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /^Save$/ }),
+    );
+
+    const db = await openLedger();
+    await waitFor(async () => {
+      expect(await db.getAll('sources')).toHaveLength(1);
+    });
+    expect(
+      screen.queryByText(/this field is required/i),
+    ).not.toBeInTheDocument();
+    const [stored] = await db.getAll('sources');
+    expect(stored.moduleId).toBe('test-chain');
+  });
+
+  it('still blocks a required field left empty on the same form', async () => {
+    // `optional` must narrow the check, not switch it off: the required
+    // field next to the optional one still has to block the save.
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /add a data source/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /Test Chain/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /^Save$/ }),
+    );
+
+    // Exactly one error: the required field's. The optional field next to
+    // it must not produce a second one.
+    const errors = await screen.findAllByText(/this field is required/i);
+    expect(errors).toHaveLength(1);
+    expect(await screen.findByLabelText(/Chain address/i)).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+    expect(probe).not.toHaveBeenCalled();
+    const db = await openLedger();
+    expect(await db.getAll('sources')).toHaveLength(0);
+  });
+
+  it('does not warn when the provider has no way to tell whether the key is read-only', async () => {
+    // readOnly undefined is NOT the same as readOnly === false - a
+    // provider that cannot tell must not be treated as a confirmed write
+    // risk. `if (!result.readOnly)` would wrongly warn here; only
+    // `readOnly === false` should.
+    probe.mockResolvedValue({ ok: true });
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /add a data source/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /Test Exchange/i }),
+    );
+    await userEvent.type(await screen.findByLabelText(/API Key/i), 'k');
+    await userEvent.type(await screen.findByLabelText(/Secret Key/i), 's');
+    await userEvent.click(
+      await screen.findByRole('button', { name: /^Save$/ }),
+    );
+
+    const db = await openLedger();
+    await waitFor(async () => {
+      expect(await db.getAll('sources')).toHaveLength(1);
+    });
+    expect(
+      screen.queryByText(/more than read access/i),
+    ).not.toBeInTheDocument();
+  });
+});

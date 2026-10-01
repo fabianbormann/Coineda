@@ -1,58 +1,27 @@
-import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
   SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  useSidebar,
 } from '@/components/ui/sidebar';
-import { ROUTES, matchRoute } from '@/lib/routes';
-import { AccountSwitcher } from '@/components/accounts/AccountSwitcher';
 import { APP_VERSION } from '@/global/version';
 
+/**
+ * Milestone 1 trims this to the shell chrome that survives the demolition:
+ * an empty header slot and content area for later tasks to fill (the
+ * account switcher and the route-driven nav both went with the deleted
+ * persistence/routing layers), plus the version and licence links. The
+ * collapse control itself lives in AppShell/AppHeader, untouched here.
+ */
 export const AppSidebar = () => {
   const { t } = useTranslation();
-  const location = useLocation();
-  const { isMobile, setOpenMobile } = useSidebar();
-  const active = matchRoute(location.pathname);
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <AccountSwitcher />
-      </SidebarHeader>
+      <SidebarHeader />
 
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {ROUTES.map(({ path, titleKey, Icon }) => (
-                <SidebarMenuItem key={path}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={active?.path === path}
-                    tooltip={t(titleKey)}
-                  >
-                    <Link
-                      to={path}
-                      onClick={() => isMobile && setOpenMobile(false)}
-                    >
-                      <Icon aria-hidden="true" />
-                      <span>{t(titleKey)}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
+      <SidebarContent />
 
       <SidebarFooter>
         <div className="flex items-center gap-2 px-2 py-1 group-data-[collapsible=icon]:hidden">
