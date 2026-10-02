@@ -1,4 +1,4 @@
-import { RefreshCw, Trash2 } from 'lucide-react';
+import { RefreshCw, Square, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -18,7 +18,16 @@ type Props = {
    *  a source a sync hasn't reached yet would have that sync resurrect it
    *  by writing back `putSource(...)` once it got there. */
   busy: boolean;
+  /**
+   * True while THIS source is syncing, as opposed to merely being busy
+   * because something else is. The two are different buttons: a syncing row
+   * offers Stop, a row that is busy for another reason offers nothing. A
+   * single `busy` flag cannot express that, which is why a greyed-out
+   * spinner with no way to cancel it was what users actually got.
+   */
+  syncing: boolean;
   onRefresh: () => void;
+  onStop: () => void;
   onRemove: () => void;
 };
 
@@ -32,7 +41,9 @@ export const SourceRow = ({
   moduleLabel,
   eventCount,
   busy,
+  syncing,
   onRefresh,
+  onStop,
   onRemove,
 }: Props) => {
   const { t, i18n } = useTranslation();
@@ -69,19 +80,33 @@ export const SourceRow = ({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon-sm"
-            disabled={busy}
-            onClick={onRefresh}
-            aria-label={t('Refresh {{label}}', { label: source.label })}
-          >
-            <RefreshCw
-              className={busy ? 'animate-spin' : undefined}
-              aria-hidden="true"
-            />
-          </Button>
+          {syncing ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              onClick={onStop}
+              aria-label={t('Stop syncing {{label}}', {
+                label: source.label,
+              })}
+            >
+              <Square aria-hidden="true" />
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              disabled={busy}
+              onClick={onRefresh}
+              aria-label={t('Refresh {{label}}', { label: source.label })}
+            >
+              <RefreshCw
+                className={busy ? 'animate-spin' : undefined}
+                aria-hidden="true"
+              />
+            </Button>
+          )}
           <Button
             type="button"
             variant="outline"

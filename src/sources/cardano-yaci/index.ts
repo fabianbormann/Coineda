@@ -1,5 +1,9 @@
-import type { Leg } from '@/ledger/types';
-import type { DerivedEvent, FetchPage, SourceModule } from '@/sources/types';
+import type { SourceModule } from '@/sources/types';
+import {
+  fetchCardanoEvents,
+  probeCardano,
+  type CardanoProvider,
+} from '@/sources/cardano/translator';
 
 /**
  * Yaci Store (https://store.yaci.xyz) is an open-source, self-hostable
@@ -7,87 +11,30 @@ import type { DerivedEvent, FetchPage, SourceModule } from '@/sources/types';
  * `https://yaci-store.{mainnet,preprod,preview}.colo2.cf-systems.org` - this
  * is only the default; `baseUrl` is a manifest field precisely so anyone
  * running their own instance, or pointing at a different network, can.
+ *
+ * The translation itself lives in src/sources/cardano/translator.ts, shared
+ * with cardano-blockfrost: Yaci Store mirrors Blockfrost's API, so the two
+ * modules differ only in host, API path and authentication.
  */
 const DEFAULT_BASE_URL = 'https://yaci-store.mainnet.colo2.cf-systems.org';
 
-// Comfortably under the provider's documented maximum of 100 per page.
-const PAGE_SIZE = 20;
-
-type AddressTransaction = {
-  tx_hash: string;
-  block_height: number;
-  block_number: number;
-  /** Seconds, not milliseconds - see fetchEvents. */
-  block_time: number;
-};
-
-type UtxoAmount = {
-  unit: string;
-  policy_id: string | null;
-  asset_name: string | null;
-  /** Already a decimal string - never parse this to a number and back. */
-  quantity: string;
-};
-
-type UtxoEntry = {
-  tx_hash: string;
-  output_index: number;
-  address: string;
-  stake_address: string | null;
-  amount: UtxoAmount[];
-};
-
-type TxUtxos = {
-  hash: string;
-  inputs: UtxoEntry[];
-  outputs: UtxoEntry[];
-};
-
-const baseUrlOf = (config: Record<string, string>): string =>
-  config.baseUrl?.trim() || DEFAULT_BASE_URL;
-
-/** Chain-qualified so 'lovelace' here can never collide with the same
- *  symbol on another chain, and the native lovelace unit gets its own
- *  readable id instead of inheriting the raw (and, for lovelace, slightly
- *  misleading) provider unit string. */
-const assetIdOf = (unit: string): string =>
-  unit === 'lovelace' ? 'cardano:lovelace' : `cardano:${unit}`;
-
 /**
- * Legs for one side (inputs or outputs) of a transaction's utxos,
- * filtered to the configured address.
- *
- * This filter is the module's half of the contract documented on
- * `SourceModule` in src/sources/types.ts: emit legs only for the account
- * this source was configured to watch, never the counterparty. An input
- * entry whose address matches is value leaving that address (direction
- * 'out'); a matching output entry is value arriving (direction 'in').
+ * Needs no credential of any kind: no API key, no project id, no header. A
+ * Yaci source therefore holds no secret, which is what keeps a chain-only
+ * user's checkpoint free of secrets entirely. `headers` returning an empty
+ * object is that property, stated where the shared translator can see it -
+ * and tests/cardanoBlockfrost.test.ts asserts sharing a translator with a
+ * credential-bearing module has not quietly introduced one here.
  */
-const legsFor = (
-  entries: UtxoEntry[],
-  direction: Leg['direction'],
-  address: string,
-): Leg[] =>
-  entries
-    .filter((entry) => entry.address === address)
-    .flatMap((entry) =>
-      entry.amount.map((amount) => ({
-        assetId: assetIdOf(amount.unit),
-        amount: amount.quantity,
-        direction,
-        venue: entry.address,
-        role: 'principal' as const,
-      })),
-    );
-
-const fetchJson = async <T>(url: string, what: string): Promise<T> => {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(
-      `cardano-yaci: ${what} failed with status ${response.status}`,
-    );
-  }
-  return (await response.json()) as T;
+const provider: CardanoProvider = {
+  // Handles all three states an optional field can be stored in - empty
+  // string, whitespace, or absent from config entirely. See the `optional`
+  // doc comment on ManifestField.
+  host: (config) => config.baseUrl?.trim() || DEFAULT_BASE_URL,
+  apiPath: '/api/v1',
+  headers: () => ({}),
+  exampleHost: DEFAULT_BASE_URL,
+  probeMessage: () => 'Could not reach the Yaci Store instance.',
 };
 
 export const cardanoYaci: SourceModule = {
@@ -101,10 +48,6 @@ export const cardanoYaci: SourceModule = {
         label: 'Yaci Store base URL',
         type: 'text',
         help: 'The Yaci Store instance to query. Leave this empty to use the public mainnet deployment, or point it at a preprod, preview or self-hosted instance.',
-        // The help text above tells the user to leave this empty, and
-        // `baseUrlOf` substitutes DEFAULT_BASE_URL for an empty, whitespace
-        // or absent value. Without this flag AddSourceDialog would refuse
-        // to save a form that followed its own instruction.
         optional: true,
       },
       {
@@ -115,86 +58,21 @@ export const cardanoYaci: SourceModule = {
       },
     ],
     needsRelay: false,
-    emits: ['transfer'],
+    // 'reward' as well as 'transfer': the shared translator emits a
+    // staking reward per epoch (fetchRewardEvents), and conformance.ts
+    // rejects a kind a manifest does not declare. The gate only ever
+    // passed on ['transfer'] because the tracked fixture account's
+    // recorded rewards response is empty, so no reward event was drained -
+    // tests/cardanoYaci.test.ts now runs conformance over a
+    // reward-bearing account as well.
+    emits: ['transfer', 'reward'],
     docsUrl: 'https://store.yaci.xyz',
   },
 
-  probe: async (config) => {
-    try {
-      const response = await fetch(`${baseUrlOf(config)}/api/v1/blocks/latest`);
-      if (!response.ok) {
-        return {
-          ok: false,
-          message: 'Could not reach the Yaci Store instance.',
-        };
-      }
-      // An address confers no spending power at all - probing it can only
-      // ever confirm read access, never anything more - so this is one of
-      // the few modules that can state readOnly with certainty rather than
-      // leaving it undefined.
-      return { ok: true, readOnly: true };
-    } catch {
-      return { ok: false, message: 'Could not reach the Yaci Store instance.' };
-    }
-  },
+  probe: (config, signal) => probeCardano(provider, config, signal),
 
-  fetchEvents: async (config, cursor): Promise<FetchPage> => {
-    const baseUrl = baseUrlOf(config);
-    const address = config.address;
-
-    // The provider's own OpenAPI document declares `page` as 0-indexed
-    // (minimum 0, default 0), but that is not how the live service actually
-    // behaves: requesting page=0 and page=1 return the identical first
-    // page, and page=2 is the real second page - verified directly against
-    // the live preprod instance. Starting the sequence at 1 (and never
-    // asking for page 1 twice) is what keeps this module's pagination from
-    // re-fetching the first page as its own "next" page, which would emit
-    // the same transactions twice in one drain and trip the conformance
-    // harness's duplicate-externalId check on any address with more
-    // transactions than fit on one page.
-    const page = cursor === null ? 1 : Number.parseInt(cursor, 10);
-
-    const transactions = await fetchJson<AddressTransaction[]>(
-      `${baseUrl}/api/v1/addresses/${address}/transactions?page=${page}&count=${PAGE_SIZE}&order=asc`,
-      'listing transactions',
-    );
-
-    const events: DerivedEvent[] = [];
-    for (const tx of transactions) {
-      const utxos = await fetchJson<TxUtxos>(
-        `${baseUrl}/api/v1/txs/${tx.tx_hash}/utxos`,
-        `fetching utxos for ${tx.tx_hash}`,
-      );
-
-      const legs = [
-        ...legsFor(utxos.inputs, 'out', address),
-        ...legsFor(utxos.outputs, 'in', address),
-      ];
-
-      // A transaction this address merely appears in without actually
-      // moving value for it (shouldn't happen given how the transactions
-      // were listed, but filtering is what makes it impossible) produces no
-      // legs - skip it rather than handing the conformance gate an empty
-      // event, which it rejects outright.
-      if (legs.length === 0) {
-        continue;
-      }
-
-      events.push({
-        externalId: tx.tx_hash,
-        // The API returns seconds; the ledger stores epoch milliseconds.
-        timestamp: tx.block_time * 1000,
-        kind: 'transfer',
-        origin: 'derived',
-        legs,
-      });
-    }
-
-    return {
-      events,
-      cursor: transactions.length < PAGE_SIZE ? null : String(page + 1),
-    };
-  },
+  fetchEvents: (config, cursor, signal) =>
+    fetchCardanoEvents(provider, config, cursor, signal),
 };
 
 export default cardanoYaci;

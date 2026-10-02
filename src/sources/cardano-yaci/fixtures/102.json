@@ -1,0 +1,15 @@
+{
+  "call": 102,
+  "url": "https://yaci-store.preprod.colo2.cf-systems.org/api/v1/epochs/269",
+  "status": 200,
+  "body": {
+    "number": 269,
+    "block_count": 15994,
+    "transaction_count": 16462,
+    "total_output": 240983161238925,
+    "total_fees": 2248525,
+    "start_time": 1770250072,
+    "end_time": 1770681174,
+    "max_slot": 114997974
+  }
+}

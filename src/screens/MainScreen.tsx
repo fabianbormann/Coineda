@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { deleteSourceCascade, getAllEvents, getSources } from '@/ledger/db';
-import { foldHoldings } from '@/ledger/balances';
+import { foldHoldings, ownedVenuesOf } from '@/ledger/balances';
 import { resolveSpotPrices, totalValue } from '@/prices/priceStore';
 import { syncAll, syncSource } from '@/sync/syncSource';
 import { getSettings } from '@/settings/settingsStore';
@@ -13,33 +13,10 @@ import type { LedgerEvent, SourceRecord } from '@/ledger/types';
 import { BalanceHeader } from './BalanceHeader';
 import { SourceList } from './SourceList';
 import { AddSourceDialog } from './AddSourceDialog';
+import { TaxReportDialog } from './TaxReportDialog';
+import { JourneyDialog } from '@/journey/JourneyDialog';
 
 const DEFAULT_CURRENCY = 'eur';
-
-/**
- * Every leg's venue, trusted wholesale.
- *
- * There is no independent way to know, from the host side, which value a
- * module used for `leg.venue` - a chain module typically uses the
- * configured address, an exchange module whatever it can derive from its
- * own credentials, and the host never sees that mapping directly (see the
- * module contract in src/sources/types.ts: `fetchEvents` takes only
- * `config` and a cursor). Everything already sitting in this device's own
- * ledger came from this device's own configured sources or from the
- * user's own authored entries, so every venue it names is trusted as
- * owned. This is the same trust boundary `isInternalTransfer` already
- * leans on one leg at a time; here it is just applied to the whole log at
- * once to build the set foldHoldings needs.
- */
-const ownedVenuesOf = (events: LedgerEvent[]): Set<string> => {
-  const venues = new Set<string>();
-  for (const event of events) {
-    for (const leg of event.legs) {
-      venues.add(leg.venue);
-    }
-  }
-  return venues;
-};
 
 export const MainScreen = () => {
   const { t } = useTranslation();
@@ -57,7 +34,16 @@ export const MainScreen = () => {
   const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set());
   const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  /**
+   * One AbortController per in-flight sync, so Stop can reach the request
+   * that is actually running. A ref rather than state: aborting must not
+   * depend on a re-render having happened, and the controllers are not
+   * rendered.
+   */
+  const controllersRef = useRef<Map<string, AbortController>>(new Map());
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [taxReportDialogOpen, setTaxReportDialogOpen] = useState(false);
+  const [journeyDialogOpen, setJourneyDialogOpen] = useState(false);
 
   // Fetches only - no setState here, so this is safe to call directly from
   // the mount effect below without tripping react-hooks' rule against
@@ -191,14 +177,27 @@ export const MainScreen = () => {
     }
   };
 
+  const handleStop = (source: SourceRecord) => {
+    // Abort the in-flight request directly. The sync itself notices, stops
+    // between pages, and keeps everything that already committed - the
+    // cursor is persisted per page, so stopping is not losing.
+    controllersRef.current.get(source.id)?.abort();
+  };
+
   const handleRefreshOne = async (source: SourceRecord) => {
     if (busyIds.has(source.id)) {
       return;
     }
+    const controller = new AbortController();
+    controllersRef.current.set(source.id, controller);
     setSyncingIds((prev) => new Set(prev).add(source.id));
     try {
-      const report = await syncSource(source);
-      if (report.error) {
+      const report = await syncSource(source, { signal: controller.signal });
+      if (report.cancelled) {
+        // Not an error and not a success: the user asked for it. Saying so
+        // beats silence, which would look like the Stop button did nothing.
+        notify.info(t('Stopped syncing {{label}}', { label: source.label }));
+      } else if (report.error) {
         // report.error is a raw provider diagnostic (see SyncReport in
         // src/sync/syncSource.ts) - framed in a translated sentence here,
         // with the diagnostic itself kept verbatim as the detail.
@@ -212,6 +211,7 @@ export const MainScreen = () => {
         notify.success(t('Synced {{label}}', { label: source.label }));
       }
     } finally {
+      controllersRef.current.delete(source.id);
       setSyncingIds((prev) => {
         const next = new Set(prev);
         next.delete(source.id);
@@ -275,12 +275,14 @@ export const MainScreen = () => {
         loadError={loadError}
         syncingAll={syncingAll}
         busyIds={busyIds}
+        syncingIds={syncingIds}
         onRefreshAll={handleRefreshAll}
         onRefreshOne={handleRefreshOne}
+        onStop={handleStop}
         onRemove={handleRemove}
         onAddSource={() => setAddDialogOpen(true)}
       />
-      <div>
+      <div className="flex flex-wrap gap-2">
         <Button
           type="button"
           variant="outline"
@@ -288,18 +290,45 @@ export const MainScreen = () => {
         >
           {t('Create checkpoint')}
         </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setTaxReportDialogOpen(true)}
+        >
+          {t('Create tax report')}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setJourneyDialogOpen(true)}
+        >
+          {t('Create journey video')}
+        </Button>
       </div>
       <AddSourceDialog
         open={addDialogOpen}
         onOpenChange={setAddDialogOpen}
-        onCreated={async () => {
+        onCreated={async (created) => {
           setAddDialogOpen(false);
           await load();
+          // Sync immediately. A source that sits there saying "Never
+          // synced" until the user finds the refresh button is a source
+          // that looks broken, and adding one is an unambiguous request
+          // for its data.
+          await handleRefreshOne(created);
         }}
       />
       <ExportCheckpointDialog
         open={exportDialogOpen}
         onOpenChange={setExportDialogOpen}
+      />
+      <TaxReportDialog
+        open={taxReportDialogOpen}
+        onOpenChange={setTaxReportDialogOpen}
+      />
+      <JourneyDialog
+        open={journeyDialogOpen}
+        onOpenChange={setJourneyDialogOpen}
       />
     </div>
   );

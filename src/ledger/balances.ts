@@ -1,7 +1,43 @@
-import { addAmounts, isZeroAmount, subtractAmounts } from './amount';
-import type { LedgerEvent } from './types';
+import {
+  addAmounts,
+  compareAmounts,
+  isZeroAmount,
+  negateAmount,
+  subtractAmounts,
+} from './amount';
+import type { Leg, LedgerEvent } from './types';
 
 export type Holding = { assetId: string; amount: string };
+
+/**
+ * Every leg's venue, trusted wholesale.
+ *
+ * There is no independent way to know, from the host side, which value a
+ * module used for `leg.venue` - a chain module typically uses the
+ * configured address, an exchange module whatever it can derive from its
+ * own credentials, and the host never sees that mapping directly (see the
+ * module contract in src/sources/types.ts: `fetchEvents` takes only
+ * `config` and a cursor). Everything already sitting in this device's own
+ * ledger came from this device's own configured sources or from the
+ * user's own authored entries, so every venue it names is trusted as
+ * owned. This is the same trust boundary `isInternalTransfer` already
+ * leans on one leg at a time; here it is just applied to the whole log at
+ * once to build the set `foldHoldings` and `isInternalTransfer`'s callers
+ * need.
+ *
+ * Shared by `MainScreen` and `runTaxReport` - two independent "fold the
+ * whole log into a set of owned venues" needs is the line past which a
+ * local helper becomes a duplicated one.
+ */
+export const ownedVenuesOf = (events: LedgerEvent[]): Set<string> => {
+  const venues = new Set<string>();
+  for (const event of events) {
+    for (const leg of event.legs) {
+      venues.add(leg.venue);
+    }
+  }
+  return venues;
+};
 
 /**
  * Holdings are folded from the log, never stored.
@@ -117,6 +153,99 @@ export const isInternalTransfer = (
   // lovelace change while sending a native token away nets zero on one
   // asset and negative on the other, and is a disposal.
   return [...net.values()].every((amount) => isZeroAmount(amount));
+};
+
+/**
+ * One event's owned principal legs collapsed to their per-asset net.
+ *
+ * The companion to `isInternalTransfer`, and the reason it has to exist.
+ * That predicate decides internal-versus-disposal on the per-asset NET, but
+ * it answers only yes or no - so a host that used it purely as a filter
+ * handed the surviving event's RAW legs on to a tax module, which maps every
+ * leg to its own tax event. On a UTXO chain that is catastrophic: a
+ * transaction whose inputs are 19,997.637 ADA and outputs 19,997.452 ADA
+ * disposed of 0.185 ADA in fees, but leg-by-leg it reads as a disposal of
+ * 19,997.637 plus a re-acquisition of 19,997.452. Every transaction then
+ * realises the wallet's whole unrealised gain and restarts any
+ * holding-period clock, which puts an exemption like Germany's §23 one-year
+ * rule permanently out of reach for a wallet that transacts at all.
+ *
+ * The net is the same quantity `isInternalTransfer` tests, computed once so
+ * the two cannot disagree: a zero net here is exactly the event that
+ * predicate calls internal.
+ *
+ * Three deliberate properties:
+ *
+ * - **Per asset, never summed across assets.** A swap sends one asset out
+ *   and brings a different one in; those must stay a disposal AND an
+ *   acquisition, because they are different assets. Only legs of the SAME
+ *   asset cancel.
+ * - **Owned venues only.** A leg at a venue we do not own is the
+ *   counterparty's side of the movement - the same reason `foldHoldings`
+ *   skips it. Netting it in would cancel a genuine outbound payment (`out
+ *   500 @ ours`, `in 500 @ theirs`) to nothing and hide the disposal
+ *   entirely.
+ * - **Fee legs pass through untouched.** A fee goes to the network, not to
+ *   a venue we own, so it is not part of the principal net - exactly as
+ *   `isInternalTransfer` already has it. It survives as its own leg, so a
+ *   jurisdiction still sees it.
+ *
+ * The net leg inherits the venue of the first same-asset leg pointing the
+ * same way as the net, so a per-venue partition (Germany's per-wallet FIFO)
+ * attributes the disposal to the venue the value actually left from.
+ */
+export const netPrincipalLegs = (
+  event: LedgerEvent,
+  ownedVenues: Set<string>,
+): LedgerEvent => {
+  const principals = event.legs.filter(
+    (leg) => leg.role === 'principal' && ownedVenues.has(leg.venue),
+  );
+  const others = event.legs.filter(
+    (leg) => leg.role !== 'principal' || !ownedVenues.has(leg.venue),
+  );
+
+  // Insertion order, not Map iteration luck: the legs a jurisdiction sees
+  // should follow the order the event itself presented them in, so a
+  // report's rows stay stable across runs.
+  const assetOrder: string[] = [];
+  const nets = new Map<string, string>();
+  for (const leg of principals) {
+    const current = nets.get(leg.assetId);
+    if (current === undefined) {
+      assetOrder.push(leg.assetId);
+    }
+    nets.set(
+      leg.assetId,
+      leg.direction === 'in'
+        ? addAmounts(current ?? '0', leg.amount)
+        : subtractAmounts(current ?? '0', leg.amount),
+    );
+  }
+
+  const netted: Leg[] = [];
+  for (const assetId of assetOrder) {
+    const net = nets.get(assetId) ?? '0';
+    // A zero net moved nothing for this asset: no disposal, and no
+    // acquisition either. Emitting a zero-amount leg instead would give a
+    // jurisdiction a tax event with nothing in it.
+    if (isZeroAmount(net)) {
+      continue;
+    }
+    const direction = compareAmounts(net, '0') > 0 ? 'in' : 'out';
+    const sameAsset = principals.filter((leg) => leg.assetId === assetId);
+    const source =
+      sameAsset.find((leg) => leg.direction === direction) ?? sameAsset[0];
+    netted.push({
+      assetId,
+      amount: direction === 'in' ? net : negateAmount(net),
+      direction,
+      venue: source.venue,
+      role: 'principal',
+    });
+  }
+
+  return { ...event, legs: [...netted, ...others] };
 };
 
 /**

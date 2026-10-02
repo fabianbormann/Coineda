@@ -1,54 +1,46 @@
-import { useCallback, useState } from 'react';
-import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
-import { AppSidebar } from './AppSidebar';
+import { useTranslation } from 'react-i18next';
+import { APP_VERSION } from '@/global/version';
 import { AppHeader } from './AppHeader';
 
-const SIDEBAR_OPEN_STORAGE_KEY = 'coineda.sidebarOpen';
-
 /**
- * Reads the last collapse state defensively, the same way
- * ThemeProvider.readStoredTheme does: localStorage can throw in private
- * windows or when site data is blocked, and this is never worth failing
- * the shell over.
+ * The shell: a header, the page, and a footer.
+ *
+ * There is deliberately no sidebar. One existed through milestone 1 as a
+ * placeholder, but the navigation it was built for went with the deleted
+ * routing layer, so it rendered an empty panel and a toggle that revealed
+ * nothing - which reads as a broken app rather than an unfinished one.
+ * Re-adding a shadcn sidebar is cheap once there are routes to put in it;
+ * until then its collapse state, its localStorage persistence and its
+ * header trigger were all machinery serving nothing.
+ *
+ * The version and licence links were the sidebar's only real content, so
+ * they moved here rather than being lost with it.
  */
-const readStoredSidebarOpen = (): boolean => {
-  try {
-    const stored = localStorage.getItem(SIDEBAR_OPEN_STORAGE_KEY);
-    if (stored === 'true' || stored === 'false') {
-      return stored === 'true';
-    }
-  } catch {
-    // ignore - fall through to the default
-  }
-  return true;
-};
-
 export const AppShell = ({ children }: { children: React.ReactNode }) => {
-  const [open, setOpen] = useState<boolean>(readStoredSidebarOpen);
-
-  // SidebarProvider writes a `sidebar_state` cookie on every toggle, but
-  // never reads it back on mount - this app has no backend for that cookie
-  // to reach anyway. We seed our own state from localStorage above and
-  // persist it here instead. Note this must be full controlled mode (both
-  // `open` and `onOpenChange`): passing `onOpenChange` alone would make
-  // SidebarProvider route every toggle through it and skip its own
-  // internal state update, so the sidebar would silently stop responding.
-  const handleOpenChange = useCallback((next: boolean) => {
-    setOpen(next);
-    try {
-      localStorage.setItem(SIDEBAR_OPEN_STORAGE_KEY, String(next));
-    } catch {
-      // ignore - the choice still applies for this session
-    }
-  }, []);
+  const { t } = useTranslation();
 
   return (
-    <SidebarProvider open={open} onOpenChange={handleOpenChange}>
-      <AppSidebar />
-      <SidebarInset>
-        <AppHeader />
-        <main className="flex min-h-0 flex-1 flex-col">{children}</main>
-      </SidebarInset>
-    </SidebarProvider>
+    <div className="flex min-h-svh flex-col">
+      <AppHeader />
+      <main className="flex min-h-0 flex-1 flex-col">{children}</main>
+      <footer className="flex shrink-0 items-center gap-3 border-t border-border px-4 py-2">
+        <a
+          href={`https://github.com/fabianbormann/Coineda/releases/tag/v${APP_VERSION}`}
+          target="_blank"
+          rel="noreferrer"
+          className="text-xs text-muted-foreground hover:text-foreground"
+        >
+          {`v${APP_VERSION}`}
+        </a>
+        <a
+          href="https://github.com/fabianbormann/Coineda/blob/main/LICENSE"
+          target="_blank"
+          rel="noreferrer"
+          className="text-xs text-muted-foreground hover:text-foreground"
+        >
+          {t('GPLv3 License')}
+        </a>
+      </footer>
+    </div>
   );
 };

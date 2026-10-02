@@ -47,6 +47,12 @@ beforeEach(async () => {
   await db.clear('events');
   await db.clear('cursors');
   await db.clear('sources');
+  // The source row has to exist, the way it does in the app: MainScreen
+  // only ever syncs records it loaded from this store, and syncSource's
+  // writes are all guarded on the row still being there - a sync for a
+  // source with no record would otherwise leave events nothing can
+  // delete. See putEventsIfSourceExists in src/ledger/db.ts.
+  await putSource(source);
 
   seenCursors = [];
   // Keyed on the cursor, not on a call counter. With a counter the

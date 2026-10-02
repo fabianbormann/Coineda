@@ -27,6 +27,20 @@ const FIXTURES_DIR = path.join(
   '../src/sources/cardano-yaci/fixtures',
 );
 
+/** The account the transaction fixtures belong to. Its recorded rewards
+ *  response is `[]` - it never delegated. */
+const TRACKED_STAKE =
+  'stake_test1uqexa4sgarysazapgg6sq5e78g6dfmhx8x3ns3t2fsk6jagkccvfk';
+
+/** A different preprod account, recorded precisely because it has ten real
+ *  epoch rewards. */
+const DELEGATED_STAKE =
+  'stake_test1uqfzskazkqhtph40s82g93n4srh3x463lazy0n2gkv9rnyq7acw3c';
+
+const HOST = 'https://yaci-store.preprod.colo2.cf-systems.org';
+const rewardsUrl = (stake: string): string =>
+  `${HOST}/api/v1/accounts/${stake}/rewards`;
+
 const loadFixtures = async (): Promise<Map<string, unknown>> => {
   const files = await readdir(FIXTURES_DIR);
   const fixtures = new Map<string, unknown>();
@@ -46,8 +60,7 @@ const loadFixtures = async (): Promise<Map<string, unknown>> => {
 // to check idempotence, so a counter would have advanced by the second drain
 // and this module would look non-idempotent for the harness's reason rather
 // than its own.
-beforeEach(async () => {
-  const fixtures = await loadFixtures();
+const stubFetch = (fixtures: Map<string, unknown>) => {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string) => {
@@ -58,6 +71,35 @@ beforeEach(async () => {
       return new Response(JSON.stringify(body), { status: 200 });
     }),
   );
+};
+
+/**
+ * The same fixture set, with the TRACKED account's rewards response
+ * replaced by the reward-bearing account's recorded one.
+ *
+ * Not a hand-written body: it is fixture 101 verbatim, served under the
+ * tracked account's URL. The distinction matters, because it is the whole
+ * reason the conformance gate was vacuous. The tracked account's recorded
+ * rewards response is `[]`, so a drain over the fixtures as recorded never
+ * emits a `kind: 'reward'` event at all, and `checkEvent`'s
+ * manifest-declares-this-kind rule - the one rule in the harness that
+ * exists to catch exactly a missing `emits` entry - was never reached.
+ * Both Cardano manifests declared only ['transfer'] while the shared
+ * translator emitted rewards too, and the gate stayed green for an entire
+ * milestone.
+ */
+const withRewardsForTrackedAccount = (
+  fixtures: Map<string, unknown>,
+): Map<string, unknown> => {
+  const recorded = fixtures.get(rewardsUrl(DELEGATED_STAKE));
+  if (!Array.isArray(recorded) || recorded.length === 0) {
+    throw new Error('fixture 101 should hold the recorded epoch rewards');
+  }
+  return new Map(fixtures).set(rewardsUrl(TRACKED_STAKE), recorded);
+};
+
+beforeEach(async () => {
+  stubFetch(await loadFixtures());
 });
 
 describe('cardano-yaci', () => {
@@ -65,6 +107,29 @@ describe('cardano-yaci', () => {
     await expect(
       runConformance(cardanoYaci, { config }),
     ).resolves.toBeUndefined();
+  });
+
+  it('passes the conformance suite for an account that HAS staking rewards', async () => {
+    // The non-vacuous half of the gate. Over the fixtures exactly as
+    // recorded the tracked account has no rewards, so no reward event is
+    // ever drained and the harness's "emitted a kind its manifest does not
+    // declare" check is unreachable. This run serves the recorded rewards
+    // of the delegating account for the tracked one, so the drain really
+    // does produce `kind: 'reward'` and the manifest really is tested
+    // against it.
+    stubFetch(withRewardsForTrackedAccount(await loadFixtures()));
+    await expect(
+      runConformance(cardanoYaci, { config }),
+    ).resolves.toBeUndefined();
+  });
+
+  it('declares every kind the shared translator can emit', () => {
+    // Stated as a property of the manifest as well, because the drain
+    // above only covers the kinds THESE fixtures happen to contain.
+    expect([...cardanoYaci.manifest.emits].sort()).toEqual([
+      'reward',
+      'transfer',
+    ]);
   });
 
   it('declares itself browser-callable and credential-free', () => {
@@ -122,14 +187,21 @@ describe('cardano-yaci', () => {
     }
   });
 
-  it('emits legs only for the configured address, never the counterparty', async () => {
+  it('emits legs only for the configured account, never the counterparty', async () => {
     // The host derives owned venues from the venues in its own events, so a
     // counterparty leg here would inflate the balance AND make every outbound
     // send look like an internal transfer, hiding real disposals.
+    //
+    // The venue is the ACCOUNT - the stake address the configured payment
+    // address belongs to - not the payment address itself, so that every
+    // address of one wallet reports under one venue and movement between
+    // them nets to zero. See tests/cardanoAccountView.test.ts.
+    const account =
+      'stake_test1uqexa4sgarysazapgg6sq5e78g6dfmhx8x3ns3t2fsk6jagkccvfk';
     const { events } = await cardanoYaci.fetchEvents(config, null);
     for (const event of events) {
       for (const leg of event.legs) {
-        expect(leg.venue).toBe(config.address);
+        expect(leg.venue).toBe(account);
       }
     }
   });

@@ -10,6 +10,13 @@ import { openLedger } from '@/ledger/db';
 export type Settings = {
   language: string;
   baseCurrency: string;
+  /**
+   * Optional CoinGecko API key, used only for historical price lookups
+   * (src/tax/resolveValues.ts). Sent as the x-cg-demo-api-key header, never
+   * a query parameter. Deliberately NOT normalised by normalizeSettings
+   * below - unlike baseCurrency, this is a credential and case matters.
+   */
+  coingeckoApiKey?: string;
 };
 
 /**

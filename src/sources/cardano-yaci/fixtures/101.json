@@ -1,0 +1,67 @@
+{
+  "call": 101,
+  "url": "https://yaci-store.preprod.colo2.cf-systems.org/api/v1/accounts/stake_test1uqfzskazkqhtph40s82g93n4srh3x463lazy0n2gkv9rnyq7acw3c/rewards",
+  "status": 200,
+  "body": [
+    {
+      "epoch": 273,
+      "amount": 7480577,
+      "pool_id": "pool13m26ky08vz205232k20u8ft5nrg8u68klhn0xfsk9m4gsqsc44v",
+      "type": "member"
+    },
+    {
+      "epoch": 270,
+      "amount": 7773199,
+      "pool_id": "pool13m26ky08vz205232k20u8ft5nrg8u68klhn0xfsk9m4gsqsc44v",
+      "type": "member"
+    },
+    {
+      "epoch": 269,
+      "amount": 7600636,
+      "pool_id": "pool13m26ky08vz205232k20u8ft5nrg8u68klhn0xfsk9m4gsqsc44v",
+      "type": "member"
+    },
+    {
+      "epoch": 268,
+      "amount": 7641663,
+      "pool_id": "pool13m26ky08vz205232k20u8ft5nrg8u68klhn0xfsk9m4gsqsc44v",
+      "type": "member"
+    },
+    {
+      "epoch": 267,
+      "amount": 7599913,
+      "pool_id": "pool13m26ky08vz205232k20u8ft5nrg8u68klhn0xfsk9m4gsqsc44v",
+      "type": "member"
+    },
+    {
+      "epoch": 266,
+      "amount": 7293775,
+      "pool_id": "pool13m26ky08vz205232k20u8ft5nrg8u68klhn0xfsk9m4gsqsc44v",
+      "type": "member"
+    },
+    {
+      "epoch": 265,
+      "amount": 7817398,
+      "pool_id": "pool13m26ky08vz205232k20u8ft5nrg8u68klhn0xfsk9m4gsqsc44v",
+      "type": "member"
+    },
+    {
+      "epoch": 264,
+      "amount": 7700974,
+      "pool_id": "pool13m26ky08vz205232k20u8ft5nrg8u68klhn0xfsk9m4gsqsc44v",
+      "type": "member"
+    },
+    {
+      "epoch": 263,
+      "amount": 7588435,
+      "pool_id": "pool13m26ky08vz205232k20u8ft5nrg8u68klhn0xfsk9m4gsqsc44v",
+      "type": "member"
+    },
+    {
+      "epoch": 262,
+      "amount": 7548870,
+      "pool_id": "pool13m26ky08vz205232k20u8ft5nrg8u68klhn0xfsk9m4gsqsc44v",
+      "type": "member"
+    }
+  ]
+}

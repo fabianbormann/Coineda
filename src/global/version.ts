@@ -6,7 +6,7 @@ import packageJSON from '../../package.json';
  * directly cannot drift from the released version. `resolveJsonModule` is
  * enabled, so this needs no build-time plumbing.
  *
- * Must stay a bare semver with no leading 'v': AppSidebar builds a GitHub
+ * Must stay a bare semver with no leading 'v': AppShell builds a GitHub
  * release URL as `v${APP_VERSION}` against release-please's `v<semver>`
  * tags. tests/build.test.ts pins that.
  */

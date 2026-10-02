@@ -97,7 +97,9 @@ const heldEvent = (): LedgerEvent => ({
   legs: [
     {
       assetId: 'cardano:lovelace',
-      amount: '10',
+      // 10 ADA in lovelace: the spot price is per whole ADA, so the
+      // balance header below is 10 x 20 = 200. See src/prices/scale.ts.
+      amount: '10000000',
       direction: 'in',
       venue: 'addr1',
       role: 'principal',
@@ -546,5 +548,124 @@ describe('adding a source', () => {
     expect(
       screen.queryByText(/more than read access/i),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('sync lifecycle', () => {
+  it('syncs a source immediately after it is added', async () => {
+    // Reported from testing. A new source that sits there saying "Never
+    // synced" until the user hunts for a refresh button looks broken, and
+    // adding a source is an unambiguous request for its data.
+    const fetchEvents = vi.fn(async () => ({ events: [], cursor: null }));
+    registry.length = 0;
+    registry.push({ ...optionalFieldModule, fetchEvents });
+
+    renderScreen();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /add a data source/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /test chain/i }),
+    );
+    const address = await screen.findByLabelText(/address/i);
+    await userEvent.type(address, 'addr_test1_auto');
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => expect(fetchEvents).toHaveBeenCalled());
+  });
+
+  it('offers Stop while a sync is running, not a disabled spinner', async () => {
+    // The other half of the report: the refresh button greyed out for the
+    // whole sync with no way to interrupt it.
+    let release: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let seenSignal: AbortSignal | undefined;
+
+    registry.length = 0;
+    registry.push({
+      ...optionalFieldModule,
+      fetchEvents: vi.fn(async (_config, _cursor, signal) => {
+        seenSignal = signal as AbortSignal;
+        release?.();
+        // Never settles on its own: the only way out is the signal, which
+        // is exactly the situation a user needs a Stop button for.
+        await new Promise<void>((_, reject) => {
+          signal?.addEventListener('abort', () =>
+            reject(
+              new DOMException('The operation was aborted.', 'AbortError'),
+            ),
+          );
+        });
+        return { events: [], cursor: null };
+      }),
+    });
+
+    await putSource({
+      id: 'cfg-stop',
+      moduleId: 'test-chain',
+      label: 'Stoppable',
+      config: { address: 'addr_test1_stop' },
+    });
+
+    renderScreen();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /refresh stoppable/i }),
+    );
+    await started;
+
+    const stop = await screen.findByRole('button', {
+      name: /stop syncing stoppable/i,
+    });
+    expect(stop).toBeEnabled();
+
+    await userEvent.click(stop);
+
+    await waitFor(() => expect(seenSignal?.aborted).toBe(true));
+    // And the row goes back to offering a refresh rather than staying stuck.
+    expect(
+      await screen.findByRole('button', { name: /refresh stoppable/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('does not mark a stopped sync as failed', async () => {
+    // A stop is not an error. A red "Sync failed" row for doing exactly
+    // what was asked trains the user to distrust the status.
+    registry.length = 0;
+    registry.push({
+      ...optionalFieldModule,
+      fetchEvents: vi.fn(async (_config, _cursor, signal) => {
+        await new Promise<void>((_, reject) => {
+          signal?.addEventListener('abort', () =>
+            reject(
+              new DOMException('The operation was aborted.', 'AbortError'),
+            ),
+          );
+        });
+        return { events: [], cursor: null };
+      }),
+    });
+
+    await putSource({
+      id: 'cfg-stop2',
+      moduleId: 'test-chain',
+      label: 'Quiet',
+      config: { address: 'addr_test1_quiet' },
+    });
+
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /refresh quiet/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /stop syncing quiet/i }),
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByText(/sync failed/i)).not.toBeInTheDocument(),
+    );
   });
 });

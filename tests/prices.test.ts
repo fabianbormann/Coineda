@@ -116,8 +116,11 @@ describe('the price cache', () => {
 
 describe('totalling', () => {
   it('multiplies decimal strings without floats', () => {
+    // Amounts are BASE units (lovelace) and a price is per whole unit
+    // (one ADA), so 3 ADA is written as 3000000 here. See
+    // src/prices/scale.ts.
     const { total, missing } = totalValue(
-      [{ assetId: 'cardano:lovelace', amount: '3' }],
+      [{ assetId: 'cardano:lovelace', amount: '3000000' }],
       new Map([['cardano:lovelace', '0.1']]),
     );
     // 3 * 0.1 is 0.30000000000000004 in floating point
@@ -130,7 +133,7 @@ describe('totalling', () => {
     // the user has no way to know.
     const { total, missing } = totalValue(
       [
-        { assetId: 'cardano:lovelace', amount: '10' },
+        { assetId: 'cardano:lovelace', amount: '10000000' },
         { assetId: 'eth:mystery', amount: '5' },
       ],
       new Map([['cardano:lovelace', '2']]),
@@ -149,7 +152,7 @@ describe('totalling', () => {
     // foldHoldings only filters exact zero, so a negative holding (e.g. a
     // momentarily over-sold balance before a later leg lands) is reachable.
     const { total, missing } = totalValue(
-      [{ assetId: 'cardano:lovelace', amount: '-5' }],
+      [{ assetId: 'cardano:lovelace', amount: '-5000000' }],
       new Map([['cardano:lovelace', '2']]),
     );
     expect(total).toBe('-10');

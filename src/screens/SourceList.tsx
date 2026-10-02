@@ -16,8 +16,12 @@ type Props = {
    *  per-item progress) mid "Sync all". Gates both the Refresh and the
    *  Remove button on each row; see the note in MainScreen.tsx. */
   busyIds: Set<string>;
+  /** The subset of busyIds that is specifically mid-sync, so a row can
+   *  offer Stop rather than a disabled spinner. */
+  syncingIds: Set<string>;
   onRefreshAll: () => void;
   onRefreshOne: (source: SourceRecord) => void;
+  onStop: (source: SourceRecord) => void;
   onRemove: (source: SourceRecord) => void;
   onAddSource: () => void;
 };
@@ -43,8 +47,10 @@ export const SourceList = ({
   loadError,
   syncingAll,
   busyIds,
+  syncingIds,
   onRefreshAll,
   onRefreshOne,
+  onStop,
   onRemove,
   onAddSource,
 }: Props) => {
@@ -102,7 +108,9 @@ export const SourceList = ({
                 }
                 eventCount={eventCountBySource.get(source.id) ?? 0}
                 busy={busyIds.has(source.id)}
+                syncing={syncingIds.has(source.id)}
                 onRefresh={() => onRefreshOne(source)}
+                onStop={() => onStop(source)}
                 onRemove={() => onRemove(source)}
               />
             );

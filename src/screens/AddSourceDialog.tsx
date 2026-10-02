@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { useConfirm } from '@/components/confirm/ConfirmProvider';
 import { notify } from '@/lib/notify';
 import { putSource } from '@/ledger/db';
+import type { SourceRecord } from '@/ledger/types';
 import { registry } from '@/sources/registry';
 import type { ManifestField, SourceModule } from '@/sources/types';
 
@@ -21,8 +22,11 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Called after a source has actually been written, so the caller can
-   *  close the dialog and reload the list and balance. */
-  onCreated: () => void | Promise<void>;
+   *  close the dialog, reload the list and balance, and start its first
+   *  sync. The record is passed because the caller cannot otherwise tell
+   *  WHICH source to sync - picking "the newest" would be a guess that
+   *  breaks the moment two are added quickly. */
+  onCreated: (source: SourceRecord) => void | Promise<void>;
 };
 
 const inputTypeFor = (field: ManifestField): string =>
@@ -126,14 +130,15 @@ export const AddSourceDialog = ({ open, onOpenChange, onCreated }: Props) => {
         }
       }
 
-      await putSource({
+      const created: SourceRecord = {
         id: crypto.randomUUID(),
         moduleId: module.manifest.id,
         label: label.trim() || t(module.manifest.label),
         config,
-      });
+      };
+      await putSource(created);
       notify.success(t('Data source added'));
-      await onCreated();
+      await onCreated(created);
     } catch {
       setFormError(t('Save failed. Check your details and try again.'));
     } finally {

@@ -1,12 +1,12 @@
-import Big from 'big.js';
 import { openLedger } from '@/ledger/db';
 // Also configures Big.NE/Big.PE (the exponential-notation guard) as a side
-// effect, process-wide: that is what keeps new Big(...).toString() below
-// from ever producing exponential form, even though nothing in this file
-// sets them directly.
+// effect, process-wide: that is what keeps a Big's toString() - here, and
+// inside ./scale's valueOf - from ever producing exponential form, even
+// though nothing in this file sets them directly.
 import { addAmounts } from '@/ledger/amount';
 import type { Holding } from '@/ledger/balances';
 import { fetchSpotPrices } from './coingecko';
+import { valueOf } from './scale';
 import type { PriceKey } from './types';
 
 export type { PriceKey };
@@ -102,11 +102,15 @@ export const resolveSpotPrices = async (
 /**
  * Multiplies each holding by its price and sums the results.
  *
- * Multiplication goes straight through big.js rather than a ledger helper:
- * ledger amounts and fiat valuations are different concepts, and
- * src/ledger/amount.ts is deliberately only the ledger's vocabulary.
- * Summing the per-holding values reuses addAmounts, which already owns
- * float-free decimal addition.
+ * Each holding's value goes through `valueOf` (src/prices/scale.ts) rather
+ * than a bare multiplication: a CoinGecko price is quoted per WHOLE unit
+ * while a holding is in the asset's base unit, so the per-asset scale is
+ * part of the conversion, not an optional correction. Valuation lives
+ * there rather than in a ledger helper because ledger amounts and fiat
+ * valuations are different concepts, and src/ledger/amount.ts is
+ * deliberately only the ledger's vocabulary. Summing the per-holding
+ * values reuses addAmounts, which already owns float-free decimal
+ * addition.
  *
  * An asset with no entry in `prices` is reported in `missing` and excluded
  * from the sum - never counted as zero, which would silently understate the
@@ -125,7 +129,7 @@ export const totalValue = (
       missing.push(holding.assetId);
       continue;
     }
-    const value = new Big(holding.amount).times(price).toString();
+    const value = valueOf(holding.amount, price, holding.assetId);
     total = addAmounts(total, value);
   }
 

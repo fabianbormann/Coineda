@@ -1,0 +1,138 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import 'fake-indexeddb/auto';
+import { openLedger } from '@/ledger/db';
+import { putCachedPrice, totalValue } from '@/prices/priceStore';
+import { valueOf, ASSET_DECIMALS } from '@/prices/scale';
+import { resolveValues } from '@/tax/resolveValues';
+import { buildJourneySeries } from '@/journey/series';
+import type { LedgerEvent } from '@/ledger/types';
+import type { TaxEvent } from '@/tax/types';
+
+/**
+ * The unit bug, pinned at every boundary that turns an amount plus a price
+ * into a fiat figure.
+ *
+ * CoinGecko's `cardano` price is the price of ONE ADA, and a ledger holding
+ * is in lovelace (1 ADA = 10^6 lovelace), so a raw `amount * price` is
+ * 1,000,000x too large. 10,000 ADA at EUR 0.30 is EUR 3,000, never
+ * EUR 3,000,000,000 - and because there are three independent call sites,
+ * each one is asserted separately so a later edit cannot fix two and leave
+ * the third drifting.
+ *
+ * Deliberately no `indexedDB.deleteDatabase()`: that is a no-op while
+ * `openLedger()` holds its memoised connection, so the stores are cleared
+ * individually, the pattern tests/checkpointExport.test.ts established.
+ */
+
+/** 10,000 ADA, in the base unit the ledger actually stores. */
+const TEN_THOUSAND_ADA_IN_LOVELACE = '10000000000';
+const ADA_PRICE_EUR = '0.30';
+/** 10,000 x 0.30. */
+const EXPECTED_VALUE = '3000';
+
+const ADA = 'cardano:lovelace';
+const DAY = Date.UTC(2026, 0, 15);
+const ISO_DAY = '2026-01-15';
+
+beforeEach(async () => {
+  const db = await openLedger();
+  for (const store of ['events', 'prices', 'settings'] as const) {
+    await db.clear(store);
+  }
+  // Every path below resolves its price from the cache, so nothing here
+  // should ever reach the network. A fetch that throws proves it.
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => {
+      throw new Error('no test in this file should reach the network');
+    }),
+  );
+});
+
+describe('the per-asset scale', () => {
+  it('knows lovelace has 6 decimals', () => {
+    expect(ASSET_DECIMALS[ADA]).toBe(6);
+  });
+
+  it('divides a base-unit amount by its asset scale', () => {
+    expect(valueOf(TEN_THOUSAND_ADA_IN_LOVELACE, ADA_PRICE_EUR, ADA)).toBe(
+      EXPECTED_VALUE,
+    );
+  });
+
+  it('treats an unmapped asset as whole units rather than guessing a scale', () => {
+    expect(valueOf('2', '1.5', 'unknown:thing')).toBe('3');
+  });
+
+  it('stays exact on an amount far beyond Number.MAX_SAFE_INTEGER', () => {
+    // 10^19 lovelace is 10^13 ADA. A float would already have lost digits.
+    expect(valueOf('10000000000000000001', '1', ADA)).toBe(
+      '10000000000000.000001',
+    );
+  });
+});
+
+describe('every fiat boundary applies the scale', () => {
+  it('values a tax event in the base currency, not in base units (resolveValues)', async () => {
+    await putCachedPrice(
+      { assetId: ADA, currency: 'eur', date: ISO_DAY },
+      ADA_PRICE_EUR,
+    );
+
+    const disposal: TaxEvent = {
+      sourceEventId: 'sell',
+      kind: 'disposal',
+      assetId: ADA,
+      amount: TEN_THOUSAND_ADA_IN_LOVELACE,
+      timestamp: DAY,
+      venue: 'wallet-a',
+    };
+
+    const { valued, unpriced } = await resolveValues([disposal], 'eur');
+
+    expect(unpriced).toEqual([]);
+    expect(valued[0].value).toBe(EXPECTED_VALUE);
+  });
+
+  it('values a holding in the base currency, not in base units (totalValue)', () => {
+    const { total, missing } = totalValue(
+      [{ assetId: ADA, amount: TEN_THOUSAND_ADA_IN_LOVELACE }],
+      new Map([[ADA, ADA_PRICE_EUR]]),
+    );
+
+    expect(missing).toEqual([]);
+    expect(total).toBe(EXPECTED_VALUE);
+  });
+
+  it('values a journey point in the base currency, not in base units (buildJourneySeries)', async () => {
+    await putCachedPrice(
+      { assetId: ADA, currency: 'eur', date: ISO_DAY },
+      ADA_PRICE_EUR,
+    );
+
+    const event: LedgerEvent = {
+      id: 'buy',
+      sourceId: 's1',
+      externalId: 'buy',
+      timestamp: DAY,
+      kind: 'trade',
+      origin: 'authored',
+      legs: [
+        {
+          assetId: ADA,
+          amount: TEN_THOUSAND_ADA_IN_LOVELACE,
+          direction: 'in',
+          venue: 'wallet-a',
+          role: 'principal',
+        },
+      ],
+    };
+
+    // `now` is the sample timestamp, and equals the event's own day, so the
+    // series is a single point priced from the cache entry above.
+    const series = await buildJourneySeries([event], 'eur', { now: DAY });
+
+    expect(series.points).toHaveLength(1);
+    expect(series.points[0].totalValue).toBe(EXPECTED_VALUE);
+  });
+});

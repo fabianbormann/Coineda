@@ -131,6 +131,59 @@ export const putEvents = async (
   return { inserted, updated };
 };
 
+/**
+ * `putEvents`, but only if the source these events belong to still exists.
+ *
+ * The same shape, and the same reason, as `putSourceIfExists`: the check
+ * and the writes happen in ONE readwrite transaction spanning 'sources'
+ * and 'events', so a `deleteSourceCascade` that commits first makes this a
+ * no-op rather than leaving derived rows behind for a sourceId with no
+ * `sources` row. Those orphans would be invisible - nothing in the UI
+ * lists them, so nothing can delete them - while still feeding
+ * `ownedVenuesOf`, `foldHoldings` and `runTaxReport`.
+ *
+ * Returns `written: false` when the source was already gone, so a caller
+ * mid-drain can stop rather than keep paging for something that no longer
+ * exists.
+ */
+export const putEventsIfSourceExists = async (
+  sourceId: string,
+  events: LedgerEvent[],
+): Promise<{ written: boolean; inserted: number; updated: number }> => {
+  for (const event of events) {
+    assertValidEvent(event);
+  }
+
+  const db = await openLedger();
+  const tx = db.transaction(['sources', 'events'], 'readwrite');
+  const existing = await tx.objectStore('sources').get(sourceId);
+  if (!existing) {
+    await tx.done;
+    return { written: false, inserted: 0, updated: 0 };
+  }
+
+  const store = tx.objectStore('events');
+  const index = store.index('identity');
+  let inserted = 0;
+  let updated = 0;
+  // Same read-after-write reliance as putEvents: a put() earlier in this
+  // loop is visible to an index.get() later in the same transaction, which
+  // is how two events sharing an identity in one batch converge to one row.
+  for (const event of events) {
+    const row = await index.get([event.sourceId, event.externalId]);
+    if (row) {
+      await store.put({ ...event, id: row.id });
+      updated += 1;
+    } else {
+      await store.put(event);
+      inserted += 1;
+    }
+  }
+
+  await tx.done;
+  return { written: true, inserted, updated };
+};
+
 export const getAllEvents = async (): Promise<LedgerEvent[]> =>
   (await openLedger()).getAll('events');
 
@@ -253,4 +306,26 @@ export const putCursor = async (
   cursor: Cursor,
 ): Promise<void> => {
   await (await openLedger()).put('cursors', { sourceId, cursor });
+};
+
+/**
+ * `putCursor`, guarded the same way `putEventsIfSourceExists` is.
+ *
+ * `deleteSourceCascade` removes the cursor row inside its own transaction;
+ * an unconditional write from a sync still draining would recreate it, and
+ * the next sync of a source the user re-added under the same id would
+ * resume from a cursor belonging to a configuration that no longer exists.
+ */
+export const putCursorIfSourceExists = async (
+  sourceId: string,
+  cursor: Cursor,
+): Promise<boolean> => {
+  const db = await openLedger();
+  const tx = db.transaction(['sources', 'cursors'], 'readwrite');
+  const existing = await tx.objectStore('sources').get(sourceId);
+  if (existing) {
+    await tx.objectStore('cursors').put({ sourceId, cursor });
+  }
+  await tx.done;
+  return existing !== undefined;
 };

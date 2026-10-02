@@ -5,7 +5,8 @@ import {
   deleteDerivedEvents,
   getCursor,
   putCursor,
-  putEvents,
+  putCursorIfSourceExists,
+  putEventsIfSourceExists,
   putSourceIfExists,
 } from '@/ledger/db';
 import type { Cursor, LedgerEvent, SourceRecord } from '@/ledger/types';
@@ -22,7 +23,29 @@ export type SyncReport = {
    *  a static key anyway. Task 11's UI translates its own wrapper text and
    *  shows this value as the untranslated detail. */
   error?: string;
+  /**
+   * True when the caller's signal aborted this run. Deliberately separate
+   * from `error`: a stop the user asked for is not a failure, and writing
+   * it to `lastError` would leave a red row demanding attention for doing
+   * exactly what was intended. A provider that genuinely broke still sets
+   * `error`.
+   */
+  cancelled?: boolean;
 };
+
+/**
+ * Was this thrown because the caller's signal aborted?
+ *
+ * Reads `name` rather than using `instanceof DOMException`: under jsdom a
+ * DOMException comes from a different realm and fails that check, so a
+ * cancellation would be misreported as a provider failure. The checkpoint
+ * code hit the same realm problem.
+ */
+const isAbort = (error: unknown): boolean =>
+  typeof error === 'object' &&
+  error !== null &&
+  'name' in error &&
+  String((error as { name: unknown }).name) === 'AbortError';
 
 const messageOf = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
@@ -47,7 +70,7 @@ const stamp = (event: DerivedEvent, sourceId: string): LedgerEvent => ({
 
 export const syncSource = async (
   source: SourceRecord,
-  options?: { full?: boolean },
+  options?: { full?: boolean; signal?: AbortSignal },
 ): Promise<SyncReport> => {
   const report: SyncReport = {
     sourceId: source.id,
@@ -55,6 +78,13 @@ export const syncSource = async (
     updated: 0,
     pages: 0,
   };
+
+  // Checked before anything is read or written: a stop pressed while a
+  // previous sync was still finishing must not kick off a fresh drain.
+  if (options?.signal?.aborted) {
+    report.cancelled = true;
+    return report;
+  }
 
   const module = findModule(source.moduleId);
   if (!module) {
@@ -86,9 +116,20 @@ export const syncSource = async (
   let cursor: Cursor = options?.full ? null : await getCursor(source.id);
 
   for (let page = 0; page < MAX_PAGES; page += 1) {
+    // Between pages as well as inside a request: a stop arriving just after
+    // a page committed should end the run here rather than spend another
+    // round trip to discover the same thing.
+    if (options?.signal?.aborted) {
+      report.cancelled = true;
+      return report;
+    }
     try {
       const requestedCursor = cursor;
-      const result = await module.fetchEvents(source.config, cursor);
+      const result = await module.fetchEvents(
+        source.config,
+        cursor,
+        options?.signal,
+      );
 
       // A module that keeps handing back the cursor it was just given is
       // making no progress. Dedupe means this can't duplicate rows, but left
@@ -103,7 +144,22 @@ export const syncSource = async (
       }
 
       const stamped = result.events.map((event) => stamp(event, source.id));
-      const { inserted, updated } = await putEvents(stamped);
+      // Existence-guarded, like every status write-back in this function:
+      // a removal that commits mid-drain must not leave derived events
+      // behind for a sourceId with no `sources` row. Those rows are
+      // invisible to the UI - nothing lists them, so nothing can delete
+      // them - and they would still feed ownedVenuesOf, foldHoldings and
+      // runTaxReport.
+      const { written, inserted, updated } = await putEventsIfSourceExists(
+        source.id,
+        stamped,
+      );
+      if (!written) {
+        // The source is gone. Not an error - nobody is left to show one to,
+        // and putSourceIfExists would discard it anyway - and no point
+        // paging on for something that no longer exists.
+        return report;
+      }
       report.inserted += inserted;
       report.updated += updated;
       report.pages += 1;
@@ -113,7 +169,12 @@ export const syncSource = async (
       // cursor on disk is still the one we just wrote here - the last page
       // that truly committed - never one that points past a page that failed.
       cursor = result.cursor;
-      await putCursor(source.id, cursor);
+      if (!(await putCursorIfSourceExists(source.id, cursor))) {
+        // Same race, same answer: a recreated cursor row for a deleted
+        // source would be resumed from by whatever is next configured
+        // under that id.
+        return report;
+      }
 
       if (cursor === null) {
         await putSourceIfExists({
@@ -127,6 +188,12 @@ export const syncSource = async (
       // Deliberately no putCursor here: the cursor already on disk is the
       // last one a successful page persisted above, so a page that throws
       // never advances past itself and its events are retried, not skipped.
+      // That is also what makes a stop lossless: whatever committed stays
+      // committed, and the next run resumes from it.
+      if (isAbort(error) || options?.signal?.aborted) {
+        report.cancelled = true;
+        return report;
+      }
       report.error = messageOf(error);
       await putSourceIfExists({ ...source, lastError: report.error });
       return report;

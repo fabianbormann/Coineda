@@ -63,6 +63,18 @@ export type DerivedEvent = Omit<LedgerEvent, 'id' | 'sourceId'>;
 export type FetchPage = { events: DerivedEvent[]; cursor: Cursor };
 
 /**
+ * Passed to `probe` and `fetchEvents` so a sync can be stopped and so a
+ * module can combine it with its own request deadline.
+ *
+ * A module MUST give every request a timeout of its own regardless of
+ * whether a caller supplies this: a provider that accepts a connection and
+ * never answers would otherwise wedge a sync permanently, writing no error
+ * and never completing. That happened, from an ordinary pasted URL, which
+ * is why it is stated in the contract rather than left to each author.
+ */
+export type ModuleSignal = AbortSignal | undefined;
+
+/**
  * A pure translator: config plus cursor in, normalised events out.
  *
  * A module never touches storage, never writes, never fetches prices and never
@@ -100,9 +112,13 @@ export type FetchPage = { events: DerivedEvent[]; cursor: Cursor };
  */
 export type SourceModule = {
   manifest: SourceManifest;
-  probe(config: Record<string, string>): Promise<ProbeResult>;
+  probe(
+    config: Record<string, string>,
+    signal?: ModuleSignal,
+  ): Promise<ProbeResult>;
   fetchEvents(
     config: Record<string, string>,
     cursor: Cursor,
+    signal?: ModuleSignal,
   ): Promise<FetchPage>;
 };

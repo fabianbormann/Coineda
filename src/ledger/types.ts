@@ -33,6 +33,17 @@ export type LedgerEvent = {
   /** The source's own payload, kept so an event can be re-derived or
    *  debugged without another network round trip. */
   raw?: unknown;
+  /**
+   * Human-readable provenance: why this event exists, in words, for an
+   * audit trail a user or their accountant can follow back from a tax
+   * report to the thing that produced it.
+   *
+   * Display and explanation only - never parsed, and never the carrier of
+   * data a calculation depends on. Anything a tax rule must branch on
+   * belongs in a typed field, because a rule matching on prose is a rule
+   * that breaks when the prose is reworded or translated.
+   */
+  note?: string;
 };
 
 /** Opaque to the host: only the module that issued it may interpret it. */

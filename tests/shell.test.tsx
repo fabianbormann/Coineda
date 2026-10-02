@@ -1,10 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { AppShell } from '@/components/layout/AppShell';
 import { ThemeProvider } from '@/components/theme/ThemeProvider';
-
-const SIDEBAR_OPEN_STORAGE_KEY = 'coineda.sidebarOpen';
 
 beforeEach(() => {
   localStorage.clear();
@@ -17,13 +14,6 @@ beforeEach(() => {
       removeEventListener: vi.fn(),
     }),
   );
-  // shadcn's sidebar detects mobile via window.innerWidth (not the
-  // matchMedia mock above), so tests default to jsdom's desktop width.
-  Object.defineProperty(window, 'innerWidth', {
-    writable: true,
-    configurable: true,
-    value: 1024,
-  });
 });
 
 const renderShell = () =>
@@ -36,39 +26,33 @@ const renderShell = () =>
   );
 
 describe('app shell', () => {
-  it('renders the sidebar, expanded by default', () => {
-    renderShell();
-    const sidebar = document.querySelector('[data-slot="sidebar"]');
-    expect(sidebar).toBeInTheDocument();
-    expect(sidebar).toHaveAttribute('data-state', 'expanded');
-  });
-
   it('renders its children as the page content', () => {
     renderShell();
     expect(screen.getByTestId('page')).toBeInTheDocument();
   });
 
-  it('collapses the sidebar via the header trigger and persists the choice', async () => {
+  it('renders no sidebar', () => {
+    // Reported from testing: "why is the sidebar there but empty?" It was a
+    // placeholder for nav that went with the deleted routing layer, so it
+    // rendered a blank panel and a toggle that revealed nothing. Visible
+    // chrome that does nothing reads as a broken app, and a shadcn sidebar
+    // is cheap to add back once there are routes to put in it.
     renderShell();
-    const trigger = screen.getByRole('button', {
-      name: /toggle navigation/i,
-    });
-
-    await userEvent.click(trigger);
-
-    const sidebar = document.querySelector('[data-slot="sidebar"]');
-    expect(sidebar).toHaveAttribute('data-state', 'collapsed');
-    expect(localStorage.getItem(SIDEBAR_OPEN_STORAGE_KEY)).toBe('false');
-
-    await userEvent.click(trigger);
-    expect(sidebar).toHaveAttribute('data-state', 'expanded');
-    expect(localStorage.getItem(SIDEBAR_OPEN_STORAGE_KEY)).toBe('true');
+    expect(document.querySelector('[data-slot="sidebar"]')).toBeNull();
   });
 
-  it('restores a previously collapsed sidebar from localStorage on mount', () => {
-    localStorage.setItem(SIDEBAR_OPEN_STORAGE_KEY, 'false');
+  it('offers no navigation toggle, since there is nothing to toggle', () => {
     renderShell();
-    const sidebar = document.querySelector('[data-slot="sidebar"]');
-    expect(sidebar).toHaveAttribute('data-state', 'collapsed');
+    expect(
+      screen.queryByRole('button', { name: /toggle navigation/i }),
+    ).toBeNull();
+  });
+
+  it('keeps the version and licence links the sidebar used to carry', () => {
+    // These were the sidebar's only real content. Removing the panel must
+    // not quietly lose them.
+    renderShell();
+    expect(screen.getByRole('link', { name: /^v\d/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /GPLv3/i })).toBeInTheDocument();
   });
 });

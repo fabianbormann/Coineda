@@ -79,13 +79,13 @@ describe('electron production load', () => {
 });
 
 describe('app version', () => {
-  it('is a bare semver, so the release link in the sidebar resolves', () => {
+  it('is a bare semver, so the release link in the footer resolves', () => {
     // Rewritten: this test used to assert that
     // `'version:1.2.3'.split(':')[1] === '1.2.3'`, which is a property of
     // String.prototype.split and can never fail, and it documented v1's
     // exportData/CoinedaFileInput .cnd header, neither of which exists any
     // more. The real invariant APP_VERSION still has to satisfy is this:
-    // AppSidebar builds a GitHub release URL as `v${APP_VERSION}` and
+    // AppShell builds a GitHub release URL as `v${APP_VERSION}` and
     // release-please tags releases as `v<semver>`, so a leading 'v', a
     // 'v'-prefixed package version or a prerelease suffix would link to a
     // tag that does not exist.
@@ -100,21 +100,16 @@ describe('app version', () => {
     expect(APP_VERSION).toBe(packageJson.version);
   });
 
-  it('is the version the sidebar actually links to', () => {
+  it('is the version the footer actually links to', () => {
     // Pins the `v`-prefixed tag shape at the one call site that depends on
-    // it, so a change there has to be a deliberate one.
-    const sidebar = fs.readFileSync(
-      path.join(
-        __dirname,
-        '..',
-        'src',
-        'components',
-        'layout',
-        'AppSidebar.tsx',
-      ),
+    // it, so a change there has to be a deliberate one. The link moved from
+    // AppSidebar to AppShell when the empty sidebar was removed; this test
+    // is what caught that the link had a dependent at all.
+    const shell = fs.readFileSync(
+      path.join(__dirname, '..', 'src', 'components', 'layout', 'AppShell.tsx'),
       'utf8',
     );
-    expect(sidebar).toContain('releases/tag/v${APP_VERSION}');
+    expect(shell).toContain('releases/tag/v${APP_VERSION}');
   });
 });
 
