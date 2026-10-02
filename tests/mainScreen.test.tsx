@@ -12,7 +12,8 @@ import * as ledgerDb from '@/ledger/db';
 import { putSettings } from '@/settings/settingsStore';
 import { registry } from '@/sources/registry';
 import type { LedgerEvent } from '@/ledger/types';
-import type { ProbeResult } from '@/sources/types';
+import type { FetchPage, ProbeResult } from '@/sources/types';
+import { CARDANO_MESSAGES } from '@/sources/cardano/messages';
 
 // Typed explicitly against ProbeResult - inferring the mock's return type
 // from its first implementation alone would pin it to `{ ok: boolean;
@@ -443,6 +444,35 @@ describe('adding a source', () => {
     expect(await db.getAll('sources')).toHaveLength(0);
   });
 
+  it('interpolates a probe message’s placeholders instead of showing them raw', async () => {
+    // The dialog renders ProbeResult.message through t(). Without
+    // messageParams the user sees a literal "{{example}}" where the host
+    // they are meant to copy should be - and the one message that needs
+    // interpolation is the one telling them their base URL is wrong.
+    probe.mockResolvedValue({
+      ok: false,
+      message: CARDANO_MESSAGES.hostShape,
+      messageParams: { example: 'https://provider.example.org' },
+    });
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /add a data source/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /Test Exchange/i }),
+    );
+    await userEvent.type(await screen.findByLabelText(/API Key/i), 'k');
+    await userEvent.type(await screen.findByLabelText(/Secret Key/i), 's');
+    await userEvent.click(
+      await screen.findByRole('button', { name: /^Save$/ }),
+    );
+
+    expect(
+      await screen.findByText(/https:\/\/provider\.example\.org/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/\{\{example\}\}/)).not.toBeInTheDocument();
+  });
+
   it('warns prominently when the key turns out to be writable', async () => {
     // A writable exchange key is the user's largest risk in this whole app.
     probe.mockResolvedValue({ ok: true, readOnly: false });
@@ -667,5 +697,186 @@ describe('sync lifecycle', () => {
     await waitFor(() =>
       expect(screen.queryByText(/sync failed/i)).not.toBeInTheDocument(),
     );
+  });
+});
+
+describe('repairing what is already on disk', () => {
+  it('offers a resync from scratch and says it re-downloads the history', async () => {
+    // An ordinary refresh cannot repair every wrong row. A re-drain upserts
+    // on (sourceId, externalId), so a row the module emits again IS
+    // corrected - but a transaction the module now (correctly) produces no
+    // legs for is SKIPPED, and a skipped event is never updated or deleted.
+    // A row recorded before the collateral and reference-input fixes keeps
+    // its phantom disposal until something deletes it, and
+    // syncSource(source, { full: true }) was reachable from nowhere in this
+    // UI.
+    await putSource({
+      id: 'cfg-resync',
+      moduleId: 'test-exchange',
+      label: 'Stale',
+      config: {},
+    });
+    renderScreen();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /resync Stale from scratch/i }),
+    );
+
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent(/whole history again/i);
+  });
+
+  it('drains from the start, discarding what the source synced before', async () => {
+    // Typed through the generic rather than named parameters, so
+    // `mock.calls[0][1]` is the cursor - an untyped `vi.fn(async () => ...)`
+    // has a zero-length call tuple and the assertion below, which is the
+    // whole test, would not compile.
+    const fetchEvents = vi.fn<
+      (
+        config: Record<string, string>,
+        cursor: string | null,
+      ) => Promise<FetchPage>
+    >(async () => ({ events: [], cursor: null }));
+    registry.length = 0;
+    registry.push({ ...testModule, fetchEvents });
+
+    await putSource({
+      id: 'cfg-resync2',
+      moduleId: 'test-exchange',
+      label: 'Stale',
+      config: {},
+    });
+    // A phantom row from before the fix, and a cursor that would otherwise
+    // make an ordinary refresh skip straight past it.
+    await putEvents([
+      {
+        ...heldEvent(),
+        id: 'phantom-1',
+        sourceId: 'cfg-resync2',
+        externalId: 'phantom',
+      },
+    ]);
+    await ledgerDb.putCursor('cfg-resync2', 'page-9');
+
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /resync Stale from scratch/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /^Resync$/ }),
+    );
+
+    await waitFor(() => expect(fetchEvents).toHaveBeenCalled());
+    // Drained from the start, not from the persisted cursor.
+    expect(fetchEvents.mock.calls[0][1]).toBeNull();
+    // And the row an ordinary re-drain would have silently kept is gone.
+    const db = await openLedger();
+    await waitFor(async () =>
+      expect(
+        (await db.getAll('events')).filter(
+          (event) => event.sourceId === 'cfg-resync2',
+        ),
+      ).toEqual([]),
+    );
+  });
+
+  it('does nothing when the confirmation is declined', async () => {
+    const fetchEvents = vi.fn(async () => ({ events: [], cursor: null }));
+    registry.length = 0;
+    registry.push({ ...testModule, fetchEvents });
+    await putSource({
+      id: 'cfg-resync3',
+      moduleId: 'test-exchange',
+      label: 'Stale',
+      config: {},
+    });
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /resync Stale from scratch/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /^Cancel$/ }),
+    );
+    expect(fetchEvents).not.toHaveBeenCalled();
+  });
+
+  it('is gated by the same busy rule as refresh', async () => {
+    // Removing or syncing a source while a resync is in flight is the same
+    // race the busyIds set already exists for - a resync must not be the
+    // one action that escapes it.
+    registry.length = 0;
+    registry.push({
+      ...optionalFieldModule,
+      fetchEvents: vi.fn(
+        () => new Promise<never>(() => {}),
+      ) as unknown as typeof optionalFieldModule.fetchEvents,
+    });
+    await putSource({
+      id: 'cfg-busy',
+      moduleId: 'test-chain',
+      label: 'Busy',
+      config: { address: 'addr_test1_busy' },
+    });
+    renderScreen();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /refresh busy/i }),
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: /resync Busy from scratch/i }),
+      ).toBeDisabled(),
+    );
+  });
+});
+
+describe('a failed sync that reports a translation key', () => {
+  it('renders it translated on the row, not as the raw English key', async () => {
+    // SyncReport.error is documented as never a translation key, but
+    // fetchCardanoEvents throws one of CARDANO_MESSAGES - which syncSource
+    // stores verbatim as lastError and SourceRow rendered raw, so a German
+    // user was shown the English sentence. Keying on the English string is
+    // this project's whole i18n model, so one t() on the detail covers both
+    // a key and a raw provider diagnostic.
+    const i18n = (await import('@/i18n')).default;
+    await i18n.changeLanguage('de');
+    try {
+      await putSource({
+        id: 'cfg-keyed',
+        moduleId: 'test-exchange',
+        label: 'Keyed',
+        config: {},
+        lastError: CARDANO_MESSAGES.stakeAddressNeedsAccountApi,
+      });
+      renderScreen();
+      expect(
+        await screen.findByText(/Zahlungsadressen der Wallet|Zahlungsadresse/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(new RegExp('That looks like a stake address')),
+      ).not.toBeInTheDocument();
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+
+  it('still shows a raw provider diagnostic unchanged', async () => {
+    // t() hands back any string it has no key for, so wrapping the detail
+    // must not mangle a provider's own message - including the colon, which
+    // i18next would otherwise be free to read as a namespace separator.
+    await putSource({
+      id: 'cfg-raw',
+      moduleId: 'test-exchange',
+      label: 'Raw',
+      config: {},
+      lastError: 'cardano: listing transactions failed with status 404',
+    });
+    renderScreen();
+    expect(
+      await screen.findByText(
+        /cardano: listing transactions failed with status 404/,
+      ),
+    ).toBeInTheDocument();
   });
 });

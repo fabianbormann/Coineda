@@ -199,16 +199,83 @@ export const MainScreen = () => {
         notify.info(t('Stopped syncing {{label}}', { label: source.label }));
       } else if (report.error) {
         // report.error is a raw provider diagnostic (see SyncReport in
-        // src/sync/syncSource.ts) - framed in a translated sentence here,
-        // with the diagnostic itself kept verbatim as the detail.
+        // src/sync/syncSource.ts) - framed in a translated sentence here.
+        // The detail goes through t() too: a Cardano refusal throws a
+        // translation key (CARDANO_MESSAGES), and t() returns any string it
+        // has no key for unchanged, so one call covers both.
         notify.error(
           t('Could not sync {{label}}: {{detail}}', {
             label: source.label,
-            detail: report.error,
+            detail: t(report.error),
           }),
         );
       } else {
         notify.success(t('Synced {{label}}', { label: source.label }));
+      }
+    } finally {
+      controllersRef.current.delete(source.id);
+      setSyncingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(source.id);
+        return next;
+      });
+      await load();
+    }
+  };
+
+  /**
+   * Re-download a source's whole history.
+   *
+   * The same path as Refresh - same busy gating, same AbortController, same
+   * reporting - differing only in `full: true`, which discards this source's
+   * derived events and resets its cursor before draining (see syncSource).
+   * It exists because a plain refresh cannot repair every wrong row on disk:
+   * `putEventsIfSourceExists` upserts on (sourceId, externalId), so a row
+   * the module emits again IS corrected, but a transaction the module now
+   * produces no legs for is skipped - and a skipped event is never updated
+   * or deleted. A row recorded before the collateral and reference-input
+   * fixes keeps its phantom disposal until something deletes it, and
+   * `full: true` was reachable from nowhere in this UI.
+   *
+   * Confirmed first, because it throws away local state and re-issues the
+   * source's entire request history against a provider that may rate-limit.
+   */
+  const handleResyncOne = async (source: SourceRecord) => {
+    if (busyIds.has(source.id)) {
+      return;
+    }
+    const proceed = await confirm({
+      title: t('Resync {{label}} from scratch?', { label: source.label }),
+      description: t(
+        'This discards the events Coineda synced from {{label}} and downloads its whole history again. Events you added yourself stay. It can take a while and makes many requests to the provider.',
+        { label: source.label },
+      ),
+      confirmLabel: t('Resync'),
+      cancelLabel: t('Cancel'),
+    });
+    if (!proceed) {
+      return;
+    }
+
+    const controller = new AbortController();
+    controllersRef.current.set(source.id, controller);
+    setSyncingIds((prev) => new Set(prev).add(source.id));
+    try {
+      const report = await syncSource(source, {
+        full: true,
+        signal: controller.signal,
+      });
+      if (report.cancelled) {
+        notify.info(t('Stopped syncing {{label}}', { label: source.label }));
+      } else if (report.error) {
+        notify.error(
+          t('Could not sync {{label}}: {{detail}}', {
+            label: source.label,
+            detail: t(report.error),
+          }),
+        );
+      } else {
+        notify.success(t('Resynced {{label}}', { label: source.label }));
       }
     } finally {
       controllersRef.current.delete(source.id);
@@ -278,6 +345,7 @@ export const MainScreen = () => {
         syncingIds={syncingIds}
         onRefreshAll={handleRefreshAll}
         onRefreshOne={handleRefreshOne}
+        onResyncOne={handleResyncOne}
         onStop={handleStop}
         onRemove={handleRemove}
         onAddSource={() => setAddDialogOpen(true)}

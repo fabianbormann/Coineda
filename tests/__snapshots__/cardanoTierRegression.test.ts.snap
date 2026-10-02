@@ -1,0 +1,22 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`a healthy native Yaci instance is unaffected > produces byte-identical holdings to the pre-change behaviour 1`] = `
+[
+  {
+    "amount": "9990807",
+    "assetId": "cardano:0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b55534472",
+  },
+  {
+    "amount": "6821487",
+    "assetId": "cardano:0684f582b8abeb4236b20688744eca788a61cd9881422a7113637f6b7355534472",
+  },
+  {
+    "amount": "59982000000",
+    "assetId": "cardano:d8906ca5c7ba124a0407a32dab37b2c82b13b3dcd9111e42940dcea45553444378",
+  },
+  {
+    "amount": "9995078965",
+    "assetId": "cardano:lovelace",
+  },
+]
+`;

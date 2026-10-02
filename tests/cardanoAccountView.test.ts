@@ -2,9 +2,19 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import cardanoYaci from '@/sources/cardano-yaci';
-import { foldDisposals, isInternalTransfer } from '@/ledger/balances';
+import {
+  foldDisposals,
+  foldHoldings,
+  isInternalTransfer,
+  ownedVenuesOf,
+} from '@/ledger/balances';
 import type { LedgerEvent } from '@/ledger/types';
-import { fetchRewardEvents } from '@/sources/cardano/translator';
+import {
+  fetchRewardEvents,
+  rewardsVenueOf,
+} from '@/sources/cardano/translator';
+import { CARDANO_MESSAGES } from '@/sources/cardano/messages';
+import { withAccountHistoryRoutes } from './cardanoRecordings';
 
 const HOST = 'https://yaci-store.preprod.colo2.cf-systems.org';
 
@@ -27,26 +37,48 @@ const FIXTURES_DIR = path.join(
 
 const config = { baseUrl: HOST, address: RECORDED_ADDRESS };
 
-const loadFixtures = async (): Promise<Map<string, unknown>> => {
+type Recorded = { url: string; status: number; body: unknown };
+
+const loadFixtures = async (): Promise<Map<string, Recorded>> => {
   const files = await readdir(FIXTURES_DIR);
-  const fixtures = new Map<string, unknown>();
+  const fixtures = new Map<string, Recorded>();
   for (const file of files.filter((name) => name.endsWith('.json'))) {
     const raw = await readFile(path.join(FIXTURES_DIR, file), 'utf8');
-    const { url, body } = JSON.parse(raw) as { url: string; body: unknown };
-    fixtures.set(url, body);
+    const recorded = JSON.parse(raw) as Recorded;
+    fixtures.set(recorded.url, recorded);
   }
   return fixtures;
 };
 
-const stubFetch = (fixtures: Map<string, unknown>) => {
+/** A route this instance does not serve. Yaci answers 404 on the plain
+ *  /addresses/{addr} lookup and on both account routes - recorded, see
+ *  fixtures 200 and 201 - and the hand-built tables below say so the same
+ *  way rather than relying on the stub's throw. */
+const absent = (url: string): Recorded => ({ url, status: 404, body: {} });
+
+const ok = (url: string, body: unknown): Recorded => ({
+  url,
+  status: 200,
+  body,
+});
+
+const stubFetch = (fixtures: Map<string, Recorded>) => {
+  // See tests/cardanoRecordings.ts: the paged /rewards URLs and an empty
+  // /withdrawals, two routes these recordings predate.
+  const served = withAccountHistoryRoutes(fixtures);
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string) => {
-      const body = fixtures.get(String(url));
-      if (!body) {
+      const recorded = served.get(String(url));
+      if (!recorded) {
+        // A throw rather than a blanket 404, so a URL nobody recorded is
+        // reported as the mistake it is instead of looking like a route the
+        // instance does not serve.
         throw new Error(`no recorded fixture for ${String(url)}`);
       }
-      return new Response(JSON.stringify(body), { status: 200 });
+      return new Response(JSON.stringify(recorded.body), {
+        status: recorded.status,
+      });
     }),
   );
 };
@@ -92,15 +124,16 @@ describe('cardano account view', () => {
   it('falls back to the payment address when an entry has no stake address', async () => {
     // Enterprise and Byron addresses have stake_address: null. They are not
     // an error - they are an account of one address.
+    const lookup = `${HOST}/api/v1/addresses/addr_test1_enterprise`;
+    const listing = `${HOST}/api/v1/addresses/addr_test1_enterprise/transactions?page=1&count=20&order=asc`;
+    const utxos = `${HOST}/api/v1/txs/tx1/utxos`;
     stubFetch(
-      new Map<string, unknown>([
+      new Map<string, Recorded>([
+        [lookup, absent(lookup)],
+        [listing, ok(listing, [{ tx_hash: 'tx1', block_time: 1700000000 }])],
         [
-          `${HOST}/api/v1/addresses/addr_test1_enterprise/transactions?page=1&count=20&order=asc`,
-          [{ tx_hash: 'tx1', block_time: 1700000000 }],
-        ],
-        [
-          `${HOST}/api/v1/txs/tx1/utxos`,
-          {
+          utxos,
+          ok(utxos, {
             inputs: [],
             outputs: [
               {
@@ -109,7 +142,7 @@ describe('cardano account view', () => {
                 amount: [{ unit: 'lovelace', quantity: '1000000' }],
               },
             ],
-          },
+          }),
         ],
       ]),
     );
@@ -119,6 +152,101 @@ describe('cardano account view', () => {
       null,
     );
     expect(events[0].legs[0].venue).toBe('addr_test1_enterprise');
+  });
+
+  it('ignores a collateral entry, which a successful script never spends', async () => {
+    // Collateral is pledged as a guarantee and returned by a successful
+    // script transaction. Counting it as a spend is what made a real
+    // wallet report -727 ADA against a true +25 ADA for this account - see
+    // legsForAccount's equivalent test for the account-tier half of the fix.
+    const lookup = `${HOST}/api/v1/addresses/addr_test1_collateral`;
+    const listing = `${HOST}/api/v1/addresses/addr_test1_collateral/transactions?page=1&count=20&order=asc`;
+    const utxos = `${HOST}/api/v1/txs/collateraltx/utxos`;
+    stubFetch(
+      new Map<string, Recorded>([
+        [lookup, absent(lookup)],
+        [
+          listing,
+          ok(listing, [{ tx_hash: 'collateraltx', block_time: 1700000000 }]),
+        ],
+        [
+          utxos,
+          ok(utxos, {
+            inputs: [
+              {
+                address: 'addr_test1_collateral',
+                stake_address: null,
+                collateral: true,
+                amount: [{ unit: 'lovelace', quantity: '5000000' }],
+              },
+            ],
+            outputs: [
+              {
+                address: 'addr_test1_collateral',
+                stake_address: null,
+                amount: [{ unit: 'lovelace', quantity: '1000000' }],
+              },
+            ],
+          }),
+        ],
+      ]),
+    );
+
+    const { events } = await cardanoYaci.fetchEvents(
+      { baseUrl: HOST, address: 'addr_test1_collateral' },
+      null,
+    );
+    const transfer = events.find((event) => event.kind === 'transfer');
+    expect(transfer).toBeDefined();
+    expect(transfer!.legs.filter((leg) => leg.direction === 'out')).toEqual([]);
+  });
+
+  it('ignores a reference input, which a script reads and never consumes', async () => {
+    // The address path's half of the same fix. A reference input is read by
+    // a script, never consumed - so counting it as a spend subtracts money
+    // that never left, exactly as collateral did. Two comments in this
+    // codebase already CLAIMED reference inputs produce no legs; neither
+    // leg builder filtered them until now.
+    const lookup = `${HOST}/api/v1/addresses/addr_test1_reference`;
+    const listing = `${HOST}/api/v1/addresses/addr_test1_reference/transactions?page=1&count=20&order=asc`;
+    const utxos = `${HOST}/api/v1/txs/referencetx/utxos`;
+    stubFetch(
+      new Map<string, Recorded>([
+        [lookup, absent(lookup)],
+        [
+          listing,
+          ok(listing, [{ tx_hash: 'referencetx', block_time: 1700000000 }]),
+        ],
+        [
+          utxos,
+          ok(utxos, {
+            inputs: [
+              {
+                address: 'addr_test1_reference',
+                stake_address: null,
+                reference: true,
+                amount: [{ unit: 'lovelace', quantity: '7000000' }],
+              },
+            ],
+            outputs: [
+              {
+                address: 'addr_test1_reference',
+                stake_address: null,
+                amount: [{ unit: 'lovelace', quantity: '1000000' }],
+              },
+            ],
+          }),
+        ],
+      ]),
+    );
+
+    const { events } = await cardanoYaci.fetchEvents(
+      { baseUrl: HOST, address: 'addr_test1_reference' },
+      null,
+    );
+    const transfer = events.find((event) => event.kind === 'transfer');
+    expect(transfer).toBeDefined();
+    expect(transfer!.legs.filter((leg) => leg.direction === 'out')).toEqual([]);
   });
 
   it('makes a send between two addresses of one wallet an internal transfer', async () => {
@@ -134,15 +262,23 @@ describe('cardano account view', () => {
     // receiving leg is kept, the two legs net to zero, and the event
     // classifies as internal.
     const account = 'stake_test1_mine';
+    const lookup = `${HOST}/api/v1/addresses/addr_test1_a`;
+    const listing = `${HOST}/api/v1/addresses/addr_test1_a/transactions?page=1&count=20&order=asc`;
+    const utxos = `${HOST}/api/v1/txs/selfsend/utxos`;
+    const rewards = `${HOST}/api/v1/accounts/${account}/rewards`;
     stubFetch(
-      new Map<string, unknown>([
+      new Map<string, Recorded>([
+        // Native Yaci: no lookup route, so the tier procedure reads the
+        // 404 as "route absent" and the address tier runs - which is what
+        // keeps this an ADDRESS-tier test of the stake_address filter.
+        [lookup, absent(lookup)],
         [
-          `${HOST}/api/v1/addresses/addr_test1_a/transactions?page=1&count=20&order=asc`,
-          [{ tx_hash: 'selfsend', block_time: 1700000000 }],
+          listing,
+          ok(listing, [{ tx_hash: 'selfsend', block_time: 1700000000 }]),
         ],
         [
-          `${HOST}/api/v1/txs/selfsend/utxos`,
-          {
+          utxos,
+          ok(utxos, {
             inputs: [
               {
                 address: 'addr_test1_a',
@@ -157,9 +293,9 @@ describe('cardano account view', () => {
                 amount: [{ unit: 'lovelace', quantity: '500' }],
               },
             ],
-          },
+          }),
         ],
-        [`${HOST}/api/v1/accounts/${account}/rewards`, []],
+        [rewards, ok(rewards, [])],
       ]),
     );
 
@@ -181,15 +317,122 @@ describe('cardano account view', () => {
     expect(foldDisposals([asLedgerEvent], owned)).toEqual([]);
   });
 
+  it('merges a reward withdrawal into its transaction ON THE ADDRESS TIER too', async () => {
+    // NEW-2. The correction round restructured fetchAddressPage into two
+    // passes precisely so this path could merge a withdrawal as well -
+    // without it, F1's double count returns here - and nothing exercised
+    // it: every non-empty /withdrawals body in the suite sat behind a stake
+    // address, which always takes the ACCOUNT tier, and
+    // tests/cardanoRecordings.ts serves [] everywhere else. So deleting the
+    // merge from this path left the suite green.
+    //
+    // Native Yaci, so the plain /addresses/{addr} lookup 404s and the
+    // address tier runs; the utxo entries carry stake_address, which is how
+    // this path recognises the account at all.
+    const account = 'stake_test1_withdrawer';
+    const mine = 'addr_test1_w_a';
+    const change = 'addr_test1_w_b';
+    const lookup = `${HOST}/api/v1/addresses/${mine}`;
+    const listing = `${HOST}/api/v1/addresses/${mine}/transactions?page=1&count=20&order=asc`;
+    const utxos = `${HOST}/api/v1/txs/wtx/utxos`;
+    const rewards = `${HOST}/api/v1/accounts/${account}/rewards?page=1&count=100`;
+    const withdrawals = `${HOST}/api/v1/accounts/${account}/withdrawals?page=1&count=100`;
+    const epoch = `${HOST}/api/v1/epochs/500`;
+
+    stubFetch(
+      new Map<string, Recorded>([
+        [lookup, absent(lookup)],
+        [listing, ok(listing, [{ tx_hash: 'wtx', block_time: 1700000400 }])],
+        [
+          utxos,
+          // 1 ADA spent, 6 ADA returned: the 5 ADA withdrawal arriving with
+          // no fee, which is how a withdrawal looks on chain - outputs
+          // exceeding inputs, with no input to match.
+          ok(utxos, {
+            inputs: [
+              {
+                address: mine,
+                stake_address: account,
+                amount: [{ unit: 'lovelace', quantity: '1000000' }],
+              },
+            ],
+            outputs: [
+              {
+                address: change,
+                stake_address: account,
+                amount: [{ unit: 'lovelace', quantity: '6000000' }],
+              },
+            ],
+          }),
+        ],
+        [
+          rewards,
+          ok(rewards, [{ epoch: 500, amount: 5000000, type: 'member' }]),
+        ],
+        [epoch, ok(epoch, { end_time: 1699000000 })],
+        [withdrawals, ok(withdrawals, [{ tx_hash: 'wtx', amount: '5000000' }])],
+      ]),
+    );
+
+    const { events } = await cardanoYaci.fetchEvents(
+      { baseUrl: HOST, address: mine },
+      null,
+    );
+
+    // On the transaction's own event, never an event of its own.
+    const tx = events.find((event) => event.externalId === 'wtx');
+    expect(tx).toBeDefined();
+    expect(
+      tx!.legs.filter((leg) => leg.venue === rewardsVenueOf(account)),
+    ).toEqual([
+      {
+        assetId: 'cardano:lovelace',
+        amount: '5000000',
+        direction: 'out',
+        venue: rewardsVenueOf(account),
+        role: 'principal',
+      },
+    ]);
+    expect(
+      events.filter((event) => event.externalId.startsWith('withdrawal:')),
+    ).toEqual([]);
+
+    // And the reward is counted once: accrual +5, withdrawal -5 at the pot,
+    // and the transaction's own -1/+6 at the account. Unmerged, this reads
+    // 10 ADA.
+    const stamped = events.map((event, index) => ({
+      ...event,
+      id: `id-${index}`,
+      sourceId: 'source-1',
+    })) as LedgerEvent[];
+    const owned = ownedVenuesOf(stamped);
+    expect(foldHoldings(stamped, owned)).toEqual([
+      { assetId: 'cardano:lovelace', amount: '5000000' },
+    ]);
+    // Fee-free, so it nets to zero and disposes of nothing - no phantom
+    // taxable event on this path either.
+    expect(
+      isInternalTransfer(
+        stamped.find((e) => e.externalId === 'wtx')!,
+        owned,
+      ),
+    ).toBe(true);
+    expect(foldDisposals(stamped, owned)).toHaveLength(0);
+  });
+
   it('refuses a stake address instead of syncing nothing', async () => {
     // Yaci answers 200 [] for a stake address on the address endpoint, so
     // without this guard the user gets a SUCCESSFUL sync with zero
     // transactions and no indication anything is wrong.
+    // Asserts the exact message now, not merely that one exists: fixture
+    // 201 is this instance's REAL 404 on /accounts/{stake}/transactions, so
+    // the refusal travels the recorded "this instance has no account API"
+    // path rather than a stub that happened to fail.
     const stakeConfig = { baseUrl: HOST, address: RECORDED_STAKE };
 
     const probed = await cardanoYaci.probe(stakeConfig);
     expect(probed.ok).toBe(false);
-    expect(probed.message).toBeTruthy();
+    expect(probed.message).toBe(CARDANO_MESSAGES.stakeAddressNeedsAccountApi);
 
     await expect(cardanoYaci.fetchEvents(stakeConfig, null)).rejects.toThrow();
   });
@@ -210,7 +453,10 @@ describe('cardano staking rewards', () => {
       expect(event.legs[0]).toMatchObject({
         assetId: 'cardano:lovelace',
         direction: 'in',
-        venue: DELEGATED_STAKE,
+        // The reward POT, not the account's utxo venue. Booking an accrual
+        // at the account venue counted the same ADA twice - once here and
+        // again when the withdrawal arrived in a transaction's outputs.
+        venue: rewardsVenueOf(DELEGATED_STAKE),
         role: 'principal',
       });
     }
@@ -279,19 +525,25 @@ describe('cardano staking rewards', () => {
     // Number.MAX_SAFE_INTEGER by the time this code sees it. There is no way
     // to recover the true value here, so failing the sync is the only honest
     // option - a wrong amount would reach a tax report.
+    const rewards = `${HOST}/api/v1/accounts/${DELEGATED_STAKE}/rewards`;
+    const epoch = `${HOST}/api/v1/epochs/273`;
     stubFetch(
-      new Map<string, unknown>([
+      new Map<string, Recorded>([
         [
-          `${HOST}/api/v1/accounts/${DELEGATED_STAKE}/rewards`,
+          rewards,
           // 2**53, the first integer Number.isSafeInteger rejects. Written
           // as an expression because the literal form is itself flagged by
           // eslint's no-loss-of-precision - the lint rule and this guard are
           // protecting against the same thing at different layers.
-          [{ epoch: 273, amount: 2 ** 53, type: 'member' }],
+          ok(rewards, [{ epoch: 273, amount: 2 ** 53, type: 'member' }]),
         ],
         [
-          `${HOST}/api/v1/epochs/273`,
-          { number: 273, start_time: 1771978996, end_time: 1772408266 },
+          epoch,
+          ok(epoch, {
+            number: 273,
+            start_time: 1771978996,
+            end_time: 1772408266,
+          }),
         ],
       ]),
     );

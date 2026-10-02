@@ -1,0 +1,17 @@
+{
+  "call": 65,
+  "url": "https://cardano-mainnet.blockfrost.io/api/v0/epochs/517",
+  "status": 200,
+  "body": {
+    "epoch": 517,
+    "start_time": 1729547091,
+    "end_time": 1729979091,
+    "first_block_time": 1729547103,
+    "last_block_time": 1729978992,
+    "block_count": 21527,
+    "tx_count": 195379,
+    "output": "94271774270007769",
+    "fees": "69465379538",
+    "active_stake": "22481238040040453"
+  }
+}

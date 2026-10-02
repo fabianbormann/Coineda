@@ -55,11 +55,19 @@ if (!module) {
 // pagination, rather than leaving probe's success path uncovered.
 await module.probe(config);
 
-let cursor = null;
-do {
-  const page = await module.fetchEvents(config, cursor);
-  cursor = page.cursor;
-} while (cursor !== null);
+// A failed drain is worth recording, not worth losing. fetchJson rejects on
+// any non-ok status, so without this the 404 path - the one a contributor
+// most needs to capture - produced no fixtures at all and no explanation.
+let drainError;
+try {
+  let cursor = null;
+  do {
+    const page = await module.fetchEvents(config, cursor);
+    cursor = page.cursor;
+  } while (cursor !== null);
+} catch (error) {
+  drainError = error;
+}
 
 // Credentials must never reach a fixture file.
 const secretFields = new Set(
@@ -80,7 +88,17 @@ const redact = (text) => {
 for (const entry of captured) {
   await writeFile(
     `${outDir}/${String(entry.call).padStart(3, '0')}.json`,
-    redact(JSON.stringify(entry, null, 2)),
+    // The trailing newline is what Prettier wants, and these files are
+    // committed: without it `npm run format:check` fails on every freshly
+    // recorded fixture and the recording has to be reformatted by hand
+    // before it can land.
+    `${redact(JSON.stringify(entry, null, 2))}\n`,
   );
 }
 console.log(`wrote ${captured.length} fixture(s) to ${outDir}`);
+
+if (drainError) {
+  console.error(
+    `drain failed after ${captured.length} captured response(s): ${drainError.message}`,
+  );
+}

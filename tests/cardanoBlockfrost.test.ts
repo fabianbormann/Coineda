@@ -4,6 +4,7 @@ import path from 'node:path';
 import { runConformance } from '@/sources/conformance';
 import cardanoBlockfrost from '@/sources/cardano-blockfrost';
 import cardanoYaci from '@/sources/cardano-yaci';
+import { withAccountHistoryRoutes } from './cardanoRecordings';
 
 const ADDRESS = 'addr_test1_fixture';
 const PROJECT_ID = 'preprodTESTKEYNOTREAL000000000000000';
@@ -31,36 +32,35 @@ const FIXTURES_DIR = path.join(
  * The recorded Yaci Store bodies, served under whichever host and API path
  * is asked for.
  *
- * There are no Blockfrost-recorded fixtures: recording them needs a project
- * id, and this project does not hand-write provider fixtures. What is
- * asserted here instead is the thing the refactor can actually break - that
- * both modules drive the SAME translator to the same result - plus the parts
- * that are genuinely Blockfrost's own (its auth header and its rejection
+ * These are deliberately the YACI bodies, rehosted - they are NOT
+ * Blockfrost-recorded, and must not be read as evidence about Blockfrost's
+ * own response shapes. That confusion cost this project a milestone: these
+ * rehosted bodies carry `stake_address` on every utxo entry, a field
+ * Blockfrost does not send at all, so the account view appeared to work
+ * there while doing nothing. Real Blockfrost recordings now live in
+ * src/sources/cardano-blockfrost/fixtures and are driven by
+ * tests/cardanoBlockfrostFixtures.test.ts; what THIS file asserts is the
+ * thing sharing one translator can actually break - that both modules
+ * drive it to the same result from identical bodies - plus the parts that
+ * are genuinely Blockfrost's own (its auth header and its rejection
  * behaviour), which need no recorded body at all.
- *
- * Blockfrost's address-transactions shape is confirmed from its own
- * documentation ({tx_hash, tx_index, block_height, block_time}, block_time
- * in seconds); its /txs/{hash}/utxos shape is ASSUMED to match Yaci's,
- * which is the premise this module is built on. See the note in
- * src/sources/cardano-blockfrost/index.ts.
  */
+type Recorded = { url: string; status: number; body: unknown };
+
 const loadFixtures = async (
   host: string,
   apiPath: string,
-): Promise<Map<string, unknown>> => {
+): Promise<Map<string, Recorded>> => {
   const files = await readdir(FIXTURES_DIR);
-  const fixtures = new Map<string, unknown>();
+  const fixtures = new Map<string, Recorded>();
   for (const file of files.filter((name) => name.endsWith('.json'))) {
     const raw = await readFile(path.join(FIXTURES_DIR, file), 'utf8');
     const anonymised = raw.split(RECORDED_ADDRESS).join(ADDRESS);
-    const { url, body } = JSON.parse(anonymised) as {
-      url: string;
-      body: unknown;
-    };
-    const rehosted = url
+    const recorded = JSON.parse(anonymised) as Recorded;
+    const rehosted = recorded.url
       .replace('https://yaci-store.preprod.colo2.cf-systems.org', host)
       .replace('/api/v1/', `${apiPath}/`);
-    fixtures.set(rehosted, body);
+    fixtures.set(rehosted, { ...recorded, url: rehosted });
   }
   return fixtures;
 };
@@ -81,24 +81,30 @@ const DELEGATED_STAKE =
  * rewards. See the same helper in tests/cardanoYaci.test.ts.
  */
 const withRewardsForTrackedAccount = (
-  fixtures: Map<string, unknown>,
+  fixtures: Map<string, Recorded>,
   host: string,
   apiPath: string,
-): Map<string, unknown> => {
+): Map<string, Recorded> => {
   const rewardsUrl = (stake: string) =>
     `${host}${apiPath}/accounts/${stake}/rewards`;
   const recorded = fixtures.get(rewardsUrl(DELEGATED_STAKE));
-  if (!Array.isArray(recorded) || recorded.length === 0) {
+  if (!Array.isArray(recorded?.body) || recorded.body.length === 0) {
     throw new Error('fixture 101 should hold the recorded epoch rewards');
   }
-  return new Map(fixtures).set(rewardsUrl(TRACKED_STAKE), recorded);
+  return new Map(fixtures).set(rewardsUrl(TRACKED_STAKE), {
+    ...recorded,
+    url: rewardsUrl(TRACKED_STAKE),
+  });
 };
 
 type Call = { url: string; headers: Record<string, string> };
 
 let calls: Call[] = [];
 
-const stubFetch = (fixtures: Map<string, unknown>) => {
+const stubFetch = (fixtures: Map<string, Recorded>) => {
+  // See tests/cardanoRecordings.ts: the paged /rewards URLs and an empty
+  // /withdrawals, two routes these recordings predate.
+  const served = withAccountHistoryRoutes(fixtures);
   calls = [];
   vi.stubGlobal(
     'fetch',
@@ -107,11 +113,19 @@ const stubFetch = (fixtures: Map<string, unknown>) => {
         url: String(url),
         headers: (init?.headers ?? {}) as Record<string, string>,
       });
-      const body = fixtures.get(String(url));
-      if (!body) {
+      const recorded = served.get(String(url));
+      if (!recorded) {
+        // A throw, not a blanket 404: an unrecorded URL here means the
+        // module asked for something nobody recorded, and a 404 would hide
+        // that behind a plausible-looking "route absent".
         throw new Error(`no recorded fixture for ${String(url)}`);
       }
-      return new Response(JSON.stringify(body), { status: 200 });
+      // The recorded status. The rehosted Yaci set includes a real 404 for
+      // the plain /addresses/{addr} lookup, which is what the tier
+      // procedure reads to decide the lookup route is simply absent.
+      return new Response(JSON.stringify(recorded.body), {
+        status: recorded.status,
+      });
     }),
   );
 };

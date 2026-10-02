@@ -1,0 +1,43 @@
+{
+  "call": 19,
+  "url": "https://cardano-mainnet.blockfrost.io/api/v0/txs/6039405c3769fa8bbbc6d28fd1ae904d6f823450bb9596cf8e599836418b7a3d/utxos",
+  "status": 200,
+  "body": {
+    "hash": "6039405c3769fa8bbbc6d28fd1ae904d6f823450bb9596cf8e599836418b7a3d",
+    "inputs": [
+      {
+        "address": "addr1qyl55ytlxsuk3sxse2wmfax0vfkcphne8rjmruxhjz92lvh923ktg2mgzzy3y5jz90u0mawe47aft2m8nn8m7v2nl4yqles4x7",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "quantity": "71174960300"
+          }
+        ],
+        "tx_hash": "e95535ada0a843bf94831e9162434b03097c69db730f002ca13882db4fda60fb",
+        "output_index": 0,
+        "data_hash": null,
+        "inline_datum": null,
+        "reference_script_hash": null,
+        "collateral": false,
+        "reference": false
+      }
+    ],
+    "outputs": [
+      {
+        "address": "addr1qyl55ytlxsuk3sxse2wmfax0vfkcphne8rjmruxhjz92lvh923ktg2mgzzy3y5jz90u0mawe47aft2m8nn8m7v2nl4yqles4x7",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "quantity": "71174573591"
+          }
+        ],
+        "output_index": 0,
+        "data_hash": null,
+        "inline_datum": null,
+        "collateral": false,
+        "reference_script_hash": null,
+        "consumed_by_tx": "3f15936b2e149b5d9e76f23b14c4713191193910595aa66bde610b7bf142ae1a"
+      }
+    ]
+  }
+}

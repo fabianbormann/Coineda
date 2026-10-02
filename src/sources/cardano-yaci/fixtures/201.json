@@ -1,0 +1,12 @@
+{
+  "call": 201,
+  "url": "https://yaci-store.preprod.colo2.cf-systems.org/api/v1/accounts/stake_test1uqexa4sgarysazapgg6sq5e78g6dfmhx8x3ns3t2fsk6jagkccvfk/transactions?page=1&count=20&order=asc",
+  "status": 404,
+  "body": {
+    "type": "about:blank",
+    "title": "Not Found",
+    "status": 404,
+    "detail": "No endpoint GET /api/v1/accounts/stake_test1uqexa4sgarysazapgg6sq5e78g6dfmhx8x3ns3t2fsk6jagkccvfk/transactions.",
+    "instance": "/api/v1/accounts/stake_test1uqexa4sgarysazapgg6sq5e78g6dfmhx8x3ns3t2fsk6jagkccvfk/transactions"
+  }
+}

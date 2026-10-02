@@ -107,7 +107,14 @@ export const AddSourceDialog = ({ open, onOpenChange, onCreated }: Props) => {
         // `message` is a translation key supplied by the module (see
         // ProbeResult in src/sources/types.ts) - never a raw diagnostic,
         // so it is safe to hand straight to t().
-        setFormError(t(result.message ?? 'Could not reach the provider'));
+        // messageParams carries the placeholders a per-provider message
+        // needs - see ProbeResult in src/sources/types.ts. Passing it is
+        // what stops a keyed message rendering "{{example}}" literally.
+        setFormError(
+          t(result.message ?? 'Could not reach the provider', {
+            ...result.messageParams,
+          }),
+        );
         return;
       }
 

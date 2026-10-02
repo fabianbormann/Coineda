@@ -3,6 +3,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { runConformance } from '@/sources/conformance';
 import cardanoYaci from '@/sources/cardano-yaci';
+import { withAccountHistoryRoutes } from './cardanoRecordings';
 
 const config = {
   baseUrl: 'https://yaci-store.preprod.colo2.cf-systems.org',
@@ -41,17 +42,16 @@ const HOST = 'https://yaci-store.preprod.colo2.cf-systems.org';
 const rewardsUrl = (stake: string): string =>
   `${HOST}/api/v1/accounts/${stake}/rewards`;
 
-const loadFixtures = async (): Promise<Map<string, unknown>> => {
+type Recorded = { url: string; status: number; body: unknown };
+
+const loadFixtures = async (): Promise<Map<string, Recorded>> => {
   const files = await readdir(FIXTURES_DIR);
-  const fixtures = new Map<string, unknown>();
+  const fixtures = new Map<string, Recorded>();
   for (const file of files.filter((name) => name.endsWith('.json'))) {
     const raw = await readFile(path.join(FIXTURES_DIR, file), 'utf8');
     const anonymised = raw.split(RECORDED_ADDRESS).join(config.address);
-    const { url, body } = JSON.parse(anonymised) as {
-      url: string;
-      body: unknown;
-    };
-    fixtures.set(url, body);
+    const recorded = JSON.parse(anonymised) as Recorded;
+    fixtures.set(recorded.url, recorded);
   }
   return fixtures;
 };
@@ -60,15 +60,29 @@ const loadFixtures = async (): Promise<Map<string, unknown>> => {
 // to check idempotence, so a counter would have advanced by the second drain
 // and this module would look non-idempotent for the harness's reason rather
 // than its own.
-const stubFetch = (fixtures: Map<string, unknown>) => {
+const stubFetch = (fixtures: Map<string, Recorded>) => {
+  // withAccountHistoryRoutes adds the paged /rewards URLs the module now
+  // requests and an empty /withdrawals - two routes these recordings
+  // predate. See tests/cardanoRecordings.ts for exactly what it serves and
+  // why none of it is a fabricated provider body.
+  const served = withAccountHistoryRoutes(fixtures);
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string) => {
-      const body = fixtures.get(String(url));
-      if (!body) {
+      const recorded = served.get(String(url));
+      if (!recorded) {
+        // Kept a throw rather than a blanket 404: this strictness is what
+        // catches a typo'd URL in the module, where a 404 would quietly
+        // look like a route the instance does not serve.
         throw new Error(`no recorded fixture for ${String(url)}`);
       }
-      return new Response(JSON.stringify(body), { status: 200 });
+      // The RECORDED status, not a hardcoded 200. Yaci answers 404 on the
+      // plain /addresses/{addr} lookup - it has no such route - and the
+      // tier procedure turns that 404 into "the lookup route is absent"
+      // only if it ever sees it.
+      return new Response(JSON.stringify(recorded.body), {
+        status: recorded.status,
+      });
     }),
   );
 };
@@ -89,13 +103,16 @@ const stubFetch = (fixtures: Map<string, unknown>) => {
  * milestone.
  */
 const withRewardsForTrackedAccount = (
-  fixtures: Map<string, unknown>,
-): Map<string, unknown> => {
+  fixtures: Map<string, Recorded>,
+): Map<string, Recorded> => {
   const recorded = fixtures.get(rewardsUrl(DELEGATED_STAKE));
-  if (!Array.isArray(recorded) || recorded.length === 0) {
+  if (!Array.isArray(recorded?.body) || recorded.body.length === 0) {
     throw new Error('fixture 101 should hold the recorded epoch rewards');
   }
-  return new Map(fixtures).set(rewardsUrl(TRACKED_STAKE), recorded);
+  return new Map(fixtures).set(rewardsUrl(TRACKED_STAKE), {
+    ...recorded,
+    url: rewardsUrl(TRACKED_STAKE),
+  });
 };
 
 beforeEach(async () => {
@@ -179,7 +196,14 @@ describe('cardano-yaci', () => {
 
     await Promise.all(empties.map((cfg) => cardanoYaci.fetchEvents(cfg, null)));
 
-    expect(seen).toHaveLength(empties.length);
+    // Two requests per drain, not one: resolving the tier looks the address
+    // up before the listing request the address tier then makes. Counted
+    // rather than left loose, because the fallback host has to be the one
+    // used by EVERY request a drain issues, not just its first.
+    expect(seen).toHaveLength(empties.length * 2);
+    expect(
+      seen.filter((url) => url.endsWith(`/addresses/${config.address}`)),
+    ).toHaveLength(empties.length);
     for (const url of seen) {
       expect(url).toMatch(
         /^https:\/\/yaci-store\.mainnet\.colo2\.cf-systems\.org\//,

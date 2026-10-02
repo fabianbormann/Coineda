@@ -1,0 +1,19 @@
+{
+  "call": 5,
+  "url": "https://cardano-mainnet.blockfrost.io/api/v0/accounts/stake1u8j4gm959d5ppzgj2fpzh78a7hv6lw544dneenalx9fl6jqzpkxrm/addresses?page=1&count=100",
+  "status": 200,
+  "body": [
+    {
+      "address": "addr1qyl55ytlxsuk3sxse2wmfax0vfkcphne8rjmruxhjz92lvh923ktg2mgzzy3y5jz90u0mawe47aft2m8nn8m7v2nl4yqles4x7"
+    },
+    {
+      "address": "addr1q9peuc0k30wf5x9x34zh7zk4wvn4l3yzcdfvjdrfe3rkw98923ktg2mgzzy3y5jz90u0mawe47aft2m8nn8m7v2nl4yqwz6vle"
+    },
+    {
+      "address": "addr1qx6jawm7tv2t9hh72jw723x4h4j8379tmxznh0mgksswws0923ktg2mgzzy3y5jz90u0mawe47aft2m8nn8m7v2nl4yq742vpr"
+    },
+    {
+      "address": "addr1qx9l2y3gpph7t682ylew7uhdtrettx996k2d9wghj96lual923ktg2mgzzy3y5jz90u0mawe47aft2m8nn8m7v2nl4yqph6fhn"
+    }
+  ]
+}

@@ -211,6 +211,11 @@
     "{{count}} events_other": "{{count}} events",
     "Refresh {{label}}": "Refresh {{label}}",
     "Remove {{label}}": "Remove {{label}}",
+    "Resync {{label}} from scratch": "Resync {{label}} from scratch",
+    "Resync {{label}} from scratch?": "Resync {{label}} from scratch?",
+    "This discards the events Coineda synced from {{label}} and downloads its whole history again. Events you added yourself stay. It can take a while and makes many requests to the provider.": "This discards the events Coineda synced from {{label}} and downloads its whole history again. Events you added yourself stay. It can take a while and makes many requests to the provider.",
+    "Resync": "Resync",
+    "Resynced {{label}}": "Resynced {{label}}",
     "Remove {{label}}?": "Remove {{label}}?",
     "Removing {{label}} also deletes its synced events. Any events you added yourself stay.": "Removing {{label}} also deletes its synced events. Any events you added yourself stay.",
     "Remove": "Remove",
@@ -318,6 +323,10 @@
     "Recording…": "Recording…",
     "Record and download": "Record and download",
     "Bought": "Bought",
-    "Not enough priced history yet": "Not enough priced history yet"
+    "Not enough priced history yet": "Not enough priced history yet",
+    "This provider has no record of that address, so it has never appeared on chain. Paste the wallet’s stake address instead - that works even for a brand-new address.": "This provider has no record of that address, so it has never appeared on chain. Paste the wallet’s stake address instead - that works even for a brand-new address.",
+    "This instance answered, but it cannot list this wallet’s transactions. Point the base URL at an instance with the Blockfrost-compatible API enabled, or use a provider that has it.": "This instance answered, but it cannot list this wallet’s transactions. Point the base URL at an instance with the Blockfrost-compatible API enabled, or use a provider that has it.",
+    "That looks like a stake address, and this instance cannot look up an account. Enter one of the wallet’s payment addresses instead.": "That looks like a stake address, and this instance cannot look up an account. Enter one of the wallet’s payment addresses instead.",
+    "The base URL should be the host only, without an API path - for example {{example}}.": "The base URL should be the host only, without an API path - for example {{example}}."
   }
 }

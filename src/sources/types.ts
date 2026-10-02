@@ -46,6 +46,18 @@ export type ProbeResult = {
   ok: boolean;
   /** Translation key when !ok. */
   message?: string;
+  /**
+   * Interpolation values for `message`, when its key carries placeholders.
+   *
+   * A message cannot always be a bare sentence: the host-shape complaint
+   * has to name THIS provider's example host, and a per-provider English
+   * sentence built by string concatenation is a sentence no locale file can
+   * translate. These are rendered through t(message, messageParams).
+   *
+   * Same rule as `message`: nothing from `config` may go in here. An
+   * example host is the module's own constant, not the user's input.
+   */
+  messageParams?: Record<string, string>;
   /** False when the credential has more than read access. Undefined when the
    *  provider gives no way to tell. */
   readOnly?: boolean;

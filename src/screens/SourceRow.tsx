@@ -1,4 +1,4 @@
-import { RefreshCw, Square, Trash2 } from 'lucide-react';
+import { History, RefreshCw, Square, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -27,6 +27,19 @@ type Props = {
    */
   syncing: boolean;
   onRefresh: () => void;
+  /**
+   * Re-download this source's whole history, discarding what is on disk.
+   *
+   * Needed because an ordinary refresh cannot repair every wrong row. A
+   * re-drain upserts on (sourceId, externalId), so it does correct a row it
+   * emits again - but a transaction the module now (correctly) produces no
+   * legs for is SKIPPED rather than re-emitted, and a skipped event is
+   * never updated or deleted. A row recorded before the collateral and
+   * reference-input fixes could therefore keep a phantom disposal forever,
+   * and `syncSource(source, { full: true })` was the only remedy while
+   * nothing in the UI called it.
+   */
+  onResync: () => void;
   onStop: () => void;
   onRemove: () => void;
 };
@@ -43,6 +56,7 @@ export const SourceRow = ({
   busy,
   syncing,
   onRefresh,
+  onResync,
   onStop,
   onRemove,
 }: Props) => {
@@ -75,7 +89,15 @@ export const SourceRow = ({
           </p>
           {source.lastError && (
             <p className="text-sm text-destructive" role="alert">
-              {t('Sync failed: {{detail}}', { detail: source.lastError })}
+              {/* The detail is run through t() as well as the wrapper.
+                  Most of what reaches `lastError` is a raw provider
+                  diagnostic, and t() hands any string it has no key for
+                  straight back - but a Cardano refusal (see
+                  CARDANO_MESSAGES) deliberately throws the translation KEY,
+                  so a German user was shown the English sentence. Keying on
+                  the English string is this project's whole i18n model, so
+                  one t() serves both cases. */}
+              {t('Sync failed: {{detail}}', { detail: t(source.lastError) })}
             </p>
           )}
         </div>
@@ -107,6 +129,18 @@ export const SourceRow = ({
               />
             </Button>
           )}
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            disabled={busy}
+            onClick={onResync}
+            aria-label={t('Resync {{label}} from scratch', {
+              label: source.label,
+            })}
+          >
+            <History aria-hidden="true" />
+          </Button>
           <Button
             type="button"
             variant="outline"

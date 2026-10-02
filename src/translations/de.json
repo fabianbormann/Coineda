@@ -211,6 +211,11 @@
     "{{count}} events_other": "{{count}} Ereignisse",
     "Refresh {{label}}": "{{label}} aktualisieren",
     "Remove {{label}}": "{{label}} entfernen",
+    "Resync {{label}} from scratch": "{{label}} von vorn neu synchronisieren",
+    "Resync {{label}} from scratch?": "{{label}} von vorn neu synchronisieren?",
+    "This discards the events Coineda synced from {{label}} and downloads its whole history again. Events you added yourself stay. It can take a while and makes many requests to the provider.": "Das verwirft die Ereignisse, die Coineda von {{label}} synchronisiert hat, und lädt die komplette Historie erneut. Ereignisse, die du selbst angelegt hast, bleiben erhalten. Das kann eine Weile dauern und stellt viele Anfragen an den Anbieter.",
+    "Resync": "Neu synchronisieren",
+    "Resynced {{label}}": "{{label}} neu synchronisiert",
     "Remove {{label}}?": "{{label}} entfernen?",
     "Removing {{label}} also deletes its synced events. Any events you added yourself stay.": "Beim Entfernen von {{label}} werden auch die synchronisierten Ereignisse gelöscht. Selbst erfasste Ereignisse bleiben erhalten.",
     "Remove": "Entfernen",
@@ -318,6 +323,10 @@
     "Recording…": "Wird aufgezeichnet…",
     "Record and download": "Aufzeichnen und herunterladen",
     "Bought": "Gekauft",
-    "Not enough priced history yet": "Noch nicht genug bepreiste Historie"
+    "Not enough priced history yet": "Noch nicht genug bepreiste Historie",
+    "This provider has no record of that address, so it has never appeared on chain. Paste the wallet’s stake address instead - that works even for a brand-new address.": "Dieser Anbieter kennt diese Adresse nicht - sie ist noch nie in der Blockchain aufgetaucht. Gib stattdessen die Stake-Adresse der Wallet ein; die funktioniert auch bei einer brandneuen Adresse.",
+    "This instance answered, but it cannot list this wallet’s transactions. Point the base URL at an instance with the Blockfrost-compatible API enabled, or use a provider that has it.": "Diese Instanz antwortet, kann die Transaktionen dieser Wallet aber nicht auflisten. Richte die Basis-URL auf eine Instanz mit aktivierter Blockfrost-kompatibler API, oder nutze einen Anbieter, der sie hat.",
+    "That looks like a stake address, and this instance cannot look up an account. Enter one of the wallet’s payment addresses instead.": "Das sieht nach einer Stake-Adresse aus, und diese Instanz kann kein Konto abfragen. Gib stattdessen eine der Zahlungsadressen der Wallet ein.",
+    "The base URL should be the host only, without an API path - for example {{example}}.": "Die Basis-URL sollte nur der Host sein, ohne API-Pfad - zum Beispiel {{example}}."
   }
 }

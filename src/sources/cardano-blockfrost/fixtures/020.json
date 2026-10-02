@@ -1,0 +1,83 @@
+{
+  "call": 20,
+  "url": "https://cardano-mainnet.blockfrost.io/api/v0/txs/86bbf55a6d8a6e8f0cb6e45ec2ac528587c01e8be5bfa816239973cb8b8829d4/utxos",
+  "status": 200,
+  "body": {
+    "hash": "86bbf55a6d8a6e8f0cb6e45ec2ac528587c01e8be5bfa816239973cb8b8829d4",
+    "inputs": [
+      {
+        "address": "addr1qyl55ytlxsuk3sxse2wmfax0vfkcphne8rjmruxhjz92lvh923ktg2mgzzy3y5jz90u0mawe47aft2m8nn8m7v2nl4yqles4x7",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "quantity": "1202490"
+          },
+          {
+            "unit": "f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a63616e756b",
+            "quantity": "1"
+          },
+          {
+            "unit": "f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a636e756b32",
+            "quantity": "1"
+          },
+          {
+            "unit": "f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a636e756b33",
+            "quantity": "1"
+          }
+        ],
+        "tx_hash": "0f8a5abaaef7f306ba0aeda178748051aba01b5ce0848dbd011fdf1a092555ae",
+        "output_index": 0,
+        "data_hash": null,
+        "inline_datum": null,
+        "reference_script_hash": null,
+        "collateral": false,
+        "reference": false
+      },
+      {
+        "address": "addr1qx9l2y3gpph7t682ylew7uhdtrettx996k2d9wghj96lual923ktg2mgzzy3y5jz90u0mawe47aft2m8nn8m7v2nl4yqph6fhn",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "quantity": "3861414"
+          }
+        ],
+        "tx_hash": "3d20f62fee685aca75e56f22f7261299a55582953ebb1ecc4621ffad0855bfdc",
+        "output_index": 1,
+        "data_hash": null,
+        "inline_datum": null,
+        "reference_script_hash": null,
+        "collateral": false,
+        "reference": false
+      }
+    ],
+    "outputs": [
+      {
+        "address": "addr1qyl55ytlxsuk3sxse2wmfax0vfkcphne8rjmruxhjz92lvh923ktg2mgzzy3y5jz90u0mawe47aft2m8nn8m7v2nl4yqles4x7",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "quantity": "4882651"
+          },
+          {
+            "unit": "f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a63616e756b",
+            "quantity": "1"
+          },
+          {
+            "unit": "f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a636e756b32",
+            "quantity": "1"
+          },
+          {
+            "unit": "f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a636e756b33",
+            "quantity": "1"
+          }
+        ],
+        "output_index": 0,
+        "data_hash": null,
+        "inline_datum": null,
+        "collateral": false,
+        "reference_script_hash": null,
+        "consumed_by_tx": "3f15936b2e149b5d9e76f23b14c4713191193910595aa66bde610b7bf142ae1a"
+      }
+    ]
+  }
+}

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import cardanoYaci from '@/sources/cardano-yaci';
 import cardanoBlockfrost from '@/sources/cardano-blockfrost';
+import { CARDANO_MESSAGES } from '@/sources/cardano/messages';
 
 const ADDRESS = 'addr_test1_fixture';
 
@@ -88,22 +89,27 @@ describe('base URL handling', () => {
   it('names a host the user is actually configuring, not the other provider’s', async () => {
     // The message suggested a Yaci Store URL on every row, including a
     // Blockfrost one - sending the user to fix their configuration with an
-    // address that cannot work for the module they are configuring.
+    // address that cannot work for the module they are configuring. The
+    // example host now travels in messageParams, because a per-provider
+    // English sentence built by concatenation is a sentence no locale file
+    // can translate.
     const blockfrost = await cardanoBlockfrost.probe({
       baseUrl: 'https://cardano-preprod.blockfrost.io/api/v0',
       projectId: 'k',
       address: ADDRESS,
     });
     expect(blockfrost.ok).toBe(false);
-    expect(blockfrost.message).toContain('blockfrost.io');
-    expect(blockfrost.message).not.toContain('yaci');
+    expect(blockfrost.message).toBe(CARDANO_MESSAGES.hostShape);
+    expect(blockfrost.messageParams?.example).toContain('blockfrost.io');
+    expect(blockfrost.messageParams?.example).not.toContain('yaci');
 
     const yaci = await cardanoYaci.probe({
       baseUrl: 'https://yaci.example.org/api/v1',
       address: ADDRESS,
     });
     expect(yaci.ok).toBe(false);
-    expect(yaci.message).toContain('yaci-store');
+    expect(yaci.message).toBe(CARDANO_MESSAGES.hostShape);
+    expect(yaci.messageParams?.example).toContain('yaci-store');
   });
 
   it('refuses an API path with a trailing slash as well', async () => {
@@ -126,11 +132,19 @@ describe('base URL handling', () => {
   });
 
   it('accepts a bare host unchanged', async () => {
+    // Re-pointed at /addresses/{addr}, which is the first request the probe
+    // now makes. /blocks/latest is deliberately gone: it reported an
+    // instance alive without saying whether it could serve THIS source,
+    // which is how a never-seen address got past the probe and failed the
+    // drain with a bare "status 404". The host assembly this test exists
+    // for is unchanged - it is still the probe's very first URL.
     await cardanoYaci.probe({
       baseUrl: 'https://yaci.example.org',
       address: ADDRESS,
     });
-    expect(calls[0].url).toBe('https://yaci.example.org/api/v1/blocks/latest');
+    expect(calls[0].url).toBe(
+      `https://yaci.example.org/api/v1/addresses/${ADDRESS}`,
+    );
   });
 });
 
@@ -157,7 +171,13 @@ describe('request timeouts', () => {
     expect(calls[0].init?.signal).toBeInstanceOf(AbortSignal);
   });
 
-  it('reports a timed-out request as a timeout, not as an unknown failure', async () => {
+  it('reports an instance that times out before it can be resolved, not an unknown failure', async () => {
+    // A timeout on the FIRST request now arrives while the tier is still
+    // being resolved, and probeRoute turns it into an outcome rather than
+    // an exception - so the sync fails with the translated "this instance
+    // cannot serve you" key instead of the raw rename. Asserted as the
+    // exact key, because an untranslated English sentence reaching
+    // lastError is what CARDANO_MESSAGES exists to prevent.
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => {
@@ -170,7 +190,39 @@ describe('request timeouts', () => {
         { baseUrl: 'https://yaci.example.org', address: ADDRESS },
         null,
       ),
-    ).rejects.toThrow(/timed out|timeout/i);
+    ).rejects.toThrow(CARDANO_MESSAGES.instanceCannotServe);
+  });
+
+  it('still renames a timeout that strikes after the instance passed the tier check', async () => {
+    // The other half, and the one the reported hang actually was: an
+    // instance that answers, is accepted, and then stops answering
+    // mid-drain. That timeout reaches fetchJson, which names the request
+    // and the deadline. Without this the rename has no test left at all -
+    // every other timeout test now fails during tier resolution instead,
+    // where probeRoute swallows the error by design.
+    let answered = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        answered += 1;
+        // 1: the plain lookup native Yaci has no route for. 2: the listing
+        // the tier check makes, which is the drain's own first URL. 3: the
+        // drain re-requesting it - and that is where the instance dies.
+        if (answered > 2) {
+          throw new DOMException('The operation was aborted.', 'TimeoutError');
+        }
+        return new Response(JSON.stringify([]), {
+          status: answered === 1 ? 404 : 200,
+        });
+      }),
+    );
+
+    await expect(
+      cardanoYaci.fetchEvents(
+        { baseUrl: 'https://yaci.example.org', address: ADDRESS },
+        null,
+      ),
+    ).rejects.toThrow(/listing transactions timed out after 20s/);
   });
 
   it('reports a timed-out probe in a form the user can act on', async () => {

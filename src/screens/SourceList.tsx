@@ -21,6 +21,10 @@ type Props = {
   syncingIds: Set<string>;
   onRefreshAll: () => void;
   onRefreshOne: (source: SourceRecord) => void;
+  /** Discard this source's events and cursor and drain it from the start -
+   *  the only way to repair a row an ordinary re-drain now skips. Gated by
+   *  the same `busyIds` as Refresh. */
+  onResyncOne: (source: SourceRecord) => void;
   onStop: (source: SourceRecord) => void;
   onRemove: (source: SourceRecord) => void;
   onAddSource: () => void;
@@ -50,6 +54,7 @@ export const SourceList = ({
   syncingIds,
   onRefreshAll,
   onRefreshOne,
+  onResyncOne,
   onStop,
   onRemove,
   onAddSource,
@@ -110,6 +115,7 @@ export const SourceList = ({
                 busy={busyIds.has(source.id)}
                 syncing={syncingIds.has(source.id)}
                 onRefresh={() => onRefreshOne(source)}
+                onResync={() => onResyncOne(source)}
                 onStop={() => onStop(source)}
                 onRemove={() => onRemove(source)}
               />

@@ -1,0 +1,75 @@
+{
+  "call": 11,
+  "url": "https://cardano-mainnet.blockfrost.io/api/v0/txs/db098569fddb92fc95c530ba964663b4a97145158eacb79a5b610058ca08d18f/utxos",
+  "status": 200,
+  "body": {
+    "hash": "db098569fddb92fc95c530ba964663b4a97145158eacb79a5b610058ca08d18f",
+    "inputs": [
+      {
+        "address": "addr1qypteuf9cmjxw2pfq5m36hm3pu34g38g33tdw342506e027hqg2tfmt0kvg25wee76ecku2mkhy0nlsyzj0ggla5vgts05fa4f",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "quantity": "449800000"
+          }
+        ],
+        "tx_hash": "0cc1723e7e688b2a96656979eefd833f96eba04742c4bf71e1acffd7c40250c8",
+        "output_index": 0,
+        "data_hash": null,
+        "inline_datum": null,
+        "reference_script_hash": null,
+        "collateral": false,
+        "reference": false
+      },
+      {
+        "address": "addr1qypteuf9cmjxw2pfq5m36hm3pu34g38g33tdw342506e027hqg2tfmt0kvg25wee76ecku2mkhy0nlsyzj0ggla5vgts05fa4f",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "quantity": "550000000000"
+          }
+        ],
+        "tx_hash": "9cb5101fd99b57dcf1ad9e09ab3542b80e8ac445cb80883a91b3dbbe6c792cce",
+        "output_index": 1,
+        "data_hash": null,
+        "inline_datum": null,
+        "reference_script_hash": null,
+        "collateral": false,
+        "reference": false
+      },
+      {
+        "address": "addr1qypteuf9cmjxw2pfq5m36hm3pu34g38g33tdw342506e027hqg2tfmt0kvg25wee76ecku2mkhy0nlsyzj0ggla5vgts05fa4f",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "quantity": "100000000"
+          }
+        ],
+        "tx_hash": "c3dacb432e3ff90e5aa94052a21cfcfe2b2dc5021f59804df4f207b1909c1708",
+        "output_index": 1,
+        "data_hash": null,
+        "inline_datum": null,
+        "reference_script_hash": null,
+        "collateral": false,
+        "reference": false
+      }
+    ],
+    "outputs": [
+      {
+        "address": "addr1qyl55ytlxsuk3sxse2wmfax0vfkcphne8rjmruxhjz92lvh923ktg2mgzzy3y5jz90u0mawe47aft2m8nn8m7v2nl4yqles4x7",
+        "amount": [
+          {
+            "unit": "lovelace",
+            "quantity": "550549600000"
+          }
+        ],
+        "output_index": 0,
+        "data_hash": null,
+        "inline_datum": null,
+        "collateral": false,
+        "reference_script_hash": null,
+        "consumed_by_tx": "d9c807fe5b67a5a974ac800685df0436fc07d001ac2332a8bf700fcc51450764"
+      }
+    ]
+  }
+}
