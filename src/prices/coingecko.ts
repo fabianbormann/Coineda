@@ -11,7 +11,7 @@
  * mapping for flows through to `totalValue`'s `missing` list instead of
  * silently being priced at nothing.
  */
-const COINGECKO_IDS: Record<string, string> = {
+export const COINGECKO_IDS: Record<string, string> = {
   'cardano:lovelace': 'cardano',
   'bitcoin:native': 'bitcoin',
   'eth:native': 'ethereum',

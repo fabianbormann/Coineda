@@ -270,6 +270,14 @@
     "The project id from your Blockfrost dashboard. It only ever reads the chain - it cannot move funds - and it is stored on this device, encrypted inside any checkpoint you create.": "The project id from your Blockfrost dashboard. It only ever reads the chain - it cannot move funds - and it is stored on this device, encrypted inside any checkpoint you create.",
     "Blockfrost rejected this project id. Check that it is correct and matches the network you selected.": "Blockfrost rejected this project id. Check that it is correct and matches the network you selected.",
     "Could not reach Blockfrost. It may be unavailable or rate-limiting this project.": "Could not reach Blockfrost. It may be unavailable or rate-limiting this project.",
+    "Bitcoin (Esplora)": "Bitcoin (Esplora)",
+    "Esplora base URL": "Esplora base URL",
+    "The Esplora-compatible API to query. Leave this empty to use the public Blockstream.info deployment, or point it at mempool.space or a self-hosted instance.": "The Esplora-compatible API to query. Leave this empty to use the public Blockstream.info deployment, or point it at mempool.space or a self-hosted instance.",
+    "Bitcoin addresses": "Bitcoin addresses",
+    "One address per line. Bitcoin has no account view, so only the addresses listed here are tracked - an address you own but never add here stays completely invisible to Coineda.": "One address per line. Bitcoin has no account view, so only the addresses listed here are tracked - an address you own but never add here stays completely invisible to Coineda.",
+    "Add at least one address to track.": "Add at least one address to track.",
+    "You can track at most {{max}} addresses - remove some before saving.": "You can track at most {{max}} addresses - remove some before saving.",
+    "Could not reach the Esplora instance.": "Could not reach the Esplora instance.",
     "Stop syncing {{label}}": "Stop syncing {{label}}",
     "Stopped syncing {{label}}": "Stopped syncing {{label}}",
     "CoinGecko API key": "CoinGecko API key",
@@ -334,6 +342,8 @@
     "This provider has no record of that address, so it has never appeared on chain. Paste the wallet’s stake address instead - that works even for a brand-new address.": "This provider has no record of that address, so it has never appeared on chain. Paste the wallet’s stake address instead - that works even for a brand-new address.",
     "This instance answered, but it cannot list this wallet’s transactions. Point the base URL at an instance with the Blockfrost-compatible API enabled, or use a provider that has it.": "This instance answered, but it cannot list this wallet’s transactions. Point the base URL at an instance with the Blockfrost-compatible API enabled, or use a provider that has it.",
     "That looks like a stake address, and this instance cannot look up an account. Enter one of the wallet’s payment addresses instead.": "That looks like a stake address, and this instance cannot look up an account. Enter one of the wallet’s payment addresses instead.",
-    "The base URL should be the host only, without an API path - for example {{example}}.": "The base URL should be the host only, without an API path - for example {{example}}."
+    "The base URL should be the host only, without an API path - for example {{example}}.": "The base URL should be the host only, without an API path - for example {{example}}.",
+    "None of these addresses has any transactions. Wallets show a fresh receive address by default - check this is an address you have actually used, on the right network. Bitcoin has no account view, so Coineda can only see the addresses you list here.": "None of these addresses has any transactions. Wallets show a fresh receive address by default - check this is an address you have actually used, on the right network. Bitcoin has no account view, so Coineda can only see the addresses you list here.",
+    "Synced {{label}}, but it has no events at all": "Synced {{label}}, but it has no events at all"
   }
 }

@@ -142,6 +142,11 @@ describe('the host nets an event before a jurisdiction classifies it', () => {
     // cost basis a later BTC disposal must be able to consume. If netting
     // collapsed across assets, the later sale would have no basis and
     // would surface as `needs-cost-basis` instead.
+    //
+    // BTC amounts are satoshis (src/prices/scale.ts: 'bitcoin:native' is 8
+    // decimals), so '2 BTC' is 200000000, not '2' - the same mistake this
+    // whole task exists to catch, so the fixture has to get it right too.
+    const btc = (whole: number): string => `${whole}00000000`;
     await putEvents([
       oldAcquisition,
       event({
@@ -151,7 +156,7 @@ describe('the host nets an event before a jurisdiction classifies it', () => {
         kind: 'trade',
         legs: [
           leg({ amount: ada(100), direction: 'out' }),
-          leg({ amount: '2', direction: 'in', assetId: BTC }),
+          leg({ amount: btc(2), direction: 'in', assetId: BTC }),
         ],
       }),
       event({
@@ -160,7 +165,7 @@ describe('the host nets an event before a jurisdiction classifies it', () => {
         timestamp: Date.UTC(2025, 6, 1),
         kind: 'trade',
         legs: [
-          leg({ amount: '2', direction: 'out', assetId: BTC }),
+          leg({ amount: btc(2), direction: 'out', assetId: BTC }),
           leg({ amount: '7', direction: 'in', assetId: 'fiat:eur' }),
         ],
       }),

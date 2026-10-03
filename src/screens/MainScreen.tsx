@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import { deleteSourceCascade, getAllEvents, getSources } from '@/ledger/db';
+import {
+  deleteSourceCascade,
+  getAllEvents,
+  getEventsBySource,
+  getSources,
+} from '@/ledger/db';
 import { foldHoldings, ownedVenuesOf } from '@/ledger/balances';
 import { resolveSpotPrices, totalValue } from '@/prices/priceStore';
 import { syncAll, syncSource } from '@/sync/syncSource';
@@ -185,6 +190,32 @@ export const MainScreen = () => {
     }
   };
 
+  /**
+   * Reports a successful sync, distinguishing "nothing NEW" from "nothing AT
+   * ALL".
+   *
+   * A re-sync that finds nothing new is the normal, healthy case and gets a
+   * plain success. A source that has produced no events whatsoever is a
+   * different thing entirely, and saying "Synced" for it is what made a real
+   * report read as a broken importer: a Bitcoin address with no history
+   * synced cleanly and silently, and from the outside that is
+   * indistinguishable from an importer that failed to parse anything.
+   *
+   * The count query only runs when the sync itself wrote nothing, so a
+   * healthy source never pays for it.
+   */
+  const notifySynced = async (source: SourceRecord, wroteNothing: boolean) => {
+    if (wroteNothing && (await getEventsBySource(source.id)).length === 0) {
+      notify.warning(
+        t('Synced {{label}}, but it has no events at all', {
+          label: source.label,
+        }),
+      );
+      return;
+    }
+    notify.success(t('Synced {{label}}', { label: source.label }));
+  };
+
   const handleStop = (source: SourceRecord) => {
     // Abort the in-flight request directly. The sync itself notices, stops
     // between pages, and keeps everything that already committed - the
@@ -218,7 +249,10 @@ export const MainScreen = () => {
           }),
         );
       } else {
-        notify.success(t('Synced {{label}}', { label: source.label }));
+        await notifySynced(
+          source,
+          report.inserted === 0 && report.updated === 0,
+        );
       }
     } finally {
       controllersRef.current.delete(source.id);
@@ -357,7 +391,10 @@ export const MainScreen = () => {
       } else if (full) {
         notify.success(t('Resynced {{label}}', { label: source.label }));
       } else {
-        notify.success(t('Synced {{label}}', { label: source.label }));
+        await notifySynced(
+          source,
+          report.inserted === 0 && report.updated === 0,
+        );
       }
     } finally {
       controllersRef.current.delete(source.id);

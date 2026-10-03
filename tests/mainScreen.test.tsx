@@ -6,6 +6,7 @@ import '@/i18n';
 import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import { ConfirmProvider } from '@/components/confirm/ConfirmProvider';
 import { Toaster } from '@/components/ui/sonner';
+import { toast } from 'sonner';
 import { MainScreen } from '@/screens/MainScreen';
 import { openLedger, putSource, putEvents } from '@/ledger/db';
 import * as ledgerDb from '@/ledger/db';
@@ -109,6 +110,10 @@ const heldEvent = (): LedgerEvent => ({
 });
 
 beforeEach(async () => {
+  // Toasts are rendered into a portal that outlives a test's own render, so
+  // without this they accumulate across the file and any assertion on toast
+  // text matches an earlier test's toast as readily as its own.
+  toast.dismiss();
   const db = await openLedger();
   for (const store of [
     'events',
@@ -603,6 +608,55 @@ describe('sync lifecycle', () => {
     await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
     await waitFor(() => expect(fetchEvents).toHaveBeenCalled());
+  });
+
+  it('says so when a sync produced no events AT ALL, instead of reporting plain success', async () => {
+    // Reported from testing, against a Bitcoin address with no history: the
+    // sync "finished" having fetched nothing and said only "Synced", which
+    // from the outside is indistinguishable from an importer that failed to
+    // parse anything. The provider was right and the reporting was wrong.
+    const fetchEvents = vi.fn(async () => ({ events: [], cursor: null }));
+    registry.length = 0;
+    registry.push({ ...optionalFieldModule, fetchEvents });
+    await putSource({
+      id: 'cfg-1',
+      moduleId: optionalFieldModule.manifest.id,
+      label: 'Empty',
+      config: { address: 'addr_empty' },
+    });
+
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /refresh Empty/i }),
+    );
+
+    expect(await screen.findByText(/no events at all/i)).toBeInTheDocument();
+  });
+
+  it('reports a plain success when a sync finds nothing NEW but the source has events', async () => {
+    // The companion, and the reason the warning above is conditional rather
+    // than "inserted === 0". An up-to-date source legitimately imports
+    // nothing on a re-sync; warning about that would cry wolf on every
+    // healthy refresh, and the user would learn to ignore the one case that
+    // actually means something.
+    const fetchEvents = vi.fn(async () => ({ events: [], cursor: null }));
+    registry.length = 0;
+    registry.push({ ...optionalFieldModule, fetchEvents });
+    await putSource({
+      id: 'cfg-1',
+      moduleId: optionalFieldModule.manifest.id,
+      label: 'Current',
+      config: { address: 'addr_current' },
+    });
+    await putEvents([{ ...heldEvent(), id: 'ev-1', sourceId: 'cfg-1' }]);
+
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /refresh Current/i }),
+    );
+
+    expect(await screen.findByText(/^Synced Current$/)).toBeInTheDocument();
+    expect(screen.queryByText(/no events at all/i)).not.toBeInTheDocument();
   });
 
   it('offers Stop while a sync is running, not a disabled spinner', async () => {

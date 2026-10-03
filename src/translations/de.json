@@ -270,6 +270,14 @@
     "The project id from your Blockfrost dashboard. It only ever reads the chain - it cannot move funds - and it is stored on this device, encrypted inside any checkpoint you create.": "Die Projekt-ID aus deinem Blockfrost-Dashboard. Sie liest ausschließlich die Blockchain - sie kann keine Guthaben bewegen - und wird auf diesem Gerät gespeichert, verschlüsselt in jedem Checkpoint, den du erstellst.",
     "Blockfrost rejected this project id. Check that it is correct and matches the network you selected.": "Blockfrost hat diese Projekt-ID abgelehnt. Prüfe, ob sie korrekt ist und zum ausgewählten Netzwerk passt.",
     "Could not reach Blockfrost. It may be unavailable or rate-limiting this project.": "Blockfrost konnte nicht erreicht werden. Der Dienst ist möglicherweise nicht verfügbar oder begrenzt die Anfragen dieses Projekts.",
+    "Bitcoin (Esplora)": "Bitcoin (Esplora)",
+    "Esplora base URL": "Esplora-Basis-URL",
+    "The Esplora-compatible API to query. Leave this empty to use the public Blockstream.info deployment, or point it at mempool.space or a self-hosted instance.": "Die Esplora-kompatible API, die abgefragt werden soll. Lass dieses Feld leer, um die öffentliche Blockstream.info-Instanz zu nutzen, oder gib stattdessen mempool.space oder eine selbst gehostete Instanz an.",
+    "Bitcoin addresses": "Bitcoin-Adressen",
+    "One address per line. Bitcoin has no account view, so only the addresses listed here are tracked - an address you own but never add here stays completely invisible to Coineda.": "Eine Adresse pro Zeile. Bitcoin kennt keine Konto-Ansicht, daher werden nur die hier aufgeführten Adressen erfasst - eine Adresse, die dir gehört, aber hier nie hinzugefügt wird, bleibt für Coineda vollständig unsichtbar.",
+    "Add at least one address to track.": "Füge mindestens eine zu verfolgende Adresse hinzu.",
+    "You can track at most {{max}} addresses - remove some before saving.": "Du kannst höchstens {{max}} Adressen verfolgen - entferne einige, bevor du speicherst.",
+    "Could not reach the Esplora instance.": "Die Esplora-Instanz konnte nicht erreicht werden.",
     "Stop syncing {{label}}": "Synchronisierung von {{label}} stoppen",
     "Stopped syncing {{label}}": "Synchronisierung von {{label}} gestoppt",
     "CoinGecko API key": "CoinGecko-API-Schlüssel",
@@ -334,6 +342,8 @@
     "This provider has no record of that address, so it has never appeared on chain. Paste the wallet’s stake address instead - that works even for a brand-new address.": "Dieser Anbieter kennt diese Adresse nicht - sie ist noch nie in der Blockchain aufgetaucht. Gib stattdessen die Stake-Adresse der Wallet ein; die funktioniert auch bei einer brandneuen Adresse.",
     "This instance answered, but it cannot list this wallet’s transactions. Point the base URL at an instance with the Blockfrost-compatible API enabled, or use a provider that has it.": "Diese Instanz antwortet, kann die Transaktionen dieser Wallet aber nicht auflisten. Richte die Basis-URL auf eine Instanz mit aktivierter Blockfrost-kompatibler API, oder nutze einen Anbieter, der sie hat.",
     "That looks like a stake address, and this instance cannot look up an account. Enter one of the wallet’s payment addresses instead.": "Das sieht nach einer Stake-Adresse aus, und diese Instanz kann kein Konto abfragen. Gib stattdessen eine der Zahlungsadressen der Wallet ein.",
-    "The base URL should be the host only, without an API path - for example {{example}}.": "Die Basis-URL sollte nur der Host sein, ohne API-Pfad - zum Beispiel {{example}}."
+    "The base URL should be the host only, without an API path - for example {{example}}.": "Die Basis-URL sollte nur der Host sein, ohne API-Pfad - zum Beispiel {{example}}.",
+    "None of these addresses has any transactions. Wallets show a fresh receive address by default - check this is an address you have actually used, on the right network. Bitcoin has no account view, so Coineda can only see the addresses you list here.": "Keine dieser Adressen hat Transaktionen. Wallets zeigen standardmäßig eine neue, unbenutzte Empfangsadresse an - prüfe, ob dies eine Adresse ist, die du wirklich verwendet hast, und ob das Netzwerk stimmt. Bitcoin kennt keine Konto-Ansicht, daher sieht Coineda ausschließlich die hier aufgeführten Adressen.",
+    "Synced {{label}}, but it has no events at all": "{{label}} synchronisiert, aber es gibt dort überhaupt keine Ereignisse"
   }
 }

@@ -1,3 +1,4 @@
+import bitcoinEsplora from './bitcoin-esplora';
 import cardanoBlockfrost from './cardano-blockfrost';
 import cardanoYaci from './cardano-yaci';
 import type { SourceModule } from './types';
@@ -11,7 +12,11 @@ import type { SourceModule } from './types';
  * the interface and the conformance fixtures are what make a module
  * generatable, not the loading mechanism.
  */
-export const registry: SourceModule[] = [cardanoYaci, cardanoBlockfrost];
+export const registry: SourceModule[] = [
+  cardanoYaci,
+  cardanoBlockfrost,
+  bitcoinEsplora,
+];
 
 export const findModule = (id: string): SourceModule | undefined =>
   registry.find((module) => module.manifest.id === id);

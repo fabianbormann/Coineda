@@ -407,6 +407,57 @@ describe('editing a source', () => {
     expect(fetchEvents.mock.calls[0][1]).toBeNull();
   });
 
+  it('REORDERING the address list confirms, then full-resyncs', async () => {
+    // Order is semantic, not cosmetic: src/sources/addressList.ts dedupes
+    // while PRESERVING first-seen order, and bitcoin-esplora resolves a
+    // transaction appearing under several configured addresses to the FIRST
+    // one in the list. So swapping two addresses re-attributes every
+    // transaction they share - the venue and the owning address both change -
+    // without adding or removing a single address.
+    //
+    // A `needsRedrain` that compared parsed lists as SETS, or by length,
+    // would treat this as no change at all and leave the ledger holding
+    // events attributed to the old owner, with no way for the user to
+    // discover it. The sibling test above only adds an address, which a
+    // length comparison would still catch; this is the case that separates
+    // order-sensitive comparison from set-equality.
+    const fetchEvents = fetchEventsStub();
+    registry.length = 0;
+    registry.push({ ...editableModule, fetchEvents });
+    await seedSource({
+      baseUrl: '',
+      addresses: 'addr1\naddr2',
+      apiKey: 'secret-val',
+    });
+    await putCursor('cfg-1', 'page-5');
+    renderScreen();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /edit main/i }),
+    );
+    const addresses = await screen.findByLabelText(/Addresses/i);
+    await userEvent.clear(addresses);
+    // The same two addresses, swapped. Nothing added, nothing removed.
+    await userEvent.type(addresses, 'addr2{enter}addr1');
+    await userEvent.click(
+      await screen.findByRole('button', { name: /^Save$/ }),
+    );
+
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent(/whole history again/i);
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: /save and resync/i }),
+    );
+
+    await waitFor(() => expect(fetchEvents).toHaveBeenCalled());
+    expect(fetchEvents.mock.calls[0][1]).toBeNull();
+    // And the new order is what was stored, so the re-drain attributes
+    // ownership the way the user just asked for.
+    const db = await openLedger();
+    const [stored] = await db.getAll('sources');
+    expect(stored.config.addresses).toBe('addr2\naddr1');
+  });
+
   it('changing baseUrl confirms, then full-resyncs', async () => {
     const fetchEvents = fetchEventsStub();
     registry.length = 0;

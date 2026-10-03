@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import { openLedger } from '@/ledger/db';
 import { putCachedPrice, totalValue } from '@/prices/priceStore';
 import { valueOf, ASSET_DECIMALS } from '@/prices/scale';
+import { COINGECKO_IDS } from '@/prices/coingecko';
 import { resolveValues } from '@/tax/resolveValues';
 import { buildJourneySeries } from '@/journey/series';
 import type { LedgerEvent } from '@/ledger/types';
@@ -69,6 +70,49 @@ describe('the per-asset scale', () => {
     expect(valueOf('10000000000000000001', '1', ADA)).toBe(
       '10000000000000.000001',
     );
+  });
+
+  it('maps at least one asset, so the gate below is not vacuous', () => {
+    // Without this, an empty COINGECKO_IDS would make the it.each-style
+    // loop below pass by iterating nothing.
+    expect(Object.keys(COINGECKO_IDS).length).toBeGreaterThan(0);
+  });
+
+  it('knows the decimals of every asset it can price', () => {
+    // decimalsOf returns 0 for an unknown asset, so a priced asset missing
+    // here is priced in its BASE units as though they were whole units -
+    // satoshis as bitcoin, 100,000,000x too large. This is the C1 defect
+    // the tax milestone shipped for lovelace; the gate is what stops the
+    // next asset repeating it silently.
+    for (const assetId of Object.keys(COINGECKO_IDS)) {
+      expect(
+        ASSET_DECIMALS,
+        `${assetId} can be priced but has no decimals`,
+      ).toHaveProperty(assetId);
+    }
+  });
+
+  it('scales a satoshi amount to whole bitcoin before pricing', () => {
+    expect(valueOf('100000000', '50000', 'bitcoin:native')).toBe('50000');
+  });
+
+  it('scales a wei amount to whole ether before pricing', () => {
+    // The gate above asserts an entry EXISTS, never that its number is
+    // right - which is precisely the failure it cannot catch. 'eth:native'
+    // was the proof: no module emits it and nothing authors it, so its
+    // value was unreachable AND unpinned, and changing 18 to 7 broke none
+    // of the 622 tests in this suite. This assertion is what makes the
+    // number mean something.
+    expect(valueOf('1000000000000000000', '3000', 'eth:native')).toBe('3000');
+  });
+
+  it('keeps full precision on a wei-scale division', () => {
+    // 18 decimals is the deepest scale in the map, and the division is
+    // pinned at DIVIDE_DP = 20 rather than inheriting a global Big.DP. One
+    // wei at $3000/ETH is 3e-15, which must survive rather than round to
+    // zero - a holding that rounds to nothing is a holding that vanishes
+    // from a tax report.
+    expect(valueOf('1', '3000', 'eth:native')).toBe('0.000000000000003');
   });
 });
 

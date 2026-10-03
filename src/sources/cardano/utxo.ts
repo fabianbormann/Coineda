@@ -1,3 +1,5 @@
+import { amountString as genericAmountString } from '@/sources/amount';
+
 export type UtxoAmount = {
   unit: string;
   /** Already a decimal string - never parse this to a number and back. */
@@ -70,20 +72,12 @@ export const assetIdOf = (unit: string): string =>
  * The utxo endpoints return `quantity` as a string, which passes through
  * untouched. The rewards endpoint is where the providers disagree: Yaci
  * returns `amount` as a JSON number and Blockfrost as a string, both
- * recorded. Where it arrives as a number, `JSON.parse` has already rounded
- * anything above Number.MAX_SAFE_INTEGER by the time this function runs -
- * the true value is simply gone and no amount of care here can recover it. Failing the sync is the only honest
- * response, because the alternative is a silently wrong number in a tax
- * report.
+ * recorded.
+ *
+ * A thin wrapper over the chain-agnostic src/sources/amount.ts, binding the
+ * chain name to 'cardano' so every call site here - and both messages the
+ * tests assert on verbatim - stay exactly what they were before the guard
+ * moved to be shared with Bitcoin's Esplora module.
  */
-export const amountString = (value: number | string, what: string): string => {
-  if (typeof value === 'string') {
-    return value;
-  }
-  if (!Number.isSafeInteger(value)) {
-    throw new Error(
-      `cardano: ${what} exceeds safe integer precision - JSON parsing has already rounded it, so the true value cannot be recovered`,
-    );
-  }
-  return String(value);
-};
+export const amountString = (value: number | string, what: string): string =>
+  genericAmountString(value, what, 'cardano');
