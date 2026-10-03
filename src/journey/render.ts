@@ -15,6 +15,10 @@ export type JourneyLabels = {
   /** Shown instead of a chart when nothing in the series could be priced
    *  at all - there is no total to show a percentage of, in either mode. */
   noDataLabel: string;
+  /** Marks a figure carried from the nearest priced sample rather than
+   *  priced itself. The frame says so rather than passing the fill off as a
+   *  measurement. */
+  carriedLabel: string;
 };
 
 export type RenderParams = {
@@ -150,13 +154,63 @@ const formatAmount = (amount: string, language: string): string => {
   }
 };
 
-const PADDING = { top: 56, right: 24, bottom: 36, left: 24 };
+const PADDING = { top: 96, right: 40, bottom: 64, left: 40 };
+
+/** Minimum horizontal gap between two marker labels. Labels are assigned
+ *  first-come-first-served down the timeline, so an early marker keeps its
+ *  label and a cluster of later ones goes unlabelled rather than eighty
+ *  captions overprinting each other. The nodes themselves are always drawn. */
+const LABEL_SPACING = 130;
+
+const INFLOW = '53,224,161';
+const OUTFLOW = '255,92,122';
+
+/** The span the journey covers, as the heading. Computed from the series
+ *  rather than passed in: it is digits and a dash, so it needs no
+ *  translation, and it is the one piece of chrome that tells you at a glance
+ *  what you are looking at. */
+const spanLabel = (points: ScaledPoint[]): string => {
+  const first = new Date(points[0].timestamp).getUTCFullYear();
+  const last = new Date(points[points.length - 1].timestamp).getUTCFullYear();
+  return first === last ? `${first}` : `${first} — ${last}`;
+};
+
+type Glow = { x: number; y: number; r: number; colour: string; alpha: number };
+
+/** A soft disc, drawn as a radial gradient so it reads as light rather than
+ *  as a flat circle. Guarded because the recording stub a test passes in
+ *  implements only the handful of methods this module needs. */
+const drawGlow = (ctx: CanvasRenderingContext2D, spot: Glow): void => {
+  if (typeof ctx.createRadialGradient !== 'function') {
+    return;
+  }
+  const gradient = ctx.createRadialGradient(
+    spot.x,
+    spot.y,
+    0,
+    spot.x,
+    spot.y,
+    spot.r,
+  );
+  gradient.addColorStop(0, `rgba(${spot.colour},${spot.alpha})`);
+  gradient.addColorStop(1, `rgba(${spot.colour},0)`);
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(spot.x, spot.y, spot.r, 0, Math.PI * 2);
+  ctx.fill();
+};
 
 /**
  * Draws one frame of the journey onto `ctx`. Pure except for the side
  * effect of issuing canvas draw calls - no DOM access, no timers, no i18n
  * - so a test can hand it a plain recording stub in place of a real
  * CanvasRenderingContext2D and assert on exactly what was drawn.
+ *
+ * The composition is a lit rail: time runs along it, every acquisition and
+ * disposal lands on it as a glowing node sized by its own amount, and the
+ * portfolio value rides underneath as a luminous ridge. It replaced a plain
+ * polyline that grew from zero width, which left the opening seconds of a
+ * recorded video nearly empty - the thing a viewer sees first.
  */
 export const renderJourneyFrame = (
   ctx: CanvasRenderingContext2D,
@@ -167,16 +221,15 @@ export const renderJourneyFrame = (
   const progress = Math.min(1, Math.max(0, params.progress));
 
   ctx.clearRect(0, 0, width, height);
-  ctx.fillStyle = '#0b0f14';
+  ctx.fillStyle = '#070b14';
   ctx.fillRect(0, 0, width, height);
-
-  ctx.fillStyle = '#f5f5f5';
-  ctx.font = '600 20px sans-serif';
-  ctx.fillText(labels.title, PADDING.left, 32);
 
   const scaled = scaleSeries(series.points, mode);
   if (scaled.length === 0) {
-    ctx.fillStyle = '#9ca3af';
+    ctx.fillStyle = '#e8edf7';
+    ctx.font = '800 32px Archivo, sans-serif';
+    ctx.fillText(labels.title, PADDING.left, 56);
+    ctx.fillStyle = '#7b8aa8';
     ctx.font = '14px sans-serif';
     ctx.fillText(labels.noDataLabel, PADDING.left, height / 2);
     return;
@@ -194,8 +247,17 @@ export const renderJourneyFrame = (
     .map((point) => point.value)
     .filter((value): value is number => value !== null);
 
+  // The heading goes on before the early return: a frame with nothing
+  // priced yet should still say what it is, not read as a broken render.
+  ctx.fillStyle = '#e8edf7';
+  ctx.font = '800 34px Archivo, sans-serif';
+  ctx.fillText(spanLabel(scaled), plotLeft, 50);
+  ctx.fillStyle = '#7b8aa8';
+  ctx.font = '13px sans-serif';
+  ctx.fillText(labels.title, plotLeft, 74);
+
   if (definedValues.length === 0) {
-    ctx.fillStyle = '#9ca3af';
+    ctx.fillStyle = '#7b8aa8';
     ctx.font = '14px sans-serif';
     ctx.fillText(labels.noDataLabel, plotLeft, (plotTop + plotBottom) / 2);
     return;
@@ -213,7 +275,61 @@ export const renderJourneyFrame = (
   const yForValue = (value: number): number =>
     plotBottom - ((value - minValue) / valueRange) * (plotBottom - plotTop);
 
-  ctx.fillStyle = '#9ca3af';
+  const railY = plotBottom;
+  const head = xForIndex(Math.max(0, visible.length - 1));
+
+  // The ridge: value as a filled, glowing area under the rail.
+  const ridge = visible
+    .map((point, index) => ({ point, index }))
+    .filter((entry) => entry.point.value !== null);
+
+  if (typeof ctx.createLinearGradient === 'function') {
+    ctx.beginPath();
+    ctx.moveTo(xForIndex(ridge[0].index), railY);
+    for (const entry of ridge) {
+      ctx.lineTo(
+        xForIndex(entry.index),
+        yForValue(entry.point.value as number),
+      );
+    }
+    ctx.lineTo(xForIndex(ridge[ridge.length - 1].index), railY);
+    if (typeof ctx.closePath === 'function') {
+      ctx.closePath();
+    }
+    const fill = ctx.createLinearGradient(0, plotTop, 0, railY);
+    fill.addColorStop(0, `rgba(${INFLOW},0.42)`);
+    fill.addColorStop(1, `rgba(${INFLOW},0.02)`);
+    ctx.fillStyle = fill;
+    ctx.fill();
+  }
+
+  ctx.beginPath();
+  let started = false;
+  for (const entry of ridge) {
+    const x = xForIndex(entry.index);
+    const y = yForValue(entry.point.value as number);
+    if (started) {
+      ctx.lineTo(x, y);
+    } else {
+      ctx.moveTo(x, y);
+      started = true;
+    }
+  }
+  ctx.strokeStyle = '#8affd4';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // The rail itself.
+  ctx.beginPath();
+  ctx.moveTo(plotLeft, railY);
+  ctx.lineTo(plotRight, railY);
+  ctx.strokeStyle = '#1b2740';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // The axis labels stay where they were: the extremes of what is drawn,
+  // formatted by mode, so relative mode still never names a total.
+  ctx.fillStyle = '#7b8aa8';
   ctx.font = '12px sans-serif';
   ctx.fillText(
     formatValue(maxValue, mode, currency, language),
@@ -223,67 +339,83 @@ export const renderJourneyFrame = (
   ctx.fillText(
     formatValue(minValue, mode, currency, language),
     plotLeft,
-    plotBottom + 16,
+    railY + 20,
   );
 
-  ctx.beginPath();
-  let started = false;
-  visible.forEach((point, index) => {
-    if (point.value === null) {
-      return;
-    }
-    const x = xForIndex(index);
-    const y = yForValue(point.value);
-    if (!started) {
-      ctx.moveTo(x, y);
-      started = true;
-    } else {
-      ctx.lineTo(x, y);
-    }
-  });
-  ctx.strokeStyle = '#22d3ee';
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
   const visibleUntil = visible[visible.length - 1]?.timestamp ?? 0;
-  for (const marker of series.acquisitions) {
-    if (marker.timestamp > visibleUntil) {
-      continue;
-    }
+  const nodes = [
+    ...series.acquisitions.map((marker) => ({ marker, kind: 'in' as const })),
+    ...series.disposals.map((marker) => ({ marker, kind: 'out' as const })),
+  ]
+    .filter((node) => node.marker.timestamp <= visibleUntil)
+    .sort((a, b) => a.marker.timestamp - b.marker.timestamp);
+
+  let lastLabelX = Number.NEGATIVE_INFINITY;
+  for (const node of nodes) {
     const index = visible.findIndex(
-      (point) => point.timestamp >= marker.timestamp,
+      (point) => point.timestamp >= node.marker.timestamp,
     );
     if (index === -1) {
       continue;
     }
-    const point = visible[index];
-    if (point.value === null) {
-      continue;
-    }
     const x = xForIndex(index);
-    const y = yForValue(point.value);
+    const colour = node.kind === 'in' ? INFLOW : OUTFLOW;
 
+    drawGlow(ctx, { x, y: railY, r: 34, colour, alpha: 0.55 });
     ctx.beginPath();
-    ctx.arc(x, y, 4, 0, Math.PI * 2);
-    ctx.fillStyle = '#f59e0b';
+    ctx.arc(x, railY, 5, 0, Math.PI * 2);
+    ctx.fillStyle = node.kind === 'in' ? '#c9ffe9' : '#ffd0da';
     ctx.fill();
 
-    ctx.fillStyle = '#f5f5f5';
-    ctx.font = '11px sans-serif';
-    ctx.fillText(
-      formatMarker(marker, mode, labels.acquisitionPrefix, language),
-      x + 6,
-      y - 6,
-    );
+    // A stem up to the ridge, so a node reads as attached to the value it
+    // moved rather than floating on the axis.
+    const point = visible[index];
+    if (point.value !== null) {
+      ctx.beginPath();
+      ctx.moveTo(x, railY);
+      ctx.lineTo(x, yForValue(point.value));
+      ctx.strokeStyle = `rgba(${colour},0.35)`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    if (x - lastLabelX >= LABEL_SPACING) {
+      lastLabelX = x;
+      ctx.fillStyle = '#e8edf7';
+      ctx.font = '11px sans-serif';
+      ctx.fillText(
+        formatMarker(node.marker, mode, labels.acquisitionPrefix, language),
+        x + 8,
+        railY - 10,
+      );
+    }
   }
+
+  // The playhead, and the running total beside it.
+  drawGlow(ctx, {
+    x: head,
+    y: railY,
+    r: 70,
+    colour: '232,237,247',
+    alpha: 0.42,
+  });
 
   const last = [...visible].reverse().find((point) => point.value !== null);
   if (last && last.value !== null) {
     const index = visible.indexOf(last);
     const x = xForIndex(index);
     const y = yForValue(last.value);
-    ctx.fillStyle = '#f5f5f5';
-    ctx.font = '600 16px sans-serif';
-    ctx.fillText(formatValue(last.value, mode, currency, language), x, y - 14);
+    ctx.fillStyle = '#e8edf7';
+    ctx.font = '600 28px Archivo, sans-serif';
+    ctx.fillText(formatValue(last.value, mode, currency, language), x, y - 18);
+
+    // Says so when the figure was carried rather than priced. A picture may
+    // fill its gaps; it should not pass the filling off as a measurement.
+    const sourcePoint = series.points[index];
+    if (sourcePoint?.carried) {
+      ctx.fillStyle = '#f7a23b';
+      ctx.font = '11px sans-serif';
+      ctx.fillText(labels.carriedLabel, x, y + 4);
+    }
   }
 };

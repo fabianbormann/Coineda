@@ -22,6 +22,18 @@ export type SeriesPoint = {
   timestamp: number;
   totalValue: string | null;
   holdings: Holding[];
+  /**
+   * True when `totalValue` was carried from the nearest sample that could
+   * be priced, rather than priced itself.
+   *
+   * The journey is a picture, not a tax figure, and a run of unpriceable
+   * months at the start used to leave it drawing the words "Not enough
+   * priced history yet" over an empty frame for the opening seconds. A
+   * carried value is a better answer than a blank one - but it is an
+   * assertion nobody measured, so it is flagged, and the renderer says so
+   * on the frame. Nothing in src/tax ever reads this module.
+   */
+  carried?: boolean;
 };
 
 /** One "you bought this" annotation: which asset, when, and how much - a
@@ -35,6 +47,10 @@ export type AcquisitionMarker = {
 export type JourneySeries = {
   points: SeriesPoint[];
   acquisitions: AcquisitionMarker[];
+  /** The other half of the story: what left, and when. Same shape as an
+   *  acquisition, and subject to the same relative-mode rule - a quantity
+   *  is an absolute figure whichever direction it moved in. */
+  disposals: AcquisitionMarker[];
 };
 
 export type BuildJourneySeriesOptions = {
@@ -138,7 +154,7 @@ export const buildJourneySeries = async (
   options: BuildJourneySeriesOptions = {},
 ): Promise<JourneySeries> => {
   if (events.length === 0) {
-    return { points: [], acquisitions: [] };
+    return { points: [], acquisitions: [], disposals: [] };
   }
 
   const sorted = [...events].sort((a, b) => a.timestamp - b.timestamp);
@@ -258,7 +274,30 @@ export const buildJourneySeries = async (
     };
   });
 
+  // Fill the gaps from the nearest sample that WAS priced: forward for a
+  // hole in the middle, backward for a run at the very start, which is the
+  // case that actually spoiled the opening - there is nothing earlier to
+  // carry, so the first known value reaches back instead. A series with no
+  // priced sample at all is left entirely null, and the renderer still has
+  // its "not enough history" frame for that.
+  const firstPriced = points.find((point) => point.totalValue !== null);
+  const filled: SeriesPoint[] = [];
+  let carriedValue = firstPriced?.totalValue ?? null;
+  for (const point of points) {
+    if (point.totalValue !== null) {
+      carriedValue = point.totalValue;
+      filled.push(point);
+      continue;
+    }
+    filled.push(
+      carriedValue === null
+        ? point
+        : { ...point, totalValue: carriedValue, carried: true },
+    );
+  }
+
   const acquisitions: AcquisitionMarker[] = [];
+  const disposals: AcquisitionMarker[] = [];
   for (const event of sorted) {
     // 'trade' (a buy) and 'reward' are acquisitions in the sense this
     // feature cares about - "what did they buy, and when". 'transfer' is
@@ -269,19 +308,27 @@ export const buildJourneySeries = async (
     }
     for (const leg of event.legs) {
       if (
-        leg.direction === 'in' &&
-        leg.role === 'principal' &&
-        ownedVenues.has(leg.venue) &&
-        !isFiatAsset(leg.assetId)
+        leg.role !== 'principal' ||
+        !ownedVenues.has(leg.venue) ||
+        isFiatAsset(leg.assetId)
       ) {
-        acquisitions.push({
-          timestamp: event.timestamp,
-          assetId: leg.assetId,
-          amount: leg.amount,
-        });
+        continue;
+      }
+      // Symmetric with the acquisition rule above, and excluding 'transfer'
+      // for the same reason: moving an asset between your own venues is not
+      // selling it.
+      const marker = {
+        timestamp: event.timestamp,
+        assetId: leg.assetId,
+        amount: leg.amount,
+      };
+      if (leg.direction === 'in') {
+        acquisitions.push(marker);
+      } else {
+        disposals.push(marker);
       }
     }
   }
 
-  return { points, acquisitions };
+  return { points: filled, acquisitions, disposals };
 };

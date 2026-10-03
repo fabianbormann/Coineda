@@ -161,6 +161,7 @@ export const JourneyDialog = ({ open, onOpenChange }: Props) => {
       title: t('Your crypto journey'),
       acquisitionPrefix: t('Bought'),
       noDataLabel: t('Not enough priced history yet'),
+      carriedLabel: t('carried forward'),
     };
 
     const startedAt = performance.now();
@@ -206,6 +207,7 @@ export const JourneyDialog = ({ open, onOpenChange }: Props) => {
       title: t('Your crypto journey'),
       acquisitionPrefix: t('Bought'),
       noDataLabel: t('Not enough priced history yet'),
+      carriedLabel: t('carried forward'),
     };
 
     // captureStream() is obtained HERE, not inside recordVideo(), so a test

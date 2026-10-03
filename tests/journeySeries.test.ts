@@ -73,7 +73,7 @@ describe('monthlySampleTimestamps', () => {
 describe('buildJourneySeries', () => {
   it('returns an empty series for an empty ledger', async () => {
     const series = await buildJourneySeries([], 'eur');
-    expect(series).toEqual({ points: [], acquisitions: [] });
+    expect(series).toEqual({ points: [], acquisitions: [], disposals: [] });
   });
 
   it('folds holdings at each monthly sample and prices them on that sample’s UTC day', async () => {
@@ -179,5 +179,139 @@ describe('buildJourneySeries', () => {
         amount: '10000000',
       },
     ]);
+  });
+});
+
+describe('carrying a value over an unpriced sample', () => {
+  /** Prices only the days this set names; every other day comes back empty,
+   *  which is what an unpriceable month looks like to the series. */
+  const priceOnly = (days: string[]) =>
+    vi.fn(async (url: string) => {
+      const from = Number(/from=(\d+)/.exec(String(url))![1]) * 1000;
+      const to = Number(/to=(\d+)/.exec(String(url))![1]) * 1000;
+      const prices: [number, number][] = [];
+      for (
+        let at = Math.ceil(from / 86_400_000) * 86_400_000;
+        at <= to;
+        at += 86_400_000
+      ) {
+        const day = new Date(at).toISOString().slice(0, 10);
+        if (days.includes(day)) {
+          prices.push([at, 2]);
+        }
+      }
+      return new Response(JSON.stringify({ prices }), { status: 200 });
+    });
+
+  it('reaches BACKWARD to fill a run of unpriced samples at the start', async () => {
+    // The reported complaint: the opening seconds of the video said "Not
+    // enough priced history yet" over an empty frame. There is nothing
+    // earlier to carry forward from, so the first value that IS known
+    // reaches back - which is what removes the dead opening.
+    vi.stubGlobal('fetch', priceOnly(['2025-03-15']));
+
+    const series = await buildJourneySeries([reward()], 'eur', {
+      now: Date.UTC(2025, 2, 15),
+    });
+
+    expect(series.points).toHaveLength(3);
+    expect(series.points.map((p) => p.totalValue)).toEqual(['20', '20', '20']);
+    // Flagged, every one of them, except the sample that was really priced.
+    expect(series.points.map((p) => p.carried === true)).toEqual([
+      true,
+      true,
+      false,
+    ]);
+  });
+
+  it('carries FORWARD over a hole in the middle', async () => {
+    vi.stubGlobal('fetch', priceOnly(['2025-01-15', '2025-03-15']));
+
+    const series = await buildJourneySeries([reward()], 'eur', {
+      now: Date.UTC(2025, 2, 15),
+    });
+
+    expect(series.points.map((p) => p.carried === true)).toEqual([
+      false,
+      true,
+      false,
+    ]);
+  });
+
+  it('leaves every sample null when nothing at all could be priced', async () => {
+    // The genuinely empty case has to survive: with no priced sample there
+    // is nothing to carry, and the renderer still needs its "not enough
+    // history" frame rather than a flat line through zero.
+    vi.stubGlobal('fetch', priceOnly([]));
+
+    const series = await buildJourneySeries([reward()], 'eur', {
+      now: Date.UTC(2025, 2, 15),
+    });
+
+    expect(series.points.every((p) => p.totalValue === null)).toBe(true);
+    expect(series.points.some((p) => p.carried)).toBe(false);
+  });
+});
+
+describe('disposal markers', () => {
+  const sale = (): LedgerEvent => ({
+    id: 'sale-1',
+    sourceId: 'src-1',
+    externalId: 'sale-1',
+    timestamp: Date.UTC(2025, 1, 10),
+    kind: 'trade',
+    origin: 'authored',
+    legs: [
+      {
+        assetId: 'cardano:lovelace',
+        amount: '4000000',
+        direction: 'out',
+        venue: 'wallet-a',
+        role: 'principal',
+      },
+      {
+        assetId: 'fiat:eur',
+        amount: '8',
+        direction: 'in',
+        venue: 'wallet-a',
+        role: 'principal',
+      },
+    ],
+  });
+
+  it('records what left, so the scene can shrink as well as grow', async () => {
+    vi.stubGlobal('fetch', flatRange(2));
+
+    const series = await buildJourneySeries([reward(), sale()], 'eur', {
+      now: Date.UTC(2025, 2, 15),
+    });
+
+    expect(series.disposals).toEqual([
+      {
+        timestamp: Date.UTC(2025, 1, 10),
+        assetId: 'cardano:lovelace',
+        amount: '4000000',
+      },
+    ]);
+    // The fiat side of the trade is not a disposal of anything the journey
+    // tracks, and the reward is still an acquisition.
+    expect(series.acquisitions).toHaveLength(1);
+  });
+
+  it('does not count moving your own coins between venues as a disposal', async () => {
+    // Symmetric with the acquisition rule: a 'transfer' is excluded in both
+    // directions, or every wallet-to-wallet move would read as a sale.
+    vi.stubGlobal('fetch', flatRange(2));
+
+    const series = await buildJourneySeries(
+      [
+        reward(),
+        { ...sale(), id: 'move-1', externalId: 'move-1', kind: 'transfer' },
+      ],
+      'eur',
+      { now: Date.UTC(2025, 2, 15) },
+    );
+
+    expect(series.disposals).toEqual([]);
   });
 });

@@ -35,6 +35,7 @@ const buildJourneySeriesMock = vi.mocked(buildJourneySeries);
 const readySeries: JourneySeries = {
   points: [{ timestamp: Date.UTC(2025, 0, 1), totalValue: '20', holdings: [] }],
   acquisitions: [],
+  disposals: [],
 };
 
 beforeEach(async () => {
