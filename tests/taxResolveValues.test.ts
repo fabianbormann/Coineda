@@ -15,6 +15,33 @@ const event = (overrides: Partial<TaxEvent>): TaxEvent => ({
   ...overrides,
 });
 
+const DAY = 86_400_000;
+
+/**
+ * A faithful stand-in for `market_chart/range`: reads the window out of the
+ * URL and answers with a daily point at each UTC midnight in it, which is
+ * what the real endpoint does for any span over 90 days.
+ *
+ * Generated from the request rather than hardcoded so a test does not have
+ * to know which days the resolver decided it needed - and so a resolver that
+ * asked for the WRONG window produces no price here rather than quietly
+ * getting the right one anyway.
+ */
+const rangeStub = (priceFor: (isoDate: string) => number) =>
+  vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(
+    async (url: string) => {
+      const from = Number(/from=(\d+)/.exec(String(url))![1]) * 1000;
+      const to = Number(/to=(\d+)/.exec(String(url))![1]) * 1000;
+      const prices: [number, number][] = [];
+      for (let t = Math.ceil(from / DAY) * DAY; t <= to; t += DAY) {
+        prices.push([t, priceFor(new Date(t).toISOString().slice(0, 10))]);
+      }
+      return new Response(JSON.stringify({ prices }), { status: 200 });
+    },
+  );
+
+const flatRange = (eur: number) => rangeStub(() => eur);
+
 beforeEach(async () => {
   const db = await openLedger();
   for (const store of ['prices', 'settings'] as const) {
@@ -49,17 +76,13 @@ describe('toCoinGeckoDate', () => {
 
 describe('resolveValues', () => {
   it('values an event from the price on its own UTC day', async () => {
+    // 0.35 ONLY on the event's own UTC day, a wildly different price on
+    // every other day in the window. The value assertion below therefore
+    // proves which day was picked - the previous version asserted the
+    // dd-mm-yyyy in the URL, which the batched request no longer carries.
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (url: string) => {
-        expect(String(url)).toContain('15-09-2026');
-        return new Response(
-          JSON.stringify({
-            market_data: { current_price: { eur: 0.35 } },
-          }),
-          { status: 200 },
-        );
-      }),
+      rangeStub((isoDate) => (isoDate === '2026-09-15' ? 0.35 : 999)),
     );
 
     // 10 ADA, in lovelace: the provider's price is per whole ADA, so the
@@ -79,13 +102,7 @@ describe('resolveValues', () => {
     // hard, and a historical price for a past day never changes, so one
     // fetch per (asset, currency, day) is the difference between a report
     // that completes and one that gets throttled.
-    const fetchMock = vi.fn(
-      async () =>
-        new Response(
-          JSON.stringify({ market_data: { current_price: { eur: 1 } } }),
-          { status: 200 },
-        ),
-    );
+    const fetchMock = flatRange(1);
     vi.stubGlobal('fetch', fetchMock);
 
     const day = Date.UTC(2026, 8, 15, 1, 0, 0);
@@ -101,14 +118,58 @@ describe('resolveValues', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('serves a second run entirely from cache', async () => {
-    const fetchMock = vi.fn(
-      async () =>
-        new Response(
-          JSON.stringify({ market_data: { current_price: { eur: 2 } } }),
-          { status: 200 },
-        ),
+  it('prices eighty days in ONE request, not eighty', async () => {
+    // The reported failure, as a test. A report needing 80 days priced
+    // issued 80 sequential requests; the keyless free tier answers 429
+    // after about four, and that 429 carries no CORS header - so the
+    // browser could not read it and showed "Failed to fetch" against most
+    // of the user's events, with nothing anywhere explaining why.
+    const fetchMock = flatRange(3);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const base = Date.UTC(2026, 6, 1, 12, 0, 0);
+    const events = Array.from({ length: 80 }, (_, i) =>
+      event({ sourceEventId: `e${i}`, timestamp: base + i * DAY }),
     );
+
+    const { valued, unpriced } = await resolveValues(events, 'eur');
+
+    expect(unpriced).toHaveLength(0);
+    expect(valued).toHaveLength(80);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks one request per asset, not one per asset-day', async () => {
+    const fetchMock = flatRange(1);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const base = Date.UTC(2026, 6, 1, 12, 0, 0);
+    await resolveValues(
+      [
+        event({ sourceEventId: 'a1', timestamp: base }),
+        event({ sourceEventId: 'a2', timestamp: base + DAY }),
+        event({
+          sourceEventId: 'b1',
+          assetId: 'bitcoin:native',
+          amount: '100000000',
+          timestamp: base,
+        }),
+        event({
+          sourceEventId: 'b2',
+          assetId: 'bitcoin:native',
+          amount: '100000000',
+          timestamp: base + DAY,
+        }),
+      ],
+      'eur',
+    );
+
+    // Two assets, two days each: two requests, because a span is per asset.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('serves a second run entirely from cache', async () => {
+    const fetchMock = flatRange(2);
     vi.stubGlobal('fetch', fetchMock);
 
     await resolveValues([event({})], 'eur');
@@ -168,18 +229,7 @@ describe('resolveValues', () => {
   });
 
   it('keeps a value as a decimal string with no float round-trip', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(
-        async () =>
-          new Response(
-            JSON.stringify({
-              market_data: { current_price: { eur: 0.1 } },
-            }),
-            { status: 200 },
-          ),
-      ),
-    );
+    vi.stubGlobal('fetch', flatRange(0.1));
 
     const { valued } = await resolveValues(
       [event({ amount: '3000000' })],
@@ -204,15 +254,7 @@ describe('resolveValues', () => {
     // Typed with fetch's real (url, init) parameters - not left to infer as
     // () => ... - so the tuple destructured below actually type-checks
     // against what fetchHistoricalPrice calls fetch with.
-    const fetchMock = vi.fn<
-      (url: string, init?: RequestInit) => Promise<Response>
-    >(
-      async () =>
-        new Response(
-          JSON.stringify({ market_data: { current_price: { eur: 1 } } }),
-          { status: 200 },
-        ),
-    );
+    const fetchMock = flatRange(1);
     vi.stubGlobal('fetch', fetchMock);
 
     await resolveValues([event({})], 'eur');

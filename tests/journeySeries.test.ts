@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { openLedger } from '@/ledger/db';
 import { buildJourneySeries, monthlySampleTimestamps } from '@/journey/series';
 import type { LedgerEvent } from '@/ledger/types';
+import { flatRange } from './priceRangeStub';
 
 const reward = (overrides: Partial<LedgerEvent> = {}): LedgerEvent => ({
   id: 'reward-1',
@@ -30,6 +31,17 @@ beforeEach(async () => {
   const db = await openLedger();
   await db.clear('prices');
   vi.unstubAllGlobals();
+  // Prices are only requested for days the free tier can serve, which is
+  // decided locally against the clock - so these 2025 fixtures need a clock
+  // that sits just after them, or nothing is asked for at all. Deciding
+  // locally is deliberate: CoinGecko's 401 carries no CORS header, so a
+  // browser cannot read it and would see only "Failed to fetch".
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  vi.setSystemTime(new Date('2025-04-01T00:00:00Z'));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('monthlySampleTimestamps', () => {
@@ -65,13 +77,7 @@ describe('buildJourneySeries', () => {
   });
 
   it('folds holdings at each monthly sample and prices them on that sample’s UTC day', async () => {
-    const fetchMock = vi.fn(
-      async () =>
-        new Response(
-          JSON.stringify({ market_data: { current_price: { eur: 2 } } }),
-          { status: 200 },
-        ),
-    );
+    const fetchMock = flatRange(2);
     vi.stubGlobal('fetch', fetchMock);
 
     const now = Date.UTC(2025, 2, 15); // two months after the reward
@@ -86,10 +92,11 @@ describe('buildJourneySeries', () => {
       expect(point.totalValue).toBe('20');
     }
 
-    // One fetch per distinct (asset, day) pair - three sample months, not
-    // one lookup per day in between. This is the bound monthly sampling
-    // exists for.
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    // ONE request for all three sample months, not one per month. Monthly
+    // sampling still bounds how many DAYS are priced; batching bounds how
+    // many requests that costs, which is what stopped the journey dying on
+    // a rate limit it could not even read the status of.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
     // A buy/earn event becomes an acquisition marker: asset, when, how much.
     expect(series.acquisitions).toEqual([
@@ -102,23 +109,17 @@ describe('buildJourneySeries', () => {
   });
 
   it('never asks the provider twice for the same (asset, day) pair - a second run costs nothing', async () => {
-    const fetchMock = vi.fn(
-      async () =>
-        new Response(
-          JSON.stringify({ market_data: { current_price: { eur: 2 } } }),
-          { status: 200 },
-        ),
-    );
+    const fetchMock = flatRange(2);
     vi.stubGlobal('fetch', fetchMock);
 
     const now = Date.UTC(2025, 1, 15); // one month after the reward
     await buildJourneySeries([reward()], 'eur', { now });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
     await buildJourneySeries([reward()], 'eur', { now });
     // The second run hits the permanent (assetId, currency, day) cache for
     // every pair the first run already resolved, so no new fetches happen.
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('marks a point unpriced rather than reporting it as zero when the provider has no data for that day', async () => {
@@ -139,16 +140,7 @@ describe('buildJourneySeries', () => {
   });
 
   it('excludes transfers from acquisition markers - moving your own assets is not buying them', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(
-        async () =>
-          new Response(
-            JSON.stringify({ market_data: { current_price: { eur: 2 } } }),
-            { status: 200 },
-          ),
-      ),
-    );
+    vi.stubGlobal('fetch', flatRange(2));
 
     const transfer: LedgerEvent = {
       id: 'transfer-1',

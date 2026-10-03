@@ -5,6 +5,7 @@ import { openLedger, putEvents } from '@/ledger/db';
 import austrianTax from '@/tax/jurisdictions/at';
 import type { LedgerEvent } from '@/ledger/types';
 import type { TaxModule, TaxEvent } from '@/tax/types';
+import { flatRange, rangeStub } from './priceRangeStub';
 
 /** A deliberately minimal module: the pipeline must work without any
  *  jurisdiction's rules, so the two can be rejected independently. 'fee' is
@@ -81,16 +82,22 @@ beforeEach(async () => {
   for (const store of ['events', 'prices', 'settings'] as const) {
     await db.clear(store);
   }
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(
-      async () =>
-        new Response(
-          JSON.stringify({ market_data: { current_price: { eur: 1 } } }),
-          { status: 200 },
-        ),
-    ),
-  );
+  // These scenarios deliberately span more than a year - an acquisition in
+  // one tax year disposed of in another is the whole point of several of
+  // them - and the keyless free tier only prices the last 365 days. Prices
+  // for days outside that are no longer requested at all, because
+  // CoinGecko's 401 carries no CORS header and a browser would see only
+  // "Failed to fetch". So these run as a keyed user, which is the honest
+  // reading of a report covering several years.
+  await db.put('settings', {
+    key: 'settings',
+    value: {
+      language: 'en',
+      baseCurrency: 'eur',
+      coingeckoApiKey: 'test-key',
+    },
+  });
+  vi.stubGlobal('fetch', flatRange(1));
 });
 
 describe('taxYearOf', () => {
@@ -295,21 +302,12 @@ describe('runTaxReport', () => {
     // expected to, and must, disagree on the resulting cost basis.
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (url: string) => {
-        // CoinGecko's history endpoint is called once per (asset, UTC day)
-        // and dedicated/cached - branching on the date in the mocked
-        // request is how each acquisition gets its own distinct price
-        // without touching a real network.
-        const price = url.includes('date=01-01-2024')
-          ? 1
-          : url.includes('date=02-01-2024')
-            ? 3
-            : 5;
-        return new Response(
-          JSON.stringify({ market_data: { current_price: { eur: price } } }),
-          { status: 200 },
-        );
-      }),
+      // Prices are now requested as one span per asset, so each
+      // acquisition gets its own price by the DAY the fake answers for
+      // rather than by a date in the URL.
+      rangeStub((isoDate) =>
+        isoDate === '2024-01-01' ? 1 : isoDate === '2024-01-02' ? 3 : 5,
+      ),
     );
 
     // Amounts are lovelace while a price is per whole ADA, so these are
@@ -424,14 +422,12 @@ describe('runTaxReport', () => {
     // that exists to be read.
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (url: string) => {
-        // The native token has no CoinGecko id, so fetchHistoricalPrice
-        // returns null for it without a request; lovelace is priced.
-        if (url.includes('cardano')) {
-          return new Response(
-            JSON.stringify({ market_data: { current_price: { eur: 1 } } }),
-            { status: 200 },
-          );
+      vi.fn(async (url: string, init?: RequestInit) => {
+        // The native token has no CoinGecko id, so it is never asked about
+        // at all; lovelace is priced. Anything else 404s, which is what
+        // makes a stray request visible rather than silently satisfied.
+        if (String(url).includes('cardano')) {
+          return flatRange(1)(String(url), init);
         }
         return new Response('', { status: 404 });
       }),

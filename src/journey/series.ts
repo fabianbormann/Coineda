@@ -1,7 +1,7 @@
 import { addAmounts } from '@/ledger/amount';
 import { foldHoldings, isFiatAsset, ownedVenuesOf } from '@/ledger/balances';
 import type { Holding } from '@/ledger/balances';
-import { fetchHistoricalPrice } from '@/prices/coingecko';
+import { COINGECKO_IDS, fetchHistoricalPrices } from '@/prices/coingecko';
 import { getCachedPrice, putCachedPrice } from '@/prices/priceStore';
 import { valueOf } from '@/prices/scale';
 import type { LedgerEvent } from '@/ledger/types';
@@ -172,31 +172,49 @@ export const buildJourneySeries = async (
   }
 
   const prices = new Map<string, string>();
+
+  // Cache first, then ONE request per asset for whatever is left - never one
+  // per day. A journey spans a whole history, so the per-day endpoint meant
+  // hundreds of sequential requests; the free tier answers 429 after about
+  // four, and a 429 with no CORS header reaches the browser as "Failed to
+  // fetch". That is what left the journey saying it had too little priced
+  // history to draw.
+  const missing = new Map<string, string[]>();
   for (const [key, { assetId, date }] of pairs) {
+    const cached = await getCachedPrice({ assetId, currency, date });
+    if (cached !== null) {
+      prices.set(key, cached);
+      continue;
+    }
+    // Not mapped: never asked about, and left out of `prices`, which is what
+    // makes the point below unpriced rather than zero.
+    if (!COINGECKO_IDS[assetId]) {
+      continue;
+    }
+    const days = missing.get(assetId);
+    if (days) {
+      days.push(date);
+    } else {
+      missing.set(assetId, [date]);
+    }
+  }
+
+  for (const [assetId, days] of missing) {
     try {
-      const cached = await getCachedPrice({ assetId, currency, date });
-      if (cached !== null) {
-        prices.set(key, cached);
-        continue;
-      }
-      const fetched = await fetchHistoricalPrice(
+      const fetched = await fetchHistoricalPrices(
         assetId,
         currency,
-        date,
+        days,
         options.apiKey,
       );
-      if (fetched === null) {
-        // Not mapped, or the provider has nothing for this day - leave it
-        // out of `prices`, which is exactly what makes the point below
-        // unpriced rather than zero.
-        continue;
+      for (const [date, price] of fetched) {
+        await putCachedPrice({ assetId, currency, date }, price);
+        prices.set(`${assetId}|${date}`, price);
       }
-      await putCachedPrice({ assetId, currency, date }, fetched);
-      prices.set(key, fetched);
     } catch {
-      // A provider outage or a free-tier 401/403 for a day too old to
-      // cover: one unpriceable (asset, day) pair must not cost the user
-      // their whole journey. Leave it unpriced and move on.
+      // A provider outage, a rate limit, or a span the free tier will not
+      // cover: one unpriceable asset must not cost the user their whole
+      // journey. Leave those days unpriced and move on.
       continue;
     }
   }

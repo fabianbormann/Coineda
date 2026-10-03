@@ -1,15 +1,15 @@
 import { getCachedPrice, putCachedPrice } from '@/prices/priceStore';
 import {
-  fetchHistoricalPrice,
+  COINGECKO_IDS,
+  FREE_TIER_DAYS,
+  fetchHistoricalPrices,
+  freeTierCutoff,
   CoinGeckoHistoryError,
 } from '@/prices/coingecko';
 import { valueOf } from '@/prices/scale';
 import { getSettings } from '@/settings/settingsStore';
 import { normaliseAmount } from '@/ledger/amount';
 import type { TaxEvent, UnresolvedItem } from '@/tax/types';
-
-/** CoinGecko's free tier only serves the last 365 days of history. */
-const FREE_TIER_DAYS = 365;
 
 /** The UTC calendar day a timestamp falls on, as YYYY-MM-DD - matches
  *  PriceKey.date. Local time is deliberately never used: a local reading
@@ -30,14 +30,22 @@ const pairKey = (assetId: string, date: string): string => `${assetId}|${date}`;
  * as-is - and since that message is built in fetchHistoricalPrice without
  * ever including the API key, it is always safe to show.
  */
+/**
+ * The free tier's own boundary, as one message shared by both paths that can
+ * hit it: a provider 401 for an old day, and a day this code declined to
+ * request at all because it already knew the answer.
+ */
+const freeTierReason = (): string => {
+  const cutoff = new Date(freeTierCutoff()).toISOString().slice(0, 10);
+  return `historical prices before ${cutoff} need a CoinGecko API key: the free tier covers only the last ${FREE_TIER_DAYS} days`;
+};
+
 const describeFailure = (error: unknown, date: string): string => {
   if (error instanceof CoinGeckoHistoryError) {
-    const cutoff = new Date(Date.now() - FREE_TIER_DAYS * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .slice(0, 10);
+    const cutoff = new Date(freeTierCutoff()).toISOString().slice(0, 10);
     const isBeforeFreeTier = date < cutoff;
     if ((error.status === 401 || error.status === 403) && isBeforeFreeTier) {
-      return `historical prices before ${cutoff} need a CoinGecko API key: the free tier covers only the last 365 days`;
+      return freeTierReason();
     }
     return error.message;
   }
@@ -98,31 +106,68 @@ export const resolveValues = async (
   }
 
   const results = new Map<string, DayResult>();
+
+  // Everything already cached, first and without a request. A second run of
+  // the same report asks the provider for nothing at all.
+  const missing = new Map<string, string[]>();
   for (const [key, { assetId, date }] of pairs) {
+    const cached = await getCachedPrice({ assetId, currency, date });
+    if (cached !== null) {
+      results.set(key, { price: cached });
+      continue;
+    }
+    if (!COINGECKO_IDS[assetId]) {
+      results.set(key, {
+        reason: `no price source is configured for ${assetId}`,
+      });
+      continue;
+    }
+    const days = missing.get(assetId);
+    if (days) {
+      days.push(date);
+    } else {
+      missing.set(assetId, [date]);
+    }
+  }
+
+  // ONE request per asset, covering every day it still needs, rather than
+  // one request per day. This is the whole reason the batched fetcher
+  // exists: a report needing 80 days priced issued 80 sequential requests,
+  // the free tier answers 429 after about four, and that 429 carries no
+  // CORS header - so the browser reported `TypeError: Failed to fetch`
+  // against most of the user's events with nothing explaining it.
+  // Matches fetchHistoricalPrices: with a key, no day is refused locally.
+  const cutoff = apiKey ? Number.NEGATIVE_INFINITY : freeTierCutoff();
+  for (const [assetId, days] of missing) {
+    let fetched = new Map<string, string>();
+    let failure: unknown = null;
     try {
-      const cached = await getCachedPrice({ assetId, currency, date });
-      if (cached !== null) {
-        results.set(key, { price: cached });
-        continue;
-      }
-
-      const fetched = await fetchHistoricalPrice(
-        assetId,
-        currency,
-        date,
-        apiKey,
-      );
-      if (fetched === null) {
-        results.set(key, {
-          reason: `no price source is configured for ${assetId}`,
-        });
-        continue;
-      }
-
-      await putCachedPrice({ assetId, currency, date }, fetched);
-      results.set(key, { price: fetched });
+      fetched = await fetchHistoricalPrices(assetId, currency, days, apiKey);
     } catch (error) {
-      results.set(key, { reason: describeFailure(error, date) });
+      failure = error;
+    }
+
+    for (const date of days) {
+      const key = pairKey(assetId, date);
+      const price = fetched.get(date);
+      if (price !== undefined) {
+        await putCachedPrice({ assetId, currency, date }, price);
+        results.set(key, { price });
+        continue;
+      }
+      if (failure !== null) {
+        results.set(key, { reason: describeFailure(failure, date) });
+        continue;
+      }
+      // No failure, just no price for this day. A day older than the free
+      // tier is never even requested, so it gets the boundary's own message
+      // rather than a vague "not covered".
+      results.set(key, {
+        reason:
+          Date.parse(`${date}T00:00:00Z`) < cutoff
+            ? freeTierReason()
+            : `no price for ${assetId} on ${date}`,
+      });
     }
   }
 

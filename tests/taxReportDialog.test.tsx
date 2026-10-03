@@ -9,6 +9,7 @@ import germanTax from '@/tax/jurisdictions/de';
 import { openLedger, putEvents } from '@/ledger/db';
 import { putSettings } from '@/settings/settingsStore';
 import type { LedgerEvent } from '@/ledger/types';
+import { flatRange } from './priceRangeStub';
 import type {
   AssessInput,
   TaxAssessment,
@@ -412,10 +413,7 @@ describe('the CoinGecko API key', () => {
           url: String(url),
           headers: (init?.headers ?? {}) as Record<string, string>,
         });
-        return new Response(
-          JSON.stringify({ market_data: { current_price: { eur: 1 } } }),
-          { status: 200 },
-        );
+        return flatRange(1)(String(url), init);
       }),
     );
 
@@ -435,7 +433,12 @@ describe('the CoinGecko API key', () => {
     );
     await screen.findByText(/taxable gain/i);
 
-    const historyCalls = calls.filter((call) => call.url.includes('/history'));
+    // The batched endpoint is /market_chart/range, not the per-day /history
+    // this replaced - so a filter on the old path matched nothing and the
+    // assertion below passed over an empty list.
+    const historyCalls = calls.filter((call) =>
+      call.url.includes('/market_chart/range'),
+    );
     expect(historyCalls.length).toBeGreaterThan(0);
     for (const call of historyCalls) {
       expect(call.headers['x-cg-demo-api-key']).toBe('CG-secret-key');
@@ -446,16 +449,7 @@ describe('the CoinGecko API key', () => {
   });
 
   it('persists the key and shows it again on the next report', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(
-        async () =>
-          new Response(
-            JSON.stringify({ market_data: { current_price: { eur: 1 } } }),
-            { status: 200 },
-          ),
-      ),
-    );
+    vi.stubGlobal('fetch', flatRange(1));
 
     taxRegistry.push(makeModule());
     await putEvents([cryptoDisposal]);

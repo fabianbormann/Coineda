@@ -4,6 +4,7 @@ import { openLedger, putEvents } from '@/ledger/db';
 import { runTaxReport } from '@/tax/runTaxReport';
 import germanTax from '@/tax/jurisdictions/de';
 import type { LedgerEvent, Leg } from '@/ledger/types';
+import { flatRange, rangeStub } from './priceRangeStub';
 
 /**
  * The seam between `isInternalTransfer` and `classify`.
@@ -76,16 +77,22 @@ beforeEach(async () => {
   for (const store of ['events', 'prices', 'settings'] as const) {
     await db.clear(store);
   }
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(
-      async () =>
-        new Response(
-          JSON.stringify({ market_data: { current_price: { eur: 1 } } }),
-          { status: 200 },
-        ),
-    ),
-  );
+  // These scenarios deliberately span more than a year - an acquisition in
+  // one tax year disposed of in another is the whole point of several of
+  // them - and the keyless free tier only prices the last 365 days. Prices
+  // for days outside that are no longer requested at all, because
+  // CoinGecko's 401 carries no CORS header and a browser would see only
+  // "Failed to fetch". So these run as a keyed user, which is the honest
+  // reading of a report covering several years.
+  await db.put('settings', {
+    key: 'settings',
+    value: {
+      language: 'en',
+      baseCurrency: 'eur',
+      coingeckoApiKey: 'test-key',
+    },
+  });
+  vi.stubGlobal('fetch', flatRange(1));
 });
 
 const runGermany = (year: number) =>
@@ -197,15 +204,13 @@ describe('the host nets an event before a jurisdiction classifies it', () => {
     // able to fail at all: at a flat price the re-acquired lot costs
     // exactly what the sale fetches, so the gross path reports a zero gain
     // and looks identical to the correct one.
+    // Branching on the ISO day rather than on a dd-mm-yyyy fragment of the
+    // URL: the batched request names a span, not a date.
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (url: string) => {
-        const eur = url.includes('-2023') ? 1 : url.includes('01-2025') ? 2 : 3;
-        return new Response(
-          JSON.stringify({ market_data: { current_price: { eur } } }),
-          { status: 200 },
-        );
-      }),
+      rangeStub((isoDate) =>
+        isoDate.startsWith('2023') ? 1 : isoDate.startsWith('2025-01') ? 2 : 3,
+      ),
     );
 
     // Exactly 500 ADA acquired in 2023, so the gross out-leg of 500 would
