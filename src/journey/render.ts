@@ -41,6 +41,17 @@ export type Lane = {
    *  boundary, on values that were decimal strings everywhere before. */
   amounts: number[];
   peak: number;
+  /**
+   * The largest amount ever held, in the asset's own units, whatever the
+   * mode.
+   *
+   * A bubble is sized by its event's amount against this, so the size means
+   * "how much this moved the position" in both modes. It cannot be taken
+   * from `peak`, which is a percentage in 'relative' mode and would make
+   * every bubble the same size there. A radius is a RATIO, not a figure, so
+   * it carries no more than the lane's own shape already does.
+   */
+  rawPeak: number;
 };
 
 /**
@@ -65,14 +76,16 @@ export const buildLanes = (series: JourneySeries, mode: JourneyMode): Lane[] =>
       return holding ? Number(holding.amount) : 0;
     });
     const peak = Math.max(...amounts, 0);
+    const rawPeak = peak === 0 ? 1 : peak;
     if (mode === 'absolute') {
-      return { assetId, amounts, peak: peak === 0 ? 1 : peak };
+      return { assetId, amounts, peak: rawPeak, rawPeak };
     }
     const final = amounts[amounts.length - 1] || peak || 1;
     return {
       assetId,
       amounts: amounts.map((amount) => (amount / final) * 100),
       peak: (peak / final) * 100 || 1,
+      rawPeak,
     };
   });
 
@@ -161,6 +174,9 @@ const LANE_GAP = 14;
 
 const INFLOW = '53,224,161';
 const OUTFLOW = '255,92,122';
+/** The held-amount band: a cool slate that neither competes with the
+ *  inflow green nor reads as a warning next to the outflow red. */
+const HOLDING = '122,162,214';
 
 /** The span the journey covers, as the heading. Computed from the series
  *  rather than passed in: it is digits and a dash, so it needs no
@@ -215,29 +231,6 @@ const drawGlow = (ctx: CanvasRenderingContext2D, spot: Glow): void => {
   ctx.beginPath();
   ctx.arc(spot.x, spot.y, spot.r, 0, Math.PI * 2);
   ctx.fill();
-  if (layered) {
-    ctx.restore();
-  }
-};
-
-/** Strokes the current path as a glowing filament: the line itself plus a
- *  shadow of the same hue, which is what gives a thin stroke the bloom a
- *  flat 2px line cannot have. */
-const strokeGlowing = (
-  ctx: CanvasRenderingContext2D,
-  colour: string,
-  width: number,
-  blur: number,
-): void => {
-  const layered = typeof ctx.save === 'function';
-  if (layered) {
-    ctx.save();
-    ctx.shadowColor = colour;
-    ctx.shadowBlur = blur;
-  }
-  ctx.strokeStyle = colour;
-  ctx.lineWidth = width;
-  ctx.stroke();
   if (layered) {
     ctx.restore();
   }
@@ -341,8 +334,11 @@ export const renderJourneyFrame = (
         ctx.closePath();
       }
       const fill = ctx.createLinearGradient(0, ridgeTop, 0, railY);
-      fill.addColorStop(0, `rgba(${INFLOW},0.38)`);
-      fill.addColorStop(1, `rgba(${INFLOW},0.02)`);
+      // Neutral, deliberately. When the ridge was inflow-green it swamped
+      // the green buy bubbles and the red sells had nothing to read
+      // against, so the whole frame said "line chart" in one colour.
+      fill.addColorStop(0, `rgba(${HOLDING},0.30)`);
+      fill.addColorStop(1, `rgba(${HOLDING},0.02)`);
       ctx.fillStyle = fill;
       ctx.fill();
     }
@@ -357,7 +353,11 @@ export const renderJourneyFrame = (
         ctx.lineTo(x, y);
       }
     }
-    strokeGlowing(ctx, '#8affd4', 2.5, laneHeight * 0.22);
+    // A quiet edge rather than a lit filament: the bubbles carry the frame
+    // now, and two bright things fight.
+    ctx.strokeStyle = `rgba(${HOLDING},0.55)`;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
 
     // The rail.
     ctx.beginPath();
@@ -404,16 +404,26 @@ export const renderJourneyFrame = (
       const x = xForIndex(index);
       const colour = node.kind === 'in' ? INFLOW : OUTFLOW;
 
+      // Size says how much this event moved the position: the amount
+      // against the largest amount ever held in this lane. Square-rooted so
+      // a dust buy stays visible and a position-doubling buy does not
+      // swallow the lane - the eye reads area, not radius.
+      const influence = Math.min(
+        1,
+        Math.max(0, Number(node.marker.amount) / lane.rawPeak),
+      );
+      const bubble = laneHeight * (0.1 + 0.52 * Math.sqrt(influence));
+
       drawGlow(ctx, {
         x,
         y: railY,
-        r: laneHeight * 0.42,
+        r: bubble,
         colour,
-        alpha: 0.6,
+        alpha: 0.3 + 0.35 * Math.sqrt(influence),
       });
-      drawGlow(ctx, { x, y: railY, r: 9, colour, alpha: 0.9 });
+      drawGlow(ctx, { x, y: railY, r: bubble * 0.3, colour, alpha: 0.85 });
       ctx.beginPath();
-      ctx.arc(x, railY, 4, 0, Math.PI * 2);
+      ctx.arc(x, railY, Math.max(2, bubble * 0.1), 0, Math.PI * 2);
       ctx.fillStyle = node.kind === 'in' ? '#eafff6' : '#ffe6ec';
       ctx.fill();
 
@@ -436,13 +446,15 @@ export const renderJourneyFrame = (
       }
     }
 
-    drawGlow(ctx, {
-      x: head,
-      y: railY,
-      r: laneHeight * 0.62,
-      colour: '232,237,247',
-      alpha: 0.38,
-    });
+    // A thin leading edge, not a disc. As a big additive circle on every
+    // rail this was the brightest thing on the frame and read as a blob
+    // sitting on the floor.
+    ctx.beginPath();
+    ctx.moveTo(head, railY);
+    ctx.lineTo(head, ridgeTop);
+    ctx.strokeStyle = 'rgba(232,237,247,0.22)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
   });
 
   // Assets beyond the lane cap are named rather than silently dropped.

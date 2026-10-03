@@ -3,7 +3,7 @@ import { renderJourneyFrame, buildLanes } from '@/journey/render';
 import type { JourneyLabels } from '@/journey/render';
 import type { JourneySeries, SeriesPoint } from '@/journey/series';
 
-type RecordedCall = { method: string; args: unknown[] };
+type RecordedCall = { method: string; args: unknown[]; stops?: unknown[] };
 
 /**
  * A plain recording stub for the handful of CanvasRenderingContext2D
@@ -44,8 +44,13 @@ const createRecordingContext = () => {
       return { addColorStop: () => {} };
     },
     createRadialGradient: (...args: unknown[]) => {
-      calls.push({ method: 'createRadialGradient', args });
-      return { addColorStop: () => {} };
+      const stops: unknown[] = [];
+      calls.push({ method: 'createRadialGradient', args, stops });
+      return {
+        addColorStop: (offset: number, colour: string) => {
+          stops.push(colour);
+        },
+      };
     },
     set fillStyle(_value: string) {},
     set strokeStyle(_value: string) {},
@@ -116,6 +121,19 @@ const fillTexts = (calls: RecordedCall[]): string[] =>
   calls
     .filter((call) => call.method === 'fillText')
     .map((call) => String(call.args[0]));
+
+const INFLOW_RGB = '53,224,161';
+const OUTFLOW_RGB = '255,92,122';
+
+/** The glows painted in one direction's colour, by reading the colour stops
+ *  the renderer actually set. A radius assertion is meaningless if it
+ *  cannot say WHICH bubble it measured. */
+const glowsColoured = (calls: RecordedCall[], rgb: string) =>
+  calls.filter(
+    (call) =>
+      call.method === 'createRadialGradient' &&
+      (call.stops ?? []).some((stop) => String(stop).includes(rgb)),
+  );
 
 const lineToCount = (calls: RecordedCall[]): number =>
   calls.filter((call) => call.method === 'lineTo').length;
@@ -361,15 +379,16 @@ describe('renderJourneyFrame', () => {
       progress: 1,
     });
 
-    // Filtered by radius: the glow discs are drawn with arc() too, so an
-    // unfiltered count measures lighting rather than events.
-    const nodeYs = calls
-      .filter((call) => call.method === 'arc' && Number(call.args[2]) === 4)
-      .map((call) => Number(call.args[1]));
+    // Located by the colour each bubble is painted with: the core radius
+    // now scales with the amount, so it cannot be used to pick the nodes
+    // out. One glow pair per event, so the first of each is enough.
+    const nodeYs = glowsColoured(calls, INFLOW_RGB).map((call) =>
+      Number(call.args[1]),
+    );
 
-    expect(nodeYs).toHaveLength(2);
-    // BTC is the first lane, so its node is strictly above ADA's.
-    expect(nodeYs[0]).toBeLessThan(nodeYs[1]);
+    expect(nodeYs.length).toBeGreaterThanOrEqual(2);
+    // BTC is the first lane, so its bubbles sit strictly above ADA's.
+    expect(Math.min(...nodeYs)).toBeLessThan(Math.max(...nodeYs));
   });
 
   it('reveals only the fraction of the timeline "progress" asks for', () => {
@@ -513,14 +532,70 @@ describe('the frame is actually lit', () => {
     expect(modes).toContain('lighter');
   });
 
-  it('gives the value filament a shadow of its own hue', () => {
-    // A 2px stroke cannot bloom on its own; the shadow is what makes the
-    // ridge look like a lit filament.
-    const blurs = frame()
-      .filter((call) => call.method === 'set shadowBlur')
-      .map((call) => Number(call.args[0]));
-    expect(blurs.length).toBeGreaterThan(0);
-    expect(Math.max(...blurs)).toBeGreaterThan(0);
+  it('sizes each bubble by how much that event moved the position', () => {
+    // The complaint this answers: every transaction drew the same size
+    // bubble, so the frame carried no information about which trades
+    // mattered. Size is the amount against the largest amount ever held in
+    // that lane.
+    const points: SeriesPoint[] = [
+      { timestamp: 1, holdings: [{ assetId: ADA, amount: '100' }] },
+      { timestamp: 2, holdings: [{ assetId: ADA, amount: '100' }] },
+      { timestamp: 3, holdings: [{ assetId: ADA, amount: '100' }] },
+    ];
+    const { ctx, calls } = createRecordingContext();
+    renderJourneyFrame(
+      ctx,
+      {
+        points,
+        acquisitions: [
+          { timestamp: 1, assetId: ADA, amount: '1' },
+          { timestamp: 3, assetId: ADA, amount: '100' },
+        ],
+        disposals: [],
+        assets: [ADA],
+        finalValue: null,
+      },
+      { ...baseParams, mode: 'absolute', progress: 1 },
+    );
+
+    // Grouped by x, i.e. per EVENT, and compared outer-glow to outer-glow.
+    // The first version of this compared the two glows of a single bubble -
+    // drawn as a pair at 1.0x and 0.3x - so the ratio held even with every
+    // bubble the same size, and a mutation setting a constant radius passed.
+    const widest = new Map<number, number>();
+    for (const call of glowsColoured(calls, INFLOW_RGB)) {
+      const x = Number(call.args[0]);
+      widest.set(x, Math.max(widest.get(x) ?? 0, Number(call.args[5])));
+    }
+    const perEvent = [...widest.values()];
+    expect(perEvent).toHaveLength(2);
+    // The event worth the whole position draws a bigger bubble than the one
+    // worth a hundredth of it.
+    expect(Math.max(...perEvent)).toBeGreaterThan(Math.min(...perEvent) * 1.5);
+  });
+
+  it('paints an inflow green and an outflow red', () => {
+    // Direction has to be readable at a glance, which is the other half of
+    // the complaint. The ridge is deliberately neither colour.
+    const { ctx, calls } = createRecordingContext();
+    renderJourneyFrame(
+      ctx,
+      {
+        points: fixturePoints,
+        acquisitions: [
+          { timestamp: Date.UTC(2024, 0, 1), assetId: ADA, amount: '10000000' },
+        ],
+        disposals: [
+          { timestamp: Date.UTC(2024, 1, 1), assetId: ADA, amount: '5000000' },
+        ],
+        assets: [ADA],
+        finalValue: null,
+      },
+      { ...baseParams, mode: 'absolute', progress: 1 },
+    );
+
+    expect(glowsColoured(calls, INFLOW_RGB).length).toBeGreaterThan(0);
+    expect(glowsColoured(calls, OUTFLOW_RGB).length).toBeGreaterThan(0);
   });
 
   it('paints the ground as a pool of light, not a flat fill', () => {
