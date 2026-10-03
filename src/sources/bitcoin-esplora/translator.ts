@@ -7,6 +7,8 @@ import {
   addressListProblem,
   parseAddressList,
 } from '@/sources/addressList';
+import { parseAccountKey, type AccountKey, type KeyProblem } from './xpub';
+import { SCRIPT_TYPES, addressFor } from './script';
 
 /**
  * The Esplora translation (Blockstream.info and mempool.space both serve the
@@ -68,6 +70,14 @@ export const BITCOIN_ESPLORA_MESSAGES = {
   instanceUnreachable: 'Could not reach the Esplora instance.',
   noHistory:
     'None of these addresses has any transactions. Wallets show a fresh receive address by default - check this is an address you have actually used, on the right network. Bitcoin has no account view, so Coineda can only see the addresses you list here.',
+  nothingToTrack:
+    'Add an account xpub, or one or more addresses under advanced options.',
+  xpubPrivateKey:
+    'That is a PRIVATE key. Coineda only ever needs the public one - paste the account xpub (it starts with xpub, ypub or zpub), and keep the private key on your device.',
+  xpubWrongDepth:
+    'That is an extended public key, but not an account one. Coineda needs the key for a single account, as Ledger Live, Sparrow and Electrum export it - not the wallet master key.',
+  xpubNotAKey:
+    'That does not look like an extended public key. Copy the account xpub from your wallet - it is a long string starting with xpub, ypub or zpub, and it is case-sensitive.',
 } as const;
 
 /** The base URL, normalised. Unlike Cardano's providers this is the full API
@@ -263,22 +273,121 @@ const legsForTransaction = (
   ];
 };
 
+/** How many receive-chain indices the detector tries per candidate type. */
+const DETECT_INDICES = 5;
+
+/**
+ * Decides which address encoding a wallet uses by asking the chain, because
+ * the key itself does not say.
+ *
+ * xpub, ypub and zpub differ only in four version bytes, and Ledger Live
+ * exports a native-SegWit account labelled `xpub` regardless - so inferring
+ * BIP44 from an `xpub` would derive legacy addresses for a bech32 wallet,
+ * find nothing, and report an empty history. A valid, silent, wrong answer.
+ *
+ * Walks SCRIPT_TYPES in order and stops at the first address with history,
+ * so a native-SegWit wallet whose first address is used costs ONE request.
+ * Five indices per type rather than one: a wallet whose address 0 was never
+ * used but whose later ones were is a real wallet, and probing index 0 alone
+ * would refuse it as empty. Five is inside the gap limit, so the probe and
+ * the drain agree about what "empty" means.
+ *
+ * Null means no encoding had history, i.e. the wallet is empty - which the
+ * caller reports as such rather than falling back to a guess.
+ */
+export const detectScriptType = async (
+  key: AccountKey,
+  root: string,
+  signal?: AbortSignal,
+): Promise<(typeof SCRIPT_TYPES)[number] | null> => {
+  for (const type of SCRIPT_TYPES) {
+    for (let index = 0; index < DETECT_INDICES; index += 1) {
+      const address = addressFor(type, key.publicKeyAt(0, index), key.network);
+      const result = await probeRoute(
+        `${root}/address/${address}/txs`,
+        {},
+        signal,
+      );
+      if (
+        result.outcome === 'ok' &&
+        Array.isArray(result.body) &&
+        result.body.length > 0
+      ) {
+        return type;
+      }
+    }
+  }
+  return null;
+};
+
+/** The key problems, each with its own message: "invalid key" would leave a
+ *  user with nothing to act on, and the three causes need three different
+ *  actions. */
+const KEY_PROBLEM_MESSAGES: Record<KeyProblem, string> = {
+  privateKey: BITCOIN_ESPLORA_MESSAGES.xpubPrivateKey,
+  wrongDepth: BITCOIN_ESPLORA_MESSAGES.xpubWrongDepth,
+  notAKey: BITCOIN_ESPLORA_MESSAGES.xpubNotAKey,
+  unknownVersion: BITCOIN_ESPLORA_MESSAGES.xpubNotAKey,
+};
+
+export const configuredXpub = (config: Record<string, string>): string =>
+  (config.xpub ?? '').trim();
+
 export const probe = async (
   config: Record<string, string>,
   signal?: AbortSignal,
 ): Promise<ProbeResult> => {
+  const xpub = configuredXpub(config);
+  const listed = configuredAddresses(config);
+
+  // Both fields are optional individually; the real rule is that at least
+  // one must be given, and it has to live here because the manifest's
+  // `optional` flag is per-field and cannot express "one of these two".
+  if (xpub === '' && listed.length === 0) {
+    return { ok: false, message: BITCOIN_ESPLORA_MESSAGES.nothingToTrack };
+  }
+
+  if (xpub !== '') {
+    const parsed = parseAccountKey(xpub);
+    if ('problem' in parsed) {
+      // Takes the problem KIND only - never the key - so nothing that
+      // reveals the wallet can reach a message that gets stored as
+      // lastError and rendered on screen.
+      return { ok: false, message: KEY_PROBLEM_MESSAGES[parsed.problem] };
+    }
+    const detected = await detectScriptType(
+      parsed.key,
+      baseUrlOf(config),
+      signal,
+    );
+    if (detected !== null) {
+      // An extended PUBLIC key confers no spending power, so readOnly can be
+      // stated with certainty rather than left undefined.
+      return { ok: true, readOnly: true };
+    }
+    if (listed.length === 0) {
+      return { ok: false, message: BITCOIN_ESPLORA_MESSAGES.noHistory };
+    }
+    // An unused xpub alongside listed addresses falls through to the address
+    // check below, which may still find history there.
+  }
+
+  return probeListedAddresses(config, signal);
+};
+
+const probeListedAddresses = async (
+  config: Record<string, string>,
+  signal?: AbortSignal,
+): Promise<ProbeResult> => {
+  // Only the cap is checked here now. "Empty" is no longer this function's
+  // business: the list became optional when the xpub field arrived, and
+  // `probe` has already established that at least one of the two was given.
   const problem = addressListProblem(config.address);
-  if (problem) {
+  if (problem?.reason === 'tooMany') {
     return {
       ok: false,
-      message:
-        problem.reason === 'empty'
-          ? BITCOIN_ESPLORA_MESSAGES.noAddress
-          : BITCOIN_ESPLORA_MESSAGES.tooManyAddresses,
-      messageParams:
-        problem.reason === 'tooMany'
-          ? { max: String(MAX_ADDRESSES) }
-          : undefined,
+      message: BITCOIN_ESPLORA_MESSAGES.tooManyAddresses,
+      messageParams: { max: String(MAX_ADDRESSES) },
     };
   }
 

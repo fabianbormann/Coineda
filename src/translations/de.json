@@ -346,6 +346,10 @@
     "None of these addresses has any transactions. Wallets show a fresh receive address by default - check this is an address you have actually used, on the right network. Bitcoin has no account view, so Coineda can only see the addresses you list here.": "Keine dieser Adressen hat Transaktionen. Wallets zeigen standardmäßig eine neue, unbenutzte Empfangsadresse an - prüfe, ob dies eine Adresse ist, die du wirklich verwendet hast, und ob das Netzwerk stimmt. Bitcoin kennt keine Konto-Ansicht, daher sieht Coineda ausschließlich die hier aufgeführten Adressen.",
     "Synced {{label}}, but it has no events at all": "{{label}} synchronisiert, aber es gibt dort überhaupt keine Ereignisse",
     "Show advanced options": "Erweiterte Optionen anzeigen",
-    "Hide advanced options": "Erweiterte Optionen ausblenden"
+    "Hide advanced options": "Erweiterte Optionen ausblenden",
+    "Add an account xpub, or one or more addresses under advanced options.": "Füge einen Konto-xpub hinzu oder eine bzw. mehrere Adressen unter den erweiterten Optionen.",
+    "That is a PRIVATE key. Coineda only ever needs the public one - paste the account xpub (it starts with xpub, ypub or zpub), and keep the private key on your device.": "Das ist ein PRIVATER Schlüssel. Coineda benötigt ausschließlich den öffentlichen - füge den Konto-xpub ein (er beginnt mit xpub, ypub oder zpub) und behalte den privaten Schlüssel auf deinem Gerät.",
+    "That is an extended public key, but not an account one. Coineda needs the key for a single account, as Ledger Live, Sparrow and Electrum export it - not the wallet master key.": "Das ist ein erweiterter öffentlicher Schlüssel, aber kein Konto-Schlüssel. Coineda benötigt den Schlüssel für ein einzelnes Konto, so wie ihn Ledger Live, Sparrow und Electrum exportieren - nicht den Master-Schlüssel der Wallet.",
+    "That does not look like an extended public key. Copy the account xpub from your wallet - it is a long string starting with xpub, ypub or zpub, and it is case-sensitive.": "Das sieht nicht wie ein erweiterter öffentlicher Schlüssel aus. Kopiere den Konto-xpub aus deiner Wallet - eine lange Zeichenfolge, die mit xpub, ypub oder zpub beginnt und bei der Groß- und Kleinschreibung zählt."
   }
 }

@@ -346,6 +346,10 @@
     "None of these addresses has any transactions. Wallets show a fresh receive address by default - check this is an address you have actually used, on the right network. Bitcoin has no account view, so Coineda can only see the addresses you list here.": "None of these addresses has any transactions. Wallets show a fresh receive address by default - check this is an address you have actually used, on the right network. Bitcoin has no account view, so Coineda can only see the addresses you list here.",
     "Synced {{label}}, but it has no events at all": "Synced {{label}}, but it has no events at all",
     "Show advanced options": "Show advanced options",
-    "Hide advanced options": "Hide advanced options"
+    "Hide advanced options": "Hide advanced options",
+    "Add an account xpub, or one or more addresses under advanced options.": "Add an account xpub, or one or more addresses under advanced options.",
+    "That is a PRIVATE key. Coineda only ever needs the public one - paste the account xpub (it starts with xpub, ypub or zpub), and keep the private key on your device.": "That is a PRIVATE key. Coineda only ever needs the public one - paste the account xpub (it starts with xpub, ypub or zpub), and keep the private key on your device.",
+    "That is an extended public key, but not an account one. Coineda needs the key for a single account, as Ledger Live, Sparrow and Electrum export it - not the wallet master key.": "That is an extended public key, but not an account one. Coineda needs the key for a single account, as Ledger Live, Sparrow and Electrum export it - not the wallet master key.",
+    "That does not look like an extended public key. Copy the account xpub from your wallet - it is a long string starting with xpub, ypub or zpub, and it is case-sensitive.": "That does not look like an extended public key. Copy the account xpub from your wallet - it is a long string starting with xpub, ypub or zpub, and it is case-sensitive."
   }
 }
