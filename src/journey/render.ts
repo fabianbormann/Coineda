@@ -179,12 +179,27 @@ const spanLabel = (points: SeriesPoint[]): string => {
 
 type Glow = { x: number; y: number; r: number; colour: string; alpha: number };
 
-/** A soft disc, drawn as a radial gradient so it reads as light rather than
- *  as a flat circle. Guarded because the recording stub a test passes in
- *  implements only the handful of methods this module needs. */
+/**
+ * A soft disc of light.
+ *
+ * Two things make this read as light rather than as a flat translucent
+ * circle, and the first version of this renderer had neither: a radial
+ * gradient falling to fully transparent, and ADDITIVE compositing, so two
+ * glows that overlap get brighter instead of just more opaque. Without
+ * `lighter` the whole frame looks like coloured paper cut-outs - which is
+ * exactly how it looked.
+ *
+ * Wrapped in save/restore because both the composite mode and the shadow
+ * settings leak into every later draw call otherwise.
+ */
 const drawGlow = (ctx: CanvasRenderingContext2D, spot: Glow): void => {
   if (typeof ctx.createRadialGradient !== 'function') {
     return;
+  }
+  const layered = typeof ctx.save === 'function';
+  if (layered) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
   }
   const gradient = ctx.createRadialGradient(
     spot.x,
@@ -200,6 +215,32 @@ const drawGlow = (ctx: CanvasRenderingContext2D, spot: Glow): void => {
   ctx.beginPath();
   ctx.arc(spot.x, spot.y, spot.r, 0, Math.PI * 2);
   ctx.fill();
+  if (layered) {
+    ctx.restore();
+  }
+};
+
+/** Strokes the current path as a glowing filament: the line itself plus a
+ *  shadow of the same hue, which is what gives a thin stroke the bloom a
+ *  flat 2px line cannot have. */
+const strokeGlowing = (
+  ctx: CanvasRenderingContext2D,
+  colour: string,
+  width: number,
+  blur: number,
+): void => {
+  const layered = typeof ctx.save === 'function';
+  if (layered) {
+    ctx.save();
+    ctx.shadowColor = colour;
+    ctx.shadowBlur = blur;
+  }
+  ctx.strokeStyle = colour;
+  ctx.lineWidth = width;
+  ctx.stroke();
+  if (layered) {
+    ctx.restore();
+  }
 };
 
 /**
@@ -228,7 +269,23 @@ export const renderJourneyFrame = (
   const progress = Math.min(1, Math.max(0, params.progress));
 
   ctx.clearRect(0, 0, width, height);
-  ctx.fillStyle = '#070b14';
+  // A pool of light rather than a flat ground: it gives the frame a centre
+  // and keeps the corners dark enough for the glows to read against.
+  if (typeof ctx.createRadialGradient === 'function') {
+    const ground = ctx.createRadialGradient(
+      width * 0.5,
+      height * 0.45,
+      0,
+      width * 0.5,
+      height * 0.45,
+      width * 0.75,
+    );
+    ground.addColorStop(0, '#0c1324');
+    ground.addColorStop(1, '#070b14');
+    ctx.fillStyle = ground;
+  } else {
+    ctx.fillStyle = '#070b14';
+  }
   ctx.fillRect(0, 0, width, height);
 
   const plotLeft = PADDING.left;
@@ -300,9 +357,7 @@ export const renderJourneyFrame = (
         ctx.lineTo(x, y);
       }
     }
-    ctx.strokeStyle = '#8affd4';
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    strokeGlowing(ctx, '#8affd4', 2.5, laneHeight * 0.22);
 
     // The rail.
     ctx.beginPath();
@@ -349,10 +404,17 @@ export const renderJourneyFrame = (
       const x = xForIndex(index);
       const colour = node.kind === 'in' ? INFLOW : OUTFLOW;
 
-      drawGlow(ctx, { x, y: railY, r: 26, colour, alpha: 0.55 });
+      drawGlow(ctx, {
+        x,
+        y: railY,
+        r: laneHeight * 0.42,
+        colour,
+        alpha: 0.6,
+      });
+      drawGlow(ctx, { x, y: railY, r: 9, colour, alpha: 0.9 });
       ctx.beginPath();
       ctx.arc(x, railY, 4, 0, Math.PI * 2);
-      ctx.fillStyle = node.kind === 'in' ? '#c9ffe9' : '#ffd0da';
+      ctx.fillStyle = node.kind === 'in' ? '#eafff6' : '#ffe6ec';
       ctx.fill();
 
       ctx.beginPath();
@@ -377,9 +439,9 @@ export const renderJourneyFrame = (
     drawGlow(ctx, {
       x: head,
       y: railY,
-      r: 48,
+      r: laneHeight * 0.62,
       colour: '232,237,247',
-      alpha: 0.34,
+      alpha: 0.38,
     });
   });
 

@@ -30,6 +30,12 @@ const createRecordingContext = () => {
     arc: record('arc'),
     fill: record('fill'),
     closePath: record('closePath'),
+    // save/restore matter to what gets asserted, not just to housekeeping:
+    // the lighting is applied inside save/restore pairs, so a stub without
+    // them skipped every glow and every shadow silently - which is how a
+    // renderer that drew no glow at all passed this whole file.
+    save: record('save'),
+    restore: record('restore'),
     // The composition paints light with gradients. The stub returns an
     // addColorStop-only object: this file asserts on what TEXT and GEOMETRY
     // were drawn, and a gradient carries neither.
@@ -46,6 +52,16 @@ const createRecordingContext = () => {
     set lineWidth(_value: number) {},
     set font(_value: string) {},
     set textAlign(_value: string) {},
+    // Recorded, so a test can assert the frame is actually lit.
+    set globalCompositeOperation(value: string) {
+      calls.push({ method: 'set globalCompositeOperation', args: [value] });
+    },
+    set shadowBlur(value: number) {
+      calls.push({ method: 'set shadowBlur', args: [value] });
+    },
+    set shadowColor(value: string) {
+      calls.push({ method: 'set shadowColor', args: [value] });
+    },
   } as unknown as CanvasRenderingContext2D;
   return { ctx, calls };
 };
@@ -466,5 +482,69 @@ describe('renderJourneyFrame', () => {
       expect(y).toBeGreaterThanOrEqual(0);
       expect(y).toBeLessThanOrEqual(baseParams.height);
     }
+  });
+});
+
+describe('the frame is actually lit', () => {
+  /**
+   * The composition was ported from a prototype but the LIGHTING was not,
+   * and nothing here noticed: the recording stub had no save/restore, so
+   * every glow and every shadow was skipped and a renderer drawing flat
+   * shapes passed the whole file. These are the assertions that would have
+   * caught it.
+   */
+  const frame = () => {
+    const { ctx, calls } = createRecordingContext();
+    renderJourneyFrame(ctx, fixtureSeries, {
+      ...baseParams,
+      mode: 'absolute',
+      progress: 1,
+    });
+    return calls;
+  };
+
+  it('composites its glows additively, so overlapping light accumulates', () => {
+    // Without `lighter`, two overlapping glows are just more opaque paint
+    // and the frame reads as cut-out paper rather than light.
+    const modes = frame()
+      .filter((call) => call.method === 'set globalCompositeOperation')
+      .map((call) => call.args[0]);
+    expect(modes.length).toBeGreaterThan(0);
+    expect(modes).toContain('lighter');
+  });
+
+  it('gives the value filament a shadow of its own hue', () => {
+    // A 2px stroke cannot bloom on its own; the shadow is what makes the
+    // ridge look like a lit filament.
+    const blurs = frame()
+      .filter((call) => call.method === 'set shadowBlur')
+      .map((call) => Number(call.args[0]));
+    expect(blurs.length).toBeGreaterThan(0);
+    expect(Math.max(...blurs)).toBeGreaterThan(0);
+  });
+
+  it('paints the ground as a pool of light, not a flat fill', () => {
+    // Asserted on the background's own GEOMETRY, not on a count. Counting
+    // radial gradients could not fail: the glows make plenty of them, so
+    // the count stayed above any threshold even with the background flat -
+    // which a mutation proved before this was rewritten.
+    const grounds = frame().filter(
+      (call) =>
+        call.method === 'createRadialGradient' &&
+        Number(call.args[5]) === baseParams.width * 0.75,
+    );
+    expect(grounds).toHaveLength(1);
+    expect(Number(grounds[0].args[0])).toBe(baseParams.width * 0.5);
+    expect(Number(grounds[0].args[1])).toBe(baseParams.height * 0.45);
+  });
+
+  it('balances every save with a restore, so lighting never leaks', () => {
+    // A composite mode or shadow left set would tint everything drawn
+    // afterwards - including the text.
+    const calls = frame();
+    const saves = calls.filter((call) => call.method === 'save').length;
+    const restores = calls.filter((call) => call.method === 'restore').length;
+    expect(saves).toBeGreaterThan(0);
+    expect(restores).toBe(saves);
   });
 });
