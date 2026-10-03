@@ -1,0 +1,212 @@
+/* Lumen — milk-glass theme for Tailwind CSS v4
+   Usage: @import "tailwindcss"; @import "./lumen.css";
+   Dark mode: add class="dark" on <html> (or any ancestor). */
+/* The export loaded PT Sans and PT Serif from fonts.googleapis.com. Coineda
+   is an offline-first PWA, so a runtime font fetch would fail with no
+   network and the text would silently fall back - the faces are installed
+   from @fontsource and imported in src/index.css instead. Nothing else in
+   this file differs from the export. */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'PT Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'PT Serif', ui-serif, Georgia, serif;
+  --radius-*: initial; /* sharp corners everywhere */
+  --radius-none: 0;
+  --radius-full: 0;
+
+  --color-base: var(--lm-bg);
+  --color-ink: var(--lm-ink);
+  --color-mute: var(--lm-mute);
+  --color-faint: var(--lm-faint);
+  --color-stroke: var(--lm-stroke);
+  --color-seaglass: var(--lm-g1);
+  --color-lilac: var(--lm-g2);
+  --color-blush: var(--lm-g3);
+  --color-fill: var(--lm-fill);
+  --color-on-fill: var(--lm-on-fill);
+}
+
+/* ---------- Tokens: light (Opal) ---------- */
+:root {
+  --lm-bg: #f2f3f7;
+  --lm-ink: #121318;
+  --lm-mute: rgb(18 19 24 / 0.72);
+  --lm-faint: rgb(18 19 24 / 0.08);
+  --lm-stroke: rgb(18 19 24 / 0.3);
+  --lm-hl: rgb(255 255 255 / 0.95);
+  --lm-glass-1: rgb(255 255 255 / 0.35);
+  --lm-glass-2: rgb(255 255 255 / 0.55);
+  --lm-glass-3: rgb(255 255 255 / 0.72);
+  --lm-g1: oklch(0.77 0.21 172);
+  --lm-g2: oklch(0.73 0.22 278);
+  --lm-g3: oklch(0.75 0.22 8);
+  --lm-fill: #3a3c45;
+  --lm-on-fill: #f6f7fa;
+  --lm-shadow: rgb(40 40 90 / 0.16);
+  --lm-blob: 0.62;
+  --lm-glow-strength: 45%;
+  --lm-rim-angle: 200deg;
+}
+
+/* ---------- Tokens: dark (Noctis) ---------- */
+.dark {
+  --lm-bg: #0b0c10;
+  --lm-ink: #f3f4f8;
+  --lm-mute: rgb(243 244 248 / 0.78);
+  --lm-faint: rgb(243 244 248 / 0.1);
+  --lm-stroke: rgb(243 244 248 / 0.32);
+  --lm-hl: rgb(255 255 255 / 0.2);
+  --lm-glass-1: rgb(255 255 255 / 0.05);
+  --lm-glass-2: rgb(255 255 255 / 0.09);
+  --lm-glass-3: rgb(255 255 255 / 0.14);
+  --lm-g1: oklch(0.8 0.11 172);
+  --lm-g2: oklch(0.76 0.12 278);
+  --lm-g3: oklch(0.78 0.12 8);
+  --lm-fill: rgb(255 255 255 / 0.92);
+  --lm-on-fill: #0b0c10;
+  --lm-shadow: rgb(0 0 0 / 0.65);
+  --lm-blob: 0.35;
+}
+
+:root,
+.dark {
+  --lm-rim: conic-gradient(
+    from var(--lm-rim-angle),
+    var(--lm-g1),
+    var(--lm-g2),
+    var(--lm-g3),
+    var(--lm-g1)
+  );
+  --lm-spec: linear-gradient(90deg, var(--lm-g1), var(--lm-g2), var(--lm-g3));
+  --lm-glow:
+    inset 0 1px 0 var(--lm-hl),
+    -10px -8px 28px -20px
+      color-mix(in oklch, var(--lm-g1) var(--lm-glow-strength), transparent),
+    10px 8px 28px -20px
+      color-mix(in oklch, var(--lm-g2) var(--lm-glow-strength), transparent),
+    0 24px 48px -24px var(--lm-shadow);
+  --lm-fill-glow:
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    -4px -3px 14px -8px color-mix(in oklch, var(--lm-g1) 50%, transparent),
+    4px 3px 14px -8px color-mix(in oklch, var(--lm-g2) 50%, transparent);
+}
+
+/* ---------- Utilities ---------- */
+
+/* Frosted surfaces: glass-1 (chips/inputs) · glass-2 (cards/nav) · glass-3 (modals/menus) */
+@utility glass-1 {
+  position: relative;
+  background: var(--lm-glass-1);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  box-shadow: var(--lm-glow);
+}
+@utility glass-2 {
+  position: relative;
+  background: var(--lm-glass-2);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  box-shadow: var(--lm-glow);
+}
+@utility glass-3 {
+  position: relative;
+  background: var(--lm-glass-3);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  box-shadow: var(--lm-glow);
+}
+
+/* Iridescent 1px edge. Combine with glass-* (needs position:relative). */
+@utility rim {
+  position: relative;
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: var(--lm-rim-width, 1px);
+    background: var(--lm-rim);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: var(--lm-rim-opacity, 1);
+    pointer-events: none;
+  }
+}
+@utility rim-soft {
+  --lm-rim-opacity: 0.6;
+}
+@utility rim-strong {
+  --lm-rim-width: 1.5px;
+}
+
+@utility glow {
+  box-shadow: var(--lm-glow);
+}
+@utility glow-fill {
+  box-shadow: var(--lm-fill-glow);
+}
+@utility bg-spectrum {
+  background-image: var(--lm-spec);
+}
+
+/* Solid primary surface (buttons, checked controls) */
+@utility fill-solid {
+  background: var(--lm-fill);
+  color: var(--lm-on-fill);
+  box-shadow: var(--lm-fill-glow);
+}
+
+/* Coloured light wash behind glass — put on a page/section wrapper */
+@utility lumen-backdrop {
+  position: relative;
+  background-color: var(--lm-bg);
+  color: var(--lm-ink);
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: var(--lm-blob);
+    background:
+      radial-gradient(
+        520px 420px at 8% 3%,
+        color-mix(in oklch, var(--lm-g1) 60%, transparent),
+        transparent 70%
+      ),
+      radial-gradient(
+        480px 480px at 95% 9%,
+        color-mix(in oklch, var(--lm-g3) 45%, transparent),
+        transparent 70%
+      ),
+      radial-gradient(
+        560px 460px at 12% 30%,
+        color-mix(in oklch, var(--lm-g2) 55%, transparent),
+        transparent 70%
+      ),
+      radial-gradient(
+        520px 520px at 92% 46%,
+        color-mix(in oklch, var(--lm-g2) 50%, transparent),
+        transparent 70%
+      ),
+      radial-gradient(
+        560px 520px at 6% 66%,
+        color-mix(in oklch, var(--lm-g3) 40%, transparent),
+        transparent 70%
+      ),
+      radial-gradient(
+        620px 520px at 90% 88%,
+        color-mix(in oklch, var(--lm-g1) 55%, transparent),
+        transparent 70%
+      );
+  }
+  & > * {
+    position: relative;
+    z-index: 1;
+  }
+}

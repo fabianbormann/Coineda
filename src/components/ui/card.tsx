@@ -6,7 +6,11 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card"
       className={cn(
-        "flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground shadow-sm",
+        // glass-2 is Lumen's card tier: it brings its own translucent fill, blur
+        // and glow, so the flat bg-card and shadow-sm it replaces would only
+        // have sat on top of them. `rim` draws the iridescent 1px edge, which
+        // is why there is no `border` here either.
+        "glass-2 rim rim-soft flex flex-col gap-6 py-6 text-card-foreground",
         className
       )}
       {...props}

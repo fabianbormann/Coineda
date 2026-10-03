@@ -1,11 +1,23 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
-@import '@fontsource-variable/inter';
 
-@custom-variant dark (&:is(.dark *));
+/* Lumen's own faces, self-hosted. See src/styles/lumen.css for why these are
+   not the Google Fonts import the export shipped with. */
+@import '@fontsource/pt-sans/400.css';
+@import '@fontsource/pt-sans/700.css';
+@import '@fontsource/pt-serif/400.css';
+@import '@fontsource/pt-serif/700.css';
+
+/* Lumen defines its own `dark` custom variant, matching the .dark element as
+   well as its descendants - strictly wider than the one that used to live
+   here, and declaring it twice would leave whichever came last silently
+   winning. */
+@import './styles/lumen.css';
 
 @theme inline {
-  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  /* Typography comes from Lumen (PT Sans / PT Serif). Redeclaring
+     --font-sans here would silently win, because this block is parsed after
+     the import, and the design's type would never appear. */
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -45,40 +57,52 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
 }
 
 :root {
-  --radius: 0.625rem;
+  /* Lumen is a sharp-cornered system; its own @theme resets --radius-*, and
+     these are the shadcn-derived scale that would otherwise re-round every
+     component. */
+  --radius: 0;
 
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.21 0.006 285.9);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.21 0.006 285.9);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.21 0.006 285.9);
+  /* ---- Lumen mapping -------------------------------------------------
+     shadcn's components are written against these semantic names, so
+     pointing them at Lumen's palette restyles the whole app without
+     touching a component. Surfaces stay deliberately TRANSLUCENT - a
+     frosted panel over an opaque card is just an opaque card - and the
+     glass utilities supply the blur where a real surface needs it.
+     Lumen's own token names (bg-base, text-ink, glass-2, rim) remain
+     available for anything built against it directly. */
+  --background: var(--lm-bg);
+  --foreground: var(--lm-ink);
+  --card: var(--lm-glass-2);
+  --card-foreground: var(--lm-ink);
+  --popover: var(--lm-glass-3);
+  --popover-foreground: var(--lm-ink);
 
-  /* Emerald accent. Connects the chrome to the teal already used by the
-     charts (#03A678 is the doughnut label fill and the history-chart
-     stroke) while dropping the navy that dates the current UI. */
-  --primary: oklch(0.596 0.145 163.2);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary: var(--lm-fill);
+  --primary-foreground: var(--lm-on-fill);
 
-  --secondary: oklch(0.967 0.001 286.4);
-  --secondary-foreground: oklch(0.21 0.006 285.9);
-  --muted: oklch(0.967 0.001 286.4);
-  --muted-foreground: oklch(0.552 0.016 285.9);
-  --accent: oklch(0.967 0.001 286.4);
-  --accent-foreground: oklch(0.21 0.006 285.9);
+  --secondary: var(--lm-glass-1);
+  --secondary-foreground: var(--lm-ink);
+  --muted: var(--lm-glass-1);
+  --muted-foreground: var(--lm-mute);
+  --accent: var(--lm-glass-2);
+  --accent-foreground: var(--lm-ink);
+
+  /* Semantic colours are NOT the accent, and Lumen's spectrum is decorative
+     - blush would read as "pretty" where this has to read as "wrong". The
+     destructive red and the gain/loss pair stay as they were. */
   --destructive: oklch(0.577 0.245 27.3);
   --destructive-foreground: oklch(0.985 0 0);
 
-  --border: oklch(0.92 0.004 286.3);
-  --input: oklch(0.92 0.004 286.3);
-  --ring: oklch(0.596 0.145 163.2);
+  --border: var(--lm-faint);
+  --input: var(--lm-stroke);
+  --ring: var(--lm-g2);
 
   --gain: oklch(0.52 0.13 163.2);
   --loss: oklch(0.52 0.2 25.3);
@@ -89,41 +113,25 @@
   --chart-4: oklch(0.7 0.16 70);
   --chart-5: oklch(0.65 0.18 350);
 
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.21 0.006 285.9);
-  --sidebar-primary: oklch(0.596 0.145 163.2);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.967 0.001 286.4);
-  --sidebar-accent-foreground: oklch(0.21 0.006 285.9);
-  --sidebar-border: oklch(0.92 0.004 286.3);
-  --sidebar-ring: oklch(0.596 0.145 163.2);
+  --sidebar: var(--lm-glass-2);
+  --sidebar-foreground: var(--lm-ink);
+  --sidebar-primary: var(--lm-fill);
+  --sidebar-primary-foreground: var(--lm-on-fill);
+  --sidebar-accent: var(--lm-glass-1);
+  --sidebar-accent-foreground: var(--lm-ink);
+  --sidebar-border: var(--lm-faint);
+  --sidebar-ring: var(--lm-g2);
 }
 
 .dark {
   /* Zinc-950/900 range rather than pure black: pure black produces
      halation and smeared contrast on OLED panels. */
-  --background: oklch(0.17 0.006 285.9);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.21 0.006 285.9);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.21 0.006 285.9);
-  --popover-foreground: oklch(0.985 0 0);
-
-  --primary: oklch(0.765 0.177 163.2);
-  --primary-foreground: oklch(0.21 0.006 285.9);
-
-  --secondary: oklch(0.274 0.006 286);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.274 0.006 286);
-  --muted-foreground: oklch(0.705 0.015 286);
-  --accent: oklch(0.274 0.006 286);
-  --accent-foreground: oklch(0.985 0 0);
+  /* Everything Lumen owns is already swapped: its own --lm-* tokens change
+     under .dark, and the mapping in :root reads through them, so the
+     surfaces, text, borders and primary fill follow with nothing repeated
+     here. Only the colours Lumen has no opinion about are restated. */
   --destructive: oklch(0.704 0.191 22.2);
   --destructive-foreground: oklch(0.21 0.006 285.9);
-
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.765 0.177 163.2);
 
   --gain: oklch(0.78 0.16 163.2);
   --loss: oklch(0.72 0.19 25.3);
@@ -133,15 +141,6 @@
   --chart-3: oklch(0.72 0.16 295);
   --chart-4: oklch(0.79 0.16 70);
   --chart-5: oklch(0.74 0.18 350);
-
-  --sidebar: oklch(0.21 0.006 285.9);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.765 0.177 163.2);
-  --sidebar-primary-foreground: oklch(0.21 0.006 285.9);
-  --sidebar-accent: oklch(0.274 0.006 286);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.765 0.177 163.2);
 }
 
 @layer base {
@@ -149,7 +148,11 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-sans;
+    /* The page wash goes here rather than on a shell component: App renders
+       three different trees (checking, onboarding, the app), dialogs portal
+       straight into body, and all of them want the same ground. */
+    @apply lumen-backdrop text-foreground font-sans;
     margin: 0;
+    min-height: 100svh;
   }
 }
