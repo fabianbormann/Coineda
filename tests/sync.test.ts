@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import 'fake-indexeddb/auto';
+import fs from 'fs';
+import path from 'path';
 import type { LedgerEvent, SourceRecord } from '@/ledger/types';
 import {
   deleteSourceCascade,
@@ -10,6 +12,7 @@ import {
   putEvents,
   putCursor,
   putSource,
+  putSourceStatus,
 } from '@/ledger/db';
 import { registry } from '@/sources/registry';
 import { syncAll, syncSource } from '@/sync/syncSource';
@@ -297,6 +300,215 @@ describe('a source removed while a sync still holds a stale reference to it', ()
     expect(report.error).toBeUndefined();
     expect(await getSources()).toEqual([]);
     expect(await getAllEvents()).toHaveLength(0);
+  });
+});
+
+describe("a completed sync's success write-back", () => {
+  it('does not clobber an edit that landed while it drained', async () => {
+    // The edit happens INSIDE fetchEvents, before it resolves, so it is
+    // guaranteed to have committed by the time syncSource reaches the
+    // cursor === null success branch - no race needed, because editing a
+    // row (unlike deleting it) never trips the existence guards the
+    // per-page writes already have (putEventsIfSourceExists,
+    // putCursorIfSourceExists): the row is still there, just with new
+    // values, so every earlier check still passes and the drain reaches
+    // its normal, single-page success exit.
+    const original: SourceRecord = {
+      id: 'cfg-1',
+      moduleId: 'fake-chain',
+      label: 'old',
+      config: { address: 'OLD' },
+    };
+    await putSource(original);
+
+    registry[0].fetchEvents = async () => {
+      await putSource({
+        ...original,
+        label: 'new',
+        config: { address: 'NEW' },
+      });
+      return { events: [], cursor: null };
+    };
+
+    // syncSource is handed the record as it was captured BEFORE the edit -
+    // exactly what a caller that read `sources` before kicking off a drain
+    // would still be holding seconds or minutes later.
+    const report = await syncSource(original);
+
+    expect(report.error).toBeUndefined();
+    const after = (await getSources()).find((s) => s.id === 'cfg-1');
+    expect(after?.config).toEqual({ address: 'NEW' });
+    expect(after?.label).toBe('new');
+    expect(after?.lastSyncedAt).toBeTypeOf('number');
+  });
+
+  it('does not recreate a source removed while it drained', async () => {
+    // Unlike the edit above, a removal DOES trip the existing per-page
+    // existence guards - so firing deleteSourceCascade from inside
+    // fetchEvents, or racing it via a plain Promise.all against a
+    // single-page drain, both get caught by the very next guard before
+    // syncSource ever reaches its success write-back; they cannot exercise
+    // the thing this test exists to pin.
+    //
+    // fake-indexeddb schedules all transaction work through its own task
+    // queue (`queueTask`, aliased to Node's setImmediate - see
+    // node_modules/fake-indexeddb/lib/scheduling.js), not microtasks. That
+    // makes the relative ordering of two independently-started async
+    // chains a function of how many of THOSE macrotask ticks have elapsed
+    // when the second one starts, which is both real concurrency (neither
+    // promise is awaited before the other starts) and fully deterministic
+    // (no wall-clock timing is involved). Sweeping a wide range of tick
+    // offsets - rather than hand-picking one - lands the removal at many
+    // different points inside a 20-page drain, including the narrow gap
+    // between the LAST page's existence checks and the final write. Which
+    // exact offset that gap falls at is incidental to the drain's page
+    // count and internals, not the point of the test: the invariant
+    // (nothing is ever left behind) has to hold at every offset, not just
+    // a specific one.
+    const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
+    const resurrectedAt: number[] = [];
+
+    for (let k = 0; k <= 150; k += 1) {
+      const db = await openLedger();
+      await db.clear('events');
+      await db.clear('cursors');
+      await db.clear('sources');
+      await putSource(source);
+
+      let call = 0;
+      registry[0].fetchEvents = async () => {
+        call += 1;
+        if (call < 20) {
+          return { events: [], cursor: `p${call + 1}` };
+        }
+        return { events: [], cursor: null };
+      };
+
+      const removal = (async () => {
+        for (let i = 0; i < k; i += 1) {
+          await tick();
+        }
+        await deleteSourceCascade(source.id);
+      })();
+
+      const [report] = await Promise.all([syncSource({ ...source }), removal]);
+
+      if (report.error) {
+        throw new Error(`unexpected error at k=${k}: ${report.error}`);
+      }
+      if ((await getSources()).length > 0) {
+        resurrectedAt.push(k);
+      }
+    }
+
+    expect(resurrectedAt).toEqual([]);
+  });
+});
+
+describe("a sync's error write-back", () => {
+  it('does not clobber an edit that landed before a later page failed', async () => {
+    // The same property as the success write-back above, down the path
+    // syncSource actually takes more often in practice: a page that throws
+    // mid-drain - a timeout, a 404, a rate limit, all routine for a real
+    // provider. Deterministic, no race needed, for the same reason the
+    // success-path edit test needed none: the edit is awaited INSIDE
+    // fetchEvents before it throws, so it has already committed by the
+    // time the catch block below writes `lastError` back, and editing a
+    // row - unlike deleting it - never trips an existence guard, because
+    // the row is still there.
+    const original: SourceRecord = {
+      id: 'cfg-1',
+      moduleId: 'fake-chain',
+      label: 'old',
+      config: { address: 'OLD' },
+    };
+    await putSource(original);
+
+    let call = 0;
+    registry[0].fetchEvents = async () => {
+      call += 1;
+      if (call === 1) {
+        // A real first page, so the edit below genuinely lands mid-drain
+        // rather than before syncSource has done anything at all.
+        return { events: [], cursor: 'p2' };
+      }
+      await putSource({
+        ...original,
+        label: 'new',
+        config: { address: 'NEW' },
+      });
+      throw new Error('provider exploded on page 2');
+    };
+
+    const report = await syncSource(original);
+
+    expect(report.error).toMatch(/provider exploded/);
+    const after = (await getSources()).find((s) => s.id === 'cfg-1');
+    expect(after?.config).toEqual({ address: 'NEW' });
+    expect(after?.label).toBe('new');
+    expect(after?.lastError).toMatch(/provider exploded/);
+  });
+});
+
+describe('syncSource write-back shape', () => {
+  it('never writes a whole source record, on any path', () => {
+    // syncSource holds a SourceRecord captured when the drain began.
+    // Writing it back wholesale on ANY exit path restores the pre-edit
+    // config and, because putSource is unconditional, recreates a source
+    // removed mid-drain. Five status write-backs exist in this module
+    // (module-not-found, stuck cursor, success, per-page error,
+    // max-pages-exceeded) and a behavioural test per path is more
+    // machinery than the invariant deserves - the invariant is simply
+    // that this module does not reach for putSource at all, only for
+    // putSourceStatus.
+    //
+    // Matches a CALL (`putSource(`), not the bare identifier: this file's
+    // own comments mention "putSource" by name in prose, explaining why
+    // it is deliberately not used, and a bare /\bputSource\b/ would flag
+    // that prose too. Requiring the immediately-following '(' also keeps
+    // `putSourceStatus(` out of the match without needing a lookahead -
+    // verified against this exact file before relying on it: zero matches
+    // against the current source (including its own comments), and
+    // exactly one for a call-site mutant substituted into any of the five
+    // write-back lines in turn.
+    const src = fs.readFileSync(
+      path.join(__dirname, '..', 'src', 'sync', 'syncSource.ts'),
+      'utf8',
+    );
+    expect(src).not.toMatch(/\bputSource\(/);
+  });
+});
+
+describe('putSourceStatus', () => {
+  it('does not clobber a concurrent edit when a sync writes its status back', async () => {
+    // syncSource captures the SourceRecord it was handed. An edit that lands
+    // mid-sync changes the stored row; writing the captured snapshot back
+    // would silently restore the old config, and the user's correction would
+    // vanish with no error.
+    const db = await openLedger();
+    await putSource({
+      id: 's1',
+      moduleId: 'test',
+      label: 'old',
+      config: { address: 'OLD' },
+    });
+    const stale = (await db.get('sources', 's1'))!;
+
+    // the user edits while that snapshot is in flight
+    await putSource({ ...stale, label: 'new', config: { address: 'NEW' } });
+
+    await putSourceStatus('s1', { lastSyncedAt: 123 });
+
+    const after = (await db.get('sources', 's1'))!;
+    expect(after.config).toEqual({ address: 'NEW' });
+    expect(after.label).toBe('new');
+    expect(after.lastSyncedAt).toBe(123);
+  });
+
+  it('reports that a removed source was not written', async () => {
+    await expect(putSourceStatus('gone', { lastSyncedAt: 1 })).resolves.toBe(
+      false,
+    );
   });
 });
 

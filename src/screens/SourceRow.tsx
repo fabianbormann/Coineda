@@ -1,4 +1,4 @@
-import { History, RefreshCw, Square, Trash2 } from 'lucide-react';
+import { History, Pencil, RefreshCw, Square, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -42,6 +42,10 @@ type Props = {
   onResync: () => void;
   onStop: () => void;
   onRemove: () => void;
+  /** Opens EditSourceDialog for this source. Gated by the same `busy` flag
+   *  as Refresh/Resync/Remove - a sync that began before an edit opens must
+   *  not race the record a save would write back. */
+  onEdit: () => void;
 };
 
 /**
@@ -59,6 +63,7 @@ export const SourceRow = ({
   onResync,
   onStop,
   onRemove,
+  onEdit,
 }: Props) => {
   const { t, i18n } = useTranslation();
 
@@ -140,6 +145,16 @@ export const SourceRow = ({
             })}
           >
             <History aria-hidden="true" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            disabled={busy}
+            onClick={onEdit}
+            aria-label={t('Edit {{label}}', { label: source.label })}
+          >
+            <Pencil aria-hidden="true" />
           </Button>
           <Button
             type="button"

@@ -9,14 +9,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useConfirm } from '@/components/confirm/ConfirmProvider';
 import { notify } from '@/lib/notify';
 import { putSource } from '@/ledger/db';
 import type { SourceRecord } from '@/ledger/types';
 import { registry } from '@/sources/registry';
-import type { ManifestField, SourceModule } from '@/sources/types';
+import type { SourceModule } from '@/sources/types';
+import { SourceForm } from './SourceForm';
 
 type Props = {
   open: boolean;
@@ -28,9 +27,6 @@ type Props = {
    *  breaks the moment two are added quickly. */
   onCreated: (source: SourceRecord) => void | Promise<void>;
 };
-
-const inputTypeFor = (field: ManifestField): string =>
-  field.type === 'apiKey' || field.type === 'secret' ? 'password' : 'text';
 
 /**
  * Module picker, then a manifest-driven form, then a probe-gated save.
@@ -192,63 +188,17 @@ export const AddSourceDialog = ({ open, onOpenChange, onCreated }: Props) => {
               <DialogTitle>{t(module.manifest.label)}</DialogTitle>
             </DialogHeader>
             <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="source-label">{t('Label')}</Label>
-                <Input
-                  id="source-label"
-                  value={label}
-                  onChange={(event) => setLabel(event.target.value)}
-                />
-              </div>
-              {module.manifest.fields.map((field) => {
-                const fieldId = `source-field-${field.name}`;
-                return (
-                  <div key={field.name} className="flex flex-col gap-2">
-                    <Label htmlFor={fieldId}>{t(field.label)}</Label>
-                    <Input
-                      id={fieldId}
-                      type={inputTypeFor(field)}
-                      value={config[field.name] ?? ''}
-                      aria-invalid={fieldErrors[field.name] || undefined}
-                      onChange={(event) =>
-                        setConfig((prev) => ({
-                          ...prev,
-                          [field.name]: event.target.value,
-                        }))
-                      }
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      {t(field.help)}
-                    </p>
-                    {fieldErrors[field.name] && (
-                      <p className="text-sm text-destructive" role="alert">
-                        {t('This field is required')}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-              {module.manifest.requiredScopes &&
-                module.manifest.requiredScopes.length > 0 && (
-                  <div className="flex flex-col gap-1">
-                    <p className="text-sm font-medium">
-                      {t('Permissions to enable')}
-                    </p>
-                    <ul className="list-inside list-disc text-sm text-muted-foreground">
-                      {module.manifest.requiredScopes.map((scope) => (
-                        <li key={scope}>{scope}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              <a
-                href={module.manifest.docsUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-sm text-primary underline-offset-4 hover:underline"
-              >
-                {t('View docs')}
-              </a>
+              <SourceForm
+                module={module}
+                label={label}
+                config={config}
+                fieldErrors={fieldErrors}
+                secretsOptional={false}
+                onLabelChange={setLabel}
+                onConfigChange={(name, value) =>
+                  setConfig((prev) => ({ ...prev, [name]: value }))
+                }
+              />
               {formError && (
                 <p className="text-sm text-destructive" role="alert">
                   {formError}

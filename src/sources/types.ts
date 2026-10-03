@@ -4,7 +4,7 @@ export type ManifestField = {
   name: string;
   /** Translation key, not display text - see the i18n constraint. */
   label: string;
-  type: 'address' | 'apiKey' | 'secret' | 'text';
+  type: 'address' | 'addressList' | 'apiKey' | 'secret' | 'text';
   /** Translation key for the help line under the field. */
   help: string;
   /**

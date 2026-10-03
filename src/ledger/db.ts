@@ -134,7 +134,7 @@ export const putEvents = async (
 /**
  * `putEvents`, but only if the source these events belong to still exists.
  *
- * The same shape, and the same reason, as `putSourceIfExists`: the check
+ * The same shape, and the same reason, as `putSourceStatus`: the check
  * and the writes happen in ONE readwrite transaction spanning 'sources'
  * and 'events', so a `deleteSourceCascade` that commits first makes this a
  * no-op rather than leaving derived rows behind for a sourceId with no
@@ -219,30 +219,44 @@ export const getSources = async (): Promise<SourceRecord[]> =>
   (await openLedger()).getAll('sources');
 
 /**
- * Writes a source's status back only if the record is still there.
+ * Writes only `lastSyncedAt`/`lastError` onto the stored record, merging
+ * onto whatever is there now rather than overwriting the whole row.
  *
- * A sync that finishes after the user removed its source must not recreate
- * it: get and put happen in ONE readwrite transaction, so a delete that
- * commits first makes this a no-op rather than a resurrection. A plain
- * get-then-put in two transactions would still lose that race - IndexedDB
- * only serializes overlapping transactions against EACH OTHER as a whole,
- * not against two separate transactions issued from two separate calls in
- * between which anything could happen. `syncSource` (src/sync/syncSource.ts)
- * uses this for every status write-back instead of the unconditional
- * `putSource`, because the check has to live where the write happens - a
+ * `syncSource` (src/sync/syncSource.ts) captures the `SourceRecord` it was
+ * handed at the start of a drain that can run for seconds to minutes. If the
+ * user edits that source while the drain is in flight, spreading the
+ * captured snapshot back (`{ ...source, lastSyncedAt }`) would silently
+ * restore the pre-edit config and discard the user's correction with no
+ * error. Reading the current row and patching just the status fields onto
+ * it, in the same transaction as the read, avoids that - and keeps the same
+ * guarantee `putSourceIfExists` used to provide: a sync that finishes after
+ * the user removed its source must not recreate it. Get and put happen in
+ * ONE readwrite transaction, so a delete that commits first makes this a
+ * no-op rather than a resurrection. A plain get-then-put in two transactions
+ * would still lose that race - IndexedDB only serializes overlapping
+ * transactions against EACH OTHER as a whole, not against two separate
+ * transactions issued from two separate calls in between which anything
+ * could happen. The check has to live where the write happens - a
  * caller-side "is this source still busy" guard is a UI affordance, not a
  * guarantee, and cannot be won by whichever caller is racing it.
+ *
+ * Returns `false` when the source was already gone, so a caller mid-drain
+ * can stop rather than keep paging for something that no longer exists.
  */
-export const putSourceIfExists = async (
-  source: SourceRecord,
-): Promise<void> => {
+export const putSourceStatus = async (
+  sourceId: string,
+  status: { lastSyncedAt?: number; lastError?: string | undefined },
+): Promise<boolean> => {
   const db = await openLedger();
   const tx = db.transaction('sources', 'readwrite');
-  const existing = await tx.store.get(source.id);
-  if (existing) {
-    await tx.store.put(source);
+  const existing = await tx.store.get(sourceId);
+  if (!existing) {
+    await tx.done;
+    return false;
   }
+  await tx.store.put({ ...existing, ...status });
   await tx.done;
+  return true;
 };
 
 export const deleteSource = async (id: string): Promise<void> => {

@@ -7,7 +7,7 @@ import {
   putCursor,
   putCursorIfSourceExists,
   putEventsIfSourceExists,
-  putSourceIfExists,
+  putSourceStatus,
 } from '@/ledger/db';
 import type { Cursor, LedgerEvent, SourceRecord } from '@/ledger/types';
 
@@ -90,12 +90,15 @@ export const syncSource = async (
   if (!module) {
     report.error = `unknown module '${source.moduleId}'`;
     // Every status write-back in this function goes through
-    // putSourceIfExists, never the unconditional putSource: a sync that
-    // finishes after its source was removed - by the UI, or by anything
-    // else - must not recreate the record. See putSourceIfExists's own doc
-    // comment in src/ledger/db.ts for why the check has to live there and
-    // not just in a caller's "is this busy" guard.
-    await putSourceIfExists({ ...source, lastError: report.error });
+    // putSourceStatus, never the unconditional putSource (and never a
+    // spread of the captured `source` snapshot, which can be stale by the
+    // time a drain ends): a sync that finishes after its source was
+    // removed - by the UI, or by anything else - must not recreate the
+    // record, and a sync that finishes after its source was edited must not
+    // clobber the edit. See putSourceStatus's own doc comment in
+    // src/ledger/db.ts for why the check has to live there and not just in
+    // a caller's "is this busy" guard.
+    await putSourceStatus(source.id, { lastError: report.error });
     return report;
   }
 
@@ -139,7 +142,7 @@ export const syncSource = async (
       // it repeats fails fast and names the module responsible.
       if (result.cursor !== null && result.cursor === requestedCursor) {
         report.error = `${module.manifest.id}: fetchEvents returned the same cursor '${result.cursor}' it was given - the module is not making progress`;
-        await putSourceIfExists({ ...source, lastError: report.error });
+        await putSourceStatus(source.id, { lastError: report.error });
         return report;
       }
 
@@ -156,8 +159,8 @@ export const syncSource = async (
       );
       if (!written) {
         // The source is gone. Not an error - nobody is left to show one to,
-        // and putSourceIfExists would discard it anyway - and no point
-        // paging on for something that no longer exists.
+        // and putSourceStatus would discard it anyway - and no point paging
+        // on for something that no longer exists.
         return report;
       }
       report.inserted += inserted;
@@ -177,8 +180,7 @@ export const syncSource = async (
       }
 
       if (cursor === null) {
-        await putSourceIfExists({
-          ...source,
+        await putSourceStatus(source.id, {
           lastSyncedAt: Date.now(),
           lastError: undefined,
         });
@@ -195,13 +197,13 @@ export const syncSource = async (
         return report;
       }
       report.error = messageOf(error);
-      await putSourceIfExists({ ...source, lastError: report.error });
+      await putSourceStatus(source.id, { lastError: report.error });
       return report;
     }
   }
 
   report.error = `exceeded the maximum of ${MAX_PAGES} pages while syncing`;
-  await putSourceIfExists({ ...source, lastError: report.error });
+  await putSourceStatus(source.id, { lastError: report.error });
   return report;
 };
 

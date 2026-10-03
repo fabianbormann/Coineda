@@ -27,6 +27,7 @@ type Props = {
   onResyncOne: (source: SourceRecord) => void;
   onStop: (source: SourceRecord) => void;
   onRemove: (source: SourceRecord) => void;
+  onEditOne: (source: SourceRecord) => void;
   onAddSource: () => void;
 };
 
@@ -57,6 +58,7 @@ export const SourceList = ({
   onResyncOne,
   onStop,
   onRemove,
+  onEditOne,
   onAddSource,
 }: Props) => {
   const { t } = useTranslation();
@@ -118,6 +120,7 @@ export const SourceList = ({
                 onResync={() => onResyncOne(source)}
                 onStop={() => onStop(source)}
                 onRemove={() => onRemove(source)}
+                onEdit={() => onEditOne(source)}
               />
             );
           })}

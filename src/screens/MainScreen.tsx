@@ -13,6 +13,7 @@ import type { LedgerEvent, SourceRecord } from '@/ledger/types';
 import { BalanceHeader } from './BalanceHeader';
 import { SourceList } from './SourceList';
 import { AddSourceDialog } from './AddSourceDialog';
+import { EditSourceDialog } from './EditSourceDialog';
 import { TaxReportDialog } from './TaxReportDialog';
 import { JourneyDialog } from '@/journey/JourneyDialog';
 
@@ -34,6 +35,12 @@ export const MainScreen = () => {
   const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set());
   const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  /** The source EditSourceDialog is currently open for. Kept separate from
+   *  `sources` so a reload that lands while the dialog is open (another
+   *  sync finishing, say) cannot swap out the record the dialog is mid-edit
+   *  against. */
+  const [editingSource, setEditingSource] = useState<SourceRecord | null>(null);
   /**
    * One AbortController per in-flight sync, so Stop can reach the request
    * that is actually running. A ref rather than state: aborting must not
@@ -149,11 +156,12 @@ export const MainScreen = () => {
   // This gating is a UI affordance, not the real guarantee - a user can
   // only click what the UI lets them click, but nothing stops two actions
   // from landing in whatever order anyway. The guarantee that actually
-  // holds is `putSourceIfExists` in src/sync/syncSource.ts: every status
-  // write-back there checks, in the SAME transaction as the write, that
-  // the source record still exists before writing it back, so a sync that
-  // finishes after a removal already committed is a no-op rather than a
-  // resurrection, regardless of what this UI did or didn't disable.
+  // holds is `putSourceStatus` (src/ledger/db.ts), used for every status
+  // write-back in src/sync/syncSource.ts: it checks, in the SAME
+  // transaction as the write, that the source record still exists before
+  // writing it back, so a sync that finishes after a removal already
+  // committed is a no-op rather than a resurrection, regardless of what
+  // this UI did or didn't disable.
   const busyIds = syncingAll
     ? new Set(sources.map((source) => source.id))
     : new Set([...syncingIds, ...removingIds]);
@@ -288,6 +296,80 @@ export const MainScreen = () => {
     }
   };
 
+  const handleOpenEdit = (source: SourceRecord) => {
+    if (busyIds.has(source.id)) {
+      return;
+    }
+    setEditingSource(source);
+    setEditDialogOpen(true);
+  };
+
+  /**
+   * Runs after EditSourceDialog has already written the edited record -
+   * this is the sync half only, not the save itself. `outcome.sync` is
+   * EditSourceDialog's own decision (see `needsRedrain`/`hasCredentialChange`
+   * there), made from comparing the normalised config against what was
+   * stored:
+   *
+   * - `'none'` - only the label changed. No provider request is worth
+   *   making for a rename, so this reloads the list (to show the new label)
+   *   and stops - no busy gating, no AbortController, no sync at all.
+   * - `'incremental'` - only a credential changed. An ordinary sync, same
+   *   as Refresh: cheap, and lets the user see a corrected key start
+   *   working.
+   * - `'full'` - what the source fetches changed, so the drain restarts
+   *   from scratch.
+   *
+   * No confirm here for the `'full'` case - EditSourceDialog already asked,
+   * before the write this runs after. Same busy gating, same
+   * AbortController-per-sync and same report handling as
+   * handleRefreshOne/handleResyncOne for the two cases that do sync.
+   */
+  const handleEditOne = async (
+    source: SourceRecord,
+    outcome: { sync: 'none' | 'incremental' | 'full' },
+  ) => {
+    if (outcome.sync === 'none') {
+      await load();
+      return;
+    }
+    if (busyIds.has(source.id)) {
+      return;
+    }
+    const full = outcome.sync === 'full';
+    const controller = new AbortController();
+    controllersRef.current.set(source.id, controller);
+    setSyncingIds((prev) => new Set(prev).add(source.id));
+    try {
+      const report = await syncSource(source, {
+        full,
+        signal: controller.signal,
+      });
+      if (report.cancelled) {
+        notify.info(t('Stopped syncing {{label}}', { label: source.label }));
+      } else if (report.error) {
+        notify.error(
+          t('Could not sync {{label}}: {{detail}}', {
+            label: source.label,
+            detail: t(report.error),
+          }),
+        );
+      } else if (full) {
+        notify.success(t('Resynced {{label}}', { label: source.label }));
+      } else {
+        notify.success(t('Synced {{label}}', { label: source.label }));
+      }
+    } finally {
+      controllersRef.current.delete(source.id);
+      setSyncingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(source.id);
+        return next;
+      });
+      await load();
+    }
+  };
+
   const handleRemove = async (source: SourceRecord) => {
     if (busyIds.has(source.id)) {
       return;
@@ -348,6 +430,7 @@ export const MainScreen = () => {
         onResyncOne={handleResyncOne}
         onStop={handleStop}
         onRemove={handleRemove}
+        onEditOne={handleOpenEdit}
         onAddSource={() => setAddDialogOpen(true)}
       />
       <div className="flex flex-wrap gap-2">
@@ -385,6 +468,12 @@ export const MainScreen = () => {
           // for its data.
           await handleRefreshOne(created);
         }}
+      />
+      <EditSourceDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        source={editingSource}
+        onEdited={handleEditOne}
       />
       <ExportCheckpointDialog
         open={exportDialogOpen}
