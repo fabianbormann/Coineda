@@ -2,6 +2,7 @@ import type { CardanoProvider } from './provider';
 import { probeRoute } from './http';
 import { CARDANO_MESSAGES } from './messages';
 import { ADDRESS_PAGE_SIZE, PAGE_SIZE } from './cursor';
+import { stakeAddressOf } from './shelley';
 
 /**
  * A Cardano wallet is an account - one stake address - spread across many
@@ -185,6 +186,40 @@ export const resolveTarget = async (
       tier: 'refused',
       message: CARDANO_MESSAGES.stakeAddressNeedsAccountApi,
     };
+  }
+
+  // The staking credential is IN the address, so read it before asking the
+  // provider for it.
+  //
+  // This is not an optimisation, it is the fix for a reported failure. The
+  // lookup below resolves the account from `/addresses/{address}`, which
+  // Blockfrost answers 404 for an address that has never appeared on chain -
+  // so the account tier was unreachable for exactly the address a user is
+  // most likely to paste, the fresh receive address their wallet shows them,
+  // and the result was a 404 with nothing explaining it. A base address
+  // carries its staking credential in bytes 29..57 whatever its history, so
+  // an unused address now resolves as well as a busy one, and with one fewer
+  // request.
+  //
+  // Only a successful account tier short-circuits. Anything else falls
+  // through to the provider path below rather than returning the address
+  // tier directly, because that path is what validates the drain's OWN
+  // route - skipping it would let a probe pass on an instance the sync then
+  // fails against, which is the exact gap this probe was rewritten to close.
+  // That costs one extra request on an instance with no account routes, at
+  // probe time only, which is worth paying to keep the validation.
+  const derived = stakeAddressOf(configured);
+  if (derived !== null) {
+    const tier = await accountTier(root, headers, derived, signal);
+    if (tier.tier === 'timeout') {
+      return { tier: 'refused', message: CARDANO_MESSAGES.instanceCannotServe };
+    }
+    if (tier.tier === 'status') {
+      return { tier: 'refused', message: provider.probeMessage(tier.status) };
+    }
+    if (tier.tier === 'available') {
+      return { tier: 'account', account: derived };
+    }
   }
 
   const lookup = await probeRoute(

@@ -419,3 +419,80 @@ describe('resolveTarget — cancellation', () => {
     ).rejects.toMatchObject({ name: 'AbortError' });
   });
 });
+
+/**
+ * A REAL mainnet base address and the account it belongs to, from the
+ * recordings in src/sources/cardano-blockfrost/fixtures.
+ *
+ * The PAYMENT constant above is a placeholder string, not a decodable
+ * address, which is exactly why it cannot exercise the local-derivation path
+ * added to resolveTarget: stakeAddressOf returns null for it and the
+ * procedure falls through to the provider lookup, the behaviour every test
+ * above was written against. These two are the real thing.
+ */
+const REAL_PAYMENT =
+  'addr1q9peuc0k30wf5x9x34zh7zk4wvn4l3yzcdfvjdrfe3rkw98923ktg2mgzzy3y5jz90u0mawe47aft2m8nn8m7v2nl4yqwz6vle';
+const REAL_ACCOUNT =
+  'stake1u8j4gm959d5ppzgj2fpzh78a7hv6lw544dneenalx9fl6jqzpkxrm';
+
+describe('resolveTarget - the staking credential is read from the address', () => {
+  it('reaches the account tier without asking the provider to resolve the account', async () => {
+    const seen = stub(accountRoutes(REAL_ACCOUNT));
+
+    await expect(
+      resolveTarget(provider, { address: REAL_PAYMENT }, ROOT),
+    ).resolves.toEqual({ tier: 'account', account: REAL_ACCOUNT });
+
+    // The point of the change, and asserted as an absence because the tier
+    // alone cannot distinguish it: /addresses/{address} is never requested,
+    // so the account was resolved from the address bytes rather than from a
+    // provider that may not know the address at all.
+    expect(seen.some((url) => url.includes('/addresses/'))).toBe(false);
+    expect(seen.some((url) => url.includes('/accounts/'))).toBe(true);
+  });
+
+  it('reaches the account tier for an address with NO history, which the provider 404s', async () => {
+    // The reported failure. /addresses/{address} is left unstubbed, so it
+    // answers 404 exactly as Blockfrost does for an address that has never
+    // appeared on chain - and the account tier is still reached.
+    stub(accountRoutes(REAL_ACCOUNT));
+
+    await expect(
+      resolveTarget(provider, { address: REAL_PAYMENT }, ROOT),
+    ).resolves.toEqual({ tier: 'account', account: REAL_ACCOUNT });
+  });
+
+  it('tolerates the whitespace and casing a pasted address arrives with', async () => {
+    stub(accountRoutes(REAL_ACCOUNT));
+    await expect(
+      resolveTarget(
+        provider,
+        { address: `  ${REAL_PAYMENT.toUpperCase()}\n` },
+        ROOT,
+      ),
+    ).resolves.toEqual({ tier: 'account', account: REAL_ACCOUNT });
+  });
+
+  it('falls through to the provider path when the instance serves no account routes', async () => {
+    // Deliberately NOT short-circuiting to the address tier here: the
+    // provider path below is what validates the drain's own listing route,
+    // and skipping it would let the probe pass on an instance the sync then
+    // fails against.
+    const seen = stub({
+      [`${ROOT}/addresses/${REAL_PAYMENT}`]: {
+        body: { stake_address: REAL_ACCOUNT },
+      },
+      [`${ROOT}/addresses/${REAL_PAYMENT}/transactions?page=1&count=20&order=asc`]:
+        { body: [] },
+    });
+
+    await expect(
+      resolveTarget(provider, { address: REAL_PAYMENT }, ROOT),
+    ).resolves.toEqual({ tier: 'address' });
+    // It tried the account first, then fell through to the provider lookup
+    // rather than short-circuiting - which is what keeps the pre-existing
+    // provider path, and the decisions it makes, reachable.
+    expect(seen.some((url) => url.includes('/accounts/'))).toBe(true);
+    expect(seen).toContain(`${ROOT}/addresses/${REAL_PAYMENT}`);
+  });
+});
