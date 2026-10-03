@@ -174,9 +174,6 @@ const LANE_GAP = 14;
 
 const INFLOW = '53,224,161';
 const OUTFLOW = '255,92,122';
-/** The held-amount band: a cool slate that neither competes with the
- *  inflow green nor reads as a warning next to the outflow red. */
-const HOLDING = '122,162,214';
 
 /** The span the journey covers, as the heading. Computed from the series
  *  rather than passed in: it is digits and a dash, so it needs no
@@ -337,8 +334,8 @@ export const renderJourneyFrame = (
       // Neutral, deliberately. When the ridge was inflow-green it swamped
       // the green buy bubbles and the red sells had nothing to read
       // against, so the whole frame said "line chart" in one colour.
-      fill.addColorStop(0, `rgba(${HOLDING},0.30)`);
-      fill.addColorStop(1, `rgba(${HOLDING},0.02)`);
+      fill.addColorStop(0, `rgba(${INFLOW},0.34)`);
+      fill.addColorStop(1, `rgba(${INFLOW},0.02)`);
       ctx.fillStyle = fill;
       ctx.fill();
     }
@@ -353,17 +350,28 @@ export const renderJourneyFrame = (
         ctx.lineTo(x, y);
       }
     }
-    // A quiet edge rather than a lit filament: the bubbles carry the frame
-    // now, and two bright things fight.
-    ctx.strokeStyle = `rgba(${HOLDING},0.55)`;
-    ctx.lineWidth = 1.5;
+    // A lit filament, not a hairline. Making it neutral to "let the bubbles
+    // breathe" just produced a pale area chart with nothing glowing in it;
+    // the two coexist because the bubbles sit ON the rail with wide halos
+    // while this runs above them.
+    const bloom = typeof ctx.save === 'function';
+    if (bloom) {
+      ctx.save();
+      ctx.shadowColor = '#35e0a1';
+      ctx.shadowBlur = laneHeight * 0.18;
+    }
+    ctx.strokeStyle = '#8affd4';
+    ctx.lineWidth = 2.5;
     ctx.stroke();
+    if (bloom) {
+      ctx.restore();
+    }
 
     // The rail.
     ctx.beginPath();
     ctx.moveTo(plotLeft, railY);
     ctx.lineTo(plotRight, railY);
-    ctx.strokeStyle = '#1b2740';
+    ctx.strokeStyle = '#2b3c5e';
     ctx.lineWidth = 1;
     ctx.stroke();
 

@@ -288,20 +288,127 @@ describe('disposal markers', () => {
     expect(series.acquisitions).toHaveLength(1);
   });
 
-  it('does not count moving your own coins between venues as a disposal', async () => {
-    // Symmetric with the acquisition rule: a 'transfer' is excluded in both
-    // directions, or every wallet-to-wallet move would read as a sale.
+  it('does not count moving your own coins between venues as anything', async () => {
+    // A real internal move: the SAME asset leaving one owned venue and
+    // arriving at another. It nets to zero and so is neither an acquisition
+    // nor a disposal - which is the behaviour the old kind-based rule was
+    // reaching for when it dropped every 'transfer', and the reason netting
+    // can replace it without losing anything.
     vi.stubGlobal('fetch', flatRange(2));
 
-    const series = await buildJourneySeries(
-      [
-        reward(),
-        { ...sale(), id: 'move-1', externalId: 'move-1', kind: 'transfer' },
+    const internalMove: LedgerEvent = {
+      id: 'move-1',
+      sourceId: 'src-1',
+      externalId: 'move-1',
+      timestamp: Date.UTC(2025, 1, 10),
+      kind: 'transfer',
+      origin: 'derived',
+      legs: [
+        {
+          assetId: 'cardano:lovelace',
+          amount: '4000000',
+          direction: 'out',
+          venue: 'wallet-a',
+          role: 'principal',
+        },
+        {
+          assetId: 'cardano:lovelace',
+          amount: '4000000',
+          direction: 'in',
+          venue: 'wallet-b',
+          role: 'principal',
+        },
       ],
-      'eur',
-      { now: Date.UTC(2025, 2, 15) },
-    );
+    };
+
+    const series = await buildJourneySeries([reward(), internalMove], 'eur', {
+      now: Date.UTC(2025, 2, 15),
+    });
 
     expect(series.disposals).toEqual([]);
+    // The reward is still the only acquisition - the move added nothing.
+    expect(series.acquisitions).toHaveLength(1);
+  });
+
+  it('marks a chain receipt, which carries no kind but a real net gain', async () => {
+    // The bug this rule change fixes: the Bitcoin module emits 'transfer'
+    // for everything it drains, so under the old kind-based rule a Bitcoin
+    // wallet produced no markers at all and its journey could only ever be
+    // a line chart.
+    vi.stubGlobal('fetch', flatRange(2));
+
+    const received: LedgerEvent = {
+      id: 'btc-in',
+      sourceId: 'src-btc',
+      externalId: 'btc-in',
+      timestamp: Date.UTC(2025, 1, 10),
+      kind: 'transfer',
+      origin: 'derived',
+      legs: [
+        {
+          assetId: 'bitcoin:native',
+          amount: '150000',
+          direction: 'in',
+          venue: 'bc1qwallet',
+          role: 'principal',
+        },
+      ],
+    };
+
+    const series = await buildJourneySeries([received], 'eur', {
+      now: Date.UTC(2025, 2, 15),
+    });
+
+    expect(series.acquisitions).toEqual([
+      {
+        timestamp: Date.UTC(2025, 1, 10),
+        assetId: 'bitcoin:native',
+        amount: '150000',
+      },
+    ]);
+  });
+
+  it('nets a spend with change down to what actually left', async () => {
+    // A Bitcoin spend is one event with an input and a change output, both
+    // the user's own. The marker has to be the NET - what really left - or
+    // every outgoing payment would look like a disposal of the whole input.
+    vi.stubGlobal('fetch', flatRange(2));
+
+    const spend: LedgerEvent = {
+      id: 'btc-out',
+      sourceId: 'src-btc',
+      externalId: 'btc-out',
+      timestamp: Date.UTC(2025, 1, 12),
+      kind: 'transfer',
+      origin: 'derived',
+      legs: [
+        {
+          assetId: 'bitcoin:native',
+          amount: '150000',
+          direction: 'out',
+          venue: 'bc1qwallet',
+          role: 'principal',
+        },
+        {
+          assetId: 'bitcoin:native',
+          amount: '90000',
+          direction: 'in',
+          venue: 'bc1qwallet',
+          role: 'principal',
+        },
+      ],
+    };
+
+    const series = await buildJourneySeries([spend], 'eur', {
+      now: Date.UTC(2025, 2, 15),
+    });
+
+    expect(series.disposals).toEqual([
+      {
+        timestamp: Date.UTC(2025, 1, 12),
+        assetId: 'bitcoin:native',
+        amount: '60000',
+      },
+    ]);
   });
 });

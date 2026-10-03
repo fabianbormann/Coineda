@@ -1,3 +1,4 @@
+import { addAmounts, isZeroAmount } from '@/ledger/amount';
 import { foldHoldings, isFiatAsset, ownedVenuesOf } from '@/ledger/balances';
 import type { Holding } from '@/ledger/balances';
 import { resolveSpotPrices, totalValue } from '@/prices/priceStore';
@@ -234,33 +235,44 @@ export const buildJourneySeries = async (
   const acquisitions: AcquisitionMarker[] = [];
   const disposals: AcquisitionMarker[] = [];
   for (const event of sorted) {
-    // 'trade' (a buy) and 'reward' are acquisitions in the sense this
-    // feature cares about - "what did they buy, and when". 'transfer' is
-    // deliberately excluded: moving an asset between the user's own venues,
-    // or receiving it from outside, is not "buying" it.
-    if (event.kind !== 'trade' && event.kind !== 'reward') {
-      continue;
-    }
+    // Markers follow the NET CHANGE in holdings, not the event's kind.
+    //
+    // The old rule took 'trade' and 'reward' and dropped 'transfer', which
+    // was right when Cardano was the only source and wrong the moment a
+    // second one existed: the Bitcoin module emits 'transfer' for
+    // everything, so a Bitcoin wallet produced no markers at all and its
+    // journey could only ever be a line chart. Netting says the same thing
+    // the old rule was reaching for, without asking a module to classify
+    // intent it does not know: coins arriving from outside are an
+    // acquisition, coins leaving are a disposal, and a move between the
+    // user's own venues nets to zero and is neither - which is exactly why
+    // 'transfer' was excluded in the first place.
+    //
+    // Summed across every leg at an owned venue, fees included, so a marker
+    // agrees with the curve it sits under: foldHoldings counts the same
+    // legs.
+    const net = new Map<string, string>();
     for (const leg of event.legs) {
-      if (
-        leg.role !== 'principal' ||
-        !ownedVenues.has(leg.venue) ||
-        isFiatAsset(leg.assetId)
-      ) {
+      if (!ownedVenues.has(leg.venue) || isFiatAsset(leg.assetId)) {
         continue;
       }
-      // Symmetric with the acquisition rule above, and excluding 'transfer'
-      // for the same reason: moving an asset between your own venues is not
-      // selling it.
+      const signed = leg.direction === 'in' ? leg.amount : `-${leg.amount}`;
+      net.set(leg.assetId, addAmounts(net.get(leg.assetId) ?? '0', signed));
+    }
+
+    for (const [assetId, change] of net) {
+      if (isZeroAmount(change)) {
+        continue;
+      }
       const marker = {
         timestamp: event.timestamp,
-        assetId: leg.assetId,
-        amount: leg.amount,
+        assetId,
+        amount: change.startsWith('-') ? change.slice(1) : change,
       };
-      if (leg.direction === 'in') {
-        acquisitions.push(marker);
-      } else {
+      if (change.startsWith('-')) {
         disposals.push(marker);
+      } else {
+        acquisitions.push(marker);
       }
     }
   }

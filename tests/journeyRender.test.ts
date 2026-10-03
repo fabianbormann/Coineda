@@ -598,6 +598,17 @@ describe('the frame is actually lit', () => {
     expect(glowsColoured(calls, OUTFLOW_RGB).length).toBeGreaterThan(0);
   });
 
+  it('blooms the value filament rather than drawing a hairline', () => {
+    // Making this neutral to "let the bubbles breathe" produced a pale area
+    // chart with nothing glowing in it. The two coexist: the bubbles sit on
+    // the rail with wide halos, the filament runs above them.
+    const blurs = frame()
+      .filter((call) => call.method === 'set shadowBlur')
+      .map((call) => Number(call.args[0]));
+    expect(blurs.length).toBeGreaterThan(0);
+    expect(Math.max(...blurs)).toBeGreaterThan(0);
+  });
+
   it('paints the ground as a pool of light, not a flat fill', () => {
     // Asserted on the background's own GEOMETRY, not on a count. Counting
     // radial gradients could not fail: the glows make plenty of them, so
