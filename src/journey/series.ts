@@ -1,9 +1,6 @@
-import { addAmounts } from '@/ledger/amount';
 import { foldHoldings, isFiatAsset, ownedVenuesOf } from '@/ledger/balances';
 import type { Holding } from '@/ledger/balances';
-import { COINGECKO_IDS, fetchHistoricalPrices } from '@/prices/coingecko';
-import { getCachedPrice, putCachedPrice } from '@/prices/priceStore';
-import { valueOf } from '@/prices/scale';
+import { resolveSpotPrices, totalValue } from '@/prices/priceStore';
 import type { LedgerEvent } from '@/ledger/types';
 
 /**
@@ -20,20 +17,7 @@ import type { LedgerEvent } from '@/ledger/types';
  */
 export type SeriesPoint = {
   timestamp: number;
-  totalValue: string | null;
   holdings: Holding[];
-  /**
-   * True when `totalValue` was carried from the nearest sample that could
-   * be priced, rather than priced itself.
-   *
-   * The journey is a picture, not a tax figure, and a run of unpriceable
-   * months at the start used to leave it drawing the words "Not enough
-   * priced history yet" over an empty frame for the opening seconds. A
-   * carried value is a better answer than a blank one - but it is an
-   * assertion nobody measured, so it is flagged, and the renderer says so
-   * on the frame. Nothing in src/tax ever reads this module.
-   */
-  carried?: boolean;
 };
 
 /** One "you bought this" annotation: which asset, when, and how much - a
@@ -51,22 +35,31 @@ export type JourneySeries = {
    *  acquisition, and subject to the same relative-mode rule - a quantity
    *  is an absolute figure whichever direction it moved in. */
   disposals: AcquisitionMarker[];
+  /**
+   * The assets to give a lane each, most valuable first.
+   *
+   * Amounts cannot be summed across assets - 0.5 BTC and 10,000 ADA share
+   * no unit - so the journey draws one lane per asset rather than one
+   * total, and this is the order they are drawn in.
+   */
+  assets: string[];
+  /**
+   * Today's total, in the base currency, for the CLOSING frame alone.
+   *
+   * The animation itself never touches a price: holdings come straight out
+   * of the ledger, so the whole history plays offline, for any year, with no
+   * rate limit and no 365-day window. This one figure costs a single spot
+   * request, the same one the balance header makes. Null when it could not
+   * be priced, and the journey still plays without it.
+   */
+  finalValue: string | null;
 };
 
 export type BuildJourneySeriesOptions = {
-  /** Forwarded to fetchHistoricalPrice for dates older than the free
-   *  tier's 365-day window. */
-  apiKey?: string;
   /** Overridable only for tests; defaults to the real current time so the
    *  series always ends at "now". */
   now?: number;
 };
-
-/** The UTC calendar day a timestamp falls on, as YYYY-MM-DD - matches
- *  PriceKey.date and src/tax/resolveValues.ts's own `utcDay`. Local time is
- *  deliberately never used here. */
-const utcDay = (timestamp: number): string =>
-  new Date(timestamp).toISOString().slice(0, 10);
 
 /** The number of days in `year`-`month` (0-indexed month), used to clamp a
  *  day-of-month that would otherwise overflow into a later month than
@@ -154,7 +147,13 @@ export const buildJourneySeries = async (
   options: BuildJourneySeriesOptions = {},
 ): Promise<JourneySeries> => {
   if (events.length === 0) {
-    return { points: [], acquisitions: [], disposals: [] };
+    return {
+      points: [],
+      acquisitions: [],
+      disposals: [],
+      assets: [],
+      finalValue: null,
+    };
   }
 
   const sorted = [...events].sort((a, b) => a.timestamp - b.timestamp);
@@ -167,134 +166,70 @@ export const buildJourneySeries = async (
     return foldHoldings(eventsUpTo, ownedVenues);
   });
 
-  const baseFiatAssetId = `fiat:${currency}`;
+  const points: SeriesPoint[] = sampleTimestamps.map((timestamp, i) => ({
+    timestamp,
+    holdings: holdingsPerSample[i],
+  }));
 
-  // Every distinct (assetId, day) pair this series needs a price for,
-  // deduplicated before any lookup. The base currency's own fiat holding
-  // never needs a lookup - it is worth exactly 1 by definition, the same
-  // rule src/prices/priceStore.ts applies.
-  const pairs = new Map<string, { assetId: string; date: string }>();
-  for (let i = 0; i < sampleTimestamps.length; i += 1) {
-    const date = utcDay(sampleTimestamps[i]);
-    for (const holding of holdingsPerSample[i]) {
-      if (isFiatAsset(holding.assetId)) {
-        continue;
-      }
-      const key = `${holding.assetId}|${date}`;
-      if (!pairs.has(key)) {
-        pairs.set(key, { assetId: holding.assetId, date });
-      }
-    }
-  }
-
-  const prices = new Map<string, string>();
-
-  // Cache first, then ONE request per asset for whatever is left - never one
-  // per day. A journey spans a whole history, so the per-day endpoint meant
-  // hundreds of sequential requests; the free tier answers 429 after about
-  // four, and a 429 with no CORS header reaches the browser as "Failed to
-  // fetch". That is what left the journey saying it had too little priced
-  // history to draw.
-  const missing = new Map<string, string[]>();
-  for (const [key, { assetId, date }] of pairs) {
-    const cached = await getCachedPrice({ assetId, currency, date });
-    if (cached !== null) {
-      prices.set(key, cached);
-      continue;
-    }
-    // Not mapped: never asked about, and left out of `prices`, which is what
-    // makes the point below unpriced rather than zero.
-    if (!COINGECKO_IDS[assetId]) {
-      continue;
-    }
-    const days = missing.get(assetId);
-    if (days) {
-      days.push(date);
-    } else {
-      missing.set(assetId, [date]);
-    }
-  }
-
-  for (const [assetId, days] of missing) {
-    try {
-      const fetched = await fetchHistoricalPrices(
-        assetId,
-        currency,
-        days,
-        options.apiKey,
-      );
-      for (const [date, price] of fetched) {
-        await putCachedPrice({ assetId, currency, date }, price);
-        prices.set(`${assetId}|${date}`, price);
-      }
-    } catch {
-      // A provider outage, a rate limit, or a span the free tier will not
-      // cover: one unpriceable asset must not cost the user their whole
-      // journey. Leave those days unpriced and move on.
-      continue;
-    }
-  }
-
-  const points: SeriesPoint[] = sampleTimestamps.map((timestamp, index) => {
-    const holdings = holdingsPerSample[index];
-    const date = utcDay(timestamp);
-    let total = '0';
-    let allPriced = true;
-
+  // Every non-fiat asset that ever appeared, not only what is still held: an
+  // asset bought and later sold in full has a story worth a lane, and
+  // dropping it would make the journey disagree with the ledger.
+  const seen = new Set<string>();
+  for (const holdings of holdingsPerSample) {
     for (const holding of holdings) {
-      if (holding.assetId === baseFiatAssetId) {
-        total = addAmounts(total, holding.amount);
-        continue;
+      if (!isFiatAsset(holding.assetId)) {
+        seen.add(holding.assetId);
       }
-      if (isFiatAsset(holding.assetId)) {
-        // A non-base fiat balance: no FX rate is available (the same gap
-        // resolveSpotPrices leaves to `missing`), so this point cannot be
-        // fully priced either.
-        allPriced = false;
-        continue;
-      }
-      const price = prices.get(`${holding.assetId}|${date}`);
-      if (price === undefined) {
-        allPriced = false;
-        continue;
-      }
-      // Decimal string x decimal string -> decimal string, through the
-      // same per-asset scale src/prices/priceStore.ts's totalValue uses -
-      // a price is per whole unit, a holding is in base units. Converted to
-      // a number only at render.ts's final pixel-coordinate boundary,
-      // never here.
-      const value = valueOf(holding.amount, price, holding.assetId);
-      total = addAmounts(total, value);
     }
-
-    return {
-      timestamp,
-      totalValue: allPriced ? total : null,
-      holdings,
-    };
-  });
-
-  // Fill the gaps from the nearest sample that WAS priced: forward for a
-  // hole in the middle, backward for a run at the very start, which is the
-  // case that actually spoiled the opening - there is nothing earlier to
-  // carry, so the first known value reaches back instead. A series with no
-  // priced sample at all is left entirely null, and the renderer still has
-  // its "not enough history" frame for that.
-  const firstPriced = points.find((point) => point.totalValue !== null);
-  const filled: SeriesPoint[] = [];
-  let carriedValue = firstPriced?.totalValue ?? null;
-  for (const point of points) {
-    if (point.totalValue !== null) {
-      carriedValue = point.totalValue;
-      filled.push(point);
-      continue;
-    }
-    filled.push(
-      carriedValue === null
-        ? point
-        : { ...point, totalValue: carriedValue, carried: true },
-    );
   }
+
+  // ONE spot request, and it does two jobs: the closing figure, and the
+  // order of the lanes. Ranking by today's value is the only ranking that
+  // means anything across assets - a bigger NUMBER of units says nothing,
+  // since 10,000 ADA and 0.5 BTC are not comparable quantities.
+  const finalHoldings = holdingsPerSample[holdingsPerSample.length - 1] ?? [];
+  let prices = new Map<string, string>();
+  try {
+    prices = await resolveSpotPrices(
+      [...new Set([...seen, ...finalHoldings.map((h) => h.assetId)])],
+      currency,
+    );
+  } catch {
+    // The journey is about amounts and does not need this to play. Only the
+    // closing figure and the lane order fall back.
+    prices = new Map();
+  }
+
+  const priced = totalValue(finalHoldings, prices);
+  const finalValue = priced.missing.length === 0 ? priced.total : null;
+
+  const valueOfAsset = (assetId: string): number => {
+    const holding = finalHoldings.find((h) => h.assetId === assetId);
+    const price = prices.get(assetId);
+    if (!holding || price === undefined) {
+      return -1;
+    }
+    return Number(totalValue([holding], prices).total);
+  };
+
+  // Activity breaks the tie, so an unpriceable asset is ordered by how much
+  // happened in it rather than arbitrarily.
+  const activity = new Map<string, number>();
+  for (const event of sorted) {
+    for (const leg of event.legs) {
+      if (!isFiatAsset(leg.assetId)) {
+        activity.set(leg.assetId, (activity.get(leg.assetId) ?? 0) + 1);
+      }
+    }
+  }
+
+  const assets = [...seen].sort((a, b) => {
+    const byValue = valueOfAsset(b) - valueOfAsset(a);
+    if (byValue !== 0) {
+      return byValue;
+    }
+    return (activity.get(b) ?? 0) - (activity.get(a) ?? 0);
+  });
 
   const acquisitions: AcquisitionMarker[] = [];
   const disposals: AcquisitionMarker[] = [];
@@ -330,5 +265,5 @@ export const buildJourneySeries = async (
     }
   }
 
-  return { points: filled, acquisitions, disposals };
+  return { points, acquisitions, disposals, assets, finalValue };
 };

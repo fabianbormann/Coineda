@@ -33,9 +33,16 @@ const recordVideoMock = vi.mocked(recordVideo);
 const buildJourneySeriesMock = vi.mocked(buildJourneySeries);
 
 const readySeries: JourneySeries = {
-  points: [{ timestamp: Date.UTC(2025, 0, 1), totalValue: '20', holdings: [] }],
+  points: [
+    {
+      timestamp: Date.UTC(2025, 0, 1),
+      holdings: [{ assetId: 'cardano:lovelace', amount: '10000000' }],
+    },
+  ],
   acquisitions: [],
   disposals: [],
+  assets: ['cardano:lovelace'],
+  finalValue: '20',
 };
 
 beforeEach(async () => {

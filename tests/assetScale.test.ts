@@ -172,11 +172,19 @@ describe('every fiat boundary applies the scale', () => {
       ],
     };
 
-    // `now` is the sample timestamp, and equals the event's own day, so the
-    // series is a single point priced from the cache entry above.
-    const series = await buildJourneySeries([event], 'eur', { now: DAY });
+    // The journey itself draws AMOUNTS now and never prices a point, so the
+    // scale boundary it still owns is the closing figure. That comes from
+    // today's spot price, hence the clock: it makes the cache entry above
+    // today's, which is the day resolveSpotPrices looks for.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date(`${ISO_DAY}T12:00:00Z`));
+    try {
+      const series = await buildJourneySeries([event], 'eur', { now: DAY });
 
-    expect(series.points).toHaveLength(1);
-    expect(series.points[0].totalValue).toBe(EXPECTED_VALUE);
+      expect(series.points).toHaveLength(1);
+      expect(series.finalValue).toBe(EXPECTED_VALUE);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

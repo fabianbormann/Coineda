@@ -73,70 +73,131 @@ describe('monthlySampleTimestamps', () => {
 describe('buildJourneySeries', () => {
   it('returns an empty series for an empty ledger', async () => {
     const series = await buildJourneySeries([], 'eur');
-    expect(series).toEqual({ points: [], acquisitions: [], disposals: [] });
+    expect(series).toEqual({
+      points: [],
+      acquisitions: [],
+      disposals: [],
+      assets: [],
+      finalValue: null,
+    });
   });
 
-  it('folds holdings at each monthly sample and prices them on that sample’s UTC day', async () => {
-    const fetchMock = flatRange(2);
-    vi.stubGlobal('fetch', fetchMock);
+  it('folds the holdings at each monthly sample, in base units', async () => {
+    // No price anywhere. The animation is about amounts, which come
+    // straight out of the ledger - so the whole history draws offline, for
+    // any year, with no rate limit and no 365-day window.
+    vi.stubGlobal('fetch', flatRange(2));
 
-    const now = Date.UTC(2025, 2, 15); // two months after the reward
-    const series = await buildJourneySeries([reward()], 'eur', { now });
+    const series = await buildJourneySeries([reward()], 'eur', {
+      now: Date.UTC(2025, 2, 15),
+    });
 
     expect(series.points).toHaveLength(3);
     for (const point of series.points) {
       expect(point.holdings).toEqual([
         { assetId: 'cardano:lovelace', amount: '10000000' },
       ]);
-      // 10 ADA at a price of 2 = 20, as a decimal string.
-      expect(point.totalValue).toBe('20');
     }
-
-    // ONE request for all three sample months, not one per month. Monthly
-    // sampling still bounds how many DAYS are priced; batching bounds how
-    // many requests that costs, which is what stopped the journey dying on
-    // a rate limit it could not even read the status of.
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-
-    // A buy/earn event becomes an acquisition marker: asset, when, how much.
-    expect(series.acquisitions).toEqual([
-      {
-        timestamp: Date.UTC(2025, 0, 15),
-        assetId: 'cardano:lovelace',
-        amount: '10000000',
-      },
-    ]);
   });
 
-  it('never asks the provider twice for the same (asset, day) pair - a second run costs nothing', async () => {
-    const fetchMock = flatRange(2);
+  it('spends ONE request on the whole journey, however long it is', async () => {
+    // The animation needs no prices at all; the single request is the spot
+    // price behind the closing figure. This is what retired the hundreds of
+    // historical lookups that made the journey fail against a rate limit it
+    // could not even read the status of.
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ cardano: { eur: 0.5 } }), {
+          status: 200,
+        }),
+    );
     vi.stubGlobal('fetch', fetchMock);
 
-    const now = Date.UTC(2025, 1, 15); // one month after the reward
-    await buildJourneySeries([reward()], 'eur', { now });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const series = await buildJourneySeries([reward()], 'eur', {
+      now: Date.UTC(2025, 11, 15), // twelve monthly samples
+    });
 
-    await buildJourneySeries([reward()], 'eur', { now });
-    // The second run hits the permanent (assetId, currency, day) cache for
-    // every pair the first run already resolved, so no new fetches happen.
+    expect(series.points.length).toBeGreaterThan(10);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('marks a point unpriced rather than reporting it as zero when the provider has no data for that day', async () => {
+  it('prices the closing figure from the spot price, scaled per asset', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => new Response('', { status: 404 })),
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ cardano: { eur: 0.5 } }), {
+            status: 200,
+          }),
+      ),
     );
 
-    const now = Date.UTC(2025, 0, 15); // same day as the reward
-    const series = await buildJourneySeries([reward()], 'eur', { now });
+    const series = await buildJourneySeries([reward()], 'eur', {
+      now: Date.UTC(2025, 2, 15),
+    });
 
-    expect(series.points).toHaveLength(1);
-    // Real, non-zero holdings exist at this point - a provider failure
-    // must leave totalValue null, never fabricate '0', which would draw a
-    // cliff in the chart that never happened.
-    expect(series.points[0].holdings).not.toEqual([]);
-    expect(series.points[0].totalValue).toBeNull();
+    // 10 ADA held, at 0.50 = 5. The holding is lovelace, so the per-asset
+    // scale is part of the conversion - see src/prices/scale.ts.
+    expect(series.finalValue).toBe('5');
+  });
+
+  it('still plays when the closing figure cannot be priced', async () => {
+    // A provider outage costs the end card and nothing else. The journey is
+    // the point; the figure is a garnish.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch');
+      }),
+    );
+
+    const series = await buildJourneySeries([reward()], 'eur', {
+      now: Date.UTC(2025, 2, 15),
+    });
+
+    expect(series.finalValue).toBeNull();
+    expect(series.points).toHaveLength(3);
+    expect(series.assets).toEqual(['cardano:lovelace']);
+  });
+
+  it('gives a lane to an asset that was sold in full', async () => {
+    // That a position went to nothing IS the story. Ranking by today's
+    // value would put it last, but dropping it would make the journey
+    // disagree with the ledger.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ cardano: { eur: 0.5 } }), {
+            status: 200,
+          }),
+      ),
+    );
+
+    const sellAll: LedgerEvent = {
+      id: 'sell-all',
+      sourceId: 'src-1',
+      externalId: 'sell-all',
+      timestamp: Date.UTC(2025, 1, 10),
+      kind: 'trade',
+      origin: 'authored',
+      legs: [
+        {
+          assetId: 'cardano:lovelace',
+          amount: '10000000',
+          direction: 'out',
+          venue: 'wallet-a',
+          role: 'principal',
+        },
+      ],
+    };
+
+    const series = await buildJourneySeries([reward(), sellAll], 'eur', {
+      now: Date.UTC(2025, 2, 15),
+    });
+
+    expect(series.assets).toEqual(['cardano:lovelace']);
+    expect(series.points[series.points.length - 1].holdings).toEqual([]);
   });
 
   it('excludes transfers from acquisition markers - moving your own assets is not buying them', async () => {
@@ -179,77 +240,6 @@ describe('buildJourneySeries', () => {
         amount: '10000000',
       },
     ]);
-  });
-});
-
-describe('carrying a value over an unpriced sample', () => {
-  /** Prices only the days this set names; every other day comes back empty,
-   *  which is what an unpriceable month looks like to the series. */
-  const priceOnly = (days: string[]) =>
-    vi.fn(async (url: string) => {
-      const from = Number(/from=(\d+)/.exec(String(url))![1]) * 1000;
-      const to = Number(/to=(\d+)/.exec(String(url))![1]) * 1000;
-      const prices: [number, number][] = [];
-      for (
-        let at = Math.ceil(from / 86_400_000) * 86_400_000;
-        at <= to;
-        at += 86_400_000
-      ) {
-        const day = new Date(at).toISOString().slice(0, 10);
-        if (days.includes(day)) {
-          prices.push([at, 2]);
-        }
-      }
-      return new Response(JSON.stringify({ prices }), { status: 200 });
-    });
-
-  it('reaches BACKWARD to fill a run of unpriced samples at the start', async () => {
-    // The reported complaint: the opening seconds of the video said "Not
-    // enough priced history yet" over an empty frame. There is nothing
-    // earlier to carry forward from, so the first value that IS known
-    // reaches back - which is what removes the dead opening.
-    vi.stubGlobal('fetch', priceOnly(['2025-03-15']));
-
-    const series = await buildJourneySeries([reward()], 'eur', {
-      now: Date.UTC(2025, 2, 15),
-    });
-
-    expect(series.points).toHaveLength(3);
-    expect(series.points.map((p) => p.totalValue)).toEqual(['20', '20', '20']);
-    // Flagged, every one of them, except the sample that was really priced.
-    expect(series.points.map((p) => p.carried === true)).toEqual([
-      true,
-      true,
-      false,
-    ]);
-  });
-
-  it('carries FORWARD over a hole in the middle', async () => {
-    vi.stubGlobal('fetch', priceOnly(['2025-01-15', '2025-03-15']));
-
-    const series = await buildJourneySeries([reward()], 'eur', {
-      now: Date.UTC(2025, 2, 15),
-    });
-
-    expect(series.points.map((p) => p.carried === true)).toEqual([
-      false,
-      true,
-      false,
-    ]);
-  });
-
-  it('leaves every sample null when nothing at all could be priced', async () => {
-    // The genuinely empty case has to survive: with no priced sample there
-    // is nothing to carry, and the renderer still needs its "not enough
-    // history" frame rather than a flat line through zero.
-    vi.stubGlobal('fetch', priceOnly([]));
-
-    const series = await buildJourneySeries([reward()], 'eur', {
-      now: Date.UTC(2025, 2, 15),
-    });
-
-    expect(series.points.every((p) => p.totalValue === null)).toBe(true);
-    expect(series.points.some((p) => p.carried)).toBe(false);
   });
 });
 

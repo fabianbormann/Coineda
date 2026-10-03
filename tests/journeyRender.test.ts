@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { renderJourneyFrame, scaleSeries } from '@/journey/render';
+import { renderJourneyFrame, buildLanes } from '@/journey/render';
 import type { JourneyLabels } from '@/journey/render';
 import type { JourneySeries, SeriesPoint } from '@/journey/series';
 
@@ -30,9 +30,9 @@ const createRecordingContext = () => {
     arc: record('arc'),
     fill: record('fill'),
     closePath: record('closePath'),
-    // The commit-stream composition paints light with gradients. The stub
-    // returns an addColorStop-only object: this file asserts on what TEXT
-    // and GEOMETRY were drawn, and a gradient carries neither.
+    // The composition paints light with gradients. The stub returns an
+    // addColorStop-only object: this file asserts on what TEXT and GEOMETRY
+    // were drawn, and a gradient carries neither.
     createLinearGradient: (...args: unknown[]) => {
       calls.push({ method: 'createLinearGradient', args });
       return { addColorStop: () => {} };
@@ -45,6 +45,7 @@ const createRecordingContext = () => {
     set strokeStyle(_value: string) {},
     set lineWidth(_value: number) {},
     set font(_value: string) {},
+    set textAlign(_value: string) {},
   } as unknown as CanvasRenderingContext2D;
   return { ctx, calls };
 };
@@ -53,7 +54,8 @@ const labels: JourneyLabels = {
   title: 'Your crypto journey',
   acquisitionPrefix: 'Bought',
   noDataLabel: 'Not enough priced history yet',
-  carriedLabel: 'carried forward',
+  moreAssets: 'and {{count}} more assets',
+  todayLabel: 'value today',
 };
 
 const baseParams = {
@@ -64,21 +66,34 @@ const baseParams = {
   labels,
 };
 
-/** Three priced points ending on a large, distinctive total - chosen so
- *  its digits never coincidentally appear in a rounded percentage or in
- *  the small acquisition quantity below. */
+const ADA = 'cardano:lovelace';
+const BTC = 'bitcoin:native';
+
+/** Three monthly samples of a growing ADA position, in lovelace - the base
+ *  unit the ledger stores. */
 const fixturePoints: SeriesPoint[] = [
-  { timestamp: 1, totalValue: '20000.00', holdings: [] },
-  { timestamp: 2, totalValue: '40000.00', holdings: [] },
-  { timestamp: 3, totalValue: '87654.32', holdings: [] },
+  {
+    timestamp: Date.UTC(2024, 0, 1),
+    holdings: [{ assetId: ADA, amount: '10000000' }],
+  },
+  {
+    timestamp: Date.UTC(2024, 1, 1),
+    holdings: [{ assetId: ADA, amount: '20000000' }],
+  },
+  {
+    timestamp: Date.UTC(2025, 2, 1),
+    holdings: [{ assetId: ADA, amount: '40000000' }],
+  },
 ];
 
 const fixtureSeries: JourneySeries = {
   points: fixturePoints,
   acquisitions: [
-    { timestamp: 1, assetId: 'cardano:lovelace', amount: '0.015' },
+    { timestamp: Date.UTC(2024, 0, 1), assetId: ADA, amount: '0.015' },
   ],
   disposals: [],
+  assets: [ADA],
+  finalValue: '87654.32',
 };
 
 const fillTexts = (calls: RecordedCall[]): string[] =>
@@ -86,58 +101,128 @@ const fillTexts = (calls: RecordedCall[]): string[] =>
     .filter((call) => call.method === 'fillText')
     .map((call) => String(call.args[0]));
 
-describe('scaleSeries', () => {
-  it('passes the absolute total through as a number in "absolute" mode', () => {
-    const scaled = scaleSeries(fixturePoints, 'absolute');
-    expect(scaled.map((point) => point.value)).toEqual([
-      20000, 40000, 87654.32,
+const lineToCount = (calls: RecordedCall[]): number =>
+  calls.filter((call) => call.method === 'lineTo').length;
+
+describe('buildLanes', () => {
+  it('gives each asset its own lane, scaled to its own peak', () => {
+    // Amounts cannot be summed across assets, so they cannot share a scale
+    // either: against one portfolio-wide maximum, every asset but the
+    // largest would be a line along the floor.
+    const series: JourneySeries = {
+      points: [
+        {
+          timestamp: 1,
+          holdings: [
+            { assetId: BTC, amount: '0.5' },
+            { assetId: ADA, amount: '10000000' },
+          ],
+        },
+      ],
+      acquisitions: [],
+      disposals: [],
+      assets: [BTC, ADA],
+      finalValue: null,
+    };
+
+    const lanes = buildLanes(series, 'absolute');
+    expect(lanes.map((lane) => lane.assetId)).toEqual([BTC, ADA]);
+    expect(lanes[0].peak).toBe(0.5);
+    expect(lanes[1].peak).toBe(10000000);
+  });
+
+  it('reads a missing holding as zero, not as a gap', () => {
+    // An asset sold in full still has a lane - that it went to nothing IS
+    // the story - and a sample where it is absent means exactly zero held.
+    const series: JourneySeries = {
+      points: [
+        { timestamp: 1, holdings: [{ assetId: ADA, amount: '10000000' }] },
+        { timestamp: 2, holdings: [] },
+      ],
+      acquisitions: [],
+      disposals: [],
+      assets: [ADA],
+      finalValue: null,
+    };
+
+    expect(buildLanes(series, 'absolute')[0].amounts).toEqual([10000000, 0]);
+  });
+
+  it('expresses each lane as a percentage of its own final amount in "relative" mode', () => {
+    // 10m, 20m, 40m lovelace against a final 40m.
+    expect(buildLanes(fixtureSeries, 'relative')[0].amounts).toEqual([
+      25, 50, 100,
     ]);
-  });
-
-  it('expresses every point as a percentage of the final priced total in "relative" mode', () => {
-    const scaled = scaleSeries(fixturePoints, 'relative');
-    expect(scaled[2].value).toBe(100);
-    expect(scaled[0].value).toBeCloseTo((20000 / 87654.32) * 100, 5);
-    expect(scaled[1].value).toBeCloseTo((40000 / 87654.32) * 100, 5);
-  });
-
-  it('normalises against the last PRICED point, not the last point, when the newest point is unpriced', () => {
-    const points: SeriesPoint[] = [
-      ...fixturePoints,
-      { timestamp: 4, totalValue: null, holdings: [] },
-    ];
-    const scaled = scaleSeries(points, 'relative');
-    expect(scaled[2].value).toBe(100);
-    expect(scaled[3].value).toBeNull();
-  });
-
-  it('leaves a point null rather than dividing by zero when the final total is zero', () => {
-    const points: SeriesPoint[] = [
-      { timestamp: 1, totalValue: '0', holdings: [] },
-    ];
-    expect(scaleSeries(points, 'relative')[0].value).toBeNull();
   });
 });
 
 describe('renderJourneyFrame', () => {
-  it('draws the real base-currency values in "absolute" mode', () => {
+  it('heads the frame with the span the journey covers', () => {
     const { ctx, calls } = createRecordingContext();
     renderJourneyFrame(ctx, fixtureSeries, {
       ...baseParams,
       mode: 'absolute',
       progress: 1,
     });
-    const texts = fillTexts(calls);
-    expect(texts.some((text) => text.includes('87,654'))).toBe(true);
-    expect(texts.some((text) => text.includes('€'))).toBe(true);
+    expect(fillTexts(calls)).toContain('2024 — 2025');
   });
 
-  // The one requirement this feature must not get wrong: in 'relative'
-  // mode, no absolute currency amount may reach any draw call - not in an
-  // axis label, not in a tooltip, not in a legend, not in the title. This
-  // is the test that proves it, by inspecting literally every piece of
-  // text the frame drew.
-  it('never draws an absolute total in "relative" mode', () => {
+  it('names a single year without a span', () => {
+    const { ctx, calls } = createRecordingContext();
+    renderJourneyFrame(
+      ctx,
+      { ...fixtureSeries, points: fixturePoints.slice(0, 2) },
+      { ...baseParams, mode: 'absolute', progress: 1 },
+    );
+    expect(fillTexts(calls)).toContain('2024');
+  });
+
+  it('draws no price at all while the journey is still playing', () => {
+    // The point of the change: the animation is about amounts, so no fiat
+    // figure belongs on any frame before the last one.
+    const { ctx, calls } = createRecordingContext();
+    renderJourneyFrame(ctx, fixtureSeries, {
+      ...baseParams,
+      mode: 'absolute',
+      progress: 0.6,
+    });
+    for (const text of fillTexts(calls)) {
+      expect(text).not.toContain('87,654');
+      expect(text).not.toContain('value today');
+    }
+  });
+
+  it('shows the closing total once the journey reaches the end', () => {
+    const { ctx, calls } = createRecordingContext();
+    renderJourneyFrame(ctx, fixtureSeries, {
+      ...baseParams,
+      mode: 'absolute',
+      progress: 1,
+    });
+    expect(fillTexts(calls).join(' ')).toContain('87,654');
+    expect(fillTexts(calls)).toContain('value today');
+  });
+
+  it('never shows the closing total in "relative" mode', () => {
+    // Shareable mode promises no absolute figure on the frame. The closing
+    // total is the one fiat number this composition draws, so it is also
+    // the one that has to disappear.
+    const { ctx, calls } = createRecordingContext();
+    renderJourneyFrame(ctx, fixtureSeries, {
+      ...baseParams,
+      mode: 'relative',
+      progress: 1,
+    });
+    for (const text of fillTexts(calls)) {
+      expect(text).not.toContain('87,654');
+      expect(text).not.toContain('87654');
+    }
+  });
+
+  it('never prints a lane AMOUNT in "relative" mode', () => {
+    // This matters more than it did when the journey drew fiat: the subject
+    // of the picture is now the quantity itself, and a quantity is an
+    // absolute figure, because crypto prices are public.
     const { ctx, calls } = createRecordingContext();
     renderJourneyFrame(ctx, fixtureSeries, {
       ...baseParams,
@@ -145,43 +230,31 @@ describe('renderJourneyFrame', () => {
       progress: 1,
     });
     const texts = fillTexts(calls);
-
-    expect(texts.length).toBeGreaterThan(0);
+    expect(texts).toContain(ADA);
     for (const text of texts) {
-      expect(text).not.toMatch(/87654|87,654|87\.654/);
-      expect(text).not.toMatch(/20000|20,000|40000|40,000/);
-      expect(text).not.toContain('€');
-      expect(text).not.toContain('EUR');
-      // The invariant is NO absolute figure, and a crypto quantity is one:
-      // prices are public, so a quantity against a percentage yields the
-      // absolute total. Acquisition markers are drawn from the same
-      // fillText calls, so they are covered by this loop too.
-      expect(text).not.toMatch(/0\.015/);
+      expect(text).not.toContain('40,000,000');
+      expect(text).not.toContain('40000000');
     }
-    // And nothing anywhere in relative mode may carry a digit-bearing
-    // quantity for the marker's asset.
-    const markerTexts = texts.filter((text) =>
-      text.includes('cardano:lovelace'),
-    );
-    expect(markerTexts.length).toBeGreaterThan(0);
-    for (const text of markerTexts) {
-      expect(text).not.toMatch(/\d/);
-    }
-    // The leading-edge readout and the top axis label should both show the
-    // normalised percentage instead.
-    expect(texts.some((text) => text.includes('100%'))).toBe(true);
+  });
+
+  it('prints the lane peak in "absolute" mode, so the scale is readable', () => {
+    const { ctx, calls } = createRecordingContext();
+    renderJourneyFrame(ctx, fixtureSeries, {
+      ...baseParams,
+      mode: 'absolute',
+      progress: 1,
+    });
+    expect(fillTexts(calls).join(' ')).toContain('40,000,000');
   });
 
   it('shows the acquisition quantity in "absolute" mode but never in "relative"', () => {
     // A quantity IS an absolute figure. Crypto prices are public, so
-    // "Bought 0.015 cardano:lovelace" drawn at a point the chart labels
-    // 23% gives the portfolio's absolute value directly - and it is worse
-    // for the only source that exists: Cardano transactions are
-    // 'transfer' and excluded from markers, so a Cardano user's markers
-    // are exclusively staking rewards, and a member reward is a
-    // near-fixed fraction of stake. One marker would reveal total staked
-    // ADA to within a few percent. Shareable mode exists to prevent
-    // exactly that.
+    // "Bought 0.015 cardano:lovelace" on a frame whose lane is labelled
+    // 100% gives the position away - and it is worse for the only source
+    // that exists: Cardano transactions are 'transfer' and excluded from
+    // markers, so a Cardano user's markers are exclusively staking rewards,
+    // and a member reward is a near-fixed fraction of stake. One marker
+    // would reveal total staked ADA to within a few percent.
     const relative = createRecordingContext();
     renderJourneyFrame(relative.ctx, fixtureSeries, {
       ...baseParams,
@@ -195,113 +268,25 @@ describe('renderJourneyFrame', () => {
       progress: 1,
     });
 
-    expect(fillTexts(absolute.calls)).toContain(
-      'Bought 0.015 cardano:lovelace',
-    );
-    // The marker still exists in relative mode - the asset and the point
-    // in time are not secret - it just carries no quantity.
-    expect(fillTexts(relative.calls)).toContain('Bought cardano:lovelace');
+    expect(fillTexts(absolute.calls)).toContain(`Bought 0.015 ${ADA}`);
+    // The marker still exists in relative mode - the asset and the point in
+    // time are not secret - it just carries no quantity.
+    expect(fillTexts(relative.calls)).toContain(`Bought ${ADA}`);
     for (const text of fillTexts(relative.calls)) {
       expect(text).not.toContain('0.015');
     }
   });
 
-  it('reveals only the fraction of the timeline "progress" asks for', () => {
-    const full = createRecordingContext();
-    renderJourneyFrame(full.ctx, fixtureSeries, {
-      ...baseParams,
-      mode: 'absolute',
-      progress: 1,
-    });
-    const partial = createRecordingContext();
-    renderJourneyFrame(partial.ctx, fixtureSeries, {
-      ...baseParams,
-      mode: 'absolute',
-      progress: 0.1,
-    });
-
-    const lineToCount = (calls: RecordedCall[]) =>
-      calls.filter((call) => call.method === 'lineTo').length;
-
-    expect(lineToCount(partial.calls)).toBeLessThan(lineToCount(full.calls));
-  });
-
-  it('draws only the "no data" label when nothing in the series could be priced', () => {
-    const { ctx, calls } = createRecordingContext();
-    const series: JourneySeries = {
-      disposals: [],
-      points: [
-        { timestamp: 1, totalValue: null, holdings: [] },
-        { timestamp: 2, totalValue: null, holdings: [] },
-      ],
-      acquisitions: [],
-    };
-    renderJourneyFrame(ctx, series, {
-      ...baseParams,
-      mode: 'relative',
-      progress: 1,
-    });
-    const texts = fillTexts(calls);
-    expect(texts).toContain(labels.noDataLabel);
-    expect(calls.some((call) => call.method === 'stroke')).toBe(false);
-  });
-});
-
-describe('the commit-stream composition', () => {
-  it('heads the frame with the span the journey covers', () => {
-    // The owner asked for the years at the top. Computed from the series
-    // rather than passed in: it is digits and a dash, so it needs no
-    // translation, and it is what tells you at a glance what you are
-    // looking at while the rail is still filling.
-    const { ctx, calls } = createRecordingContext();
-    renderJourneyFrame(
-      ctx,
-      {
-        points: [
-          { timestamp: Date.UTC(2018, 0, 1), totalValue: '100', holdings: [] },
-          { timestamp: Date.UTC(2025, 11, 1), totalValue: '900', holdings: [] },
-        ],
-        acquisitions: [],
-        disposals: [],
-      },
-      { ...baseParams, mode: 'absolute', progress: 1 },
-    );
-
-    expect(fillTexts(calls)).toContain('2018 — 2025');
-  });
-
-  it('names a single year without a span', () => {
-    const { ctx, calls } = createRecordingContext();
-    renderJourneyFrame(
-      ctx,
-      {
-        points: [
-          { timestamp: Date.UTC(2025, 0, 1), totalValue: '100', holdings: [] },
-          { timestamp: Date.UTC(2025, 5, 1), totalValue: '200', holdings: [] },
-        ],
-        acquisitions: [],
-        disposals: [],
-      },
-      { ...baseParams, mode: 'absolute', progress: 1 },
-    );
-
-    expect(fillTexts(calls)).toContain('2025');
-    expect(fillTexts(calls).join(' ')).not.toContain('2025 — 2025');
-  });
-
   it('hides a DISPOSAL quantity in "relative" mode, exactly as it hides an acquisition', () => {
-    // The shrinking half of the scene carries quantities too, and a
-    // quantity is an absolute figure whichever direction it moved in. A
-    // disposal exempted from the rule would hand back everything the
-    // acquisition rule protects.
+    // The shrinking half carries quantities too, and a quantity is an
+    // absolute figure whichever direction it moved in.
     const series: JourneySeries = {
-      points: fixturePoints,
+      ...fixtureSeries,
       acquisitions: [],
       disposals: [
-        { timestamp: 1, assetId: 'cardano:lovelace', amount: '0.015' },
+        { timestamp: Date.UTC(2024, 0, 1), assetId: ADA, amount: '0.015' },
       ],
     };
-
     const absolute = createRecordingContext();
     renderJourneyFrame(absolute.ctx, series, {
       ...baseParams,
@@ -315,113 +300,144 @@ describe('the commit-stream composition', () => {
       progress: 1,
     });
 
-    expect(fillTexts(absolute.calls)).toContain(
-      'Bought 0.015 cardano:lovelace',
-    );
+    expect(fillTexts(absolute.calls)).toContain(`Bought 0.015 ${ADA}`);
     for (const text of fillTexts(relative.calls)) {
       expect(text).not.toContain('0.015');
     }
   });
 
-  it('says when the figure it shows was carried rather than priced', () => {
-    const carried: JourneySeries = {
+  it('puts each asset event on its own asset lane', () => {
+    // A BTC buy must not land on the ADA rail. With one lane per asset the
+    // y-coordinate is what says which asset an event belongs to, so getting
+    // this wrong is invisible to any count-based assertion. Compared
+    // against each other rather than against a guessed midpoint, so the
+    // test says "different lanes" and not "a particular padding".
+    const series: JourneySeries = {
       points: [
-        { timestamp: 1, totalValue: '20000.00', holdings: [] },
-        { timestamp: 2, totalValue: '20000.00', holdings: [], carried: true },
+        {
+          timestamp: 1,
+          holdings: [
+            { assetId: BTC, amount: '1' },
+            { assetId: ADA, amount: '10000000' },
+          ],
+        },
+        {
+          timestamp: 2,
+          holdings: [
+            { assetId: BTC, amount: '2' },
+            { assetId: ADA, amount: '20000000' },
+          ],
+        },
       ],
-      acquisitions: [],
+      acquisitions: [
+        { timestamp: 2, assetId: BTC, amount: '1' },
+        { timestamp: 2, assetId: ADA, amount: '10000000' },
+      ],
       disposals: [],
+      assets: [BTC, ADA],
+      finalValue: null,
     };
+
     const { ctx, calls } = createRecordingContext();
-    renderJourneyFrame(ctx, carried, {
+    renderJourneyFrame(ctx, series, {
       ...baseParams,
       mode: 'absolute',
       progress: 1,
     });
 
-    // A picture may fill its gaps; it must not pass the filling off as a
-    // measurement.
-    expect(fillTexts(calls)).toContain('carried forward');
+    // Filtered by radius: the glow discs are drawn with arc() too, so an
+    // unfiltered count measures lighting rather than events.
+    const nodeYs = calls
+      .filter((call) => call.method === 'arc' && Number(call.args[2]) === 4)
+      .map((call) => Number(call.args[1]));
+
+    expect(nodeYs).toHaveLength(2);
+    // BTC is the first lane, so its node is strictly above ADA's.
+    expect(nodeYs[0]).toBeLessThan(nodeYs[1]);
   });
 
-  it('stays silent about carrying when the figure was really priced', () => {
-    const { ctx, calls } = createRecordingContext();
-    renderJourneyFrame(ctx, fixtureSeries, {
+  it('reveals only the fraction of the timeline "progress" asks for', () => {
+    const full = createRecordingContext();
+    renderJourneyFrame(full.ctx, fixtureSeries, {
       ...baseParams,
       mode: 'absolute',
       progress: 1,
     });
-    expect(fillTexts(calls)).not.toContain('carried forward');
+    const partial = createRecordingContext();
+    renderJourneyFrame(partial.ctx, fixtureSeries, {
+      ...baseParams,
+      mode: 'absolute',
+      progress: 0.34,
+    });
+    expect(lineToCount(partial.calls)).toBeLessThan(lineToCount(full.calls));
   });
 
-  it('thins out marker labels instead of overprinting eighty of them', () => {
-    // The owner's own wallet produced 80 events. Every node is still drawn;
-    // the labels are spaced, first-come-first-served, so the earliest keeps
-    // its caption and a dense cluster goes unlabelled rather than
-    // illegible.
-    const points: SeriesPoint[] = Array.from({ length: 40 }, (_, i) => ({
-      timestamp: i + 1,
-      totalValue: String((i + 1) * 100),
-      holdings: [],
-    }));
-    const acquisitions = points.map((point) => ({
-      timestamp: point.timestamp,
-      assetId: 'bitcoin:native',
-      amount: '0.01',
-    }));
-
+  it('names the assets that did not fit a lane instead of dropping them', () => {
+    const many = Array.from({ length: 8 }, (_, i) => `chain:asset${i}`);
     const { ctx, calls } = createRecordingContext();
     renderJourneyFrame(
       ctx,
-      { points, acquisitions, disposals: [] },
+      {
+        points: [
+          {
+            timestamp: 1,
+            holdings: many.map((assetId) => ({ assetId, amount: '100' })),
+          },
+        ],
+        acquisitions: [],
+        disposals: [],
+        assets: many,
+        finalValue: null,
+      },
       { ...baseParams, mode: 'absolute', progress: 1 },
     );
 
-    const captions = fillTexts(calls).filter((text) =>
-      text.startsWith('Bought'),
-    );
-    expect(captions.length).toBeGreaterThan(0);
-    expect(captions.length).toBeLessThan(acquisitions.length);
-    // Every marker still gets a node, label or not.
-    const arcs = calls.filter((call) => call.method === 'arc');
-    expect(arcs.length).toBeGreaterThanOrEqual(acquisitions.length);
+    // Five lanes fit; the other three are counted on the frame.
+    expect(fillTexts(calls)).toContain('and 3 more assets');
   });
-});
 
-describe('the frame stays inside itself', () => {
+  it('draws only the "no data" label when there is nothing to draw', () => {
+    const { ctx, calls } = createRecordingContext();
+    renderJourneyFrame(
+      ctx,
+      {
+        points: [],
+        acquisitions: [],
+        disposals: [],
+        assets: [],
+        finalValue: null,
+      },
+      { ...baseParams, mode: 'absolute', progress: 1 },
+    );
+    expect(fillTexts(calls)).toContain('Not enough priced history yet');
+  });
+
   it('draws every mark and caption within the canvas bounds', () => {
     // Canvas silently accepts coordinates off the edge, so a scale mistake
     // shows up as a clipped or missing element in the exported video rather
-    // than as an error anywhere. This is the cheapest guard against that.
+    // than as an error anywhere.
     const points: SeriesPoint[] = Array.from({ length: 30 }, (_, i) => ({
       timestamp: Date.UTC(2018, i, 1),
-      totalValue: String(1000 + i * 2500),
-      holdings: [],
+      holdings: [
+        { assetId: BTC, amount: String(0.1 * (i + 1)) },
+        { assetId: ADA, amount: String(1000000 * (i + 1)) },
+      ],
     }));
+
     const { ctx, calls } = createRecordingContext();
     renderJourneyFrame(
       ctx,
       {
         points,
         acquisitions: [
-          {
-            timestamp: Date.UTC(2018, 0, 1),
-            assetId: 'bitcoin:native',
-            amount: '0.5',
-          },
-          {
-            timestamp: Date.UTC(2019, 5, 1),
-            assetId: 'bitcoin:native',
-            amount: '0.2',
-          },
+          { timestamp: Date.UTC(2018, 0, 1), assetId: BTC, amount: '0.5' },
+          { timestamp: Date.UTC(2019, 5, 1), assetId: ADA, amount: '200' },
         ],
         disposals: [
-          {
-            timestamp: Date.UTC(2020, 2, 1),
-            assetId: 'bitcoin:native',
-            amount: '0.1',
-          },
+          { timestamp: Date.UTC(2020, 2, 1), assetId: BTC, amount: '0.1' },
         ],
+        assets: [BTC, ADA],
+        finalValue: '1234.00',
       },
       { ...baseParams, mode: 'absolute', progress: 1 },
     );
@@ -429,7 +445,7 @@ describe('the frame stays inside itself', () => {
     const xs: number[] = [];
     const ys: number[] = [];
     for (const call of calls) {
-      if (['moveTo', 'lineTo'].includes(call.method)) {
+      if (call.method === 'moveTo' || call.method === 'lineTo') {
         xs.push(Number(call.args[0]));
         ys.push(Number(call.args[1]));
       }

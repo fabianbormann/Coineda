@@ -1,4 +1,3 @@
-import type { Holding } from '@/ledger/balances';
 import type { JourneySeries, SeriesPoint } from './series';
 
 export type JourneyMode = 'absolute' | 'relative';
@@ -15,10 +14,10 @@ export type JourneyLabels = {
   /** Shown instead of a chart when nothing in the series could be priced
    *  at all - there is no total to show a percentage of, in either mode. */
   noDataLabel: string;
-  /** Marks a figure carried from the nearest priced sample rather than
-   *  priced itself. The frame says so rather than passing the fill off as a
-   *  measurement. */
-  carriedLabel: string;
+  /** Names how many assets did not fit into a lane, with {{count}}. */
+  moreAssets: string;
+  /** Captions the closing total, e.g. "value today". */
+  todayLabel: string;
 };
 
 export type RenderParams = {
@@ -34,57 +33,48 @@ export type RenderParams = {
   labels: JourneyLabels;
 };
 
-type ScaledPoint = {
-  timestamp: number;
-  value: number | null;
-  holdings: Holding[];
+/** One asset's lane: its amount at each sample, and the peak that lane is
+ *  drawn against. */
+export type Lane = {
+  assetId: string;
+  /** Amount held at each sample, as a number - the final pixel-coordinate
+   *  boundary, on values that were decimal strings everywhere before. */
+  amounts: number[];
+  peak: number;
 };
 
 /**
- * The ONLY place this module reads an absolute total out of the series.
+ * Turns the series into one lane per asset.
  *
- * In 'absolute' mode it converts the decimal-string total to a number -
- * the final pixel-coordinate boundary, fine here and nowhere earlier. In
- * 'relative' mode it converts every point to a PERCENTAGE of the final
- * priced total and then discards the absolute number: nothing downstream
- * of this function ever sees `point.totalValue` again, only the resulting
- * `value`, a plain ratio with no currency meaning. That is what makes "no
- * absolute figure in relative mode" structural rather than something every
- * draw call below has to remember to avoid - there is exactly one place an
- * absolute number could leak from, and it is this function.
+ * Each lane is scaled against its OWN peak, because that is the only
+ * scaling that means anything: a lane drawn against some portfolio-wide
+ * maximum would flatten every asset but the largest into a line on the
+ * floor. The cost is that two lanes' heights are not comparable to each
+ * other, which the unit printed on each lane is there to make obvious.
+ *
+ * 'relative' mode divides each lane by its own final amount instead, so the
+ * shape survives and the quantity does not. That matters more here than it
+ * did when the journey drew fiat: the subject of the picture is now the
+ * quantity itself, and a quantity is an absolute figure - crypto prices are
+ * public, so one real number on a shared frame gives the holding away.
  */
-export const scaleSeries = (
-  points: SeriesPoint[],
-  mode: JourneyMode,
-): ScaledPoint[] => {
-  if (mode === 'absolute') {
-    return points.map((point) => ({
-      timestamp: point.timestamp,
-      value: point.totalValue === null ? null : Number(point.totalValue),
-      holdings: point.holdings,
-    }));
-  }
-
-  const finalPriced = [...points]
-    .reverse()
-    .find((point) => point.totalValue !== null);
-  const finalTotal = finalPriced ? Number(finalPriced.totalValue) : null;
-
-  return points.map((point) => {
-    if (point.totalValue === null || finalTotal === null || finalTotal === 0) {
-      return {
-        timestamp: point.timestamp,
-        value: null,
-        holdings: point.holdings,
-      };
+export const buildLanes = (series: JourneySeries, mode: JourneyMode): Lane[] =>
+  series.assets.map((assetId) => {
+    const amounts = series.points.map((point) => {
+      const holding = point.holdings.find((h) => h.assetId === assetId);
+      return holding ? Number(holding.amount) : 0;
+    });
+    const peak = Math.max(...amounts, 0);
+    if (mode === 'absolute') {
+      return { assetId, amounts, peak: peak === 0 ? 1 : peak };
     }
+    const final = amounts[amounts.length - 1] || peak || 1;
     return {
-      timestamp: point.timestamp,
-      value: (Number(point.totalValue) / finalTotal) * 100,
-      holdings: point.holdings,
+      assetId,
+      amounts: amounts.map((amount) => (amount / final) * 100),
+      peak: (peak / final) * 100 || 1,
     };
   });
-};
 
 /** Mode-aware value formatting. 'relative' never touches `currency` -
  *  it formats a plain ratio, already stripped of any absolute meaning by
@@ -162,6 +152,13 @@ const PADDING = { top: 96, right: 40, bottom: 64, left: 40 };
  *  captions overprinting each other. The nodes themselves are always drawn. */
 const LABEL_SPACING = 130;
 
+/** Lanes below this get thin enough to be unreadable; the rest are named
+ *  instead of silently dropped. */
+const MAX_LANES = 5;
+
+/** Breathing room between one lane's rail and the next lane's ridge. */
+const LANE_GAP = 14;
+
 const INFLOW = '53,224,161';
 const OUTFLOW = '255,92,122';
 
@@ -169,7 +166,12 @@ const OUTFLOW = '255,92,122';
  *  rather than passed in: it is digits and a dash, so it needs no
  *  translation, and it is the one piece of chrome that tells you at a glance
  *  what you are looking at. */
-const spanLabel = (points: ScaledPoint[]): string => {
+const spanLabel = (points: SeriesPoint[]): string => {
+  if (points.length === 0) {
+    // Reached before the empty-series return below used to be, which threw
+    // on points[0] - caught by the "nothing to draw" test.
+    return '';
+  }
   const first = new Date(points[0].timestamp).getUTCFullYear();
   const last = new Date(points[points.length - 1].timestamp).getUTCFullYear();
   return first === last ? `${first}` : `${first} — ${last}`;
@@ -206,11 +208,16 @@ const drawGlow = (ctx: CanvasRenderingContext2D, spot: Glow): void => {
  * - so a test can hand it a plain recording stub in place of a real
  * CanvasRenderingContext2D and assert on exactly what was drawn.
  *
- * The composition is a lit rail: time runs along it, every acquisition and
- * disposal lands on it as a glowing node sized by its own amount, and the
- * portfolio value rides underneath as a luminous ridge. It replaced a plain
- * polyline that grew from zero width, which left the opening seconds of a
- * recorded video nearly empty - the thing a viewer sees first.
+ * One lane per asset, stacked on a shared time axis: each lane is a lit rail
+ * with that asset's buys and sells landing on it as glowing nodes, and the
+ * amount held riding underneath as a luminous ridge. Parallel branches, the
+ * way a commit graph draws them.
+ *
+ * The animation never reads a price. Holdings come out of the ledger, so the
+ * whole history plays offline for any year - which is what retired the
+ * "Not enough priced history yet" frame that used to open the video. The one
+ * fiat figure is the closing total, and it appears only at the end and only
+ * in 'absolute' mode.
  */
 export const renderJourneyFrame = (
   ctx: CanvasRenderingContext2D,
@@ -224,198 +231,184 @@ export const renderJourneyFrame = (
   ctx.fillStyle = '#070b14';
   ctx.fillRect(0, 0, width, height);
 
-  const scaled = scaleSeries(series.points, mode);
-  if (scaled.length === 0) {
-    ctx.fillStyle = '#e8edf7';
-    ctx.font = '800 32px Archivo, sans-serif';
-    ctx.fillText(labels.title, PADDING.left, 56);
-    ctx.fillStyle = '#7b8aa8';
-    ctx.font = '14px sans-serif';
-    ctx.fillText(labels.noDataLabel, PADDING.left, height / 2);
-    return;
-  }
-
-  const visibleCount = Math.max(1, Math.round(progress * scaled.length));
-  const visible = scaled.slice(0, visibleCount);
-
   const plotLeft = PADDING.left;
   const plotRight = width - PADDING.right;
-  const plotTop = PADDING.top;
-  const plotBottom = height - PADDING.bottom;
 
-  const definedValues = visible
-    .map((point) => point.value)
-    .filter((value): value is number => value !== null);
-
-  // The heading goes on before the early return: a frame with nothing
-  // priced yet should still say what it is, not read as a broken render.
-  ctx.fillStyle = '#e8edf7';
-  ctx.font = '800 34px Archivo, sans-serif';
-  ctx.fillText(spanLabel(scaled), plotLeft, 50);
+  const span = spanLabel(series.points);
+  if (span !== '') {
+    ctx.fillStyle = '#e8edf7';
+    ctx.font = '800 34px Archivo, sans-serif';
+    ctx.fillText(span, plotLeft, 50);
+  }
   ctx.fillStyle = '#7b8aa8';
   ctx.font = '13px sans-serif';
   ctx.fillText(labels.title, plotLeft, 74);
 
-  if (definedValues.length === 0) {
+  const lanes = buildLanes(series, mode).slice(0, MAX_LANES);
+  if (series.points.length === 0 || lanes.length === 0) {
     ctx.fillStyle = '#7b8aa8';
     ctx.font = '14px sans-serif';
-    ctx.fillText(labels.noDataLabel, plotLeft, (plotTop + plotBottom) / 2);
+    ctx.fillText(labels.noDataLabel, plotLeft, height / 2);
     return;
   }
 
-  const maxValue = Math.max(...definedValues, 0);
-  const minValue = Math.min(0, ...definedValues);
-  const valueRange = maxValue - minValue === 0 ? 1 : maxValue - minValue;
+  const visibleCount = Math.max(1, Math.round(progress * series.points.length));
+  const lastIndex = visibleCount - 1;
 
   const xForIndex = (index: number): number =>
-    scaled.length <= 1
+    series.points.length <= 1
       ? plotLeft
-      : plotLeft + (plotRight - plotLeft) * (index / (scaled.length - 1));
+      : plotLeft +
+        (plotRight - plotLeft) * (index / (series.points.length - 1));
 
-  const yForValue = (value: number): number =>
-    plotBottom - ((value - minValue) / valueRange) * (plotBottom - plotTop);
+  const top = PADDING.top;
+  const available = height - PADDING.bottom - top;
+  const laneHeight = available / lanes.length;
+  const head = xForIndex(lastIndex);
 
-  const railY = plotBottom;
-  const head = xForIndex(Math.max(0, visible.length - 1));
+  lanes.forEach((lane, laneIndex) => {
+    const railY = top + laneHeight * (laneIndex + 1) - LANE_GAP;
+    const ridgeTop = top + laneHeight * laneIndex + 18;
+    const yForAmount = (amount: number): number =>
+      railY - (amount / lane.peak) * (railY - ridgeTop);
 
-  // The ridge: value as a filled, glowing area under the rail.
-  const ridge = visible
-    .map((point, index) => ({ point, index }))
-    .filter((entry) => entry.point.value !== null);
+    // The ridge: this asset's amount over time.
+    if (typeof ctx.createLinearGradient === 'function') {
+      ctx.beginPath();
+      ctx.moveTo(plotLeft, railY);
+      for (let i = 0; i <= lastIndex; i += 1) {
+        ctx.lineTo(xForIndex(i), yForAmount(lane.amounts[i]));
+      }
+      ctx.lineTo(head, railY);
+      if (typeof ctx.closePath === 'function') {
+        ctx.closePath();
+      }
+      const fill = ctx.createLinearGradient(0, ridgeTop, 0, railY);
+      fill.addColorStop(0, `rgba(${INFLOW},0.38)`);
+      fill.addColorStop(1, `rgba(${INFLOW},0.02)`);
+      ctx.fillStyle = fill;
+      ctx.fill();
+    }
 
-  if (typeof ctx.createLinearGradient === 'function') {
     ctx.beginPath();
-    ctx.moveTo(xForIndex(ridge[0].index), railY);
-    for (const entry of ridge) {
-      ctx.lineTo(
-        xForIndex(entry.index),
-        yForValue(entry.point.value as number),
-      );
+    for (let i = 0; i <= lastIndex; i += 1) {
+      const x = xForIndex(i);
+      const y = yForAmount(lane.amounts[i]);
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
     }
-    ctx.lineTo(xForIndex(ridge[ridge.length - 1].index), railY);
-    if (typeof ctx.closePath === 'function') {
-      ctx.closePath();
-    }
-    const fill = ctx.createLinearGradient(0, plotTop, 0, railY);
-    fill.addColorStop(0, `rgba(${INFLOW},0.42)`);
-    fill.addColorStop(1, `rgba(${INFLOW},0.02)`);
-    ctx.fillStyle = fill;
-    ctx.fill();
-  }
+    ctx.strokeStyle = '#8affd4';
+    ctx.lineWidth = 2;
+    ctx.stroke();
 
-  ctx.beginPath();
-  let started = false;
-  for (const entry of ridge) {
-    const x = xForIndex(entry.index);
-    const y = yForValue(entry.point.value as number);
-    if (started) {
-      ctx.lineTo(x, y);
-    } else {
-      ctx.moveTo(x, y);
-      started = true;
-    }
-  }
-  ctx.strokeStyle = '#8affd4';
-  ctx.lineWidth = 3;
-  ctx.stroke();
+    // The rail.
+    ctx.beginPath();
+    ctx.moveTo(plotLeft, railY);
+    ctx.lineTo(plotRight, railY);
+    ctx.strokeStyle = '#1b2740';
+    ctx.lineWidth = 1;
+    ctx.stroke();
 
-  // The rail itself.
-  ctx.beginPath();
-  ctx.moveTo(plotLeft, railY);
-  ctx.lineTo(plotRight, railY);
-  ctx.strokeStyle = '#1b2740';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  // The axis labels stay where they were: the extremes of what is drawn,
-  // formatted by mode, so relative mode still never names a total.
-  ctx.fillStyle = '#7b8aa8';
-  ctx.font = '12px sans-serif';
-  ctx.fillText(
-    formatValue(maxValue, mode, currency, language),
-    plotLeft,
-    plotTop - 8,
-  );
-  ctx.fillText(
-    formatValue(minValue, mode, currency, language),
-    plotLeft,
-    railY + 20,
-  );
-
-  const visibleUntil = visible[visible.length - 1]?.timestamp ?? 0;
-  const nodes = [
-    ...series.acquisitions.map((marker) => ({ marker, kind: 'in' as const })),
-    ...series.disposals.map((marker) => ({ marker, kind: 'out' as const })),
-  ]
-    .filter((node) => node.marker.timestamp <= visibleUntil)
-    .sort((a, b) => a.marker.timestamp - b.marker.timestamp);
-
-  let lastLabelX = Number.NEGATIVE_INFINITY;
-  for (const node of nodes) {
-    const index = visible.findIndex(
-      (point) => point.timestamp >= node.marker.timestamp,
+    // The lane's own name and scale. In relative mode the peak is a
+    // percentage of this asset's final amount and carries no quantity.
+    ctx.fillStyle = '#7b8aa8';
+    ctx.font = '12px sans-serif';
+    ctx.fillText(
+      mode === 'relative'
+        ? lane.assetId
+        : `${lane.assetId} · ${formatAmount(String(lane.peak), language)}`,
+      plotLeft,
+      ridgeTop - 4,
     );
-    if (index === -1) {
-      continue;
-    }
-    const x = xForIndex(index);
-    const colour = node.kind === 'in' ? INFLOW : OUTFLOW;
 
-    drawGlow(ctx, { x, y: railY, r: 34, colour, alpha: 0.55 });
-    ctx.beginPath();
-    ctx.arc(x, railY, 5, 0, Math.PI * 2);
-    ctx.fillStyle = node.kind === 'in' ? '#c9ffe9' : '#ffd0da';
-    ctx.fill();
+    // This asset's events, on this asset's rail.
+    const nodes = [
+      ...series.acquisitions
+        .filter((marker) => marker.assetId === lane.assetId)
+        .map((marker) => ({ marker, kind: 'in' as const })),
+      ...series.disposals
+        .filter((marker) => marker.assetId === lane.assetId)
+        .map((marker) => ({ marker, kind: 'out' as const })),
+    ].sort((a, b) => a.marker.timestamp - b.marker.timestamp);
 
-    // A stem up to the ridge, so a node reads as attached to the value it
-    // moved rather than floating on the axis.
-    const point = visible[index];
-    if (point.value !== null) {
+    const visibleUntil = series.points[lastIndex]?.timestamp ?? 0;
+    let lastLabelX = Number.NEGATIVE_INFINITY;
+    for (const node of nodes) {
+      if (node.marker.timestamp > visibleUntil) {
+        continue;
+      }
+      const index = series.points.findIndex(
+        (point) => point.timestamp >= node.marker.timestamp,
+      );
+      if (index === -1 || index > lastIndex) {
+        continue;
+      }
+      const x = xForIndex(index);
+      const colour = node.kind === 'in' ? INFLOW : OUTFLOW;
+
+      drawGlow(ctx, { x, y: railY, r: 26, colour, alpha: 0.55 });
+      ctx.beginPath();
+      ctx.arc(x, railY, 4, 0, Math.PI * 2);
+      ctx.fillStyle = node.kind === 'in' ? '#c9ffe9' : '#ffd0da';
+      ctx.fill();
+
       ctx.beginPath();
       ctx.moveTo(x, railY);
-      ctx.lineTo(x, yForValue(point.value));
+      ctx.lineTo(x, yForAmount(lane.amounts[index]));
       ctx.strokeStyle = `rgba(${colour},0.35)`;
       ctx.lineWidth = 1;
       ctx.stroke();
+
+      if (x - lastLabelX >= LABEL_SPACING) {
+        lastLabelX = x;
+        ctx.fillStyle = '#e8edf7';
+        ctx.font = '11px sans-serif';
+        ctx.fillText(
+          formatMarker(node.marker, mode, labels.acquisitionPrefix, language),
+          x + 8,
+          railY - 8,
+        );
+      }
     }
 
-    if (x - lastLabelX >= LABEL_SPACING) {
-      lastLabelX = x;
-      ctx.fillStyle = '#e8edf7';
-      ctx.font = '11px sans-serif';
-      ctx.fillText(
-        formatMarker(node.marker, mode, labels.acquisitionPrefix, language),
-        x + 8,
-        railY - 10,
-      );
-    }
-  }
-
-  // The playhead, and the running total beside it.
-  drawGlow(ctx, {
-    x: head,
-    y: railY,
-    r: 70,
-    colour: '232,237,247',
-    alpha: 0.42,
+    drawGlow(ctx, {
+      x: head,
+      y: railY,
+      r: 48,
+      colour: '232,237,247',
+      alpha: 0.34,
+    });
   });
 
-  const last = [...visible].reverse().find((point) => point.value !== null);
-  if (last && last.value !== null) {
-    const index = visible.indexOf(last);
-    const x = xForIndex(index);
-    const y = yForValue(last.value);
-    ctx.fillStyle = '#e8edf7';
-    ctx.font = '600 28px Archivo, sans-serif';
-    ctx.fillText(formatValue(last.value, mode, currency, language), x, y - 18);
+  // Assets beyond the lane cap are named rather than silently dropped.
+  const hidden = series.assets.length - lanes.length;
+  if (hidden > 0) {
+    ctx.fillStyle = '#7b8aa8';
+    ctx.font = '12px sans-serif';
+    ctx.fillText(
+      labels.moreAssets.replace('{{count}}', String(hidden)),
+      plotLeft,
+      height - 16,
+    );
+  }
 
-    // Says so when the figure was carried rather than priced. A picture may
-    // fill its gaps; it should not pass the filling off as a measurement.
-    const sourcePoint = series.points[index];
-    if (sourcePoint?.carried) {
-      ctx.fillStyle = '#f7a23b';
-      ctx.font = '11px sans-serif';
-      ctx.fillText(labels.carriedLabel, x, y + 4);
-    }
+  // The closing figure: today's total, once, at the end. The only fiat on
+  // the frame, and absent in shareable mode because it is an absolute one.
+  if (progress >= 1 && mode === 'absolute' && series.finalValue !== null) {
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#e8edf7';
+    ctx.font = '700 40px Archivo, sans-serif';
+    ctx.fillText(
+      formatValue(Number(series.finalValue), mode, currency, language),
+      plotRight,
+      56,
+    );
+    ctx.fillStyle = '#7b8aa8';
+    ctx.font = '12px sans-serif';
+    ctx.fillText(labels.todayLabel, plotRight, 76);
+    ctx.textAlign = 'left';
   }
 };

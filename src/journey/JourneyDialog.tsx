@@ -113,9 +113,7 @@ export const JourneyDialog = ({ open, onOpenChange }: Props) => {
           getSettings(),
         ]);
         const baseCurrency = settings?.baseCurrency ?? DEFAULT_CURRENCY;
-        const built = await buildJourneySeries(events, baseCurrency, {
-          apiKey: settings?.coingeckoApiKey,
-        });
+        const built = await buildJourneySeries(events, baseCurrency, {});
         if (cancelled) {
           return;
         }
@@ -161,7 +159,8 @@ export const JourneyDialog = ({ open, onOpenChange }: Props) => {
       title: t('Your crypto journey'),
       acquisitionPrefix: t('Bought'),
       noDataLabel: t('Not enough priced history yet'),
-      carriedLabel: t('carried forward'),
+      moreAssets: t('and {{count}} more assets'),
+      todayLabel: t('value today'),
     };
 
     const startedAt = performance.now();
@@ -207,7 +206,8 @@ export const JourneyDialog = ({ open, onOpenChange }: Props) => {
       title: t('Your crypto journey'),
       acquisitionPrefix: t('Bought'),
       noDataLabel: t('Not enough priced history yet'),
-      carriedLabel: t('carried forward'),
+      moreAssets: t('and {{count}} more assets'),
+      todayLabel: t('value today'),
     };
 
     // captureStream() is obtained HERE, not inside recordVideo(), so a test
