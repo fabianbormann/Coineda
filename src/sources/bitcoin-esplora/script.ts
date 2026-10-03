@@ -31,7 +31,12 @@ export type ScriptType = 'p2wpkh' | 'p2sh-p2wpkh' | 'p2pkh' | 'p2tr';
  * Native SegWit leads because it is what every current wallet defaults to,
  * Ledger Live included.
  */
-export const SCRIPT_TYPES: Exclude<ScriptType, 'p2tr'>[] = [
+/** The types this module can actually encode. Taproot stays in ScriptType
+ *  as a named, documented gap rather than being quietly forgotten, but it
+ *  cannot appear anywhere an address is produced. */
+export type SupportedScriptType = Exclude<ScriptType, 'p2tr'>;
+
+export const SCRIPT_TYPES: SupportedScriptType[] = [
   'p2wpkh',
   'p2sh-p2wpkh',
   'p2pkh',
@@ -65,7 +70,7 @@ const segwitV0 = (hrp: string, program: Uint8Array): string =>
   bech32.encode(hrp, [0, ...bech32.toWords(program)]);
 
 export const addressFor = (
-  type: Exclude<ScriptType, 'p2tr'>,
+  type: SupportedScriptType,
   pubkey: Uint8Array,
   network: Network,
 ): string => {

@@ -8,7 +8,8 @@ import {
   parseAddressList,
 } from '@/sources/addressList';
 import { parseAccountKey, type AccountKey, type KeyProblem } from './xpub';
-import { SCRIPT_TYPES, addressFor } from './script';
+import { SCRIPT_TYPES, addressFor, type SupportedScriptType } from './script';
+import { GAP_LIMIT, buildWallet, type Wallet } from './wallet';
 
 /**
  * The Esplora translation (Blockstream.info and mempool.space both serve the
@@ -91,45 +92,74 @@ export const configuredAddresses = (config: Record<string, string>): string[] =>
   parseAddressList(config.address);
 
 /**
- * The cursor: `btc:<addressIndex>:<lastSeenTxid>`.
+ * The cursor: `btc:<scriptType>:<stage>:<index>:<gap>:<lastSeenTxid>`.
  *
- * `addressIndex` is which configured address (0-based, in the user's own
- * list order) is currently being drained; `lastSeenTxid` is empty when that
- * address's drain has not yet requested a page, and otherwise the oldest
- * txid seen so far for it - exactly the `last_seen_txid` Esplora's `/chain/`
- * route expects, so the next page continues further into the past rather
- * than re-requesting the newest 25 again.
+ * Three stages, in ownership order: 0 the receive chain, 1 the change chain,
+ * 2 the listed addresses. One uniform shape covers both halves of a source
+ * rather than two formats that could disagree, and `gap` is unused in stage
+ * 2, where the address set is finite and known.
  *
- * Stateless by construction: the whole position is recoverable from the
- * string alone, which is what lets a resume pick up an exhausted address and
- * move on to the next one instead of restarting address 0.
+ * `scriptType` travels here rather than in config because `probe` has no way
+ * to write config back and `ProbeResult` has no field for it - and
+ * re-detecting on every page would spend requests per page instead of once
+ * per drain. Empty means nothing is derived: no xpub, or an xpub whose type
+ * could not be detected because the wallet is empty.
+ *
+ * `gap` has to be IN the cursor: it is state the scan needs and nothing else
+ * persists, so a resume that lost it would restart the gap and rescan, or
+ * stop early. `lastSeenTxid` stays last because a txid is hex and cannot
+ * contain the separator.
+ *
+ * Any other shape restarts rather than guessing, which is also what retires
+ * the two-component format this replaced: an old stored cursor reads as
+ * unrecognised and the drain begins again, which dedupe on
+ * (sourceId, externalId) makes lossless.
  */
 export const encodeCursor = (
-  addressIndex: number,
+  scriptType: SupportedScriptType | '',
+  stage: number,
+  index: number,
+  gap: number,
   lastSeenTxid: string,
-): string => `btc:${addressIndex}:${lastSeenTxid}`;
+): string => `btc:${scriptType}:${stage}:${index}:${gap}:${lastSeenTxid}`;
 
-export const decodeCursor = (
-  cursor: string | null,
-): { addressIndex: number; lastSeenTxid: string } => {
-  const start = { addressIndex: 0, lastSeenTxid: '' };
-  if (cursor === null || !cursor.startsWith('btc:')) {
-    // null starts at index 0; anything unrecognised starts over rather than
-    // guess, the same choice Cardano's own decodeCursor makes.
-    return start;
+export type DecodedCursor = {
+  scriptType: SupportedScriptType | '';
+  stage: number;
+  index: number;
+  gap: number;
+  lastSeenTxid: string;
+};
+
+const START: DecodedCursor = {
+  scriptType: '',
+  stage: 0,
+  index: 0,
+  gap: 0,
+  lastSeenTxid: '',
+};
+
+export const decodeCursor = (cursor: string | null): DecodedCursor => {
+  if (cursor === null) {
+    return START;
   }
-  const rest = cursor.slice('btc:'.length);
-  const firstColon = rest.indexOf(':');
-  if (firstColon < 0) {
-    return start;
+  const parts = cursor.split(':');
+  if (parts.length !== 6 || parts[0] !== 'btc') {
+    return START;
   }
-  const indexPart = rest.slice(0, firstColon);
-  if (!/^\d+$/.test(indexPart)) {
-    return start;
+  const [, type, stage, index, gap, lastSeenTxid] = parts;
+  if (![stage, index, gap].every((value) => /^\d+$/.test(value))) {
+    return START;
+  }
+  if (type !== '' && !SCRIPT_TYPES.includes(type as SupportedScriptType)) {
+    return START;
   }
   return {
-    addressIndex: Number.parseInt(indexPart, 10),
-    lastSeenTxid: rest.slice(firstColon + 1),
+    scriptType: type as SupportedScriptType | '',
+    stage: Number.parseInt(stage, 10),
+    index: Number.parseInt(index, 10),
+    gap: Number.parseInt(gap, 10),
+    lastSeenTxid,
   };
 };
 
@@ -177,61 +207,29 @@ const isConfirmedWithDate = (
   tx.status.confirmed === true && typeof tx.status.block_time === 'number';
 
 /**
- * The first configured address (in the user's own list order) that appears
- * anywhere in this transaction - as a spent input or a paid output - or
- * `null` when none of them do.
+ * Legs for one side of a transaction, filtered to the addresses this source
+ * covers.
  *
- * Order is semantic, exactly as it is in `parseAddressList`: configuring A
- * before B means a transaction touching both is A's, not B's. That is the
- * entire ownership rule, and it needs no state beyond the transaction
- * itself and the user's own address list, which is why it survives a
- * resume with nothing persisted but the cursor.
- */
-export const ownerOf = (
-  tx: EsploraTransaction,
-  addresses: string[],
-): string | null => {
-  const participants = new Set<string>();
-  for (const vin of tx.vin) {
-    const address = vin.prevout?.scriptpubkey_address;
-    if (address) {
-      participants.add(address);
-    }
-  }
-  for (const vout of tx.vout) {
-    if (vout.scriptpubkey_address) {
-      participants.add(vout.scriptpubkey_address);
-    }
-  }
-  return addresses.find((address) => participants.has(address)) ?? null;
-};
-
-/**
- * Legs for one side of a transaction (spent inputs or paid outputs),
- * filtered to ANY configured address - the whole wallet, not just the one
- * address whose drain happened to emit this transaction.
- *
- * `venue` is always `addresses[0]`, never the entry's own address: that is
- * what makes a self-transfer between two configured addresses net to the
- * fee instead of looking like a disposal at one address and an un-tracked
- * receipt at the other. See the module doc comment above for the full
- * reasoning and the negative-balance failure mode this guards against.
- *
- * A coinbase input contributes nothing (no `prevout`, so no address and no
- * value to read), which is why this never throws on one; it simply filters
- * it out like any other entry whose address is not in the configured set.
+ * Filtered to the WHOLE wallet, not to the address being scanned. That is
+ * what makes a transfer between two of the wallet's own addresses net to the
+ * fee rather than look like a disposal of everything that left, and it is
+ * also what keeps the drain idempotent: the leg set does not depend on which
+ * address surfaced the transaction, so a replayed drain produces identical
+ * content. A coinbase input contributes nothing, having no prevout and so no
+ * address to match.
  */
 const legsFrom = (
   entries: { address?: string; value?: number }[],
   direction: Leg['direction'],
-  addressSet: Set<string>,
+  wallet: Wallet,
   venue: string,
   what: string,
 ): Leg[] =>
   entries
     .filter(
       (entry): entry is { address: string; value?: number } =>
-        typeof entry.address === 'string' && addressSet.has(entry.address),
+        typeof entry.address === 'string' &&
+        wallet.rankOf(entry.address) !== undefined,
     )
     .map((entry) => ({
       assetId: 'bitcoin:native',
@@ -243,12 +241,8 @@ const legsFrom = (
       role: 'principal' as const,
     }));
 
-const legsForTransaction = (
-  tx: EsploraTransaction,
-  addresses: string[],
-): Leg[] => {
-  const addressSet = new Set(addresses);
-  const venue = addresses[0];
+const legsForTransaction = (tx: EsploraTransaction, wallet: Wallet): Leg[] => {
+  const venue = wallet.ordered[0];
   return [
     ...legsFrom(
       tx.vin.map((vin) => ({
@@ -256,7 +250,7 @@ const legsForTransaction = (
         value: vin.prevout?.value,
       })),
       'out',
-      addressSet,
+      wallet,
       venue,
       'a spent input amount',
     ),
@@ -266,11 +260,49 @@ const legsForTransaction = (
         value: vout.value,
       })),
       'in',
-      addressSet,
+      wallet,
       venue,
       'a paid output amount',
     ),
   ];
+};
+
+/**
+ * The address that owns this transaction: the earliest of the wallet's own
+ * addresses appearing anywhere in it, or null if none does.
+ *
+ * "Earliest" is by the wallet's own total order - receive chain, then change
+ * chain, then the listed addresses. A total order is what makes this a rule
+ * rather than a preference: every pair of the source's addresses is
+ * comparable, so exactly one of them owns any given transaction however many
+ * of them it touches, and the answer does not depend on which address's page
+ * the transaction was drained from. Nothing is persisted to decide it, which
+ * is what lets a resume mid-drain reach the same conclusion.
+ */
+export const ownerOf = (
+  tx: EsploraTransaction,
+  wallet: Wallet,
+): string | null => {
+  let best: { address: string; rank: number } | null = null;
+  const consider = (address?: string) => {
+    if (address === undefined) {
+      return;
+    }
+    const rank = wallet.rankOf(address);
+    if (rank === undefined) {
+      return;
+    }
+    if (best === null || rank < best.rank) {
+      best = { address, rank };
+    }
+  };
+  for (const vin of tx.vin) {
+    consider(vin.prevout?.scriptpubkey_address);
+  }
+  for (const vout of tx.vout) {
+    consider(vout.scriptpubkey_address);
+  }
+  return best === null ? null : (best as { address: string }).address;
 };
 
 /** How many receive-chain indices the detector tries per candidate type. */
@@ -441,33 +473,105 @@ const probeListedAddresses = async (
   return { ok: false, message: BITCOIN_ESPLORA_MESSAGES.noHistory };
 };
 
+/** Stage 0 receive chain, 1 change chain, 2 the listed addresses. */
+const LAST_STAGE = 2;
+
+/** The address a stage/index pair points at, or null when that stage has
+ *  nothing there - no xpub for the derived stages, or past the end of the
+ *  list for stage 2. */
+const addressAt = (
+  wallet: Wallet,
+  stage: number,
+  index: number,
+): string | null => {
+  if (stage === 0 || stage === 1) {
+    return wallet.derivedAt(stage, index);
+  }
+  return index < wallet.listed.length ? wallet.listed[index] : null;
+};
+
+/** The next stage that has anything to scan, or null when none does. An
+ *  empty stage is skipped rather than walked, which is how an addresses-only
+ *  source is the same drain with its derived stages empty instead of a
+ *  second code path. */
+const nextStageWithWork = (wallet: Wallet, from: number): number | null => {
+  for (let stage = from; stage <= LAST_STAGE; stage += 1) {
+    if (addressAt(wallet, stage, 0) !== null) {
+      return stage;
+    }
+  }
+  return null;
+};
+
 export const fetchEvents = async (
   config: Record<string, string>,
   cursor: string | null,
   signal?: AbortSignal,
 ): Promise<FetchPage> => {
-  const addresses = configuredAddresses(config);
-  const { addressIndex, lastSeenTxid } = decodeCursor(cursor);
+  const root = baseUrlOf(config);
+  const listed = configuredAddresses(config);
+  const xpub = configuredXpub(config);
 
-  if (addressIndex >= addresses.length) {
-    // Defensive: a cursor outliving a shrunk address list. Nothing left to
-    // drain.
+  let key: AccountKey | null = null;
+  if (xpub !== '') {
+    const parsed = parseAccountKey(xpub);
+    if ('problem' in parsed) {
+      // The same refusal the probe gives, by the same message - a config
+      // that cannot be parsed must fail the sync loudly rather than drain
+      // the listed addresses and quietly report a partial wallet.
+      throw new Error(KEY_PROBLEM_MESSAGES[parsed.problem]);
+    }
+    key = parsed.key;
+  }
+
+  const decoded = decodeCursor(cursor);
+
+  // Resolve the script type once per drain, not once per page: a fresh
+  // cursor carries none, every later page carries what this resolved.
+  let scriptType: SupportedScriptType | '' = decoded.scriptType;
+  if (key !== null && scriptType === '' && cursor === null) {
+    scriptType = (await detectScriptType(key, root, signal)) ?? '';
+  }
+
+  const wallet = buildWallet(
+    key,
+    scriptType === '' ? null : scriptType,
+    listed,
+  );
+  if (wallet.ordered.length === 0) {
     return { events: [], cursor: null };
   }
 
-  const address = addresses[addressIndex];
-  const root = baseUrlOf(config);
+  const stage = nextStageWithWork(wallet, decoded.stage);
+  if (stage === null) {
+    return { events: [], cursor: null };
+  }
+  // A skipped stage resets the position: index and gap belong to the stage
+  // they were counted in.
+  const index = stage === decoded.stage ? decoded.index : 0;
+  const gap = stage === decoded.stage ? decoded.gap : 0;
+  const lastSeenTxid = stage === decoded.stage ? decoded.lastSeenTxid : '';
+
+  const address = addressAt(wallet, stage, index);
+  if (address === null) {
+    const after = nextStageWithWork(wallet, stage + 1);
+    return {
+      events: [],
+      cursor: after === null ? null : encodeCursor(scriptType, after, 0, 0, ''),
+    };
+  }
+
   const url =
     lastSeenTxid === ''
       ? `${root}/address/${address}/txs`
       : `${root}/address/${address}/txs/chain/${lastSeenTxid}`;
 
   const page = await fetchJson<EsploraTransaction[]>(
-    // Named by POSITION, never by the address itself - see the error-message
-    // rule on SourceModule: whatever this throws is stored verbatim as the
-    // source's lastError and rendered on screen.
+    // Named by POSITION, never by the address or the key itself - whatever
+    // this throws is stored verbatim as the source's lastError and rendered
+    // on screen.
     url,
-    `listing transactions for configured address ${addressIndex + 1}`,
+    `listing transactions for address ${index + 1} of set ${stage + 1}`,
     {},
     signal,
     'bitcoin',
@@ -478,24 +582,13 @@ export const fetchEvents = async (
     if (!isConfirmedWithDate(tx)) {
       continue;
     }
-    const owner = ownerOf(tx, addresses);
-    if (owner !== address) {
-      // Either owned by an earlier-configured address (already emitted
-      // during that address's own drain) or, in principle, no configured
-      // address at all - either way not this address's event to emit. Which
-      // address emits it is still decided by ownership; what its legs and
-      // venue are is decided across the WHOLE configured list, below.
+    if (ownerOf(tx, wallet) !== address) {
+      // Owned by an earlier address of this same wallet, which will emit it
+      // during its own turn - or by none of them at all.
       continue;
     }
-    const legs = legsForTransaction(tx, addresses);
+    const legs = legsForTransaction(tx, wallet);
     if (legs.length === 0) {
-      // Belt and braces, and deliberately kept as such rather than described
-      // as a reachable path: `owner === address` above means this address is
-      // among the transaction's participants, and legsFrom filters on nothing
-      // but address membership, so at least one leg always follows. This
-      // guard only fires if that reasoning stops holding - which is exactly
-      // when an event with no legs would otherwise reach the ledger and be
-      // counted as a transfer of nothing.
       continue;
     }
     events.push({
@@ -508,20 +601,49 @@ export const fetchEvents = async (
     });
   }
 
-  // Pagination is decided from the RAW page length, independent of the
-  // confirmed-status filter above: Esplora's own paging contract is "a page
-  // shorter than PAGE_SIZE is the last page", and that is a fact about what
-  // the provider returned, not about which of those rows this module chose
-  // to emit.
-  if (page.length < PAGE_SIZE) {
-    const nextIndex = addressIndex + 1;
+  // Paging is decided from the RAW page length, before the confirmed filter:
+  // Esplora's contract is "a page shorter than PAGE_SIZE is the last", which
+  // is a fact about what the provider returned rather than about which rows
+  // this module chose to emit. Filtering first would see a short page in a
+  // burst of mempool activity and declare the address finished.
+  if (page.length === PAGE_SIZE) {
     return {
       events,
-      cursor: nextIndex < addresses.length ? encodeCursor(nextIndex, '') : null,
+      cursor: encodeCursor(
+        scriptType,
+        stage,
+        index,
+        gap,
+        page[page.length - 1].txid,
+      ),
     };
   }
+
+  // The address is finished. An address with no history at all widens the
+  // gap; one that had any resets it, including when we were paging through
+  // it, which is what `lastSeenTxid` distinguishes.
+  const untouched = page.length === 0 && lastSeenTxid === '';
+  const nextGap = untouched ? gap + 1 : 0;
+
+  if (stage !== LAST_STAGE && nextGap >= GAP_LIMIT) {
+    const after = nextStageWithWork(wallet, stage + 1);
+    return {
+      events,
+      cursor: after === null ? null : encodeCursor(scriptType, after, 0, 0, ''),
+    };
+  }
+
+  const nextIndex = index + 1;
+  if (addressAt(wallet, stage, nextIndex) === null) {
+    const after = nextStageWithWork(wallet, stage + 1);
+    return {
+      events,
+      cursor: after === null ? null : encodeCursor(scriptType, after, 0, 0, ''),
+    };
+  }
+
   return {
     events,
-    cursor: encodeCursor(addressIndex, page[page.length - 1].txid),
+    cursor: encodeCursor(scriptType, stage, nextIndex, nextGap, ''),
   };
 };

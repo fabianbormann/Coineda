@@ -253,11 +253,13 @@ describe('bitcoin-esplora: cursor advance', () => {
     );
 
     const first = await bitcoinEsplora.fetchEvents(config, null);
-    expect(first.cursor).toBe(`btc:0:a-24`);
+    // Stage 2 is the listed addresses; the empty first component is the
+    // script type, which an addresses-only source has none of.
+    expect(first.cursor).toBe('btc::2:0:0:a-24');
 
     const second = await bitcoinEsplora.fetchEvents(config, first.cursor);
     // A short page (1 < 25) ends address 0 and advances to address 1.
-    expect(second.cursor).toBe('btc:1:');
+    expect(second.cursor).toBe('btc::2:1:0:');
   });
 
   it('advances the address index, not just the txid, once an address is exhausted', async () => {
@@ -296,7 +298,7 @@ describe('bitcoin-esplora: cursor advance', () => {
     );
 
     const first = await bitcoinEsplora.fetchEvents(config, null);
-    expect(first.cursor).toBe('btc:1:');
+    expect(first.cursor).toBe('btc::2:1:1:');
     const second = await bitcoinEsplora.fetchEvents(config, first.cursor);
     expect(second.cursor).toBeNull();
     expect(second.events).toHaveLength(0);
