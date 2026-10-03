@@ -5,10 +5,24 @@ export type ConformanceFixture = {
   config: Record<string, string>;
 };
 
-/** A module that keeps returning a non-null cursor forever would hang a sync.
- *  Exported so the live sync driver (src/sync/syncSource.ts) caps its own
- *  page loop at the exact same bound a module was conformance-tested against. */
-export const MAX_PAGES = 50;
+/**
+ * A module that keeps returning a non-null cursor forever would hang a sync.
+ * Exported so the live sync driver (src/sync/syncSource.ts) caps its own page
+ * loop at the exact same bound a module was conformance-tested against.
+ *
+ * Raised from 50, which was sized for page-based providers and became wrong
+ * the moment a module scanned a DERIVED address set: a BIP44 gap-limit scan
+ * spends 20 pages per chain before it has looked at a single used address,
+ * so 40 of the old budget went on discovering an empty wallet and every real
+ * one ended its sync with "exceeded the maximum".
+ *
+ * This is the last resort behind three tighter bounds, which is why it can be
+ * generous: every request carries a 20s deadline, syncSource rejects a module
+ * that hands back the cursor it was given, and the user has a Stop button
+ * throughout. What this catches is a module that makes progress forever -
+ * and 1000 pages of that is still caught, just later.
+ */
+export const MAX_PAGES = 1000;
 
 const checkEvent = (event: DerivedEvent, module: SourceModule): void => {
   if (!module.manifest.emits.includes(event.kind)) {

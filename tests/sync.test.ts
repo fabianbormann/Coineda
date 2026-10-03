@@ -238,8 +238,9 @@ describe('syncing a source', () => {
   it('reports a stuck cursor immediately instead of exhausting the page budget', async () => {
     // A module that keeps handing back the cursor it was just given would
     // otherwise burn the whole MAX_PAGES budget before being reported as a
-    // generic "exceeded max pages" - up to 50 pointless round trips against
-    // what may be a rate-limited provider.
+    // generic "exceeded max pages" - a thousand pointless round trips
+    // against what may be a rate-limited provider. This check is what lets
+    // that budget be generous enough for a derived-address scan.
     let calls = 0;
     registry[0].fetchEvents = async (_config, cursor) => {
       calls += 1;

@@ -136,10 +136,11 @@ export const syncSource = async (
 
       // A module that keeps handing back the cursor it was just given is
       // making no progress. Dedupe means this can't duplicate rows, but left
-      // unchecked it would burn the full MAX_PAGES budget - up to 50 pointless
-      // round trips against a provider that may well be rate-limited - before
-      // being reported as merely "exceeded max pages". Catching it the moment
-      // it repeats fails fast and names the module responsible.
+      // unchecked it would burn the full MAX_PAGES budget - a thousand
+      // pointless round trips against a provider that may well be
+      // rate-limited - before being reported as merely "exceeded max pages".
+      // Catching it the moment it repeats fails fast, names the module
+      // responsible, and is why that budget can afford to be generous.
       if (result.cursor !== null && result.cursor === requestedCursor) {
         report.error = `${module.manifest.id}: fetchEvents returned the same cursor '${result.cursor}' it was given - the module is not making progress`;
         await putSourceStatus(source.id, { lastError: report.error });
