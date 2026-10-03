@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { ManifestField, SourceModule } from '@/sources/types';
@@ -49,6 +51,58 @@ export const SourceForm = ({
 }: Props) => {
   const { t } = useTranslation();
 
+  const plainFields = module.manifest.fields.filter((f) => !f.advanced);
+  const advancedFields = module.manifest.fields.filter((f) => f.advanced);
+
+  // Open from the start when an advanced field already holds a value. A
+  // source configured through one - an address list predating the xpub
+  // field, say - would otherwise open looking empty, with its own
+  // configuration hidden behind a control the user has no reason to click.
+  // Whitespace does not count: an optional field is stored exactly as it was
+  // left, so a stray newline is "not given".
+  const [showAdvanced, setShowAdvanced] = useState(() =>
+    advancedFields.some((f) => (config[f.name] ?? '').trim() !== ''),
+  );
+
+  const renderField = (field: ManifestField) => {
+    const fieldId = `source-field-${field.name}`;
+    const isSecret = field.type === 'apiKey' || field.type === 'secret';
+    const help =
+      isSecret && secretsOptional
+        ? t('Leave empty to keep the stored value')
+        : t(field.help);
+
+    return (
+      <div key={field.name} className="flex flex-col gap-2">
+        <Label htmlFor={fieldId}>{t(field.label)}</Label>
+        {field.type === 'addressList' ? (
+          <textarea
+            id={fieldId}
+            rows={4}
+            value={config[field.name] ?? ''}
+            aria-invalid={fieldErrors[field.name] || undefined}
+            onChange={(event) => onConfigChange(field.name, event.target.value)}
+            className={textAreaClassName}
+          />
+        ) : (
+          <Input
+            id={fieldId}
+            type={inputTypeFor(field)}
+            value={config[field.name] ?? ''}
+            aria-invalid={fieldErrors[field.name] || undefined}
+            onChange={(event) => onConfigChange(field.name, event.target.value)}
+          />
+        )}
+        <p className="text-sm text-muted-foreground">{help}</p>
+        {fieldErrors[field.name] && (
+          <p className="text-sm text-destructive" role="alert">
+            {t('This field is required')}
+          </p>
+        )}
+      </div>
+    );
+  };
+
   return (
     <>
       <div className="flex flex-col gap-2">
@@ -59,48 +113,23 @@ export const SourceForm = ({
           onChange={(event) => onLabelChange(event.target.value)}
         />
       </div>
-      {module.manifest.fields.map((field) => {
-        const fieldId = `source-field-${field.name}`;
-        const isSecret = field.type === 'apiKey' || field.type === 'secret';
-        const help =
-          isSecret && secretsOptional
-            ? t('Leave empty to keep the stored value')
-            : t(field.help);
-
-        return (
-          <div key={field.name} className="flex flex-col gap-2">
-            <Label htmlFor={fieldId}>{t(field.label)}</Label>
-            {field.type === 'addressList' ? (
-              <textarea
-                id={fieldId}
-                rows={4}
-                value={config[field.name] ?? ''}
-                aria-invalid={fieldErrors[field.name] || undefined}
-                onChange={(event) =>
-                  onConfigChange(field.name, event.target.value)
-                }
-                className={textAreaClassName}
-              />
-            ) : (
-              <Input
-                id={fieldId}
-                type={inputTypeFor(field)}
-                value={config[field.name] ?? ''}
-                aria-invalid={fieldErrors[field.name] || undefined}
-                onChange={(event) =>
-                  onConfigChange(field.name, event.target.value)
-                }
-              />
-            )}
-            <p className="text-sm text-muted-foreground">{help}</p>
-            {fieldErrors[field.name] && (
-              <p className="text-sm text-destructive" role="alert">
-                {t('This field is required')}
-              </p>
-            )}
-          </div>
-        );
-      })}
+      {plainFields.map(renderField)}
+      {advancedFields.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            className="self-start px-0 text-sm text-muted-foreground hover:bg-transparent hover:text-foreground"
+            aria-expanded={showAdvanced}
+            onClick={() => setShowAdvanced((open) => !open)}
+          >
+            {showAdvanced
+              ? t('Hide advanced options')
+              : t('Show advanced options')}
+          </Button>
+          {showAdvanced && advancedFields.map(renderField)}
+        </div>
+      )}
       {module.manifest.requiredScopes &&
         module.manifest.requiredScopes.length > 0 && (
           <div className="flex flex-col gap-1">

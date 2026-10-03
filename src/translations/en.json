@@ -344,6 +344,8 @@
     "That looks like a stake address, and this instance cannot look up an account. Enter one of the wallet’s payment addresses instead.": "That looks like a stake address, and this instance cannot look up an account. Enter one of the wallet’s payment addresses instead.",
     "The base URL should be the host only, without an API path - for example {{example}}.": "The base URL should be the host only, without an API path - for example {{example}}.",
     "None of these addresses has any transactions. Wallets show a fresh receive address by default - check this is an address you have actually used, on the right network. Bitcoin has no account view, so Coineda can only see the addresses you list here.": "None of these addresses has any transactions. Wallets show a fresh receive address by default - check this is an address you have actually used, on the right network. Bitcoin has no account view, so Coineda can only see the addresses you list here.",
-    "Synced {{label}}, but it has no events at all": "Synced {{label}}, but it has no events at all"
+    "Synced {{label}}, but it has no events at all": "Synced {{label}}, but it has no events at all",
+    "Show advanced options": "Show advanced options",
+    "Hide advanced options": "Hide advanced options"
   }
 }

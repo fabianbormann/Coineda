@@ -21,6 +21,21 @@ export type ManifestField = {
    * declaring `optional` must handle all three.
    */
   optional?: boolean;
+  /**
+   * Hides this field behind the form's advanced disclosure, closed by
+   * default.
+   *
+   * For a field a typical user does not need - an alternative input, an
+   * escape hatch - so the common path stays short. It must never be set on
+   * a field that is also REQUIRED: a required field behind a closed
+   * disclosure is a form nobody can complete without first going looking
+   * for it, and AddSourceDialog's validation would reject a save while the
+   * offending field was not even on screen.
+   *
+   * The disclosure opens on its own when such a field already holds a
+   * value, so a source configured through it does not open looking empty.
+   */
+  advanced?: boolean;
 };
 
 export type SourceManifest = {

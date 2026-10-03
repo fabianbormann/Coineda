@@ -344,6 +344,8 @@
     "That looks like a stake address, and this instance cannot look up an account. Enter one of the wallet’s payment addresses instead.": "Das sieht nach einer Stake-Adresse aus, und diese Instanz kann kein Konto abfragen. Gib stattdessen eine der Zahlungsadressen der Wallet ein.",
     "The base URL should be the host only, without an API path - for example {{example}}.": "Die Basis-URL sollte nur der Host sein, ohne API-Pfad - zum Beispiel {{example}}.",
     "None of these addresses has any transactions. Wallets show a fresh receive address by default - check this is an address you have actually used, on the right network. Bitcoin has no account view, so Coineda can only see the addresses you list here.": "Keine dieser Adressen hat Transaktionen. Wallets zeigen standardmäßig eine neue, unbenutzte Empfangsadresse an - prüfe, ob dies eine Adresse ist, die du wirklich verwendet hast, und ob das Netzwerk stimmt. Bitcoin kennt keine Konto-Ansicht, daher sieht Coineda ausschließlich die hier aufgeführten Adressen.",
-    "Synced {{label}}, but it has no events at all": "{{label}} synchronisiert, aber es gibt dort überhaupt keine Ereignisse"
+    "Synced {{label}}, but it has no events at all": "{{label}} synchronisiert, aber es gibt dort überhaupt keine Ereignisse",
+    "Show advanced options": "Erweiterte Optionen anzeigen",
+    "Hide advanced options": "Erweiterte Optionen ausblenden"
   }
 }
