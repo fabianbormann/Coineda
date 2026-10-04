@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import {
@@ -118,9 +118,13 @@ export const MainScreen = () => {
   // separate from `load` so a currency-only change (none exist yet in this
   // milestone, but the model already supports it) would not need to
   // re-read the ledger to re-price it.
+  const holdings = useMemo(
+    () => foldHoldings(events, ownedVenuesOf(events)),
+    [events],
+  );
+
   useEffect(() => {
     let active = true;
-    const holdings = foldHoldings(events, ownedVenuesOf(events));
     void resolveSpotPrices(
       holdings.map((holding) => holding.assetId),
       currency,
@@ -135,7 +139,7 @@ export const MainScreen = () => {
     return () => {
       active = false;
     };
-  }, [events, currency]);
+  }, [holdings, currency]);
 
   const lastSyncedAt = sources.reduce<number | null>((latest, source) => {
     if (source.lastSyncedAt === undefined) {
@@ -454,6 +458,8 @@ export const MainScreen = () => {
         currency={currency}
         missingCount={missingCount}
         lastSyncedAt={lastSyncedAt}
+        assetCount={holdings.length}
+        sourceCount={sources.length}
       />
       <SourceList
         sources={sources}

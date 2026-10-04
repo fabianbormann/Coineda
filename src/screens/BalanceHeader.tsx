@@ -16,47 +16,88 @@ type Props = {
   /** Epoch millis of the most recent successful sync across every
    *  configured source, or null if none has ever completed. */
   lastSyncedAt: number | null;
+  /** Distinct assets currently held, priced or not. */
+  assetCount: number;
+  /** Configured data sources, synced or not. */
+  sourceCount: number;
 };
 
 /**
- * The headline figure. A missing price is never folded into `total` as
- * zero - see src/prices/priceStore.ts - so when `missingCount` is above
- * zero this says so right next to the number, instead of letting a
- * confident-looking total quietly be wrong.
+ * The headline figure, as Lumen's header panel: an eyebrow, the number set
+ * large in the serif face, a status pill, and the facts behind the figure on
+ * a rule beneath it.
+ *
+ * A missing price is never folded into `total` as zero - see
+ * src/prices/priceStore.ts - so when `missingCount` is above zero the pill
+ * says so right beside the number, instead of letting a confident-looking
+ * total quietly be wrong. That is also why the pill is the one place the
+ * blush spectrum colour is used as a signal rather than decoration: it marks
+ * the figure as incomplete.
  */
 export const BalanceHeader = ({
   total,
   currency,
   missingCount,
   lastSyncedAt,
+  assetCount,
+  sourceCount,
 }: Props) => {
   const { t, i18n } = useTranslation();
 
   const lastSyncedLabel =
     lastSyncedAt === null
       ? t('Not synced yet')
-      : t('Last synced {{time}}', {
-          time: new Intl.DateTimeFormat(i18n.language, {
-            dateStyle: 'medium',
-            timeStyle: 'short',
-          }).format(new Date(lastSyncedAt)),
-        });
+      : new Intl.DateTimeFormat(i18n.language, {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }).format(lastSyncedAt);
+
+  const complete = missingCount === 0;
 
   return (
     <Card>
-      <CardContent className="flex flex-col gap-1">
-        <span className="text-sm text-muted-foreground">{t('Balance')}</span>
-        <Money
-          value={total}
-          currency={currency}
-          className="text-3xl font-semibold"
-        />
-        <span className="text-sm text-muted-foreground">{lastSyncedLabel}</span>
-        {missingCount > 0 && (
-          <span className="text-sm text-destructive">
-            {t('{{count}} asset has no price', { count: missingCount })}
+      <CardContent className="flex flex-col gap-8 p-8 md:p-10">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex flex-col gap-3.5">
+            <span className="text-muted-foreground text-xs tracking-widest uppercase">
+              {t('Balance')}
+            </span>
+            <Money
+              value={total}
+              currency={currency}
+              className="font-serif text-5xl leading-none md:text-6xl"
+            />
+          </div>
+
+          <span className="glass-1 ring-stroke flex items-center gap-1.5 px-2.5 py-1 text-xs ring-1 ring-inset">
+            <i
+              aria-hidden="true"
+              className={
+                complete ? 'size-1.5 bg-seaglass' : 'size-1.5 bg-blush'
+              }
+            />
+            {complete
+              ? t('Every holding priced')
+              : t('{{count}} asset has no price', { count: missingCount })}
           </span>
-        )}
+        </div>
+
+        <dl className="border-border grid grid-cols-2 gap-5 border-t pt-5 md:grid-cols-4">
+          <div>
+            <dt className="text-muted-foreground text-xs">{t('Assets')}</dt>
+            <dd className="font-bold tabular-nums">{assetCount}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground text-xs">{t('Sources')}</dt>
+            <dd className="font-bold tabular-nums">{sourceCount}</dd>
+          </div>
+          <div className="col-span-2">
+            <dt className="text-muted-foreground text-xs">
+              {t('Last synced')}
+            </dt>
+            <dd className="font-bold">{lastSyncedLabel}</dd>
+          </div>
+        </dl>
       </CardContent>
     </Card>
   );
