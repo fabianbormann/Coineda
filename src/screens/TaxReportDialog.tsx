@@ -657,7 +657,7 @@ export const TaxReportDialog = ({ open, onOpenChange }: Props) => {
                                 {formatDate(item.timestamp)} · {item.venue} ·{' '}
                                 <CryptoAmount
                                   value={item.amount}
-                                  symbol={item.assetId}
+                                  assetId={item.assetId}
                                 />
                               </p>
                               <p className="text-destructive" role="alert">

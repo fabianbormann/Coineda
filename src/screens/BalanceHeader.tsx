@@ -58,7 +58,12 @@ export const BalanceHeader = ({
     <Card>
       <CardContent className="flex flex-col gap-8 p-8 md:p-10">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex flex-col gap-3.5">
+          {/* Anchored for tests. The per-source rows now show priced
+              figures too, so "find the text that looks like a total" is
+              ambiguous on this screen - and a test that resolves the
+              ambiguity by luck is worse than one that names what it
+              means. */}
+          <div className="flex flex-col gap-3.5" data-testid="balance-total">
             <span className="text-muted-foreground text-xs tracking-widest uppercase">
               {t('Balance')}
             </span>

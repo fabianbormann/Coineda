@@ -209,7 +209,11 @@ describe('the balance', () => {
 
     renderScreen();
 
-    const total = await screen.findByText(/200\.00/);
+    // Scoped to the headline: the source rows carry priced figures of
+    // their own now, and an unscoped match would find whichever one the
+    // DOM happened to order first.
+    const total = await screen.findByTestId('balance-total');
+    await waitFor(() => expect(total.textContent).toMatch(/200\.00/));
     expect(total.textContent).toContain('$');
     expect(total.textContent).not.toContain('\u20ac');
   });

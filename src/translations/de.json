@@ -365,6 +365,17 @@
     "Bitpanda rejected this API key. Check that it is correct and that it has not expired.": "Bitpanda hat diesen API-Schlüssel abgelehnt. Prüfe, ob er korrekt ist und nicht abgelaufen.",
     "Bitpanda refused the request before checking the key. This is its bot protection rather than anything wrong with your key - trying again later usually works.": "Bitpanda hat die Anfrage abgewiesen, bevor der Schlüssel geprüft wurde. Das ist der Bot-Schutz und kein Problem mit deinem Schlüssel - ein späterer Versuch funktioniert meist.",
     "Could not reach Bitpanda. It may be unavailable right now.": "Bitpanda ist nicht erreichbar. Der Dienst ist möglicherweise gerade nicht verfügbar.",
-    "Bitpanda": "Bitpanda"
+    "Bitpanda": "Bitpanda",
+    "+{{n}} more": "+{{n}} weitere",
+    "Show {{n}} more": "{{n}} weitere anzeigen",
+    "Show events from {{label}}": "Ereignisse von {{label}} anzeigen",
+    "Events": "Ereignisse",
+    "This source has not recorded any events yet.": "Diese Datenquelle hat noch keine Ereignisse erfasst.",
+    "Moved between your own venues": "Zwischen deinen eigenen Wallets bewegt",
+    "network fee": "Netzwerkgebühr",
+    "Trade": "Handel",
+    "Reward": "Belohnung",
+    "Deposit": "Einzahlung",
+    "Withdrawal": "Auszahlung"
   }
 }

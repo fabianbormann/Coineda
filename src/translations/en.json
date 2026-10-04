@@ -365,6 +365,17 @@
     "Bitpanda rejected this API key. Check that it is correct and that it has not expired.": "Bitpanda rejected this API key. Check that it is correct and that it has not expired.",
     "Bitpanda refused the request before checking the key. This is its bot protection rather than anything wrong with your key - trying again later usually works.": "Bitpanda refused the request before checking the key. This is its bot protection rather than anything wrong with your key - trying again later usually works.",
     "Could not reach Bitpanda. It may be unavailable right now.": "Could not reach Bitpanda. It may be unavailable right now.",
-    "Bitpanda": "Bitpanda"
+    "Bitpanda": "Bitpanda",
+    "+{{n}} more": "+{{n}} more",
+    "Show {{n}} more": "Show {{n}} more",
+    "Show events from {{label}}": "Show events from {{label}}",
+    "Events": "Events",
+    "This source has not recorded any events yet.": "This source has not recorded any events yet.",
+    "Moved between your own venues": "Moved between your own venues",
+    "network fee": "network fee",
+    "Trade": "Trade",
+    "Reward": "Reward",
+    "Deposit": "Deposit",
+    "Withdrawal": "Withdrawal"
   }
 }

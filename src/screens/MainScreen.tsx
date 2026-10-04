@@ -7,7 +7,7 @@ import {
   getEventsBySource,
   getSources,
 } from '@/ledger/db';
-import { foldHoldings, ownedVenuesOf } from '@/ledger/balances';
+import { foldHoldings, isFiatAsset, ownedVenuesOf } from '@/ledger/balances';
 import { resolveSpotPrices, totalValue } from '@/prices/priceStore';
 import { syncAll, syncSource } from '@/sync/syncSource';
 import { getSettings } from '@/settings/settingsStore';
@@ -17,8 +17,10 @@ import { ExportCheckpointDialog } from '@/checkpoint/ExportCheckpointDialog';
 import type { LedgerEvent, SourceRecord } from '@/ledger/types';
 import { BalanceHeader } from './BalanceHeader';
 import { SourceList } from './SourceList';
+import type { SourceSummary } from './SourceRow';
 import { AddSourceDialog } from './AddSourceDialog';
 import { EditSourceDialog } from './EditSourceDialog';
+import { SourceEventsDialog } from './SourceEventsDialog';
 import { TaxReportDialog } from './TaxReportDialog';
 import { JourneyDialog } from '@/journey/JourneyDialog';
 
@@ -29,6 +31,9 @@ export const MainScreen = () => {
   const confirm = useConfirm();
 
   const [sources, setSources] = useState<SourceRecord[]>([]);
+  /** Kept from the pricing effect so a per-source figure is built from the
+   *  same prices as the headline total, rather than fetched again. */
+  const [prices, setPrices] = useState<Map<string, string>>(new Map());
   const [events, setEvents] = useState<LedgerEvent[]>([]);
   const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -56,6 +61,11 @@ export const MainScreen = () => {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [taxReportDialogOpen, setTaxReportDialogOpen] = useState(false);
   const [journeyDialogOpen, setJourneyDialogOpen] = useState(false);
+  /** The source whose event log is open, or null. Doubles as the dialog's
+   *  open flag: unlike the edit dialog there is nothing in flight to
+   *  protect from a reload, so a second piece of state would only be
+   *  another thing to keep in step. */
+  const [eventsSource, setEventsSource] = useState<SourceRecord | null>(null);
 
   // Fetches only - no setState here, so this is safe to call directly from
   // the mount effect below without tripping react-hooks' rule against
@@ -118,9 +128,16 @@ export const MainScreen = () => {
   // separate from `load` so a currency-only change (none exist yet in this
   // milestone, but the model already supports it) would not need to
   // re-read the ledger to re-price it.
+  // One owned-venue set for the whole screen. Ownership is a property of
+  // the entire ledger, not of whichever slice is being folded, so the
+  // headline, the per-source summaries and the event log must all use the
+  // same one - deriving it per slice is what makes a transfer between two
+  // of the user's own sources read as a disposal on one side.
+  const ownedVenues = useMemo(() => ownedVenuesOf(events), [events]);
+
   const holdings = useMemo(
-    () => foldHoldings(events, ownedVenuesOf(events)),
-    [events],
+    () => foldHoldings(events, ownedVenues),
+    [events, ownedVenues],
   );
 
   useEffect(() => {
@@ -135,11 +152,47 @@ export const MainScreen = () => {
       const { total: nextTotal, missing } = totalValue(holdings, prices);
       setTotal(Number(nextTotal));
       setMissingCount(missing.length);
+      setPrices(prices);
     });
     return () => {
       active = false;
     };
   }, [holdings, currency]);
+
+  /**
+   * Per source: its own events, what they add up to, and what that is worth.
+   *
+   * Folded from the SAME owned-venue set as the headline figure, not from
+   * each source's own legs - a venue belongs to the user or it does not, and
+   * deriving that per source would make a transfer between two of their own
+   * sources look like a disposal on one side.
+   */
+  const perSource = useMemo(() => {
+    const summary = new Map<string, SourceSummary>();
+    for (const source of sources) {
+      const own = events.filter((event) => event.sourceId === source.id);
+      // Fiat is dropped from a source's own figure, and only from this
+      // figure. An exchange module emits a trade's euro leg because the tax
+      // engine needs it for cost basis, but no module emits fiat deposits
+      // yet, so a source's folded euro balance is minus everything ever
+      // spent there - an artifact of an incomplete log rather than a
+      // holding. Priced at 1, it would render the Bitpanda row as a
+      // negative number. The legs themselves are untouched and still
+      // visible in SourceEventsDialog.
+      const held = foldHoldings(own, ownedVenues).filter(
+        (holding) => !isFiatAsset(holding.assetId),
+      );
+      const { total, missing } = totalValue(held, prices);
+      summary.set(source.id, {
+        eventCount: own.length,
+        holdings: held,
+        // Null rather than an understated number: a holding with no price
+        // is never counted as zero, the same rule the headline follows.
+        value: missing.length === 0 ? total : null,
+      });
+    }
+    return summary;
+  }, [events, sources, prices, ownedVenues]);
 
   const lastSyncedAt = sources.reduce<number | null>((latest, source) => {
     if (source.lastSyncedAt === undefined) {
@@ -463,7 +516,8 @@ export const MainScreen = () => {
       />
       <SourceList
         sources={sources}
-        events={events}
+        perSource={perSource}
+        currency={currency}
         loadError={loadError}
         syncingAll={syncingAll}
         busyIds={busyIds}
@@ -474,6 +528,7 @@ export const MainScreen = () => {
         onStop={handleStop}
         onRemove={handleRemove}
         onEditOne={handleOpenEdit}
+        onShowEvents={setEventsSource}
         onAddSource={() => setAddDialogOpen(true)}
       />
       <div className="flex flex-wrap gap-2">
@@ -525,6 +580,17 @@ export const MainScreen = () => {
       <TaxReportDialog
         open={taxReportDialogOpen}
         onOpenChange={setTaxReportDialogOpen}
+      />
+      <SourceEventsDialog
+        open={eventsSource !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEventsSource(null);
+          }
+        }}
+        source={eventsSource}
+        events={events}
+        ownedVenues={ownedVenues}
       />
       <JourneyDialog
         open={journeyDialogOpen}

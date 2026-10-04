@@ -37,13 +37,12 @@ import { normaliseAmount } from '@/ledger/amount';
  * which is now a trap rather than a rationale: there is no authored-entry UI
  * in the app at all, and two of the three assets below are base-unit chains.
  *
- * 'eth:native' is a special case worth knowing about before trusting it: no
- * source module emits it and nothing authors it, so it is UNREACHABLE today.
- * It exists only because COINGECKO_IDS can price ethereum and the gate in
- * tests/assetScale.test.ts requires a decimals entry for anything priceable.
- * 18 is right for wei - but it is a promise about a source that does not
- * exist yet, so whoever writes the first Ethereum module owns checking that
- * the provider really reports wei rather than ether.
+ * 'eth:native' is no longer the unreachable placeholder an earlier version
+ * of this comment described. src/sources/bitpanda emits it, and that module
+ * is where the 18 is honoured: Bitpanda reports whole ether, and
+ * `baseUnits` scales by THIS number on the way in, so the two cannot
+ * disagree. A real Ethereum chain module would report wei already and must
+ * not scale again.
  */
 export const ASSET_DECIMALS: Record<string, number> = {
   'cardano:lovelace': 6,

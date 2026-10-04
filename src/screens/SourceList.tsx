@@ -3,12 +3,22 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { findModule } from '@/sources/registry';
-import type { LedgerEvent, SourceRecord } from '@/ledger/types';
+import type { SourceRecord } from '@/ledger/types';
 import { SourceRow } from './SourceRow';
+import type { SourceSummary } from './SourceRow';
 
 type Props = {
   sources: SourceRecord[];
-  events: LedgerEvent[];
+  /** What each source contributed: how many events, what they fold to, and
+   *  what that is worth. Computed once by MainScreen from the SAME owned-venue
+   *  set as the headline figure - see the note on `perSource` there - rather
+   *  than derived per row, so a transfer between two of the user's own
+   *  sources cannot read as a disposal on one side. A source missing from
+   *  the map simply has no summary yet. */
+  perSource: Map<string, SourceSummary>;
+  /** The base currency `perSource` values were priced in. Passed down
+   *  explicitly rather than read from a context - see the note on `Money`. */
+  currency: string;
   loadError: string | null;
   syncingAll: boolean;
   /** Every source id that must not be touched right now - mid per-row
@@ -28,6 +38,9 @@ type Props = {
   onStop: (source: SourceRecord) => void;
   onRemove: (source: SourceRecord) => void;
   onEditOne: (source: SourceRecord) => void;
+  /** Opens the source's own event log. Read-only, so unlike every other
+   *  per-row action it is not gated by `busyIds`. */
+  onShowEvents: (source: SourceRecord) => void;
   onAddSource: () => void;
 };
 
@@ -48,7 +61,8 @@ type Props = {
  */
 export const SourceList = ({
   sources,
-  events,
+  perSource,
+  currency,
   loadError,
   syncingAll,
   busyIds,
@@ -59,17 +73,10 @@ export const SourceList = ({
   onStop,
   onRemove,
   onEditOne,
+  onShowEvents,
   onAddSource,
 }: Props) => {
   const { t } = useTranslation();
-
-  const eventCountBySource = new Map<string, number>();
-  for (const event of events) {
-    eventCountBySource.set(
-      event.sourceId,
-      (eventCountBySource.get(event.sourceId) ?? 0) + 1,
-    );
-  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -113,7 +120,8 @@ export const SourceList = ({
                 moduleLabel={
                   module ? t(module.manifest.label) : source.moduleId
                 }
-                eventCount={eventCountBySource.get(source.id) ?? 0}
+                summary={perSource.get(source.id)}
+                currency={currency}
                 busy={busyIds.has(source.id)}
                 syncing={syncingIds.has(source.id)}
                 onRefresh={() => onRefreshOne(source)}
@@ -121,6 +129,7 @@ export const SourceList = ({
                 onStop={() => onStop(source)}
                 onRemove={() => onRemove(source)}
                 onEdit={() => onEditOne(source)}
+                onShowEvents={() => onShowEvents(source)}
               />
             );
           })}

@@ -1,8 +1,37 @@
-import { History, Pencil, RefreshCw, Square, Trash2 } from 'lucide-react';
+import { History, List, Pencil, RefreshCw, Square, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { CryptoAmount } from '@/components/money/CryptoAmount';
+import { Money } from '@/components/money/Money';
+import type { Holding } from '@/ledger/balances';
 import type { SourceRecord } from '@/ledger/types';
+
+/**
+ * What one source contributed to the ledger.
+ *
+ * `holdings` carries the source's NON-FIAT positions only, and `value`
+ * prices exactly those. The reason is specific rather than tidiness: an
+ * exchange module emits a trade's euro leg (the tax engine needs it for
+ * cost basis) but nothing funds it, because no module emits fiat deposits
+ * yet. So a source's folded euro balance is minus everything ever spent
+ * there - an artifact of an incomplete log, not a holding - and including
+ * it would render the user's Bitpanda row as a negative number. The euro
+ * legs are not hidden: the events dialog lists every leg of every event,
+ * this one included.
+ */
+export type SourceSummary = {
+  eventCount: number;
+  holdings: Holding[];
+  /** Null when any holding has no price - never a total that silently
+   *  counts an unpriced asset as zero, the same rule the headline follows. */
+  value: string | null;
+};
+
+/** Enough to tell a row at a glance what it holds; the rest is one click
+ *  away in the events dialog, and a wallet with thirty dust tokens must not
+ *  push the buttons off the card. */
+const HOLDINGS_SHOWN = 3;
 
 type Props = {
   source: SourceRecord;
@@ -10,7 +39,13 @@ type Props = {
    *  `findModule` - a source whose module is no longer in the registry
    *  falls back to the raw `moduleId` there, not here. */
   moduleLabel: string;
-  eventCount: number;
+  /** Undefined only before the first fold, never for a source with no
+   *  events - that case is a summary with `eventCount: 0`. */
+  summary?: SourceSummary;
+  /** The base currency `value` was priced in, passed down explicitly for
+   *  the reason given on `Money`: a component rendering a number cannot
+   *  know which currency produced it. */
+  currency: string;
   /** True while this source must not be touched - its own refresh is in
    *  flight, or a bulk "Sync all" is running (which, since it gives no
    *  per-item progress, treats every source as busy for its whole
@@ -46,6 +81,13 @@ type Props = {
    *  as Refresh/Resync/Remove - a sync that began before an edit opens must
    *  not race the record a save would write back. */
   onEdit: () => void;
+  /**
+   * Opens this source's own event log. Deliberately NOT gated by `busy`:
+   * it reads the events already in memory and writes nothing, so there is
+   * nothing for a sync in flight to race - and a row mid-sync is exactly
+   * when a user wants to look at what it has recorded so far.
+   */
+  onShowEvents: () => void;
 };
 
 /**
@@ -56,7 +98,8 @@ type Props = {
 export const SourceRow = ({
   source,
   moduleLabel,
-  eventCount,
+  summary,
+  currency,
   busy,
   syncing,
   onRefresh,
@@ -64,6 +107,7 @@ export const SourceRow = ({
   onStop,
   onRemove,
   onEdit,
+  onShowEvents,
 }: Props) => {
   const { t, i18n } = useTranslation();
 
@@ -82,12 +126,40 @@ export const SourceRow = ({
       ? t('Synced')
       : t('Not yet synced');
 
+  const eventCount = summary?.eventCount ?? 0;
+  const holdings = summary?.holdings ?? [];
+  const shown = holdings.slice(0, HOLDINGS_SHOWN);
+  const hidden = holdings.length - shown.length;
+
   return (
     <Card>
       <CardContent className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           <p className="font-medium">{source.label}</p>
           <p className="text-sm text-muted-foreground">{moduleLabel}</p>
+          {holdings.length > 0 && (
+            <p className="flex flex-wrap items-center gap-x-2 text-sm">
+              {shown.map((holding, index) => (
+                <span key={holding.assetId}>
+                  {index > 0 && <span className="pr-2">·</span>}
+                  <CryptoAmount
+                    value={holding.amount}
+                    assetId={holding.assetId}
+                  />
+                </span>
+              ))}
+              {hidden > 0 && (
+                <span className="text-muted-foreground">
+                  {t('+{{n}} more', { n: hidden })}
+                </span>
+              )}
+              {summary?.value !== null && summary?.value !== undefined && (
+                <span className="text-muted-foreground">
+                  = <Money value={Number(summary.value)} currency={currency} />
+                </span>
+              )}
+            </p>
+          )}
           <p className="text-sm text-muted-foreground">
             {statusLabel} · {lastSyncedLabel} ·{' '}
             {t('{{count}} events', { count: eventCount })}
@@ -107,6 +179,18 @@ export const SourceRow = ({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            disabled={eventCount === 0}
+            onClick={onShowEvents}
+            aria-label={t('Show events from {{label}}', {
+              label: source.label,
+            })}
+          >
+            <List aria-hidden="true" />
+          </Button>
           {syncing ? (
             <Button
               type="button"

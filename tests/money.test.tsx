@@ -69,9 +69,19 @@ describe('crypto amounts', () => {
     expect(output).toMatch(/4213|4,213|0\.0000421/);
   });
 
-  it('shows the symbol alongside the amount', () => {
-    render(<CryptoAmount value="1.5" symbol="BTC" />);
-    expect(screen.getByText(/BTC/)).toBeInTheDocument();
+  it('scales base units to whole units and names the asset', () => {
+    // The caller hands over what the ledger stores - satoshis - and the
+    // asset id, never a pre-scaled figure and never a symbol. The old
+    // `symbol` prop let its one caller pass the raw id, which rendered
+    // "10000000 cardano:lovelace" where the user holds 10 ADA.
+    render(<CryptoAmount value="150000000" assetId="bitcoin:native" />);
+    expect(screen.getByText(/^1\.5 BTC$/)).toBeInTheDocument();
+  });
+
+  it('does not render the technical asset id', () => {
+    render(<CryptoAmount value="10000000" assetId="cardano:lovelace" />);
+    expect(screen.getByText(/^10 ADA$/)).toBeInTheDocument();
+    expect(screen.queryByText(/lovelace/)).not.toBeInTheDocument();
   });
 
   it('keeps large quantities exact instead of rounding the integer part', () => {
@@ -96,7 +106,7 @@ describe('non-finite values', () => {
   });
 
   it('renders an em dash instead of a raw NaN for crypto amounts', () => {
-    render(<CryptoAmount value="not-a-number" symbol="BTC" />);
+    render(<CryptoAmount value="not-a-number" assetId="bitcoin:native" />);
     expect(screen.getByText(/—/)).toBeInTheDocument();
     expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
   });
