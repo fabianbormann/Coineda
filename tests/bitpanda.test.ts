@@ -1,11 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import bitpanda from '@/sources/bitpanda';
 import {
   BITPANDA_MESSAGES,
-  clearMasterdataCache,
   decodeCursor,
   encodeCursor,
-  fetchSymbols,
   isCloudflareBlock,
   tradeToEvent,
 } from '@/sources/bitpanda/translator';
@@ -23,18 +21,6 @@ import {
  */
 const KEY = 'test-key';
 
-const masterdata = {
-  data: {
-    attributes: {
-      cryptocoins: [
-        { id: '1', attributes: { symbol: 'BTC' } },
-        { id: '5', attributes: { symbol: 'ADA' } },
-        { id: '9', attributes: { symbol: 'XAU' } },
-      ],
-    },
-  },
-};
-
 const respond = (status: number, body: unknown) =>
   new Response(typeof body === 'string' ? body : JSON.stringify(body), {
     status,
@@ -47,16 +33,12 @@ const stub = (rest: () => Response) => {
     'fetch',
     vi.fn(async (url: string) => {
       seen.push(String(url));
-      if (String(url).includes('/masterdata')) {
-        return respond(200, masterdata);
-      }
       return rest();
     }),
   );
   return seen;
 };
 
-beforeEach(() => clearMasterdataCache());
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -124,27 +106,31 @@ describe('telling the failures apart', () => {
 });
 
 describe('reading a trade', () => {
-  const symbols = new Map([
-    ['1', 'BTC'],
-    ['9', 'XAU'],
-  ]);
+  /** Narrows the three-way result to the event, failing the test rather
+   *  than the type checker when a row was passed over. */
+  const eventOf = (result: ReturnType<typeof tradeToEvent>) => {
+    if ('unsupported' in result || 'skipped' in result) {
+      throw new Error(`expected an event, got ${JSON.stringify(result)}`);
+    }
+    return result;
+  };
 
   const row = (attributes: Record<string, unknown>) => ({
     id: 'trade-1',
     attributes: {
+      status: 'finished',
       type: 'buy',
       amount_cryptocoin: '0.5',
       amount_fiat: '100.25',
-      cryptocoin_id: '1',
+      cryptocoin_symbol: 'BTC',
+      fiat_to_eur_rate: '1.00000000',
       time: { unix: '1700000000' },
       ...attributes,
     },
   });
 
   it('converts whole units to base units on the way in', () => {
-    const event = tradeToEvent(row({}), symbols);
-    expect('unsupported' in event).toBe(false);
-    if ('unsupported' in event) return;
+    const event = eventOf(tradeToEvent(row({})));
     // 0.5 BTC is 50000000 satoshis. Storing 0.5 understates the position a
     // hundred million fold, which is the whole reason this module has a
     // separate unit boundary.
@@ -164,8 +150,7 @@ describe('reading a trade', () => {
   });
 
   it('turns a sell around', () => {
-    const event = tradeToEvent(row({ type: 'sell' }), symbols);
-    if ('unsupported' in event) throw new Error('expected an event');
+    const event = eventOf(tradeToEvent(row({ type: 'sell' })));
     expect(event.legs[0].direction).toBe('out');
     expect(event.legs[1].direction).toBe('in');
   });
@@ -174,12 +159,42 @@ describe('reading a trade', () => {
     // Bitpanda sells gold, silver, platinum and palladium alongside 880
     // symbols of crypto. Guessing an asset id merges two different
     // positions into one, silently.
-    expect(tradeToEvent(row({ cryptocoin_id: '9' }), symbols)).toEqual({
+    // Measured against the owner's own account: of twelve trades, one is
+    // NIGHT, which this app cannot scale or price. Gold is the other shape
+    // of the same problem - Bitpanda sells it alongside 880 crypto symbols.
+    expect(tradeToEvent(row({ cryptocoin_symbol: 'XAU' }))).toEqual({
       unsupported: 'XAU',
     });
-    expect(tradeToEvent(row({ cryptocoin_id: '404' }), symbols)).toEqual({
-      unsupported: 'cryptocoin_id 404',
+    expect(tradeToEvent(row({ cryptocoin_symbol: 'NIGHT' }))).toEqual({
+      unsupported: 'NIGHT',
     });
+  });
+
+  it('passes over a trade that never settled', () => {
+    // Only a settled trade is a movement. Recording a pending or cancelled
+    // row gives the user a holding they do not have, and a disposal they
+    // never made. Every row in the owner's account reads 'finished', so
+    // this is exactly the case real data could not have caught.
+    expect(tradeToEvent(row({ status: 'pending' }))).toEqual({
+      skipped: 'trade-1 is pending',
+    });
+    expect(tradeToEvent(row({ status: 'cancelled' }))).toEqual({
+      skipped: 'trade-1 is cancelled',
+    });
+  });
+
+  it('records the fiat leg only when the rate says it is euro', () => {
+    // The row carries no fiat SYMBOL, only a numeric fiat_id that needs
+    // masterdata - which a read-scoped key cannot read. fiat_to_eur_rate of
+    // exactly 1 identifies euro without resolving anything; any other rate
+    // is some other currency, and naming it anyway would put a figure in
+    // the wrong denomination into a tax report.
+    const euro = eventOf(tradeToEvent(row({})));
+    expect(euro.legs).toHaveLength(2);
+
+    const other = eventOf(tradeToEvent(row({ fiat_to_eur_rate: '0.92' })));
+    expect(other.legs).toHaveLength(1);
+    expect(other.legs[0].assetId).toBe('bitcoin:native');
   });
 
   it('names the fields it actually received when the shape surprises it', () => {
@@ -188,7 +203,7 @@ describe('reading a trade', () => {
     // "undefined is not an object".
     let message = '';
     try {
-      tradeToEvent({ id: 'x', attributes: { foo: 1, bar: 2 } }, symbols);
+      tradeToEvent({ id: 'x', attributes: { foo: 1, bar: 2 } });
     } catch (error) {
       message = (error as Error).message;
     }
@@ -197,45 +212,15 @@ describe('reading a trade', () => {
   });
 
   it('reads a time given only as an ISO string', () => {
-    const event = tradeToEvent(
-      row({ time: { date_iso8601: '2026-01-15T12:00:00Z' } }),
-      symbols,
+    const event = eventOf(
+      tradeToEvent(row({ time: { date_iso8601: '2026-01-15T12:00:00Z' } })),
     );
-    if ('unsupported' in event) throw new Error('expected an event');
     expect(event.timestamp).toBe(Date.parse('2026-01-15T12:00:00Z'));
   });
 
   it('stamps milliseconds from a unix second', () => {
-    const event = tradeToEvent(row({}), symbols);
-    if ('unsupported' in event) throw new Error('expected an event');
+    const event = eventOf(tradeToEvent(row({})));
     expect(event.timestamp).toBe(1_700_000_000_000);
-  });
-});
-
-describe('masterdata', () => {
-  it('builds the id to symbol map the trade rows need', async () => {
-    stub(() => respond(200, { data: [] }));
-    const symbols = await fetchSymbols(KEY);
-    expect(symbols.get('1')).toBe('BTC');
-    expect(symbols.get('5')).toBe('ADA');
-  });
-
-  it('is fetched once per key, not once per page', async () => {
-    const seen = stub(() => respond(200, { data: [] }));
-    await fetchSymbols(KEY);
-    await fetchSymbols(KEY);
-    expect(seen.filter((url) => url.includes('/masterdata'))).toHaveLength(1);
-  });
-
-  it('says so loudly when it cannot read any symbols', async () => {
-    // An empty map would make every row "unsupported asset", which reads as
-    // "Bitpanda has nothing importable" when the truth is that this parser
-    // did not understand the response.
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => respond(200, { data: { attributes: { odd: [] } } })),
-    );
-    await expect(fetchSymbols(KEY)).rejects.toThrow(/odd/);
   });
 });
 

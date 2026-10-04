@@ -127,73 +127,6 @@ export const probe = async (
   return { ok: true };
 };
 
-/**
- * Bitpanda identifies an asset by a numeric id and resolves it through
- * `/v1/masterdata`, which needs the key, so it cannot be a build-time
- * table.
- *
- * Memoised per key for the life of the page: a drain is many pages and the
- * mapping does not change between them. In memory only - it is never
- * persisted, and the key is used as a map key and nothing else.
- */
-const masterdataCache = new Map<string, Map<string, string>>();
-
-export const clearMasterdataCache = (): void => masterdataCache.clear();
-
-export const fetchSymbols = async (
-  apiKey: string,
-  signal?: AbortSignal,
-): Promise<Map<string, string>> => {
-  const cached = masterdataCache.get(apiKey);
-  if (cached) {
-    return cached;
-  }
-
-  const fetched = await request('/masterdata', apiKey, signal);
-  if (isCloudflareBlock(fetched.status, fetched.body)) {
-    throw new Error(BITPANDA_MESSAGES.cloudflare);
-  }
-  const body = asJson(fetched, 'masterdata') as {
-    data?: { attributes?: Record<string, unknown> };
-  };
-
-  const symbols = new Map<string, string>();
-  const groups = body?.data?.attributes ?? {};
-  for (const group of Object.values(groups)) {
-    if (!Array.isArray(group)) {
-      continue;
-    }
-    for (const entry of group) {
-      const row = entry as {
-        id?: unknown;
-        attributes?: { symbol?: unknown };
-      };
-      const id = row?.id;
-      const symbol = row?.attributes?.symbol;
-      if (typeof id === 'string' && typeof symbol === 'string') {
-        symbols.set(id, symbol);
-      }
-    }
-  }
-
-  if (symbols.size === 0) {
-    // Loud rather than empty: with no mapping every row below would be
-    // "unsupported asset", which would read as "Bitpanda has nothing we can
-    // import" when the truth is that this parser did not understand the
-    // response.
-    throw new Error(
-      `bitpanda: could not read any asset symbols from masterdata. Top-level keys were: ${Object.keys(
-        groups,
-      )
-        .slice(0, 12)
-        .join(', ')}`,
-    );
-  }
-
-  masterdataCache.set(apiKey, symbols);
-  return symbols;
-};
-
 type TradeRow = {
   id?: unknown;
   attributes?: Record<string, unknown>;
@@ -217,8 +150,7 @@ const str = (value: unknown): string | null =>
  */
 export const tradeToEvent = (
   row: TradeRow,
-  symbols: Map<string, string>,
-): DerivedEvent | { unsupported: string } => {
+): DerivedEvent | { unsupported: string } | { skipped: string } => {
   const attributes = row.attributes ?? {};
   const seen = Object.keys(attributes).join(', ') || '(none)';
 
@@ -226,7 +158,11 @@ export const tradeToEvent = (
   const direction = str(attributes.type); // 'buy' | 'sell'
   const cryptoAmount = str(attributes.amount_cryptocoin);
   const fiatAmount = str(attributes.amount_fiat);
-  const cryptoId = str(attributes.cryptocoin_id);
+  // The row names its own asset, so there is no id to resolve. An earlier
+  // version looked this up through /v1/masterdata, which a read-scoped key
+  // cannot reach - it answers 401 - so that version could not have drained
+  // anything at all.
+  const symbol = str(attributes.cryptocoin_symbol);
   const time = attributes.time as { unix?: unknown; date_iso8601?: unknown };
   const unix = str(time?.unix);
   const iso = str(time?.date_iso8601);
@@ -235,7 +171,7 @@ export const tradeToEvent = (
     externalId === null ||
     direction === null ||
     cryptoAmount === null ||
-    cryptoId === null ||
+    symbol === null ||
     (unix === null && iso === null)
   ) {
     throw new Error(
@@ -243,10 +179,14 @@ export const tradeToEvent = (
     );
   }
 
-  const symbol = symbols.get(cryptoId);
-  if (symbol === undefined) {
-    return { unsupported: `cryptocoin_id ${cryptoId}` };
+  // Only a settled trade is a movement. A pending or cancelled row would
+  // otherwise be recorded as though it had happened, which is a holding the
+  // user does not have and a disposal they never made.
+  const status = str(attributes.status);
+  if (status !== null && status.toLowerCase() !== 'finished') {
+    return { skipped: `${externalId} is ${status}` };
   }
+
   const assetId = assetIdForSymbol(symbol);
   if (assetId === null) {
     // Bitpanda sells gold, silver and a long tail of coins. Reporting the
@@ -273,15 +213,22 @@ export const tradeToEvent = (
     },
   ];
 
-  // The fiat side is what makes this a trade rather than a transfer, and it
-  // is what the tax engine matches a disposal against. A row without it is
-  // still recorded, with the crypto leg alone, rather than dropped.
-  const fiatSymbol = str(attributes.fiat_symbol) ?? 'EUR';
-  const fiatAssetId = assetIdForSymbol(fiatSymbol);
-  if (fiatAmount !== null && fiatAssetId !== null) {
+  // The fiat side is what makes this a trade rather than a transfer, and
+  // what the tax engine matches a disposal against.
+  //
+  // The row carries no fiat SYMBOL, only a numeric `fiat_id` that would need
+  // masterdata to resolve - which a read-scoped key cannot read. What it does
+  // carry is `fiat_to_eur_rate`, so a rate of exactly 1 identifies the fiat
+  // as euro without resolving anything. Any other rate means some other
+  // currency, and inventing a name for it would put a figure in the wrong
+  // denomination into a tax report, so the leg is left off and the crypto
+  // side still recorded.
+  const eurRate = str(attributes.fiat_to_eur_rate);
+  const isEuro = eurRate !== null && Number(eurRate) === 1;
+  if (fiatAmount !== null && isEuro) {
     legs.push({
-      assetId: fiatAssetId,
-      amount: baseUnits(fiatAmount, fiatAssetId),
+      assetId: 'fiat:eur',
+      amount: baseUnits(fiatAmount, 'fiat:eur'),
       direction: bought ? 'out' : 'in',
       venue: 'bitpanda',
       role: 'principal',
@@ -320,7 +267,6 @@ export const fetchEvents = async (
   }
 
   const page = decodeCursor(cursor);
-  const symbols = await fetchSymbols(apiKey, signal);
 
   const fetched = await request(
     `/trades?page=${page}&page_size=${PAGE_SIZE}`,
@@ -353,10 +299,11 @@ export const fetchEvents = async (
 
   const events: DerivedEvent[] = [];
   for (const row of body.data as TradeRow[]) {
-    const result = tradeToEvent(row, symbols);
-    if ('unsupported' in result) {
-      // Skipped rather than failed: one holding this app cannot name must
-      // not cost the user every other trade in the account.
+    const result = tradeToEvent(row);
+    // An asset this app cannot name, or a trade that never settled, is
+    // passed over rather than failed: one of either must not cost the user
+    // every other trade in the account.
+    if ('unsupported' in result || 'skipped' in result) {
       continue;
     }
     events.push(result);
