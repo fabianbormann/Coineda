@@ -143,6 +143,40 @@
   --chart-5: oklch(0.74 0.18 350);
 }
 
+/* A horizontal-only iridescent edge, for full-bleed chrome.
+   Lumen's `rim` masks a whole perimeter, which is right for a floating card
+   and wrong for a bar that runs to both screen edges: there it draws a faint
+   line down the left and right of the viewport. These paint one edge only,
+   using Lumen's own linear spectrum - the conic `--lm-rim` is built to travel
+   around a box, and a single straight line reads better as a sweep. */
+@utility rim-b {
+  position: relative;
+  &::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    height: 1px;
+    background: var(--lm-spec);
+    opacity: var(--lm-rim-opacity, 0.6);
+    pointer-events: none;
+  }
+}
+
+@utility rim-t {
+  position: relative;
+  &::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: 1px;
+    background: var(--lm-spec);
+    opacity: var(--lm-rim-opacity, 0.6);
+    pointer-events: none;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
