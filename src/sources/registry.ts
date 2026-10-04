@@ -1,4 +1,5 @@
 import bitcoinEsplora from './bitcoin-esplora';
+import bitpanda from './bitpanda';
 import cardanoBlockfrost from './cardano-blockfrost';
 import cardanoYaci from './cardano-yaci';
 import type { SourceModule } from './types';
@@ -16,6 +17,7 @@ export const registry: SourceModule[] = [
   cardanoYaci,
   cardanoBlockfrost,
   bitcoinEsplora,
+  bitpanda,
 ];
 
 export const findModule = (id: string): SourceModule | undefined =>

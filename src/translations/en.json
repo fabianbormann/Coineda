@@ -358,6 +358,13 @@
     "Every holding priced": "Every holding priced",
     "Assets": "Assets",
     "Last synced": "Last synced",
-    "Sources": "Sources"
+    "Sources": "Sources",
+    "Bitpanda API key": "Bitpanda API key",
+    "In Bitpanda, open your profile menu and go to API. Create a new key, tick only the read scopes listed below, and copy it before closing the dialog - Bitpanda shows a key once and never again. Coineda only ever reads: it cannot trade, withdraw or move anything. The key is stored on this device and travels only inside a checkpoint you create, which is encrypted.": "In Bitpanda, open your profile menu and go to API. Create a new key, tick only the read scopes listed below, and copy it before closing the dialog - Bitpanda shows a key once and never again. Coineda only ever reads: it cannot trade, withdraw or move anything. The key is stored on this device and travels only inside a checkpoint you create, which is encrypted.",
+    "Add your Bitpanda API key.": "Add your Bitpanda API key.",
+    "Bitpanda rejected this API key. Check that it is correct and that it has not expired.": "Bitpanda rejected this API key. Check that it is correct and that it has not expired.",
+    "Bitpanda refused the request before checking the key. This is its bot protection rather than anything wrong with your key - trying again later usually works.": "Bitpanda refused the request before checking the key. This is its bot protection rather than anything wrong with your key - trying again later usually works.",
+    "Could not reach Bitpanda. It may be unavailable right now.": "Could not reach Bitpanda. It may be unavailable right now.",
+    "Bitpanda": "Bitpanda"
   }
 }

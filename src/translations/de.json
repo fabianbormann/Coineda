@@ -358,6 +358,13 @@
     "Every holding priced": "Alle Bestände bepreist",
     "Assets": "Assets",
     "Last synced": "Zuletzt synchronisiert",
-    "Sources": "Quellen"
+    "Sources": "Quellen",
+    "Bitpanda API key": "Bitpanda API-Schlüssel",
+    "In Bitpanda, open your profile menu and go to API. Create a new key, tick only the read scopes listed below, and copy it before closing the dialog - Bitpanda shows a key once and never again. Coineda only ever reads: it cannot trade, withdraw or move anything. The key is stored on this device and travels only inside a checkpoint you create, which is encrypted.": "Öffne in Bitpanda dein Profilmenü und gehe zu API. Erstelle einen neuen Schlüssel, aktiviere ausschließlich die unten aufgeführten Lese-Berechtigungen und kopiere ihn, bevor du den Dialog schließt - Bitpanda zeigt einen Schlüssel nur ein einziges Mal. Coineda liest ausschließlich: es kann weder handeln noch auszahlen oder irgendetwas bewegen. Der Schlüssel bleibt auf diesem Gerät und verlässt es nur in einem von dir erstellten Checkpoint, der verschlüsselt ist.",
+    "Add your Bitpanda API key.": "Füge deinen Bitpanda API-Schlüssel hinzu.",
+    "Bitpanda rejected this API key. Check that it is correct and that it has not expired.": "Bitpanda hat diesen API-Schlüssel abgelehnt. Prüfe, ob er korrekt ist und nicht abgelaufen.",
+    "Bitpanda refused the request before checking the key. This is its bot protection rather than anything wrong with your key - trying again later usually works.": "Bitpanda hat die Anfrage abgewiesen, bevor der Schlüssel geprüft wurde. Das ist der Bot-Schutz und kein Problem mit deinem Schlüssel - ein späterer Versuch funktioniert meist.",
+    "Could not reach Bitpanda. It may be unavailable right now.": "Bitpanda ist nicht erreichbar. Der Dienst ist möglicherweise gerade nicht verfügbar.",
+    "Bitpanda": "Bitpanda"
   }
 }
