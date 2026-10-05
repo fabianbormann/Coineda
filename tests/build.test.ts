@@ -150,3 +150,58 @@ describe('generated service worker', () => {
     expect(manifest.theme_color).toBe('#03A678');
   });
 });
+
+describe('chain icon colours survive the Tailwind build', () => {
+  /**
+   * Asserted against the COMPILED CSS, not the DOM.
+   *
+   * jsdom applies no Tailwind, so a unit test can only see that an element
+   * carries the class `text-[#F7931A]` - which it would carry just as
+   * happily if Tailwind had never generated a rule for it. And that is the
+   * actual failure mode for an arbitrary-value utility: the class name is
+   * in the markup, the stylesheet has nothing matching it, and the icon
+   * renders in the inherited text colour with no error anywhere.
+   *
+   * So this reads the emitted stylesheet and checks the rules exist.
+   */
+  const css = (): string => {
+    const dir = path.join(buildDir, 'assets');
+    const file = fs.readdirSync(dir).find((name) => name.endsWith('.css'));
+    if (file === undefined) {
+      throw new Error('no stylesheet in the build output');
+    }
+    return fs.readFileSync(path.join(dir, file), 'utf8');
+  };
+
+  it('generates a rule for each brand colour', () => {
+    const sheet = css();
+    // Bitcoin orange, Ethereum graphite, Cardano blue - the three bundled
+    // marks, each drawn in its own colour in light mode.
+    //
+    // The escaped SELECTOR, not the bare hex. A hex can appear in the
+    // stylesheet for all sorts of reasons while no rule selects the class
+    // the component actually puts in the DOM, which is the exact way an
+    // arbitrary-value utility fails: class present, no matching rule, icon
+    // silently inherits the text colour.
+    for (const hex of ['F7931A', '3C3C3D', '0133AD']) {
+      expect(sheet).toContain(`.text-\\[\\#${hex}\\]`);
+    }
+  });
+
+  it('generates the dark-mode white override, scoped to .dark', () => {
+    const sheet = css();
+    // The marks go flat white on a dark ground: the brand hexes are
+    // mid-tones picked against white paper - Ethereum's #3C3C3D is nearly
+    // black - and they read as smudges rather than logos in dark mode.
+    //
+    // Scoped to `.dark` specifically, which is the class ThemeProvider sets
+    // on documentElement. If the variant ever resolved to a bare
+    // prefers-color-scheme media query instead, an explicit in-app light
+    // choice on a dark OS would wrongly whiten the icons.
+    const rule =
+      /\.dark[^{}]*\.dark\\:text-white|\.dark\s+\.dark\\:text-white|\.dark\\:text-white/;
+    expect(sheet).toMatch(rule);
+    const atDark = sheet.slice(sheet.search(/\.dark\\:text-white/));
+    expect(atDark.slice(0, 400)).toContain('.dark');
+  });
+});

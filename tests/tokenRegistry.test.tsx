@@ -285,10 +285,32 @@ describe('marks and symbols are alternatives', () => {
     );
     const svg = container.querySelector('svg');
     expect(svg).not.toBeNull();
-    // In brand colour, not currentColor: an identity mark tinted to the
-    // body text colour stops being recognisable.
-    expect(svg?.getAttribute('fill')).toBe('#F7931A');
+    // Painted through `currentColor` so the theme can drive it: brand
+    // colour in light, flat white in dark. The classes carry both, and the
+    // rules they need are asserted against the compiled stylesheet in
+    // tests/build.test.ts - jsdom applies no Tailwind, so a class alone
+    // proves nothing here.
+    expect(svg?.getAttribute('fill')).toBe('currentColor');
+    expect(svg?.getAttribute('class')).toContain('text-[#F7931A]');
+    expect(svg?.getAttribute('class')).toContain('dark:text-white');
     expect(container.querySelector('img')).toBeNull();
+  });
+
+  it('whitens every bundled mark in dark mode, and only in dark mode', () => {
+    // One rule for all three rather than three dark brand tints: the point
+    // of going white is that the brand hexes stop working on a dark ground.
+    for (const [assetId, hex] of [
+      ['bitcoin:native', 'text-[#F7931A]'],
+      ['eth:native', 'text-[#3C3C3D]'],
+      ['cardano:lovelace', 'text-[#0133AD]'],
+    ] as const) {
+      const { container } = render(<AssetIcon assetId={assetId} label="x" />);
+      const className = container.querySelector('svg')?.getAttribute('class');
+      expect(className).toContain(hex);
+      expect(className).toContain('dark:text-white');
+      // Not unconditionally white - that would flatten light mode too.
+      expect(className).not.toMatch(/(^|\s)text-white(\s|$)/);
+    }
   });
 
   it('gives each known chain its own distinct mark', () => {

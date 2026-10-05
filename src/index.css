@@ -1,4 +1,16 @@
-@import 'tailwindcss';
+/* `source('../src')` restricts class detection to the app's own sources.
+   Tailwind v4 otherwise auto-detects every non-ignored file in the project,
+   which included `tests/` - so any class name written inside a test, even
+   only as the expected value of an assertion, generated a real utility in
+   the production stylesheet. Two consequences, both bad: the shipped CSS
+   carried rules nothing in the app uses, and a test asserting that a class
+   had been generated could not fail, because writing the assertion was
+   itself enough to generate it. Measured: `.text-[#ABCDEF]` survived in the
+   build purely because tests/tokenRegistry.test.tsx mentioned it.
+
+   `../src` is relative to THIS file, and the path is a directory, so
+   `public/`, `tests/` and the config files at the root are all out. */
+@import 'tailwindcss' source('../src');
 @import 'tw-animate-css';
 
 /* Lumen's own faces, self-hosted. See src/styles/lumen.css for why these are
