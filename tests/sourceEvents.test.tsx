@@ -65,6 +65,28 @@ const buy = (overrides: Partial<LedgerEvent> = {}): LedgerEvent => ({
   ...overrides,
 });
 
+/** The deposit that funds the buy above. Without it the euro leg has
+ *  nothing behind it and the fold shows minus everything ever spent - the
+ *  artifact that made the headline and the sum of its sources disagree. */
+const deposit = (overrides: Partial<LedgerEvent> = {}): LedgerEvent => ({
+  id: crypto.randomUUID(),
+  sourceId: 'cfg-1',
+  externalId: 'fiat:deposit-1',
+  timestamp: 1_699_000_000_000,
+  kind: 'fiat-in',
+  origin: 'derived',
+  legs: [
+    {
+      assetId: 'fiat:eur',
+      amount: '10000',
+      direction: 'in',
+      venue: 'testexchange',
+      role: 'principal',
+    },
+  ],
+  ...overrides,
+});
+
 /**
  * A UTXO spend as a chain really reports it: 5 BTC of inputs consumed and
  * 4 BTC of change returned, both at the user's own address. The net is a
@@ -167,7 +189,7 @@ describe('what a source holds', () => {
       label: 'My Wallet',
       config: {},
     });
-    await putEvents([buy(), utxoSpend()]);
+    await putEvents([deposit(), buy(), utxoSpend()]);
   });
 
   it('shows the position in whole units, not in base units', async () => {
@@ -189,13 +211,9 @@ describe('what a source holds', () => {
     expect(within(other).getByText(/^-1$/)).toBeInTheDocument();
   });
 
-  it('prices the position without the euro leg a trade leaves behind', async () => {
-    // 0.5 BTC at 20000/BTC is 10000. The same fold also leaves
-    // `fiat:eur -10000` at this venue, because the module emits the trade's
-    // payment leg but nothing ever funded the account - no module emits
-    // fiat deposits. Priced at 1 and added in, that artifact takes the row
-    // to exactly 0, and a slightly different fixture would take it
-    // negative. So this asserts the figure, not merely that one is shown.
+  it('prices a funded position at what it is worth', async () => {
+    // 10,000 deposited, 10,000 spent on 0.5 BTC, BTC at 20,000. The euro
+    // nets to zero and drops out of the fold, so the row is the BTC alone.
     renderScreen();
     const row = await sourceRow('My Exchange');
     await waitFor(() =>
@@ -203,20 +221,81 @@ describe('what a source holds', () => {
     );
   });
 
+  it('counts a euro balance the ledger actually has', async () => {
+    // Fiat is a holding like any other now. It was filtered out of this
+    // figure once, to hide an exchange module that emitted a trade's euro
+    // leg without the deposit funding it - but the headline kept counting
+    // that artifact, so the balance and the sum of its own sources differed
+    // by exactly it, with nothing on screen to explain the gap.
+    await putEvents([deposit({ externalId: 'fiat:deposit-2' })]);
+
+    renderScreen();
+    const row = await sourceRow('My Exchange');
+    // 10,000 deposited twice, 10,000 spent: 10,000 of euro left, plus
+    // 10,000 of BTC.
+    await waitFor(() =>
+      expect(within(row).getByText(/^€20,000\.00$/)).toBeInTheDocument(),
+    );
+  });
+
+  it('adds up to the headline, which is what the screen promises', async () => {
+    // The invariant a user can check by eye, and the one that was broken:
+    // the balance at the top read EUR 27,651.60 while its three sources
+    // came to EUR 31,421.60 - short by exactly the unfunded euro legs.
+    //
+    // A deposit that is NOT spent, so the ledger carries a real euro
+    // balance. Without it the euro nets to zero and the invariant holds
+    // just as well against code that leaves fiat out of the rows while the
+    // headline counts it - which is the very divergence being tested.
+    await putEvents([deposit({ externalId: 'fiat:deposit-unspent' })]);
+
+    renderScreen();
+
+    const headline = await screen.findByTestId('balance-total');
+    await waitFor(() => expect(headline.textContent).toMatch(/€/));
+
+    // The sign is part of the figure. Matching only `€…` reads
+    // "-€20,000.00" as +20,000 and turns a wallet that is down into one
+    // that is up - which is exactly the kind of error this invariant is
+    // here to catch, so the test must not make it itself.
+    const euros = (text: string): number[] =>
+      [...text.matchAll(/(-?)€([\d,]+\.\d{2})/g)].map(
+        (match) =>
+          (match[1] === '-' ? -1 : 1) * Number(match[2].replace(/,/g, '')),
+      );
+
+    await waitFor(() => {
+      const total = euros(headline.textContent ?? '')[0];
+      const rows = [...document.querySelectorAll('[data-slot="card"]')].flatMap(
+        (card) =>
+          card === headline.closest('[data-slot="card"]')
+            ? []
+            : euros(card.textContent ?? ''),
+      );
+      expect(rows.length).toBeGreaterThan(0);
+      const summed = rows.reduce((a, b) => a + b, 0);
+      expect(summed).toBeCloseTo(total, 2);
+    });
+  });
+
   it('counts its OWN events, not every event in the ledger', async () => {
-    // Three events in the ledger, one of which belongs to this row. With a
-    // single source the scoped count and the ledger-wide count are the same
-    // number and the assertion cannot tell them apart.
-    await putEvents([{ ...utxoSpend(), externalId: 'second#0' }]);
+    // Five events in the ledger: two belong to this row and three to the
+    // other. With a single source the scoped count and the ledger-wide
+    // count are the same number and the assertion cannot tell them apart,
+    // and distinct per-row counts keep it from passing on a coincidence.
+    await putEvents([
+      { ...utxoSpend(), externalId: 'second#0' },
+      { ...utxoSpend(), externalId: 'third#0' },
+    ]);
 
     renderScreen();
     const row = await sourceRow('My Exchange');
     await waitFor(() =>
-      expect(within(row).getByText(/\b1 event\b/)).toBeInTheDocument(),
+      expect(within(row).getByText(/\b2 events\b/)).toBeInTheDocument(),
     );
-    expect(within(row).queryByText(/\b3 events\b/)).toBeNull();
+    expect(within(row).queryByText(/\b5 events\b/)).toBeNull();
     const other = await sourceRow('My Wallet');
-    expect(within(other).getByText(/\b2 events\b/)).toBeInTheDocument();
+    expect(within(other).getByText(/\b3 events\b/)).toBeInTheDocument();
   });
 });
 

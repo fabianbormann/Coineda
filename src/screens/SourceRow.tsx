@@ -10,25 +10,24 @@ import type { SourceRecord } from '@/ledger/types';
 /**
  * What one source contributed to the ledger.
  *
- * `holdings` carries the source's PRICED, non-fiat positions, most valuable
- * first, and `unpricedCount` says how many were left out.
+ * `holdings` carries the source's PRICED positions, most valuable first,
+ * and `unpricedCount` says how many were left out.
  *
- * Two separate exclusions, for two separate reasons:
+ * Unpriced assets are excluded because a real Cardano wallet holds a long
+ * tail of NFTs and airdropped tokens with no market price at all. Sorted by
+ * asset id, as this row used to be, they crowd out the position that
+ * matters: the owner's own wallet led with "1 APAVIA · 1 LACIE5113 ·
+ * 1 LACIE5180 +38 more" and never showed its 507 ADA.
  *
- * - **Fiat.** An exchange module emits a trade's euro leg (the tax engine
- *   needs it for cost basis) but nothing funds it, because no module emits
- *   fiat deposits yet. So a source's folded euro balance is minus
- *   everything ever spent there - an artifact of an incomplete log, not a
- *   holding - and including it would render the row as a negative number.
- * - **Unpriced assets.** A real Cardano wallet holds a long tail of NFTs
- *   and airdropped tokens with no market price at all. Sorted by asset id,
- *   as this row used to be, they crowd out the position that matters: the
- *   owner's own wallet led with "1 APAVIA · 1 LACIE5113 · 1 LACIE5180 +38
- *   more" and never showed its 507 ADA.
+ * Fiat is NOT excluded. It was once, to hide an exchange module emitting a
+ * trade's euro leg without the deposit that funded it - but that only moved
+ * the problem: the headline kept counting the artifact, so it and the sum
+ * of its own sources differed by exactly that amount with nothing on screen
+ * to explain it. The modules emit their fiat movements now, so a euro
+ * balance here is real.
  *
- * Neither is hidden. The count of unpriced assets is shown beside the
- * figure, and every leg of every event - euro legs included - is listed in
- * the events dialog.
+ * Nothing is hidden either way. The count of unpriced assets sits beside
+ * the figure, and every leg of every event is listed in the events dialog.
  */
 export type PricedHolding = Holding & {
   /** This holding's worth in the base currency, as a decimal string. Kept

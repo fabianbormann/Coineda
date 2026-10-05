@@ -41,7 +41,7 @@ export const bitpanda: SourceModule = {
     // a wider key than the job requires.
     requiredScopes: ['Trades', 'Wallets'],
     needsRelay: false,
-    emits: ['trade', 'transfer'],
+    emits: ['trade', 'transfer', 'fiat-in', 'fiat-out'],
     docsUrl: 'https://developers.bitpanda.com',
   },
 

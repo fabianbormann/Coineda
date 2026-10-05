@@ -1,0 +1,116 @@
+{
+  "_synthetic": "INVENTED, not recorded. Modelled on a real GET /v1/fiatwallets/transactions response measured on 2026-10-05. The shape that matters: a `trade` object on the euro side of a trade - which this module must NOT ingest, because the trade event already carries that leg - and its absence on a standalone deposit or withdrawal, which is the half that was missing entirely.",
+  "call": 2,
+  "url": "https://api.bitpanda.com/v1/fiatwallets/transactions?page=1&page_size=500",
+  "status": 200,
+  "body": {
+    "data": [
+      {
+        "type": "fiat_wallet_transaction",
+        "id": "fw-1",
+        "attributes": {
+          "fiat_wallet_id": "fiat-eur",
+          "fiat_id": "1",
+          "amount": "5000.00",
+          "fee": "0.00",
+          "to_eur_rate": "1.00000000",
+          "time": {
+            "date_iso8601": "2026-01-31T09:00:00+01:00",
+            "unix": "1769846400"
+          },
+          "in_or_out": "incoming",
+          "type": "deposit",
+          "status": "finished"
+        }
+      },
+      {
+        "type": "fiat_wallet_transaction",
+        "id": "fw-2",
+        "attributes": {
+          "fiat_wallet_id": "fiat-eur",
+          "fiat_id": "1",
+          "amount": "5000.00",
+          "fee": "0.00",
+          "to_eur_rate": "1.00000000",
+          "time": {
+            "date_iso8601": "2026-02-01T10:00:00+01:00",
+            "unix": "1770022800"
+          },
+          "in_or_out": "outgoing",
+          "type": "buy",
+          "status": "finished",
+          "trade": {
+            "type": "trade",
+            "id": "trade-btc-0.25000000",
+            "attributes": {
+              "amount_fiat": "5000.00"
+            }
+          }
+        }
+      },
+      {
+        "type": "fiat_wallet_transaction",
+        "id": "fw-3",
+        "attributes": {
+          "fiat_wallet_id": "fiat-eur",
+          "fiat_id": "1",
+          "amount": "100.00",
+          "fee": "1.50",
+          "to_eur_rate": "1.00000000",
+          "time": {
+            "date_iso8601": "2026-02-06T10:00:00+01:00",
+            "unix": "1770368400"
+          },
+          "in_or_out": "outgoing",
+          "type": "withdrawal",
+          "status": "finished"
+        }
+      },
+      {
+        "type": "fiat_wallet_transaction",
+        "id": "fw-4",
+        "attributes": {
+          "fiat_wallet_id": "fiat-usd",
+          "fiat_id": "2",
+          "amount": "77.00",
+          "fee": "0.00",
+          "to_eur_rate": "0.92000000",
+          "time": {
+            "date_iso8601": "2026-02-07T10:00:00+01:00",
+            "unix": "1770454800"
+          },
+          "in_or_out": "incoming",
+          "type": "deposit",
+          "status": "finished"
+        }
+      },
+      {
+        "type": "fiat_wallet_transaction",
+        "id": "fw-5",
+        "attributes": {
+          "fiat_wallet_id": "fiat-eur",
+          "fiat_id": "1",
+          "amount": "999.00",
+          "fee": "0.00",
+          "to_eur_rate": "1.00000000",
+          "time": {
+            "date_iso8601": "2026-02-08T10:00:00+01:00",
+            "unix": "1770541200"
+          },
+          "in_or_out": "incoming",
+          "type": "deposit",
+          "status": "pending"
+        }
+      }
+    ],
+    "meta": {
+      "total_count": 5,
+      "page_size": 500,
+      "page": 1,
+      "page_number": 1
+    },
+    "links": {
+      "self": "?page_number=1&page_size=500"
+    }
+  }
+}

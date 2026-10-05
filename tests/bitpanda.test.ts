@@ -11,8 +11,7 @@ import {
   movementToEvent,
 } from '@/sources/bitpanda/translator';
 import { NIGHT_ASSET_ID, decimalsOf } from '@/prices/scale';
-import { foldHoldings, ownedVenuesOf } from '@/ledger/balances';
-import type { LedgerEvent } from '@/ledger/types';
+import type { DerivedEvent } from '@/sources/types';
 
 /**
  * Bitpanda, draining /wallets/transactions.
@@ -354,75 +353,206 @@ describe('NIGHT', () => {
 });
 
 describe('the cursor', () => {
-  it('round-trips a page', () => {
-    expect(decodeCursor(encodeCursor(4))).toBe(4);
+  it('round-trips a phase and a page', () => {
+    expect(decodeCursor(encodeCursor('movements', 4))).toEqual({
+      phase: 'movements',
+      page: 4,
+    });
+    expect(decodeCursor(encodeCursor('fiat', 2))).toEqual({
+      phase: 'fiat',
+      page: 2,
+    });
   });
 
   it('starts over on anything it does not recognise', () => {
-    for (const cursor of [null, 'nonsense', 'bitpanda:', 'btc:0:0:0:']) {
-      expect(decodeCursor(cursor)).toBe(1);
+    // Including the old single-phase `bitpanda:<n>` form, which named a
+    // page in a drain that no longer exists. Restarting is cheap and
+    // converges, because events upsert on (sourceId, externalId).
+    for (const cursor of [
+      null,
+      'nonsense',
+      'bitpanda:',
+      'bitpanda:3',
+      'btc:0:0:0:',
+    ]) {
+      expect(decodeCursor(cursor)).toEqual({ phase: 'movements', page: 1 });
     }
   });
 });
 
 describe('against the recorded response shape', () => {
-  let fixture: { url: string; status: number; body: unknown };
+  type Recorded = { url: string; status: number; body: unknown };
+  let crypto: Recorded;
+  let fiat: Recorded;
 
   beforeAll(async () => {
-    fixture = JSON.parse(
-      await readFile(
-        path.join(__dirname, '../src/sources/bitpanda/fixtures/000.json'),
-        'utf8',
-      ),
-    );
+    const read = async (name: string) =>
+      JSON.parse(
+        await readFile(
+          path.join(__dirname, `../src/sources/bitpanda/fixtures/${name}`),
+          'utf8',
+        ),
+      );
+    crypto = await read('000.json');
+    fiat = await read('001.json');
   });
 
-  const drain = async () => {
+  /** Serves whichever route the module asks for, and drains to exhaustion
+   *  so BOTH phases run - a drain that stopped after the crypto phase is
+   *  the exact bug this route pair exists to fix. */
+  const drainAll = async () => {
+    const asked: string[] = [];
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => respond(fixture.status, fixture.body)),
+      vi.fn(async (url: string) => {
+        asked.push(String(url));
+        const which = String(url).includes('/fiatwallets/') ? fiat : crypto;
+        return respond(which.status, which.body);
+      }),
     );
-    return bitpanda.fetchEvents({ apiKey: KEY }, null);
+    const events = [];
+    let cursor: string | null = null;
+    for (let guard = 0; guard < 10; guard += 1) {
+      const result: { events: DerivedEvent[]; cursor: string | null } =
+        await bitpanda.fetchEvents({ apiKey: KEY }, cursor);
+      events.push(...result.events);
+      cursor = result.cursor;
+      if (cursor === null) {
+        break;
+      }
+    }
+    expect(cursor).toBeNull();
+    return { events, asked };
   };
 
-  it('drains the whole page and stops when the provider offers no next', async () => {
-    const page = await drain();
-    // Six rows in, four events out: one pending, one gold, both passed over.
-    expect(page.events).toHaveLength(4);
-    expect(page.cursor).toBeNull();
+  const fold = (
+    events: {
+      legs: { assetId: string; amount: string; direction: string }[];
+    }[],
+  ) => {
+    const totals = new Map<string, Big>();
+    for (const event of events) {
+      for (const leg of event.legs) {
+        const current = totals.get(leg.assetId) ?? new Big(0);
+        totals.set(
+          leg.assetId,
+          leg.direction === 'in'
+            ? current.plus(leg.amount)
+            : current.minus(leg.amount),
+        );
+      }
+    }
+    return totals;
+  };
+
+  it('drains both routes and only then finishes', async () => {
+    const { asked } = await drainAll();
+    expect(asked.some((url) => url.includes('/wallets/transactions'))).toBe(
+      true,
+    );
+    expect(asked.some((url) => url.includes('/fiatwallets/transactions'))).toBe(
+      true,
+    );
   });
 
-  it('reconciles to the balance the exchange reports', async () => {
-    // THE test. `in - out - fee`, per asset, against what Bitpanda itself
-    // says the wallet holds. Against the owner's real account this holds
-    // exactly to all eight decimals for BTC, ETH, ADA and NIGHT - and it is
-    // the arithmetic the /trades route could not satisfy, because the
-    // withdrawals that balance it are not trades.
+  it('ingests the deposits that make the euro balance real', async () => {
+    // THE regression. Without the fiat phase the ledger sees every euro
+    // leave and none arrive, so the balance is understated by exactly
+    // everything ever spent - EUR 3,770.00 on the owner's own account.
     //
-    // The fixture's own figures: 0.25 BTC bought, 0.1 BTC withdrawn with a
+    // These fixtures: a 5,000 deposit, a 5,000 trade (whose euro leg comes
+    // from the crypto route), a 100 withdrawal with a 1.50 fee, plus a
+    // non-euro deposit and a pending one that are both passed over.
+    // 5000 - 5000 - 100 - 1.50 = -101.50.
+    const { events } = await drainAll();
+    expect(fold(events).get('fiat:eur')?.toString()).toBe('-101.5');
+  });
+
+  it('does not count a trade twice through its own fiat row', async () => {
+    // The fiat route lists the euro side of every trade as well. That leg
+    // is already on the trade event, so ingesting the row again would
+    // subtract the same 5,000 twice - and on the owner's account twelve
+    // such rows sit beside thirteen genuine deposits.
+    const { events } = await drainAll();
+    const fiatIn = events.filter((event) => event.kind === 'fiat-in');
+    const fiatOut = events.filter((event) => event.kind === 'fiat-out');
+    expect(fiatIn).toHaveLength(1);
+    expect(fiatOut).toHaveLength(1);
+    expect(fiatOut[0].legs.some((leg) => leg.amount === '5000')).toBe(false);
+  });
+
+  it('charges a withdrawal fee on the fiat side too', async () => {
+    const { events } = await drainAll();
+    const withdrawal = events.find((event) => event.kind === 'fiat-out');
+    expect(withdrawal?.legs).toEqual([
+      {
+        assetId: 'fiat:eur',
+        amount: '100',
+        direction: 'out',
+        venue: 'bitpanda',
+        role: 'principal',
+      },
+      {
+        assetId: 'fiat:eur',
+        amount: '1.5',
+        direction: 'out',
+        venue: 'bitpanda',
+        role: 'fee',
+      },
+    ]);
+  });
+
+  it('passes over a fiat wallet that is not euro', async () => {
+    // Recording a dollar deposit as euro would put a figure in the wrong
+    // denomination into a tax report. The rate decides, because the row
+    // carries no currency name.
+    const { events } = await drainAll();
+    const amounts = events
+      .flatMap((event) => event.legs)
+      .map((leg) => leg.amount);
+    expect(amounts).not.toContain('77');
+  });
+
+  it('passes over a fiat movement that never settled', async () => {
+    const { events } = await drainAll();
+    const amounts = events
+      .flatMap((event) => event.legs)
+      .map((leg) => leg.amount);
+    expect(amounts).not.toContain('999');
+  });
+
+  it('gives fiat rows their own id space', async () => {
+    // Different providers' id spaces, and events upsert on
+    // (sourceId, externalId) - an unnamespaced collision would have one
+    // movement silently overwrite another.
+    const { events } = await drainAll();
+    for (const event of events) {
+      if (event.kind === 'fiat-in' || event.kind === 'fiat-out') {
+        expect(event.externalId.startsWith('fiat:')).toBe(true);
+      }
+    }
+    expect(new Set(events.map((e) => e.externalId)).size).toBe(events.length);
+  });
+
+  it('reconciles the crypto side to the balance the exchange reports', async () => {
+    // `in - out - fee`, per asset, against what Bitpanda itself says the
+    // wallet holds. Against the owner's real account this holds exactly to
+    // all eight decimals for BTC, ETH, ADA and NIGHT.
+    //
+    // The fixture's figures: 0.25 BTC bought, 0.1 BTC withdrawn with a
     // 0.000039 fee, and a non-euro buy of 0.01 BTC that still moves BTC.
     // 0.25 - 0.1 - 0.000039 + 0.01 = 0.159961 BTC, and 12 NIGHT deposited.
-    const page = await drain();
-    const events = page.events.map((event, index): LedgerEvent => ({
-      ...event,
-      id: `e${index}`,
-      sourceId: 'bitpanda-1',
-    }));
-    const held = foldHoldings(events, ownedVenuesOf(events));
-    const byAsset = new Map(held.map((h) => [h.assetId, h.amount]));
-
-    expect(new Big(byAsset.get('bitcoin:native') ?? '0').toFixed(0)).toBe(
+    const { events } = await drainAll();
+    const totals = fold(events);
+    expect(totals.get('bitcoin:native')?.toFixed(0)).toBe(
       new Big('0.159961').times(1e8).toFixed(0),
     );
-    expect(byAsset.get(NIGHT_ASSET_ID)).toBe('12000000');
+    expect(totals.get(NIGHT_ASSET_ID)?.toString()).toBe('12000000');
   });
 
   it('records the withdrawal the trades route cannot see', async () => {
-    // The regression this whole route exists for. If the drain ever goes
-    // back to a trades-only source, there is no outgoing principal leg
-    // anywhere in the page and this fails.
-    const page = await drain();
-    const outgoing = page.events.flatMap((event) =>
+    const { events } = await drainAll();
+    const outgoing = events.flatMap((event) =>
       event.legs.filter(
         (leg) => leg.direction === 'out' && leg.assetId === 'bitcoin:native',
       ),
@@ -434,27 +564,11 @@ describe('against the recorded response shape', () => {
     ]);
   });
 
-  it('asks for the movements route, with paging', async () => {
-    const seen: string[] = [];
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string) => {
-        seen.push(String(url));
-        return respond(fixture.status, fixture.body);
-      }),
-    );
-    await bitpanda.fetchEvents({ apiKey: KEY }, null);
-    expect(seen[0]).toContain('/wallets/transactions');
-    expect(seen[0]).toContain('page=1');
-  });
-
   it('is a synthetic fixture, not a recording of a real account', () => {
-    // Guards the rule rather than the shape: a real recording of this route
-    // is somebody's account history and their own wallet addresses, so if
-    // this file is ever replaced by a genuine capture the marker goes and
-    // this fails. The addresses below are the invented ones.
-    const raw = JSON.stringify(fixture);
-    expect(raw).toContain('_synthetic');
-    expect(raw).toContain('bc1qexampleaddress');
+    // Guards the rule rather than the shape: a real recording of these
+    // routes is somebody's account history and their own wallet addresses.
+    for (const recorded of [crypto, fiat]) {
+      expect(JSON.stringify(recorded)).toContain('_synthetic');
+    }
   });
 });

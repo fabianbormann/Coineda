@@ -111,8 +111,23 @@ const asJson = (fetched: Fetched, what: string): unknown => {
   }
 };
 
-/** The one route the drain depends on, so the one route the probe tests. */
+/** The route the drain leans on hardest, so the one the probe tests. */
 const MOVEMENTS = '/wallets/transactions';
+
+/**
+ * The fiat side, drained after the crypto side.
+ *
+ * Needed because /wallets/transactions covers only crypto wallets. A euro
+ * DEPOSIT appears nowhere in it, while every trade's euro leg does - so a
+ * ledger built from that route alone shows the money leaving and never
+ * arriving. Measured on the owner's account: twelve trades subtract
+ * EUR 3,770.00 and thirteen standalone deposits adding the same 3,770.00
+ * were simply absent, so the headline balance was understated by exactly
+ * everything ever spent at Bitpanda.
+ *
+ * This key reads it: 200, where /transactions answers 401.
+ */
+const FIAT_MOVEMENTS = '/fiatwallets/transactions';
 
 export const probe = async (
   config: Record<string, string>,
@@ -348,16 +363,198 @@ export const movementToEvent = (
   };
 };
 
-export const encodeCursor = (page: number): string => `bitpanda:${page}`;
+/**
+ * One fiat-wallet row to one ledger event.
+ *
+ * Only STANDALONE rows become events. A row carrying a `trade` is the euro
+ * side of a trade this module already emitted from /wallets/transactions,
+ * complete with its fiat leg - ingesting it again would subtract the same
+ * euro twice. The owner's account has twelve of those and thirteen
+ * standalone deposits, so getting this discriminator wrong is not a corner
+ * case, it is most of the data.
+ */
+export const fiatMovementToEvent = (
+  row: MovementRow,
+): DerivedEvent | { unsupported: string } | { skipped: string } => {
+  const attributes = row.attributes ?? {};
+  const seen = Object.keys(attributes).join(', ') || '(none)';
 
-export const decodeCursor = (cursor: string | null): number => {
-  if (cursor === null) {
-    return 1;
+  const externalId = str(row.id);
+  const direction = str(attributes.in_or_out);
+  const amount = str(attributes.amount);
+  const time = attributes.time as { unix?: unknown; date_iso8601?: unknown };
+  const unix = str(time?.unix);
+  const iso = str(time?.date_iso8601);
+
+  if (
+    externalId === null ||
+    direction === null ||
+    amount === null ||
+    (unix === null && iso === null)
+  ) {
+    throw new Error(
+      `bitpanda: a fiat wallet transaction is missing fields this parser needs. It carried: ${seen}`,
+    );
   }
-  const match = /^bitpanda:(\d+)$/.exec(cursor);
+
+  if (attributes.trade !== undefined && attributes.trade !== null) {
+    return { skipped: `${externalId} is a trade's own fiat leg` };
+  }
+
+  const status = str(attributes.status);
+  if (status !== null && status.toLowerCase() !== 'finished') {
+    return { skipped: `${externalId} is ${status}` };
+  }
+
+  // Euro only, decided by the rate rather than by a currency name the row
+  // does not carry - the same test the trade side makes. Recording some
+  // other currency as euro would put a figure in the wrong denomination
+  // into a tax report.
+  const rate = str(attributes.to_eur_rate);
+  if (rate === null || Number(rate) !== 1) {
+    return {
+      unsupported: `a fiat wallet whose rate to euro is ${rate ?? 'unknown'}`,
+    };
+  }
+
+  const timestamp = unix !== null ? Number(unix) * 1000 : Date.parse(iso!);
+  if (!Number.isFinite(timestamp)) {
+    throw new Error(
+      `bitpanda: a fiat wallet transaction carried an unreadable time: ${JSON.stringify(attributes.time)}`,
+    );
+  }
+
+  const incoming = direction.toLowerCase() === 'incoming';
+  const legs: Leg[] = [
+    {
+      assetId: 'fiat:eur',
+      amount: baseUnits(amount, 'fiat:eur'),
+      direction: incoming ? 'in' : 'out',
+      venue: 'bitpanda',
+      role: 'principal',
+    },
+  ];
+
+  const fee = str(attributes.fee);
+  if (isPositive(fee)) {
+    legs.push({
+      assetId: 'fiat:eur',
+      amount: baseUnits(fee!, 'fiat:eur'),
+      direction: 'out',
+      venue: 'bitpanda',
+      role: 'fee',
+    });
+  }
+
+  return {
+    // Namespaced, because this is a different id space from the crypto
+    // wallet rows and nothing guarantees the two never collide. A collision
+    // would have one movement silently overwrite another, since events
+    // upsert on (sourceId, externalId).
+    externalId: `fiat:${externalId}`,
+    timestamp,
+    kind: incoming ? 'fiat-in' : 'fiat-out',
+    origin: 'derived',
+    legs,
+  };
+};
+
+/**
+ * The drain runs in two phases, crypto movements then fiat movements, and
+ * the cursor carries which one it is in.
+ *
+ * Crypto first because it is the larger history and the one a user cares
+ * about seeing appear; fiat second because it only ever adjusts a euro
+ * balance. The phase is part of the cursor rather than inferred, so a sync
+ * resumed from disk cannot restart in the wrong half.
+ */
+export type Phase = 'movements' | 'fiat';
+
+export const encodeCursor = (phase: Phase, page: number): string =>
+  `bitpanda:${phase}:${page}`;
+
+export const decodeCursor = (
+  cursor: string | null,
+): { phase: Phase; page: number } => {
+  if (cursor === null) {
+    return { phase: 'movements', page: 1 };
+  }
+  const match = /^bitpanda:(movements|fiat):(\d+)$/.exec(cursor);
+  if (match !== null) {
+    return { phase: match[1] as Phase, page: Number.parseInt(match[2], 10) };
+  }
   // Anything unrecognised starts over rather than guessing, the same choice
-  // every other module here makes.
-  return match ? Number.parseInt(match[1], 10) : 1;
+  // every other module here makes - and that deliberately covers the old
+  // single-phase `bitpanda:<n>` form, which named a page in a drain that no
+  // longer exists. Restarting is cheap and converges: events upsert on
+  // (sourceId, externalId).
+  return { phase: 'movements', page: 1 };
+};
+
+/** Fetches one page of a route, mapping every failure to the same named
+ *  causes the probe reports. */
+const page = async (
+  route: string,
+  pageNumber: number,
+  apiKey: string,
+  signal: AbortSignal | undefined,
+  what: string,
+): Promise<{ rows: MovementRow[]; more: boolean }> => {
+  const fetched = await request(
+    `${route}?page=${pageNumber}&page_size=${PAGE_SIZE}`,
+    apiKey,
+    signal,
+  );
+  if (isCloudflareBlock(fetched.status, fetched.body)) {
+    throw new Error(BITPANDA_MESSAGES.cloudflare);
+  }
+  if (fetched.status === 401 || fetched.status === 403) {
+    throw new Error(BITPANDA_MESSAGES.rejectedKey);
+  }
+  if (fetched.status < 200 || fetched.status >= 300) {
+    throw new Error(
+      `bitpanda: listing ${what} failed with status ${fetched.status}`,
+    );
+  }
+
+  const body = asJson(fetched, `the ${what} list`) as {
+    data?: unknown;
+    links?: { next?: unknown };
+  };
+  if (!Array.isArray(body.data)) {
+    throw new Error(
+      `bitpanda: expected a list of ${what} under "data" but the response carried: ${Object.keys(
+        body ?? {},
+      ).join(', ')}`,
+    );
+  }
+
+  // Paging stops on the provider's own say-so where it offers one, and on a
+  // short page otherwise.
+  const hasNext =
+    typeof body.links?.next === 'string' && body.links.next !== '';
+  return {
+    rows: body.data as MovementRow[],
+    more: hasNext || body.data.length === PAGE_SIZE,
+  };
+};
+
+/** An asset this app cannot name, or a movement that never settled, is
+ *  passed over rather than failed: one of either must not cost the user
+ *  every other row in the account. */
+const kept = (
+  rows: MovementRow[],
+  translate: (row: MovementRow) => ReturnType<typeof movementToEvent>,
+): DerivedEvent[] => {
+  const events: DerivedEvent[] = [];
+  for (const row of rows) {
+    const result = translate(row);
+    if ('unsupported' in result || 'skipped' in result) {
+      continue;
+    }
+    events.push(result);
+  }
+  return events;
 };
 
 export const fetchEvents = async (
@@ -370,56 +567,38 @@ export const fetchEvents = async (
     throw new Error(BITPANDA_MESSAGES.missingKey);
   }
 
-  const page = decodeCursor(cursor);
+  const { phase, page: pageNumber } = decodeCursor(cursor);
 
-  const fetched = await request(
-    `${MOVEMENTS}?page=${page}&page_size=${PAGE_SIZE}`,
+  if (phase === 'movements') {
+    const { rows, more } = await page(
+      MOVEMENTS,
+      pageNumber,
+      apiKey,
+      signal,
+      'wallet transactions',
+    );
+    return {
+      events: kept(rows, movementToEvent),
+      // Crypto exhausted, so hand over to the fiat phase rather than
+      // finishing: the euro deposits live only there, and stopping here is
+      // precisely the bug this phase was added to fix.
+      cursor: more
+        ? encodeCursor('movements', pageNumber + 1)
+        : encodeCursor('fiat', 1),
+    };
+  }
+
+  const { rows, more } = await page(
+    FIAT_MOVEMENTS,
+    pageNumber,
     apiKey,
     signal,
+    'fiat wallet transactions',
   );
-  if (isCloudflareBlock(fetched.status, fetched.body)) {
-    throw new Error(BITPANDA_MESSAGES.cloudflare);
-  }
-  if (fetched.status === 401 || fetched.status === 403) {
-    throw new Error(BITPANDA_MESSAGES.rejectedKey);
-  }
-  if (fetched.status < 200 || fetched.status >= 300) {
-    throw new Error(
-      `bitpanda: listing wallet transactions failed with status ${fetched.status}`,
-    );
-  }
-
-  const body = asJson(fetched, 'the wallet transaction list') as {
-    data?: unknown;
-    links?: { next?: unknown };
+  return {
+    events: kept(rows, fiatMovementToEvent),
+    cursor: more ? encodeCursor('fiat', pageNumber + 1) : null,
   };
-  if (!Array.isArray(body.data)) {
-    throw new Error(
-      `bitpanda: expected a list of wallet transactions under "data" but the response carried: ${Object.keys(
-        body ?? {},
-      ).join(', ')}`,
-    );
-  }
-
-  const events: DerivedEvent[] = [];
-  for (const row of body.data as MovementRow[]) {
-    const result = movementToEvent(row);
-    // An asset this app cannot name, or a movement that never settled, is
-    // passed over rather than failed: one of either must not cost the user
-    // every other row in the account.
-    if ('unsupported' in result || 'skipped' in result) {
-      continue;
-    }
-    events.push(result);
-  }
-
-  // Paging stops on the provider's own say-so where it offers one, and on a
-  // short page otherwise.
-  const hasNext =
-    typeof body.links?.next === 'string' && body.links.next !== '';
-  const more = hasNext || body.data.length === PAGE_SIZE;
-
-  return { events, cursor: more ? encodeCursor(page + 1) : null };
 };
 
 export { REQUEST_TIMEOUT_MS };

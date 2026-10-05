@@ -7,7 +7,7 @@ import {
   getEventsBySource,
   getSources,
 } from '@/ledger/db';
-import { foldHoldings, isFiatAsset, ownedVenuesOf } from '@/ledger/balances';
+import { foldHoldings, ownedVenuesOf } from '@/ledger/balances';
 import { resolveSpotPrices, totalValue } from '@/prices/priceStore';
 import { valueOf } from '@/prices/scale';
 import { compareAmounts, sumAmounts } from '@/ledger/amount';
@@ -174,16 +174,22 @@ export const MainScreen = () => {
     const summary = new Map<string, SourceSummary>();
     for (const source of sources) {
       const own = events.filter((event) => event.sourceId === source.id);
-      // Fiat is dropped from a source's own figure, and only from this
-      // figure. An exchange module emits a trade's euro leg because the tax
-      // engine needs it for cost basis, but no module emits fiat deposits
-      // yet, so a source's folded euro balance is minus everything ever
-      // spent there - an artifact of an incomplete log rather than a
-      // holding. The legs themselves are untouched and still visible in
-      // SourceEventsDialog.
-      const held = foldHoldings(own, ownedVenues).filter(
-        (holding) => !isFiatAsset(holding.assetId),
-      );
+      // Fiat is INCLUDED, exactly as the headline includes it.
+      //
+      // It used to be filtered out here, because an exchange module emitted
+      // a trade's euro leg without ever emitting the deposit that funded
+      // it, which made a source's folded euro balance minus everything ever
+      // spent there. Filtering was the wrong fix: it hid the artifact on
+      // the rows while the headline kept subtracting it, so the balance and
+      // the sum of its own sources disagreed by exactly that amount -
+      // EUR 3,770.00 on the owner's screen, with nothing to explain it.
+      //
+      // The artifact is gone at the source now (src/sources/bitpanda drains
+      // the fiat route), so a euro balance here is a real one and belongs
+      // on the row like any other holding. A module that emits trades
+      // without their deposits will now show a visibly negative euro
+      // balance, which is a bug report rather than a silent discrepancy.
+      const held = foldHoldings(own, ownedVenues);
 
       // Priced and unpriced are separated here rather than in the row,
       // because the sort order depends on the figure: a real Cardano wallet
