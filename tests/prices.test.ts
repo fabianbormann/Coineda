@@ -170,7 +170,7 @@ describe('the v1 to current schema upgrade', () => {
   // ORIGINAL openLedger import's cached connection pointing at a closed
   // database, which would break any test running after this one in this
   // file - hence last, and in its own describe block.
-  it('upgrades a real v1 database in place, keeping v1 data and adding prices and settings', async () => {
+  it('upgrades a real v1 database in place, keeping v1 data and adding every later store', async () => {
     const dbName = 'coineda-v2';
 
     // Tear down what the top-level beforeEach already opened for this test,
@@ -220,6 +220,7 @@ describe('the v1 to current schema upgrade', () => {
       'prices',
       'settings',
       'sources',
+      'tokenMeta',
     ]);
     const source = await upgraded.get('sources', 'src-a');
     expect(source?.label).toBe('My wallet');

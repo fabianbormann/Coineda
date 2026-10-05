@@ -1,10 +1,11 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import { isValidAmount } from './amount';
 import type { Cursor, LedgerEvent, SourceRecord } from './types';
+import type { TokenMeta } from '@/assets/tokenRegistry';
 
 /**
- * The v2 ledger. Three stores: append-only events, configured sources, and
- * one sync cursor per source.
+ * The v2 ledger: append-only events, configured sources, one sync cursor per
+ * source, plus caches for prices, settings and Cardano token metadata.
  *
  * Events are keyed on their own uuid but carry a UNIQUE index on
  * [sourceId, externalId]. That index is what makes a re-sync converge
@@ -35,10 +36,30 @@ interface LedgerSchema extends DBSchema {
   /** Freeform app settings (language, base currency, onboarded flag, ...),
    *  keyed by name. See src/settings/settingsStore.ts. */
   settings: { key: string; value: { key: string; value: unknown } };
+  /**
+   * Cardano token registry metadata, keyed on the registry subject.
+   *
+   * Cached in IndexedDB rather than localStorage because a single logo is a
+   * base64 PNG of roughly 19KB - NIGHT's is 25,100 characters - and a wallet
+   * with a few dozen native tokens would crowd a 5MB localStorage quota
+   * that prices and settings also live in.
+   *
+   * `found: false` rows are the point of the store as much as the hits are:
+   * the registry omits an unknown subject from its response rather than
+   * answering "no", so without a recorded miss every page load would ask
+   * again about every token it will never know. See
+   * src/assets/tokenMetaStore.ts.
+   */
+  tokenMeta: {
+    key: string;
+    value: { subject: string; fetchedAt: number } & (
+      { found: true; meta: TokenMeta } | { found: false }
+    );
+  };
 }
 
 const DB_NAME = 'coineda-v2';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 let connection: Promise<IDBPDatabase<LedgerSchema>> | null = null;
 
@@ -64,6 +85,9 @@ export const openLedger = (): Promise<IDBPDatabase<LedgerSchema>> => {
         }
         if (oldVersion < 3) {
           db.createObjectStore('settings', { keyPath: 'key' });
+        }
+        if (oldVersion < 4) {
+          db.createObjectStore('tokenMeta', { keyPath: 'subject' });
         }
       },
     });

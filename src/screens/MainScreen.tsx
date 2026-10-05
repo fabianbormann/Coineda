@@ -23,6 +23,7 @@ import { EditSourceDialog } from './EditSourceDialog';
 import { SourceEventsDialog } from './SourceEventsDialog';
 import { TaxReportDialog } from './TaxReportDialog';
 import { JourneyDialog } from '@/journey/JourneyDialog';
+import { TokenMetaProvider } from '@/assets/TokenMetaContext';
 
 const DEFAULT_CURRENCY = 'eur';
 
@@ -193,6 +194,25 @@ export const MainScreen = () => {
     }
     return summary;
   }, [events, sources, prices, ownedVenues]);
+
+  /**
+   * Every asset id anywhere on this screen, for the token registry to
+   * resolve names and logos against.
+   *
+   * Taken from the EVENTS rather than from `holdings`, because a position
+   * that nets to zero drops out of a fold while its events remain readable
+   * in the per-source log - and a token the user has sold should not lose
+   * its name there.
+   */
+  const assetIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const event of events) {
+      for (const leg of event.legs) {
+        ids.add(leg.assetId);
+      }
+    }
+    return [...ids];
+  }, [events]);
 
   const lastSyncedAt = sources.reduce<number | null>((latest, source) => {
     if (source.lastSyncedAt === undefined) {
@@ -505,97 +525,101 @@ export const MainScreen = () => {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <BalanceHeader
-        total={total}
-        currency={currency}
-        missingCount={missingCount}
-        lastSyncedAt={lastSyncedAt}
-        assetCount={holdings.length}
-        sourceCount={sources.length}
-      />
-      <SourceList
-        sources={sources}
-        perSource={perSource}
-        currency={currency}
-        loadError={loadError}
-        syncingAll={syncingAll}
-        busyIds={busyIds}
-        syncingIds={syncingIds}
-        onRefreshAll={handleRefreshAll}
-        onRefreshOne={handleRefreshOne}
-        onResyncOne={handleResyncOne}
-        onStop={handleStop}
-        onRemove={handleRemove}
-        onEditOne={handleOpenEdit}
-        onShowEvents={setEventsSource}
-        onAddSource={() => setAddDialogOpen(true)}
-      />
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setExportDialogOpen(true)}
-        >
-          {t('Create checkpoint')}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setTaxReportDialogOpen(true)}
-        >
-          {t('Create tax report')}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setJourneyDialogOpen(true)}
-        >
-          {t('Create journey video')}
-        </Button>
+    // Wraps the whole screen so a logo resolved once is available to every
+    // row, dialog and table under it - including the ones that mount later.
+    <TokenMetaProvider assetIds={assetIds}>
+      <div className="flex flex-col gap-6 p-6">
+        <BalanceHeader
+          total={total}
+          currency={currency}
+          missingCount={missingCount}
+          lastSyncedAt={lastSyncedAt}
+          assetCount={holdings.length}
+          sourceCount={sources.length}
+        />
+        <SourceList
+          sources={sources}
+          perSource={perSource}
+          currency={currency}
+          loadError={loadError}
+          syncingAll={syncingAll}
+          busyIds={busyIds}
+          syncingIds={syncingIds}
+          onRefreshAll={handleRefreshAll}
+          onRefreshOne={handleRefreshOne}
+          onResyncOne={handleResyncOne}
+          onStop={handleStop}
+          onRemove={handleRemove}
+          onEditOne={handleOpenEdit}
+          onShowEvents={setEventsSource}
+          onAddSource={() => setAddDialogOpen(true)}
+        />
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setExportDialogOpen(true)}
+          >
+            {t('Create checkpoint')}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setTaxReportDialogOpen(true)}
+          >
+            {t('Create tax report')}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setJourneyDialogOpen(true)}
+          >
+            {t('Create journey video')}
+          </Button>
+        </div>
+        <AddSourceDialog
+          open={addDialogOpen}
+          onOpenChange={setAddDialogOpen}
+          onCreated={async (created) => {
+            setAddDialogOpen(false);
+            await load();
+            // Sync immediately. A source that sits there saying "Never
+            // synced" until the user finds the refresh button is a source
+            // that looks broken, and adding one is an unambiguous request
+            // for its data.
+            await handleRefreshOne(created);
+          }}
+        />
+        <EditSourceDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          source={editingSource}
+          onEdited={handleEditOne}
+        />
+        <ExportCheckpointDialog
+          open={exportDialogOpen}
+          onOpenChange={setExportDialogOpen}
+        />
+        <TaxReportDialog
+          open={taxReportDialogOpen}
+          onOpenChange={setTaxReportDialogOpen}
+        />
+        <SourceEventsDialog
+          open={eventsSource !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEventsSource(null);
+            }
+          }}
+          source={eventsSource}
+          events={events}
+          ownedVenues={ownedVenues}
+        />
+        <JourneyDialog
+          open={journeyDialogOpen}
+          onOpenChange={setJourneyDialogOpen}
+        />
       </div>
-      <AddSourceDialog
-        open={addDialogOpen}
-        onOpenChange={setAddDialogOpen}
-        onCreated={async (created) => {
-          setAddDialogOpen(false);
-          await load();
-          // Sync immediately. A source that sits there saying "Never
-          // synced" until the user finds the refresh button is a source
-          // that looks broken, and adding one is an unambiguous request
-          // for its data.
-          await handleRefreshOne(created);
-        }}
-      />
-      <EditSourceDialog
-        open={editDialogOpen}
-        onOpenChange={setEditDialogOpen}
-        source={editingSource}
-        onEdited={handleEditOne}
-      />
-      <ExportCheckpointDialog
-        open={exportDialogOpen}
-        onOpenChange={setExportDialogOpen}
-      />
-      <TaxReportDialog
-        open={taxReportDialogOpen}
-        onOpenChange={setTaxReportDialogOpen}
-      />
-      <SourceEventsDialog
-        open={eventsSource !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setEventsSource(null);
-          }
-        }}
-        source={eventsSource}
-        events={events}
-        ownedVenues={ownedVenues}
-      />
-      <JourneyDialog
-        open={journeyDialogOpen}
-        onOpenChange={setJourneyDialogOpen}
-      />
-    </div>
+    </TokenMetaProvider>
   );
 };

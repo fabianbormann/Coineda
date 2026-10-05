@@ -1,5 +1,6 @@
 import Big from 'big.js';
 import { decimalsOf } from '@/prices/scale';
+import { parseCardanoAsset, shortSubject } from '@/assets/cardanoAsset';
 
 /**
  * The display half of the base-unit rule.
@@ -30,9 +31,22 @@ export const symbolOf = (assetId: string): string => {
   if (known) {
     return known;
   }
-  return assetId.startsWith('fiat:')
-    ? assetId.slice('fiat:'.length).toUpperCase()
-    : assetId;
+  if (assetId.startsWith('fiat:')) {
+    return assetId.slice('fiat:'.length).toUpperCase();
+  }
+
+  // A Cardano native asset carries its own name inside its id - the subject
+  // is a policy followed by the asset name in hex - so this resolves with no
+  // network and no registry. `cardano:0691b2...4e49474854` is NIGHT, and
+  // printing the 66-character subject instead, as this function used to,
+  // told the user nothing. The token registry supplies a nicer ticker and a
+  // logo on top of this (see TokenMetaContext), but is never needed for it.
+  const native = parseCardanoAsset(assetId);
+  if (native !== null) {
+    return native.name ?? shortSubject(native.subject);
+  }
+
+  return assetId;
 };
 
 /**
