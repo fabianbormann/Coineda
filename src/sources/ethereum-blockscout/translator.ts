@@ -249,6 +249,7 @@ export const transactionToEvent = (
 
   return {
     externalId: hash,
+    txHash: hash,
     timestamp: timestampOf(row.timestamp, 'a transaction'),
     kind: 'transfer',
     origin: 'derived',
@@ -332,6 +333,10 @@ export const internalToEvent = (
 
   return {
     externalId,
+    // The PARENT transaction's hash, not the per-call id: the hash is what
+    // an exchange reports for the withdrawal that produced this call, and
+    // matching on the call id would never find it.
+    txHash: hash,
     timestamp: timestampOf(row.timestamp, 'an internal transaction'),
     kind: 'transfer',
     origin: 'derived',

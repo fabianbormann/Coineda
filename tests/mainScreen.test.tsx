@@ -637,7 +637,14 @@ describe('sync lifecycle', () => {
       await screen.findByRole('button', { name: /refresh Empty/i }),
     );
 
-    expect(await screen.findByText(/no events at all/i)).toBeInTheDocument();
+    // Scoped to THIS source's label, for the same reason its companion
+    // below is: a toast is dismissed with an exit animation rather than
+    // removed outright, so another test's "…but it has no events at all"
+    // can still be in the DOM when this one asserts, and an unscoped query
+    // then finds two.
+    expect(
+      await screen.findByText(/Synced Empty, but it has no events at all/i),
+    ).toBeInTheDocument();
   });
 
   it('reports a plain success when a sync finds nothing NEW but the source has events', async () => {

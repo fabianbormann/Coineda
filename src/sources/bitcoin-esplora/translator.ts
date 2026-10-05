@@ -593,6 +593,7 @@ export const fetchEvents = async (
     }
     events.push({
       externalId: tx.txid,
+      txHash: tx.txid,
       // Esplora reports seconds; the ledger stores epoch milliseconds.
       timestamp: tx.status.block_time * 1000,
       kind: 'transfer',

@@ -351,6 +351,7 @@ const fetchAddressPage = async (
 
     events.push({
       externalId: tx.tx_hash,
+      txHash: tx.tx_hash,
       // The API returns seconds; the ledger stores epoch milliseconds.
       // Storing these unconverted would date every event to 1970 and put
       // it in the wrong tax year.

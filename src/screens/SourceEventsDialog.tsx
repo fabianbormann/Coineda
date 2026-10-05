@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { CryptoAmount } from '@/components/money/CryptoAmount';
 import { netPrincipalLegs } from '@/ledger/balances';
+import { linkInternalTransfers, linkedEventIds } from '@/ledger/transfers';
 import type { EventKind, LedgerEvent, SourceRecord } from '@/ledger/types';
 import { EVENT_PAGE, shortVenue } from './sourceEvents';
 
@@ -82,6 +83,19 @@ export const SourceEventsDialog = ({
       .sort((a, b) => b.timestamp - a.timestamp);
   }, [events, source]);
 
+  /**
+   * Events that are one side of a transfer between the user's own venues,
+   * paired across sources on the on-chain transaction hash.
+   *
+   * Computed from the WHOLE ledger rather than from this source's own
+   * events: the other side of the pair is, by definition, in a different
+   * source. Filtering first would hide every link there is.
+   */
+  const internal = useMemo(
+    () => linkedEventIds(linkInternalTransfers(events, ownedVenues)),
+    [events, ownedVenues],
+  );
+
   const formatTime = (timestamp: number): string =>
     new Intl.DateTimeFormat(i18n.language, {
       dateStyle: 'medium',
@@ -130,6 +144,14 @@ export const SourceEventsDialog = ({
                         {formatTime(event.timestamp)}
                       </span>
                     </div>
+                    {internal.has(event.id) && (
+                      // Said plainly, because the figure below looks exactly
+                      // like a sale: value leaving one venue. The difference
+                      // is where it went, and only the pairing knows that.
+                      <p className="text-muted-foreground">
+                        {t('Moved between your own venues')}
+                      </p>
+                    )}
                     {netted.legs.length === 0 ? (
                       // A fully netted-out event: every asset came back to
                       // an owned venue. Saying so beats an empty card, which

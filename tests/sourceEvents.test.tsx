@@ -546,3 +546,98 @@ describe('which holdings a row shows, and in what order', () => {
     expect(amountsShown(row)).toEqual([]);
   });
 });
+
+describe('showing an internal transfer for what it is', () => {
+  /** A withdrawal and the wallet receipt it caused: two sources, one chain
+   *  transaction. Apart, the first looks exactly like a sale. */
+  const HASH = 'beef'.repeat(16);
+
+  const withdrawal = (): LedgerEvent => ({
+    id: 'withdraw',
+    sourceId: 'cfg-1',
+    externalId: 'withdraw',
+    txHash: HASH,
+    timestamp: 1_700_000_000_000,
+    kind: 'transfer',
+    origin: 'derived',
+    legs: [
+      {
+        assetId: 'bitcoin:native',
+        amount: '50000000',
+        direction: 'out',
+        venue: 'testexchange',
+        role: 'principal',
+      },
+    ],
+  });
+
+  const arrival = (): LedgerEvent => ({
+    id: 'arrive',
+    sourceId: 'cfg-2',
+    externalId: 'arrive',
+    txHash: HASH,
+    timestamp: 1_700_000_100_000,
+    kind: 'transfer',
+    origin: 'derived',
+    legs: [
+      {
+        assetId: 'bitcoin:native',
+        amount: '49995000',
+        direction: 'in',
+        venue: 'bc1qwallet',
+        role: 'principal',
+      },
+    ],
+  });
+
+  beforeEach(async () => {
+    await putSource({
+      id: 'cfg-1',
+      moduleId: 'test-exchange',
+      label: 'My Exchange',
+      config: {},
+    });
+    await putSource({
+      id: 'cfg-2',
+      moduleId: 'test-exchange',
+      label: 'My Wallet',
+      config: {},
+    });
+  });
+
+  it('labels both sides as a move between the user\u2019s own venues', async () => {
+    await putEvents([withdrawal(), arrival()]);
+    renderScreen();
+
+    const row = await sourceRow('My Exchange');
+    await userEvent.click(
+      within(row).getByRole('button', {
+        name: /show events from My Exchange/i,
+      }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    // The figure beside it looks exactly like a sale; only the pairing
+    // knows where the value went.
+    expect(
+      within(dialog).getByText(/between your own venues|eigenen Wallets/i),
+    ).toBeInTheDocument();
+  });
+
+  it('says nothing of the sort for a payment to somebody else', async () => {
+    // The guard that matters: a real disposal must not be dressed up as a
+    // transfer. Same withdrawal, with no matching arrival anywhere.
+    await putEvents([withdrawal()]);
+    renderScreen();
+
+    const row = await sourceRow('My Exchange');
+    await userEvent.click(
+      within(row).getByRole('button', {
+        name: /show events from My Exchange/i,
+      }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).queryByText(/between your own venues|eigenen Wallets/i),
+    ).toBeNull();
+  });
+});

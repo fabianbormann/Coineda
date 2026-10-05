@@ -355,6 +355,11 @@ export const movementToEvent = (
 
   return {
     externalId,
+    // Typed, so the transfer matcher never has to read it back out of the
+    // prose below. An exchange withdrawal and the wallet receipt it caused
+    // share this hash, and that is the only exact way to tell the pair from
+    // a sale followed by a purchase.
+    ...(txId === null || txId === '' ? {} : { txHash: txId }),
     timestamp,
     kind: 'transfer',
     origin: 'derived',

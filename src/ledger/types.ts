@@ -30,6 +30,22 @@ export type LedgerEvent = {
   /** 'derived' rows are discarded and refetched on a re-sync; 'authored'
    *  rows are the user's own and travel in the checkpoint. */
   origin: 'derived' | 'authored';
+  /**
+   * The on-chain transaction this movement happened in, when the source
+   * knows it.
+   *
+   * A TYPED field rather than something read back out of `note` or parsed
+   * off `externalId`. Both of those are prose or an opaque id, and this is
+   * data a calculation branches on: it is the only exact way to recognise
+   * that an exchange's withdrawal and a wallet's receipt are two sides of
+   * ONE movement rather than a sale followed by a purchase. See
+   * src/ledger/transfers.ts.
+   *
+   * Set by a chain module to the transaction's own hash, and by an exchange
+   * module to the hash it reports for a withdrawal or deposit. Absent where
+   * a source does not know one, which is most exchange-internal activity.
+   */
+  txHash?: string;
   /** The source's own payload, kept so an event can be re-derived or
    *  debugged without another network round trip. */
   raw?: unknown;

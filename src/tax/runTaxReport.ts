@@ -6,9 +6,11 @@ import {
   ownedVenuesOf,
 } from '@/ledger/balances';
 import type { LedgerEvent } from '@/ledger/types';
+import { linkInternalTransfers, linkedEventIds } from '@/ledger/transfers';
 import { match } from './matching';
 import { resolveValues } from './resolveValues';
 import type {
+  LotMove,
   MatchingMethod,
   TaxAssessment,
   TaxEvent,
@@ -124,9 +126,40 @@ export const runTaxReport = async (
 
   const allEvents = await getAllEvents();
   const ownedVenues = ownedVenuesOf(allEvents);
+  // Transfers between the user's own venues, in BOTH shapes.
+  //
+  // `isInternalTransfer` sees the one that lives inside a single event - a
+  // UTXO self-send. It cannot see the one that spans two: an exchange
+  // withdrawal and the wallet receipt it caused are separate events from
+  // separate sources, and apart they read as a disposal followed by an
+  // acquisition from nowhere. `linkInternalTransfers` pairs them on the
+  // on-chain transaction hash, which is exact rather than heuristic.
+  const transferLinks = linkInternalTransfers(allEvents, ownedVenues);
+  const linked = linkedEventIds(transferLinks);
+
   const consideredEvents = allEvents.filter(
-    (event) => !isInternalTransfer(event, ownedVenues),
+    (event) => !isInternalTransfer(event, ownedVenues) && !linked.has(event.id),
   );
+
+  /**
+   * What the dropped pair is replaced BY.
+   *
+   * Dropping the two events alone would be no better than leaving them as a
+   * disposal: German FIFO partitions per venue, so a coin bought on an
+   * exchange and later sold from a wallet would find no lot in the wallet's
+   * partition and report "no acquisition on record". The move carries the
+   * lot across, keeping its cost basis and its acquisition date - a
+   * transfer to oneself neither realises a gain nor restarts a holding
+   * period.
+   */
+  const lotMoves: LotMove[] = transferLinks.map((link) => ({
+    sourceEventId: link.fromEventId,
+    assetId: link.assetId,
+    amount: link.amount,
+    timestamp: link.timestamp,
+    fromVenue: link.fromVenue,
+    toVenue: link.toVenue,
+  }));
 
   const taxEvents: TaxEvent[] = [];
   const hostUnresolved: UnresolvedItem[] = [];
@@ -174,6 +207,7 @@ export const runTaxReport = async (
     valued,
     options.matching ?? module.defaultMatching,
     module.partitionBy,
+    lotMoves,
   );
   hostUnresolved.push(...shortfalls.map(shortfallToUnresolved));
 

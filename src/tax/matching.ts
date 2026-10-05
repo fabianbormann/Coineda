@@ -8,6 +8,7 @@ import {
 } from '@/ledger/amount';
 import type {
   ConsumedLot,
+  LotMove,
   MatchedDisposal,
   MatchingMethod,
   TaxEvent,
@@ -39,27 +40,6 @@ const proportion = (
 ): string =>
   divide(new Big(total).times(new Big(numerator)).toString(), denominator);
 
-/**
- * The tie-break when two events share a timestamp.
- *
- * Sorting on the timestamp alone leaves ties to Array.prototype.sort's
- * stability, which means to INSERTION order - and insertion order came
- * from the order the Cardano translator happens to build its legs in
- * (`legsFor(inputs, 'out')` before `legsFor(outputs, 'in')`). A tax result
- * that depends on the call order inside an unrelated module is not a
- * result, and renaming or reordering those two calls would silently change
- * a cost basis.
- *
- * Acquisition before disposal, deliberately: value that arrived in the
- * same instant really was available to cover what left, which is what the
- * user's balance did. Ordering the disposal first would report a shortfall
- * - "no acquisition on record" - for a disposal their holdings plainly
- * covered. Statute has no rule for an identical instant, so what matters
- * is that the answer is the same on every run.
- */
-const kindRank = (event: TaxEvent): number =>
-  event.kind === 'acquisition' ? 0 : 1;
-
 type FifoLot = {
   acquisitionEventId: string;
   amount: string;
@@ -89,49 +69,180 @@ export const match = (
   events: TaxEvent[],
   method: MatchingMethod,
   partitionBy: (event: TaxEvent) => string,
+  moves: LotMove[] = [],
 ): MatchResult => {
-  const groups = new Map<string, { partition: string; events: TaxEvent[] }>();
+  // Grouped by ASSET, with the partition resolved per event inside the
+  // walk, rather than by asset+partition up front.
+  //
+  // That change is what makes a lot move possible at all: a move crosses
+  // two partitions, so neither can be walked in isolation. Within one
+  // asset every partition is walked together in timestamp order, each
+  // keeping its own lots - so the partition boundary is exactly as hard as
+  // before for everything except a move, which is the only thing allowed
+  // to cross it.
+  const groups = new Map<string, { events: TaxEvent[]; moves: LotMove[] }>();
+  const groupFor = (assetId: string) => {
+    const existing = groups.get(assetId);
+    if (existing) {
+      return existing;
+    }
+    const created = { events: [] as TaxEvent[], moves: [] as LotMove[] };
+    groups.set(assetId, created);
+    return created;
+  };
 
   for (const event of events) {
     if (event.kind === 'income') {
       continue;
     }
-    const partition = partitionBy(event);
-    const key = `${event.assetId}\u0000${partition}`;
-    const group = groups.get(key);
-    if (group) {
-      group.events.push(event);
-    } else {
-      groups.set(key, { partition, events: [event] });
-    }
+    groupFor(event.assetId).events.push(event);
+  }
+  for (const move of moves) {
+    groupFor(move.assetId).moves.push(move);
   }
 
   const matched: MatchedDisposal[] = [];
   const shortfalls: TaxEvent[] = [];
 
-  for (const { partition, events: groupEvents } of groups.values()) {
-    const sorted = [...groupEvents].sort(
-      (a, b) => a.timestamp - b.timestamp || kindRank(a) - kindRank(b),
-    );
+  for (const group of groups.values()) {
+    const steps: Step[] = [
+      ...group.events.map((event): Step => ({ kind: 'event', event })),
+      ...group.moves.map((move): Step => ({ kind: 'move', move })),
+    ].sort((a, b) => stepTime(a) - stepTime(b) || stepRank(a) - stepRank(b));
+
     if (method === 'fifo') {
-      matchFifo(sorted, partition, matched, shortfalls);
+      matchFifo(steps, partitionBy, matched, shortfalls);
     } else {
-      matchMovingAverage(sorted, partition, matched, shortfalls);
+      matchMovingAverage(steps, partitionBy, matched, shortfalls);
     }
   }
 
   return { matched, shortfalls };
 };
 
-const matchFifo = (
-  events: TaxEvent[],
+/** One thing that happens to an asset: an event a jurisdiction classified,
+ *  or a move the host detected. */
+type Step =
+  { kind: 'event'; event: TaxEvent } | { kind: 'move'; move: LotMove };
+
+const stepTime = (step: Step): number =>
+  step.kind === 'event' ? step.event.timestamp : step.move.timestamp;
+
+/**
+ * The tie-break when two steps share a timestamp.
+ *
+ * Sorting on the timestamp alone leaves ties to Array.prototype.sort's
+ * stability, which means to INSERTION order - and insertion order came
+ * from the order the Cardano translator happens to build its legs in. A tax
+ * result that depends on the call order inside an unrelated module is not a
+ * result, and renaming those calls would silently change a cost basis.
+ *
+ * Acquisition, then move, then disposal. Value that arrived in the same
+ * instant really was available to move, and value that moved in the same
+ * instant was available to be sold at its destination - which is what the
+ * user's balance did. Any other order reports a shortfall ("no acquisition
+ * on record") for a disposal their holdings plainly covered. Statute has no
+ * rule for an identical instant, so what matters is that the answer is the
+ * same on every run.
+ */
+const stepRank = (step: Step): number =>
+  step.kind === 'move' ? 1 : step.event.kind === 'acquisition' ? 0 : 2;
+
+/** Lots per partition, created on first use. */
+const lotsIn = (
+  byPartition: Map<string, FifoLot[]>,
   partition: string,
+): FifoLot[] => {
+  const existing = byPartition.get(partition);
+  if (existing) {
+    return existing;
+  }
+  const created: FifoLot[] = [];
+  byPartition.set(partition, created);
+  return created;
+};
+
+/** The partition a move's two ends fall in, asked of the jurisdiction's own
+ *  function rather than assumed to be the venue. Austria partitions by
+ *  acquisition era, so both ends answer the same and the move is a no-op. */
+const movePartitions = (
+  move: LotMove,
+  partitionBy: (event: TaxEvent) => string,
+): { from: string; to: string } => {
+  const base: TaxEvent = {
+    sourceEventId: move.sourceEventId,
+    kind: 'acquisition',
+    assetId: move.assetId,
+    amount: move.amount,
+    timestamp: move.timestamp,
+    venue: move.toVenue,
+  };
+  return {
+    from: partitionBy({ ...base, venue: move.fromVenue }),
+    to: partitionBy(base),
+  };
+};
+
+const matchFifo = (
+  steps: Step[],
+  partitionBy: (event: TaxEvent) => string,
   matched: MatchedDisposal[],
   shortfalls: TaxEvent[],
 ): void => {
-  const lots: FifoLot[] = [];
+  const byPartition = new Map<string, FifoLot[]>();
 
-  for (const event of events) {
+  for (const step of steps) {
+    if (step.kind === 'move') {
+      const { from, to } = movePartitions(step.move, partitionBy);
+      if (from === to) {
+        // Nothing to do: the jurisdiction does not separate these two
+        // venues, so the lot is already where it needs to be.
+        continue;
+      }
+      const source = lotsIn(byPartition, from);
+      const destination = lotsIn(byPartition, to);
+
+      // Taken FIFO, and each piece keeps its OWN cost basis and acquisition
+      // date. Those two are the whole point: a transfer between a person's
+      // own wallets neither realises a gain nor restarts a holding period,
+      // so re-dating the lot would make a coin held for two years look
+      // freshly bought and turn a tax-free German disposal into a taxable
+      // one.
+      let remaining = step.move.amount;
+      while (!isZeroAmount(remaining) && source.length > 0) {
+        const lot = source[0];
+        const take =
+          compareAmounts(remaining, lot.amount) <= 0 ? remaining : lot.amount;
+        const takenCost =
+          compareAmounts(take, lot.amount) === 0
+            ? lot.costBasis
+            : proportion(lot.costBasis, take, lot.amount);
+
+        destination.push({
+          acquisitionEventId: lot.acquisitionEventId,
+          amount: take,
+          costBasis: takenCost,
+          acquiredAt: lot.acquiredAt,
+        });
+
+        lot.amount = subtractAmounts(lot.amount, take);
+        lot.costBasis = subtractAmounts(lot.costBasis, takenCost);
+        remaining = subtractAmounts(remaining, take);
+        if (isZeroAmount(lot.amount)) {
+          source.shift();
+        }
+      }
+      // A move the source cannot cover carries nothing further. It is not a
+      // shortfall of its own - no disposal happened - and the destination
+      // simply receives no lot, so a later disposal there reports "no
+      // acquisition on record", which is the honest answer.
+      continue;
+    }
+
+    const event = step.event;
+    const partition = partitionBy(event);
+    const lots = lotsIn(byPartition, partition);
+
     if (event.kind === 'acquisition') {
       if (event.value === undefined) {
         // Not a lot: never substitute zero for an unknown cost basis.
@@ -219,14 +330,56 @@ const matchFifo = (
 };
 
 const matchMovingAverage = (
-  events: TaxEvent[],
-  partition: string,
+  steps: Step[],
+  partitionBy: (event: TaxEvent) => string,
   matched: MatchedDisposal[],
   shortfalls: TaxEvent[],
 ): void => {
-  const pool: AveragePool = { amount: '0', cost: '0' };
+  const byPartition = new Map<string, AveragePool>();
+  const poolIn = (partition: string): AveragePool => {
+    const existing = byPartition.get(partition);
+    if (existing) {
+      return existing;
+    }
+    const created: AveragePool = { amount: '0', cost: '0' };
+    byPartition.set(partition, created);
+    return created;
+  };
 
-  for (const event of events) {
+  for (const step of steps) {
+    if (step.kind === 'move') {
+      const { from, to } = movePartitions(step.move, partitionBy);
+      if (from === to) {
+        // The usual case here: Austria partitions by acquisition era, not
+        // by venue, so a move between two of the user's wallets lands in
+        // the same pool and changes nothing.
+        continue;
+      }
+      const source = poolIn(from);
+      if (isZeroAmount(source.amount)) {
+        continue;
+      }
+      const moved =
+        compareAmounts(step.move.amount, source.amount) <= 0
+          ? step.move.amount
+          : source.amount;
+      const cost =
+        compareAmounts(moved, source.amount) === 0
+          ? source.cost
+          : proportion(source.cost, moved, source.amount);
+
+      source.amount = subtractAmounts(source.amount, moved);
+      source.cost = subtractAmounts(source.cost, cost);
+      const destination = poolIn(to);
+      destination.amount = addAmounts(destination.amount, moved);
+      destination.cost = addAmounts(destination.cost, cost);
+      continue;
+    }
+
+    const event = step.event;
+    const partition = partitionBy(event);
+    const pool = poolIn(partition);
+
     if (event.kind === 'acquisition') {
       if (event.value === undefined) {
         continue;

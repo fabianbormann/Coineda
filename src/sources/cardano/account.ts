@@ -265,6 +265,7 @@ export const fetchAccountPage = async ({
     }
     events.push({
       externalId: row.tx_hash,
+      txHash: row.tx_hash,
       // The API returns seconds; the ledger stores epoch milliseconds.
       // Unconverted, every event dates to 1970 and lands in the wrong tax
       // year.

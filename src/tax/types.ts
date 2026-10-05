@@ -18,6 +18,35 @@ export type TaxEvent = {
   note?: string;
 };
 
+/**
+ * A holding moving between two venues the user owns, with no sale in it.
+ *
+ * Deliberately NOT a TaxEventKind. A move is not something a jurisdiction
+ * classifies - no module emits one and none should have to handle one - it
+ * is the host telling the matcher that a lot changed hands between the
+ * user's own wallets. Adding a fourth kind would force every `classify`
+ * switch in every jurisdiction to grow a branch for something that never
+ * reaches it.
+ *
+ * It matters only where partitions are per venue. Germany's FIFO is, so
+ * without this a coin bought on an exchange and sold from a wallet finds no
+ * lot in the wallet's partition and reports "no acquisition on record" -
+ * trading a fake disposal for a missing cost basis, which is no better.
+ * Austria pools by acquisition era instead, so both ends of a move land in
+ * the same partition and it is a no-op there.
+ */
+export type LotMove = {
+  /** The ledger event that moved it, for the audit trail. */
+  sourceEventId: string;
+  assetId: string;
+  /** What ARRIVED. The difference from what left is the network fee, which
+   *  really did leave the user's control. */
+  amount: string;
+  timestamp: number;
+  fromVenue: string;
+  toVenue: string;
+};
+
 export type ConsumedLot = {
   acquisitionEventId: string;
   amount: string;
