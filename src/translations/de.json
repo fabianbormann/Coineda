@@ -376,6 +376,7 @@
     "Trade": "Handel",
     "Reward": "Belohnung",
     "Deposit": "Einzahlung",
-    "Withdrawal": "Auszahlung"
+    "Withdrawal": "Auszahlung",
+    "{{n}} without a price": "{{n}} ohne Kurs"
   }
 }

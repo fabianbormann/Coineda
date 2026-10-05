@@ -376,6 +376,7 @@
     "Trade": "Trade",
     "Reward": "Reward",
     "Deposit": "Deposit",
-    "Withdrawal": "Withdrawal"
+    "Withdrawal": "Withdrawal",
+    "{{n}} without a price": "{{n}} without a price"
   }
 }

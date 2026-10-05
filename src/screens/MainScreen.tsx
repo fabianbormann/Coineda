@@ -9,6 +9,8 @@ import {
 } from '@/ledger/db';
 import { foldHoldings, isFiatAsset, ownedVenuesOf } from '@/ledger/balances';
 import { resolveSpotPrices, totalValue } from '@/prices/priceStore';
+import { valueOf } from '@/prices/scale';
+import { compareAmounts, sumAmounts } from '@/ledger/amount';
 import { syncAll, syncSource } from '@/sync/syncSource';
 import { getSettings } from '@/settings/settingsStore';
 import { useConfirm } from '@/components/confirm/ConfirmProvider';
@@ -17,7 +19,7 @@ import { ExportCheckpointDialog } from '@/checkpoint/ExportCheckpointDialog';
 import type { LedgerEvent, SourceRecord } from '@/ledger/types';
 import { BalanceHeader } from './BalanceHeader';
 import { SourceList } from './SourceList';
-import type { SourceSummary } from './SourceRow';
+import type { PricedHolding, SourceSummary } from './SourceRow';
 import { AddSourceDialog } from './AddSourceDialog';
 import { EditSourceDialog } from './EditSourceDialog';
 import { SourceEventsDialog } from './SourceEventsDialog';
@@ -177,19 +179,47 @@ export const MainScreen = () => {
       // engine needs it for cost basis, but no module emits fiat deposits
       // yet, so a source's folded euro balance is minus everything ever
       // spent there - an artifact of an incomplete log rather than a
-      // holding. Priced at 1, it would render the Bitpanda row as a
-      // negative number. The legs themselves are untouched and still
-      // visible in SourceEventsDialog.
+      // holding. The legs themselves are untouched and still visible in
+      // SourceEventsDialog.
       const held = foldHoldings(own, ownedVenues).filter(
         (holding) => !isFiatAsset(holding.assetId),
       );
-      const { total, missing } = totalValue(held, prices);
+
+      // Priced and unpriced are separated here rather than in the row,
+      // because the sort order depends on the figure: a real Cardano wallet
+      // holds dozens of NFTs with no market price, and ordered by asset id
+      // they bury the position that matters. Each holding carries the value
+      // it was sorted by, so the order and the number on screen cannot
+      // disagree.
+      const priced: PricedHolding[] = [];
+      let unpricedCount = 0;
+      for (const holding of held) {
+        const price = prices.get(holding.assetId);
+        if (price === undefined) {
+          unpricedCount += 1;
+          continue;
+        }
+        priced.push({
+          ...holding,
+          value: valueOf(holding.amount, price, holding.assetId),
+        });
+      }
+      // Descending, through the decimal comparator - Number() here would
+      // collapse two dust positions that differ past 15 significant digits
+      // into an arbitrary order.
+      priced.sort((a, b) => compareAmounts(b.value, a.value));
+
       summary.set(source.id, {
         eventCount: own.length,
-        holdings: held,
-        // Null rather than an understated number: a holding with no price
-        // is never counted as zero, the same rule the headline follows.
-        value: missing.length === 0 ? total : null,
+        holdings: priced,
+        unpricedCount,
+        // Summed from the same per-holding values the list is ordered by.
+        // Null only when NOTHING could be priced, so a blank never reads as
+        // a zero balance.
+        value:
+          priced.length === 0
+            ? null
+            : sumAmounts(priced.map((holding) => holding.value)),
       });
     }
     return summary;

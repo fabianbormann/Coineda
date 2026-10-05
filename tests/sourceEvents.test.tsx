@@ -338,3 +338,129 @@ describe('the event log', () => {
     ).toBeDisabled();
   });
 });
+
+describe('which holdings a row shows, and in what order', () => {
+  /**
+   * The row is the owner's only glance at what a source holds, and a real
+   * Cardano wallet makes that hard: it carries a long tail of NFTs and
+   * airdropped tokens with no market price. Ordered by asset id, as this
+   * row used to be, they bury the position that matters - the owner's own
+   * wallet led with "1 APAVIA · 1 LACIE5113 · 1 LACIE5180 +38 more" and
+   * never showed its 507 ADA.
+   */
+  const NFT_POLICY = 'b'.repeat(56);
+  const nft = (name: string) =>
+    `cardano:${NFT_POLICY}${Buffer.from(name).toString('hex')}`;
+
+  /** Chosen so the correct order differs from BOTH orders it could be
+   *  confused with. By value: ETH, BTC, ADA. By asset id: BTC, ADA, ETH.
+   *  By quantity: ADA, ETH, BTC. Only one of the three is right. */
+  const PRICED = {
+    bitcoin: { eur: 20000 },
+    cardano: { eur: 0.5 },
+    ethereum: { eur: 2000 },
+  };
+
+  const holding = (
+    assetId: string,
+    amount: string,
+    id: string,
+  ): LedgerEvent => ({
+    id: crypto.randomUUID(),
+    sourceId: 'cfg-1',
+    externalId: id,
+    timestamp: 1_700_000_000_000,
+    kind: 'transfer',
+    origin: 'derived',
+    legs: [
+      {
+        assetId,
+        amount,
+        direction: 'in',
+        venue: 'wallet',
+        role: 'principal',
+      },
+    ],
+  });
+
+  const amountsShown = (row: HTMLElement): (string | null)[] =>
+    [...row.querySelectorAll('[data-slot="crypto-amount-value"]')].map(
+      (node) => node.textContent,
+    );
+
+  beforeEach(async () => {
+    await putSource({
+      id: 'cfg-1',
+      moduleId: 'test-exchange',
+      label: 'My Wallet',
+      config: {},
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify(PRICED), { status: 200 })),
+    );
+  });
+
+  it('orders by value, not by asset id and not by quantity', async () => {
+    await putEvents([
+      holding('eth:native', '1000000000000000000', 'e1'), // 1 ETH  = EUR 2000
+      holding('bitcoin:native', '5000000', 'e2'), //        0.05 BTC = EUR 1000
+      holding('cardano:lovelace', '1000000000', 'e3'), //   1000 ADA = EUR 500
+    ]);
+
+    renderScreen();
+    const row = await sourceRow('My Wallet');
+    await waitFor(() => expect(amountsShown(row)).toHaveLength(3));
+    // 1 ETH, 0.05 BTC, 1000 ADA - descending by euro value.
+    expect(amountsShown(row)).toEqual(['1', '0.05', '1,000']);
+  });
+
+  it('leaves out an asset with no price and says how many', async () => {
+    await putEvents([
+      holding('cardano:lovelace', '1000000000', 'e1'),
+      holding(nft('APAVIA'), '1', 'e2'),
+      holding(nft('LACIE5113'), '1', 'e3'),
+      holding(nft('LACIE5180'), '1', 'e4'),
+    ]);
+
+    renderScreen();
+    const row = await sourceRow('My Wallet');
+    await waitFor(() => expect(amountsShown(row)).toEqual(['1,000']));
+    // Left out, but not silently: a figure that quietly covered only part
+    // of a wallet would be worse than the clutter it replaced.
+    expect(row.textContent).toMatch(/3 (without a price|ohne Kurs)/);
+    expect(row.textContent).not.toContain('APAVIA');
+  });
+
+  it('still prices what it can when some assets have no price', async () => {
+    // The behaviour this replaces: `value` was null whenever ANY holding
+    // was unpriced, so a wallet with a single NFT in it showed no figure at
+    // all - which is every real Cardano wallet.
+    await putEvents([
+      holding('cardano:lovelace', '1000000000', 'e1'),
+      holding(nft('APAVIA'), '1', 'e2'),
+    ]);
+
+    renderScreen();
+    const row = await sourceRow('My Wallet');
+    await waitFor(() => expect(row.textContent).toContain('500'));
+  });
+
+  it('shows no figure at all when nothing could be priced', async () => {
+    // Null rather than zero. A wallet of NFTs is not worth EUR 0.00, it is
+    // worth an amount this app cannot determine, and printing 0 would be a
+    // claim rather than an absence.
+    await putEvents([
+      holding(nft('APAVIA'), '1', 'e1'),
+      holding(nft('LACIE5113'), '1', 'e2'),
+    ]);
+
+    renderScreen();
+    const row = await sourceRow('My Wallet');
+    await waitFor(() =>
+      expect(row.textContent).toMatch(/2 (without a price|ohne Kurs)/),
+    );
+    expect(row.textContent).not.toMatch(/€\s*0[.,]00/);
+    expect(amountsShown(row)).toEqual([]);
+  });
+});

@@ -10,21 +10,43 @@ import type { SourceRecord } from '@/ledger/types';
 /**
  * What one source contributed to the ledger.
  *
- * `holdings` carries the source's NON-FIAT positions only, and `value`
- * prices exactly those. The reason is specific rather than tidiness: an
- * exchange module emits a trade's euro leg (the tax engine needs it for
- * cost basis) but nothing funds it, because no module emits fiat deposits
- * yet. So a source's folded euro balance is minus everything ever spent
- * there - an artifact of an incomplete log, not a holding - and including
- * it would render the user's Bitpanda row as a negative number. The euro
- * legs are not hidden: the events dialog lists every leg of every event,
- * this one included.
+ * `holdings` carries the source's PRICED, non-fiat positions, most valuable
+ * first, and `unpricedCount` says how many were left out.
+ *
+ * Two separate exclusions, for two separate reasons:
+ *
+ * - **Fiat.** An exchange module emits a trade's euro leg (the tax engine
+ *   needs it for cost basis) but nothing funds it, because no module emits
+ *   fiat deposits yet. So a source's folded euro balance is minus
+ *   everything ever spent there - an artifact of an incomplete log, not a
+ *   holding - and including it would render the row as a negative number.
+ * - **Unpriced assets.** A real Cardano wallet holds a long tail of NFTs
+ *   and airdropped tokens with no market price at all. Sorted by asset id,
+ *   as this row used to be, they crowd out the position that matters: the
+ *   owner's own wallet led with "1 APAVIA · 1 LACIE5113 · 1 LACIE5180 +38
+ *   more" and never showed its 507 ADA.
+ *
+ * Neither is hidden. The count of unpriced assets is shown beside the
+ * figure, and every leg of every event - euro legs included - is listed in
+ * the events dialog.
  */
+export type PricedHolding = Holding & {
+  /** This holding's worth in the base currency, as a decimal string. Kept
+   *  rather than recomputed so the sort order and the figure on screen
+   *  cannot disagree. */
+  value: string;
+};
+
 export type SourceSummary = {
   eventCount: number;
-  holdings: Holding[];
-  /** Null when any holding has no price - never a total that silently
-   *  counts an unpriced asset as zero, the same rule the headline follows. */
+  /** Priced, non-fiat, most valuable first. */
+  holdings: PricedHolding[];
+  /** Held assets with no price. Disclosed rather than silently dropped -
+   *  the same rule the headline follows with its "n assets have no price"
+   *  pill. */
+  unpricedCount: number;
+  /** Sum of `holdings`. Null only when nothing at all could be priced, so
+   *  an empty figure never reads as a zero balance. */
   value: string | null;
 };
 
@@ -128,6 +150,7 @@ export const SourceRow = ({
 
   const eventCount = summary?.eventCount ?? 0;
   const holdings = summary?.holdings ?? [];
+  const unpriced = summary?.unpricedCount ?? 0;
   const shown = holdings.slice(0, HOLDINGS_SHOWN);
   const hidden = holdings.length - shown.length;
 
@@ -137,7 +160,7 @@ export const SourceRow = ({
         <div className="flex min-w-0 flex-col gap-1">
           <p className="font-medium">{source.label}</p>
           <p className="text-sm text-muted-foreground">{moduleLabel}</p>
-          {holdings.length > 0 && (
+          {(holdings.length > 0 || unpriced > 0) && (
             <p className="flex flex-wrap items-center gap-x-2 text-sm">
               {shown.map((holding, index) => (
                 <span key={holding.assetId}>
@@ -153,9 +176,17 @@ export const SourceRow = ({
                   {t('+{{n}} more', { n: hidden })}
                 </span>
               )}
-              {summary?.value !== null && summary?.value !== undefined && (
+              {summary?.value != null && (
                 <span className="text-muted-foreground">
                   = <Money value={Number(summary.value)} currency={currency} />
+                </span>
+              )}
+              {unpriced > 0 && (
+                /* Disclosed rather than silently dropped. A wallet with a
+                   long tail of NFTs would otherwise show a figure quietly
+                   covering only part of what it holds. */
+                <span className="text-muted-foreground">
+                  {t('{{n}} without a price', { n: unpriced })}
                 </span>
               )}
             </p>
