@@ -17,7 +17,14 @@ export default defineConfig({
       // autoUpdate + skipWaiting: a returning user must never be pinned to a
       // stale app shell, because there is no in-app update prompt to rescue them.
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'logo192.png', 'logo512.png'],
+      includeAssets: [
+        'favicon.ico',
+        'logo.svg',
+        'apple-touch-icon.png',
+        'logo192.png',
+        'logo512.png',
+        'maskable512.png',
+      ],
       manifest: {
         name: 'Coineda',
         short_name: 'Coineda',
@@ -32,7 +39,13 @@ export default defineConfig({
           { src: 'logo192.png', type: 'image/png', sizes: '192x192' },
           { src: 'logo512.png', type: 'image/png', sizes: '512x512' },
           {
-            src: 'logo512.png',
+            // A SEPARATE, full-bleed image for the maskable slot. The
+            // rounded tile cannot serve here: Android applies its own mask
+            // to a maskable icon, so a pre-rounded one gets its corners cut
+            // twice and the mark sits inside a shrunken, double-rounded
+            // blob. The App Store export exists for exactly this - art that
+            // bleeds past the safe area with no rim of its own.
+            src: 'maskable512.png',
             type: 'image/png',
             sizes: '512x512',
             purpose: 'maskable',
@@ -45,9 +58,9 @@ export default defineConfig({
         // Scoped to the app shell and its real built assets. The previous
         // '**/*.{js,css,html,ico,png,svg,ttf}' also swept up everything else
         // Vite copies from public/ into the build root - electron.js,
-        // icons/{64x64,256x256,512x512,icon}.png (Electron-only) and the
-        // unreferenced 308 KB coineda-logo.svg - into the precache for no
-        // reason, and duplicated favicon.ico/logo192.png/logo512.png, which
+        // icons/{64x64,256x256,512x512,icon}.png (Electron-only) - into the
+        // precache for no reason, and duplicated the favicon and app icons,
+        // which
         // are already precached once via includeAssets above. Workbox only
         // tolerated that duplication because both copies happened to share
         // the same revision hash.

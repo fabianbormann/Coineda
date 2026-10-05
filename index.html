@@ -2,14 +2,24 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" href="/favicon.ico" />
+    <!-- SVG first: browsers that understand it get a mark that stays crisp
+         at any size and costs 11 KB, and skip the .ico entirely. The .ico
+         stays as the legacy fallback, now carrying real 16/32/48/64 frames
+         instead of the single 192x192 one it used to, which every tab strip
+         had to downscale. -->
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#03A678" />
     <meta
       name="description"
       content="Coineda — a free, open source, local-running crypto tracking and tax tool"
     />
-    <link rel="apple-touch-icon" href="/logo192.png" />
+    <!-- The full-bleed variant, not the rounded tile: iOS ignores alpha on a
+         home-screen icon and fills transparency with black, so the tile's
+         transparent corners would come back as black ones. iOS rounds it
+         itself. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Coineda</title>
   </head>
   <body>

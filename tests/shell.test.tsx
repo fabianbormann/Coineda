@@ -56,3 +56,39 @@ describe('app shell', () => {
     expect(screen.getByRole('link', { name: /GPLv3/i })).toBeInTheDocument();
   });
 });
+
+describe('the header mark', () => {
+  it('shows one mark per theme, and only one at a time', () => {
+    // The mark carries the brand spectrum across its slices, so it cannot be
+    // recoloured through currentColor the way the chain icons are: only its
+    // top slice flips between light and dark. Two files, and CSS picks one -
+    // choosing in JavaScript from the resolved theme would swap the src
+    // after paint, which is a visible flicker on every load.
+    const { container } = renderShell();
+    const marks = [...container.querySelectorAll('header img')];
+    expect(marks).toHaveLength(2);
+
+    const classes = marks.map((node) => node.getAttribute('class') ?? '');
+    // Exactly one is visible by default and hidden in dark; exactly one is
+    // the other way round. Both showing at once would stack them.
+    expect(
+      classes.filter((c) => /(^|\s)dark:hidden(\s|$)/.test(c)),
+    ).toHaveLength(1);
+    expect(classes.filter((c) => /(^|\s)hidden(\s|$)/.test(c))).toHaveLength(1);
+    expect(
+      classes.filter((c) => /(^|\s)dark:block(\s|$)/.test(c)),
+    ).toHaveLength(1);
+    // Two different files, not the same one twice.
+    expect(new Set(marks.map((node) => node.getAttribute('src'))).size).toBe(2);
+  });
+
+  it('does not announce the name twice', () => {
+    // The mark says Coineda and so does the heading beside it.
+    const { container } = renderShell();
+    for (const mark of container.querySelectorAll('header img')) {
+      expect(mark.getAttribute('alt')).toBe('');
+      expect(mark.getAttribute('aria-hidden')).toBe('true');
+    }
+    expect(screen.getAllByText('Coineda')).toHaveLength(1);
+  });
+});

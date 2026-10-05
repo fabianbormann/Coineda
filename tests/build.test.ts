@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { execSync } from 'child_process';
 import fs from 'fs';
+import zlib from 'zlib';
 import path from 'path';
 import { APP_VERSION } from '../src/global/version';
 
@@ -203,5 +204,117 @@ describe('chain icon colours survive the Tailwind build', () => {
     expect(sheet).toMatch(rule);
     const atDark = sheet.slice(sheet.search(/\.dark\\:text-white/));
     expect(atDark.slice(0, 400)).toContain('.dark');
+  });
+});
+
+describe('app icons', () => {
+  /**
+   * Reads the top-left pixel's alpha out of a PNG.
+   *
+   * Worth the twenty lines: "is this icon opaque" is the actual
+   * requirement for two of the slots below, and it is silently breakable -
+   * pointing a maskable or an apple-touch icon back at the rounded tile
+   * looks fine in a file listing and wrong on a phone.
+   */
+  const topLeftAlpha = (file: string): number => {
+    const data = fs.readFileSync(path.join(buildDir, file));
+    let pos = 8; // past the PNG signature
+    let width = 0;
+    let colourType = 0;
+    const idat: Buffer[] = [];
+    while (pos < data.length) {
+      const length = data.readUInt32BE(pos);
+      const type = data.toString('ascii', pos + 4, pos + 8);
+      const body = data.subarray(pos + 8, pos + 8 + length);
+      if (type === 'IHDR') {
+        width = body.readUInt32BE(0);
+        colourType = body[9];
+      } else if (type === 'IDAT') {
+        idat.push(body);
+      } else if (type === 'IEND') {
+        break;
+      }
+      pos += 12 + length;
+    }
+    expect(width).toBeGreaterThan(0);
+    // Colour type 2 is truecolour with NO alpha channel at all, which is the
+    // strongest possible answer to "is this opaque" - there is nowhere for
+    // transparency to live. rsvg emits it whenever the art is fully opaque,
+    // which is exactly the case these assertions care about.
+    if (colourType === 2) {
+      return 255;
+    }
+    expect(colourType).toBe(6); // 8-bit RGBA, the only other form rsvg writes
+    const raw = zlib.inflateSync(Buffer.concat(idat));
+    // Byte 0 of a scanline is its filter type. On the FIRST row every filter
+    // either passes the byte through or subtracts a pixel to its left, and
+    // for the very first pixel there is nothing to its left - so byte 4 is
+    // the alpha channel verbatim, whichever filter was used.
+    return raw[4];
+  };
+
+  it('ships every icon the page and the manifest point at', () => {
+    const html = fs.readFileSync(path.join(buildDir, 'index.html'), 'utf8');
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(buildDir, 'manifest.webmanifest'), 'utf8'),
+    ) as { icons: { src: string }[] };
+
+    const referenced = [
+      ...[...html.matchAll(/(?:href|src)="\/?([^"]+\.(?:png|ico|svg))"/g)].map(
+        (match) => match[1],
+      ),
+      ...manifest.icons.map((icon) => icon.src),
+    ];
+    expect(referenced.length).toBeGreaterThan(3);
+    for (const file of new Set(referenced)) {
+      expect(
+        fs.existsSync(path.join(buildDir, file)),
+        `${file} is referenced but not in the build`,
+      ).toBe(true);
+    }
+  });
+
+  it('gives the maskable slot a FULL-BLEED icon, not the rounded tile', () => {
+    // Android masks a maskable icon itself. Hand it the pre-rounded tile and
+    // its corners are cut twice, leaving the mark inside a shrunken blob -
+    // and the tile's corners are transparent, so they come back black.
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(buildDir, 'manifest.webmanifest'), 'utf8'),
+    ) as { icons: { src: string; purpose?: string }[] };
+    const maskable = manifest.icons.find((icon) => icon.purpose === 'maskable');
+    expect(maskable).toBeDefined();
+    expect(topLeftAlpha(maskable!.src)).toBe(255);
+
+    // And it is a different image from the ordinary one, which is the shape
+    // this regression takes: both slots pointed at the same file.
+    const plain = manifest.icons.find((icon) => icon.purpose === undefined);
+    expect(maskable!.src).not.toBe(plain!.src);
+    expect(topLeftAlpha(plain!.src)).toBe(0);
+  });
+
+  it('gives iOS an opaque home-screen icon', () => {
+    // iOS ignores alpha on an apple-touch-icon and fills transparency with
+    // black, so a rounded tile with transparent corners gets black ones.
+    const html = fs.readFileSync(path.join(buildDir, 'index.html'), 'utf8');
+    const match = /rel="apple-touch-icon"\s+href="\/?([^"]+)"/.exec(html);
+    expect(match).not.toBeNull();
+    expect(topLeftAlpha(match![1])).toBe(255);
+  });
+
+  it('carries small frames in the .ico, for the tab strip that reads it', () => {
+    // The previous favicon.ico held one 192x192 frame and weighed 152 KB, so
+    // every 16px tab rendered a downscale of it. An .ico exists precisely to
+    // carry the small sizes ready-made.
+    const ico = fs.readFileSync(path.join(buildDir, 'favicon.ico'));
+    const count = ico.readUInt16LE(4);
+    expect(count).toBeGreaterThanOrEqual(3);
+    // Width and height live in the directory entry; 0 means 256.
+    const sizes = Array.from(
+      { length: count },
+      (_, i) => ico[6 + i * 16] || 256,
+    );
+    expect(sizes).toContain(16);
+    expect(sizes).toContain(32);
+    expect(ico.length).toBeLessThan(80_000);
   });
 });
