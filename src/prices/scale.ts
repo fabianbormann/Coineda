@@ -44,10 +44,27 @@ import { normaliseAmount } from '@/ledger/amount';
  * disagree. A real Ethereum chain module would report wei already and must
  * not scale again.
  */
+/**
+ * NIGHT, the Midnight token, identified by its Cardano policy id plus asset
+ * name in hex - never by its ticker.
+ *
+ * The ticker is the trap: CoinGecko lists TWO coins with the symbol NIGHT,
+ * and the other one ('midnight') trades at about EUR 0.0000089 against this
+ * one's EUR 0.040. Resolving a holding by symbol would have priced the
+ * owner's 2136 NIGHT at about two cents instead of EUR 86 - a 4,500-fold
+ * error with nothing downstream able to see it.
+ */
+export const NIGHT_ASSET_ID =
+  'cardano:0691b2fecca1ac4f53cb6dfb00b7013e561d1f34403b957cbb5af1fa4e49474854';
+
 export const ASSET_DECIMALS: Record<string, number> = {
   'cardano:lovelace': 6,
   'bitcoin:native': 8,
   'eth:native': 18,
+  // NIGHT (Midnight), a Cardano native token. 6 decimals per CoinGecko's
+  // detail_platforms for the Cardano platform. Bitpanda reports it in whole
+  // NIGHT, so `baseUnits` scales by this on the way in.
+  [NIGHT_ASSET_ID]: 6,
 };
 
 export const decimalsOf = (assetId: string): number =>

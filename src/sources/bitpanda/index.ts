@@ -33,9 +33,15 @@ export const bitpanda: SourceModule = {
     // Named so onboarding can tell the user exactly which boxes to tick and
     // nothing wider. A key that can trade is a key that can lose money, and
     // nothing here needs one.
-    requiredScopes: ['Trades', 'Transactions', 'Wallets'],
+    // Measured against a real read key on 2026-10-05, not copied from the
+    // docs. That key returns 401 for /transactions and /masterdata and 200
+    // for /wallets/transactions, which is the only route this module
+    // drains - so 'Transactions', which an earlier version of this manifest
+    // demanded, is not needed and asking for it would have had users grant
+    // a wider key than the job requires.
+    requiredScopes: ['Trades', 'Wallets'],
     needsRelay: false,
-    emits: ['trade'],
+    emits: ['trade', 'transfer'],
     docsUrl: 'https://developers.bitpanda.com',
   },
 

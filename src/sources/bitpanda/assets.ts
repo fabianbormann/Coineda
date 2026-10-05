@@ -1,7 +1,7 @@
 import Big from 'big.js';
 import { normaliseAmount } from '@/ledger/amount';
 import { isFiatAsset } from '@/ledger/balances';
-import { ASSET_DECIMALS } from '@/prices/scale';
+import { ASSET_DECIMALS, NIGHT_ASSET_ID } from '@/prices/scale';
 
 /**
  * Bitpanda symbol to Coineda asset id.
@@ -21,6 +21,11 @@ export const BITPANDA_ASSETS: Record<string, string> = {
   ETH: 'eth:native',
   ADA: 'cardano:lovelace',
   EUR: 'fiat:eur',
+  // Stated with certainty rather than inferred: the owner's account holds
+  // NIGHT, and the id below is its Cardano policy plus asset name, resolved
+  // through CoinGecko's own platform record. Mapping the TICKER would have
+  // been wrong - CoinGecko lists two different coins as NIGHT.
+  NIGHT: NIGHT_ASSET_ID,
 };
 
 export const assetIdForSymbol = (symbol: string): string | null =>

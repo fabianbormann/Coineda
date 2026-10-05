@@ -1,3 +1,5 @@
+import { NIGHT_ASSET_ID } from './scale';
+
 /**
  * CoinGecko is the only price provider. Native `fetch` only - `axios` was
  * removed from the project in Task 1.
@@ -15,6 +17,10 @@ export const COINGECKO_IDS: Record<string, string> = {
   'cardano:lovelace': 'cardano',
   'bitcoin:native': 'bitcoin',
   'eth:native': 'ethereum',
+  // 'midnight-3', NOT 'midnight'. Both carry the symbol NIGHT on CoinGecko
+  // and they are different coins at wildly different prices; see the note on
+  // NIGHT_ASSET_ID in src/prices/scale.ts.
+  [NIGHT_ASSET_ID]: 'midnight-3',
 };
 
 const SIMPLE_PRICE_URL = 'https://api.coingecko.com/api/v3/simple/price';

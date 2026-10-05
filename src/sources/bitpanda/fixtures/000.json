@@ -1,0 +1,265 @@
+{
+  "_synthetic": "INVENTED, not recorded. Modelled field for field on a real GET /v1/wallets/transactions response measured on 2026-10-05, but every id, address, hash, amount and date here is made up: a real recording of this route is the owner's own account history and their own wallet addresses, which must never enter this repository. What is faithful is the SHAPE - the embedded `trade` object on a trade-linked row and its absence on a standalone one, `amount` and `fee` in WHOLE units, `status`, and the `links`/`meta` paging envelope.",
+  "call": 1,
+  "url": "https://api.bitpanda.com/v1/wallets/transactions?page=1&page_size=500",
+  "status": 200,
+  "body": {
+    "data": [
+      {
+        "type": "wallet_transaction",
+        "id": "bp-1",
+        "attributes": {
+          "amount": "0.25000000",
+          "recipient": "",
+          "time": {
+            "date_iso8601": "2026-02-01T10:00:00+01:00",
+            "unix": "1770022800"
+          },
+          "confirmations": 6,
+          "in_or_out": "incoming",
+          "type": "buy",
+          "status": "finished",
+          "amount_eur": "5000.00",
+          "amount_eur_incl_fee": "5000.00",
+          "purpose_text": "",
+          "wallet_id": "wallet-btc",
+          "cryptocoin_id": "1",
+          "cryptocoin_symbol": "BTC",
+          "fee": "0.00000000",
+          "tx_id": "",
+          "is_savings": false,
+          "tags": [],
+          "public_status": "finished",
+          "trade": {
+            "type": "trade",
+            "id": "trade-btc-0.25000000",
+            "attributes": {
+              "status": "finished",
+              "type": "buy",
+              "cryptocoin_symbol": "BTC",
+              "amount_fiat": "5000.00",
+              "amount_cryptocoin": "0.25000000",
+              "fiat_to_eur_rate": "1.00000000",
+              "price": "20000.00",
+              "fee": {
+                "type": "fee",
+                "attributes": {
+                  "fee_percentage": 2.49,
+                  "fee_amount_in_fiat": "1.00000000"
+                }
+              },
+              "is_fee_transparent": true
+            }
+          }
+        }
+      },
+      {
+        "type": "wallet_transaction",
+        "id": "bp-2",
+        "attributes": {
+          "amount": "0.10000000",
+          "recipient": "bc1qexampleaddressexampleaddressexampleaddr",
+          "time": {
+            "date_iso8601": "2026-02-02T10:00:00+01:00",
+            "unix": "1770109200"
+          },
+          "confirmations": 6,
+          "in_or_out": "outgoing",
+          "type": "withdrawal",
+          "status": "finished",
+          "amount_eur": "2000.00",
+          "amount_eur_incl_fee": "2000.00",
+          "purpose_text": "",
+          "wallet_id": "wallet-btc",
+          "cryptocoin_id": "1",
+          "cryptocoin_symbol": "BTC",
+          "fee": "0.00003900",
+          "tx_id": "aaaa1111bbbb2222cccc3333dddd4444eeee5555ffff6666aaaa7777bbbb8888",
+          "is_savings": false,
+          "tags": [],
+          "public_status": "finished"
+        }
+      },
+      {
+        "type": "wallet_transaction",
+        "id": "bp-3",
+        "attributes": {
+          "amount": "9.99000000",
+          "recipient": "",
+          "time": {
+            "date_iso8601": "2026-02-03T10:00:00+01:00",
+            "unix": "1770195600"
+          },
+          "confirmations": 6,
+          "in_or_out": "incoming",
+          "type": "buy",
+          "status": "pending",
+          "amount_eur": "1.00",
+          "amount_eur_incl_fee": "1.00",
+          "purpose_text": "",
+          "wallet_id": "wallet-btc",
+          "cryptocoin_id": "1",
+          "cryptocoin_symbol": "BTC",
+          "fee": "0.00000000",
+          "tx_id": "",
+          "is_savings": false,
+          "tags": [],
+          "public_status": "pending",
+          "trade": {
+            "type": "trade",
+            "id": "trade-btc-9.99000000",
+            "attributes": {
+              "status": "pending",
+              "type": "buy",
+              "cryptocoin_symbol": "BTC",
+              "amount_fiat": "1.00",
+              "amount_cryptocoin": "9.99000000",
+              "fiat_to_eur_rate": "1.00000000",
+              "price": "0.10",
+              "fee": {
+                "type": "fee",
+                "attributes": {
+                  "fee_percentage": 2.49,
+                  "fee_amount_in_fiat": "1.00000000"
+                }
+              },
+              "is_fee_transparent": true
+            }
+          }
+        }
+      },
+      {
+        "type": "wallet_transaction",
+        "id": "bp-4",
+        "attributes": {
+          "amount": "12.00000000",
+          "recipient": "",
+          "time": {
+            "date_iso8601": "2026-02-04T10:00:00+01:00",
+            "unix": "1770282000"
+          },
+          "confirmations": 6,
+          "in_or_out": "incoming",
+          "type": "deposit",
+          "status": "finished",
+          "amount_eur": "0.48",
+          "amount_eur_incl_fee": "0.48",
+          "purpose_text": "",
+          "wallet_id": "wallet-night",
+          "cryptocoin_id": "1",
+          "cryptocoin_symbol": "NIGHT",
+          "fee": "0.00000000",
+          "tx_id": "cafe1111cafe2222cafe3333cafe4444cafe5555cafe6666cafe7777cafe8888",
+          "is_savings": false,
+          "tags": [],
+          "public_status": "finished"
+        }
+      },
+      {
+        "type": "wallet_transaction",
+        "id": "bp-5",
+        "attributes": {
+          "amount": "1.00000000",
+          "recipient": "",
+          "time": {
+            "date_iso8601": "2026-02-05T10:00:00+01:00",
+            "unix": "1770368400"
+          },
+          "confirmations": 6,
+          "in_or_out": "incoming",
+          "type": "buy",
+          "status": "finished",
+          "amount_eur": "30.00",
+          "amount_eur_incl_fee": "30.00",
+          "purpose_text": "",
+          "wallet_id": "wallet-xau",
+          "cryptocoin_id": "1",
+          "cryptocoin_symbol": "XAU",
+          "fee": "0.00000000",
+          "tx_id": "",
+          "is_savings": false,
+          "tags": [],
+          "public_status": "finished",
+          "trade": {
+            "type": "trade",
+            "id": "trade-xau-1.00000000",
+            "attributes": {
+              "status": "finished",
+              "type": "buy",
+              "cryptocoin_symbol": "XAU",
+              "amount_fiat": "30.00",
+              "amount_cryptocoin": "1.00000000",
+              "fiat_to_eur_rate": "1.00000000",
+              "price": "30.00",
+              "fee": {
+                "type": "fee",
+                "attributes": {
+                  "fee_percentage": 2.49,
+                  "fee_amount_in_fiat": "1.00000000"
+                }
+              },
+              "is_fee_transparent": true
+            }
+          }
+        }
+      },
+      {
+        "type": "wallet_transaction",
+        "id": "bp-6",
+        "attributes": {
+          "amount": "0.01000000",
+          "recipient": "",
+          "time": {
+            "date_iso8601": "2026-02-06T10:00:00+01:00",
+            "unix": "1770454800"
+          },
+          "confirmations": 6,
+          "in_or_out": "incoming",
+          "type": "buy",
+          "status": "finished",
+          "amount_eur": "828.00",
+          "amount_eur_incl_fee": "828.00",
+          "purpose_text": "",
+          "wallet_id": "wallet-btc",
+          "cryptocoin_id": "1",
+          "cryptocoin_symbol": "BTC",
+          "fee": "0.00000000",
+          "tx_id": "",
+          "is_savings": false,
+          "tags": [],
+          "public_status": "finished",
+          "trade": {
+            "type": "trade",
+            "id": "trade-btc-0.01000000",
+            "attributes": {
+              "status": "finished",
+              "type": "buy",
+              "cryptocoin_symbol": "BTC",
+              "amount_fiat": "900.00",
+              "amount_cryptocoin": "0.01000000",
+              "fiat_to_eur_rate": "0.92",
+              "price": "90000.00",
+              "fee": {
+                "type": "fee",
+                "attributes": {
+                  "fee_percentage": 2.49,
+                  "fee_amount_in_fiat": "1.00000000"
+                }
+              },
+              "is_fee_transparent": true
+            }
+          }
+        }
+      }
+    ],
+    "meta": {
+      "total_count": 6,
+      "page_size": 500,
+      "page": 1,
+      "page_number": 1
+    },
+    "links": {
+      "self": "?page_number=1&page_size=500"
+    }
+  }
+}
