@@ -16,6 +16,7 @@ import type {
   TaxAssessment,
   TaxManifest,
   TaxModule,
+  UnresolvedItem,
 } from '@/tax/types';
 
 /**
@@ -760,5 +761,125 @@ describe('printing the report', () => {
     expect(stamp?.textContent).toMatch(/2026/); // the date it was made
     // Hidden on screen, where the year is already in the form above.
     expect(stamp?.className).toContain('hidden');
+  });
+});
+
+describe('reading the unresolved list', () => {
+  /** A module whose assessment carries a fixed set of unresolved items, so
+   *  their years and order are the test's to choose. */
+  const withUnresolved = (items: UnresolvedItem[]): TaxModule => {
+    const base = makeModule();
+    return {
+      ...base,
+      assess: (input) => ({ ...base.assess(input), unresolved: items }),
+    };
+  };
+
+  const gap = (
+    label: string,
+    timestamp: number,
+    overrides: Partial<UnresolvedItem> = {},
+  ): UnresolvedItem => ({
+    kind: 'needs-price',
+    sourceEventId: label,
+    assetId: 'cardano:lovelace',
+    amount: '1000000',
+    venue: 'wallet-a',
+    timestamp,
+    reason: `gap ${label}`,
+    taxEventKind: 'acquisition',
+    resolutions: [],
+    ...overrides,
+  });
+
+  /** The reasons, in the order they are rendered. */
+  const renderedOrder = (container: HTMLElement): string[] =>
+    [...container.querySelectorAll('[role="alert"]')]
+      .map((node) => node.textContent ?? '')
+      .map((text) => /gap (\S+)/.exec(text)?.[1] ?? '')
+      .filter(Boolean);
+
+  const threeYears = [
+    gap('c', Date.UTC(2026, 0, 5)),
+    gap('a', Date.UTC(2023, 5, 1)),
+    gap('b', Date.UTC(2025, 3, 9)),
+  ];
+
+  it('lists them in date order, not in the order the engine produced them', async () => {
+    // A wallet's whole history lands here, and the engine's own order is
+    // not one a reader can follow.
+    taxRegistry.push(withUnresolved(threeYears));
+    await putEvents([acquisitionEvent, disposalEvent]);
+    const { container } = renderScreen();
+    await runReport('2025');
+
+    expect(renderedOrder(container)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('shows every year until asked not to', async () => {
+    // Off by default on purpose: an item outside the year is not
+    // automatically irrelevant to it - an unpriced acquisition from three
+    // years back is exactly why an in-year disposal has no cost basis.
+    taxRegistry.push(withUnresolved(threeYears));
+    await putEvents([acquisitionEvent, disposalEvent]);
+    const { container } = renderScreen();
+    await runReport('2025');
+
+    expect(renderedOrder(container)).toHaveLength(3);
+    expect(
+      screen.getByRole('checkbox', { name: /outside the tax year/i }),
+    ).not.toBeChecked();
+  });
+
+  it('hides the other years when asked, and says how many', async () => {
+    // Never silently: a list that shrank from three entries to one with
+    // nothing explaining it is worse than the noise it replaced.
+    taxRegistry.push(withUnresolved(threeYears));
+    await putEvents([acquisitionEvent, disposalEvent]);
+    const { container } = renderScreen();
+    await runReport('2025');
+
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: /outside the tax year/i }),
+    );
+
+    expect(renderedOrder(container)).toEqual(['b']);
+    expect(
+      screen.getByText(/2 .*2025.*hidden|2 außerhalb/i),
+    ).toBeInTheDocument();
+  });
+
+  it('judges the year in UTC, where the boundary actually is', async () => {
+    // 2026-01-01T00:30 UTC is still 2025 in any timezone west of London. A
+    // local reading moves an event across the year boundary - which is
+    // precisely the boundary this filter is about.
+    taxRegistry.push(
+      withUnresolved([
+        gap('newyear', Date.UTC(2026, 0, 1, 0, 30)),
+        gap('inyear', Date.UTC(2025, 6, 1)),
+      ]),
+    );
+    await putEvents([acquisitionEvent, disposalEvent]);
+    const { container } = renderScreen();
+    await runReport('2025');
+
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: /outside the tax year/i }),
+    );
+    expect(renderedOrder(container)).toEqual(['inyear']);
+  });
+});
+
+describe('the threshold line', () => {
+  it('does not put a dash where a minus sign would be read', async () => {
+    // "Nicht erreicht - 144,47 €" reads as minus 144,47. The figure is a
+    // distance below the limit and is positive.
+    taxRegistry.push(makeModule());
+    renderScreen();
+    await runReport('2025');
+
+    const line = await screen.findByText(/under the limit/i);
+    expect(line.textContent).not.toMatch(/-\s*€/);
+    expect(line.textContent).not.toMatch(/-\s*\d/);
   });
 });

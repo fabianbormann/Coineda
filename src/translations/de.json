@@ -310,7 +310,6 @@
     "Limit": "Grenze",
     "Actual": "Tatsächlich",
     "Limit reached": "Grenze erreicht",
-    "Not reached - {{amount}} under the limit": "Nicht erreicht - {{amount}} unter der Grenze",
     "Disposals": "Veräußerungen",
     "No disposals in this year.": "Keine Veräußerungen in diesem Jahr.",
     "Proceeds": "Erlös",
@@ -389,6 +388,9 @@
     "Back to overview": "Zurück zur Übersicht",
     "Print or save as PDF": "Drucken oder als PDF speichern",
     "Tax year": "Steuerjahr",
-    "Created on {{date}}": "Erstellt am {{date}}"
+    "Created on {{date}}": "Erstellt am {{date}}",
+    "Not reached · {{amount}} under the limit": "Nicht erreicht · {{amount}} unter der Grenze",
+    "Hide transactions outside the tax year": "Transaktionen außerhalb des Steuerjahrs ausblenden",
+    "{{n}} outside {{year}} are hidden": "{{n}} außerhalb von {{year}} ausgeblendet"
   }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TriangleAlertIcon, Loader2Icon } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -118,6 +118,17 @@ const groupByKind = (
 export const TaxReportScreen = () => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  /**
+   * Whether to hide unresolved items dated outside the tax year.
+   *
+   * Off by default, and deliberately so: an item outside the year is not
+   * automatically irrelevant to it. An unpriced ACQUISITION from three
+   * years ago is exactly why an in-year disposal has no cost basis, so
+   * hiding it by default would hide the reason the figure above is
+   * missing. The noise is real though - a wallet's whole history lands
+   * here - so the choice is offered rather than made.
+   */
+  const [hideOutsideYear, setHideOutsideYear] = useState(false);
 
   const [module, setModule] = useState<TaxModule | null>(null);
   // Built once, when the jurisdiction is actually chosen (an event
@@ -280,6 +291,28 @@ export const TaxReportScreen = () => {
       window.print();
     }
   };
+
+  /**
+   * The unresolved items as they are shown: optionally filtered to the tax
+   * year, and always in date order.
+   *
+   * The year is read in UTC, matching the rest of this app - a local
+   * reading can move an event across a year boundary, which is precisely
+   * the boundary this filter is about.
+   */
+  const shownUnresolved = useMemo(() => {
+    const items = assessment?.unresolved ?? [];
+    const kept = hideOutsideYear
+      ? items.filter(
+          (item) =>
+            new Date(item.timestamp).getUTCFullYear() === assessment?.year,
+        )
+      : [...items];
+    return kept.sort((a, b) => a.timestamp - b.timestamp);
+  }, [assessment, hideOutsideYear]);
+
+  const hiddenOutsideYear =
+    (assessment?.unresolved.length ?? 0) - shownUnresolved.length;
 
   const formatDate = (timestamp: number): string =>
     new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium' }).format(
@@ -620,7 +653,7 @@ export const TaxReportScreen = () => {
                             </p>
                           ) : (
                             <p className="text-muted-foreground">
-                              {t('Not reached - {{amount}} under the limit', {
+                              {t('Not reached · {{amount}} under the limit', {
                                 amount: formatFiat(
                                   Number(
                                     subtractAmounts(
@@ -708,7 +741,36 @@ export const TaxReportScreen = () => {
                         { count: assessment.unresolved.length },
                       )}
                     </h3>
-                    {groupByKind(assessment.unresolved).map(([kind, items]) => (
+
+                    {/* Chronological within each kind. The list arrives in
+                        whatever order the engine produced it, which for a
+                        wallet's whole history is no order a reader can
+                        follow. Hidden from the print: it is a control, and
+                        what it hides is stated below it anyway. */}
+                    <label className="flex w-fit items-center gap-2 text-sm text-muted-foreground print:hidden">
+                      <input
+                        type="checkbox"
+                        checked={hideOutsideYear}
+                        onChange={(changed) =>
+                          setHideOutsideYear(changed.target.checked)
+                        }
+                        className="size-4 accent-current"
+                      />
+                      {t('Hide transactions outside the tax year')}
+                    </label>
+                    {hiddenOutsideYear > 0 && (
+                      // Never silently. A list that shrank from 60 entries
+                      // to 4 with nothing saying why is worse than the
+                      // noise it replaced.
+                      <p className="text-sm text-muted-foreground">
+                        {t('{{n}} outside {{year}} are hidden', {
+                          n: hiddenOutsideYear,
+                          year: assessment.year,
+                        })}
+                      </p>
+                    )}
+
+                    {groupByKind(shownUnresolved).map(([kind, items]) => (
                       <div key={kind} className="flex flex-col gap-2">
                         <p className="text-sm font-medium">
                           {kindHeading(kind, t)} ({items.length})

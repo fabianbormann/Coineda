@@ -93,5 +93,20 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],
+    /**
+     * Tests run in a NON-UTC timezone on purpose.
+     *
+     * This app is strict about UTC - a local reading can move an event
+     * across a day boundary and, at year end, across a tax year - but on a
+     * machine whose own zone is UTC, `getFullYear` and `getUTCFullYear`
+     * return the same thing for every input, so a local-time slip is
+     * invisible to every test. Pinning a zone with a real offset is what
+     * makes that class of bug fail here instead of in somebody's report.
+     *
+     * New York rather than somewhere ahead of UTC because it is behind it:
+     * a timestamp just after midnight UTC on 1 January falls in the
+     * PREVIOUS year locally, which is the exact boundary that matters.
+     */
+    env: { TZ: 'America/New_York' },
   },
 });
