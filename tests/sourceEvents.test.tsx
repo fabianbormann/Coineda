@@ -173,16 +173,20 @@ describe('what a source holds', () => {
   it('shows the position in whole units, not in base units', async () => {
     renderScreen();
     const row = await sourceRow('My Exchange');
+    // Anchored on the value slot, which is still exactly one figure - so
+    // this continues to tell 0.5 from -0.5, which a substring match on the
+    // row's whole text could not.
     await waitFor(() =>
-      expect(within(row).getByText(/^0\.5 BTC$/)).toBeInTheDocument(),
+      expect(within(row).getByText(/^0\.5$/)).toBeInTheDocument(),
     );
+    expect(row.textContent).toContain('BTC');
     // The two shapes of the bug this replaces: the raw satoshi figure, and
     // the technical asset id standing in for a symbol.
     expect(within(row).queryByText(/50000000|50,000,000/)).toBeNull();
     expect(within(row).queryByText(/bitcoin:native/)).toBeNull();
     // The other source's own, different position.
     const other = await sourceRow('My Wallet');
-    expect(within(other).getByText(/^-1 BTC$/)).toBeInTheDocument();
+    expect(within(other).getByText(/^-1$/)).toBeInTheDocument();
   });
 
   it('prices the position without the euro leg a trade leaves behind', async () => {
@@ -266,9 +270,11 @@ describe('the event log', () => {
     // 5 out, 4 back in, so what the user actually parted with is 1 BTC.
     // Showing the raw legs would print both 5 and 4 and neither would be
     // the answer.
-    expect(within(dialog).getByText(/1 BTC/)).toBeInTheDocument();
-    expect(within(dialog).queryByText(/5 BTC/)).toBeNull();
-    expect(within(dialog).queryByText(/4 BTC/)).toBeNull();
+    const amounts = [
+      ...dialog.querySelectorAll('[data-slot="crypto-amount-value"]'),
+    ].map((node) => node.textContent);
+    expect(amounts).toEqual(['1']);
+    expect(dialog.textContent).toContain('BTC');
   });
 
   it('keeps both ends of an address so two from one wallet stay distinct', () => {

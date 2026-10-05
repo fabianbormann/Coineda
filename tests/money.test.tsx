@@ -74,14 +74,27 @@ describe('crypto amounts', () => {
     // asset id, never a pre-scaled figure and never a symbol. The old
     // `symbol` prop let its one caller pass the raw id, which rendered
     // "10000000 cardano:lovelace" where the user holds 10 ADA.
-    render(<CryptoAmount value="150000000" assetId="bitcoin:native" />);
-    expect(screen.getByText(/^1\.5 BTC$/)).toBeInTheDocument();
+    const { container } = render(
+      <CryptoAmount value="150000000" assetId="bitcoin:native" />,
+    );
+    // The figure and the unit are separate elements now: BTC has a mark, so
+    // the unit is drawn rather than written and survives as screen-reader
+    // text. Asserting the value slot keeps this exact instead of loose.
+    expect(
+      container.querySelector('[data-slot="crypto-amount-value"]')?.textContent,
+    ).toBe('1.5');
+    expect(container.textContent).toContain('BTC');
   });
 
   it('does not render the technical asset id', () => {
-    render(<CryptoAmount value="10000000" assetId="cardano:lovelace" />);
-    expect(screen.getByText(/^10 ADA$/)).toBeInTheDocument();
-    expect(screen.queryByText(/lovelace/)).not.toBeInTheDocument();
+    const { container } = render(
+      <CryptoAmount value="10000000" assetId="cardano:lovelace" />,
+    );
+    expect(
+      container.querySelector('[data-slot="crypto-amount-value"]')?.textContent,
+    ).toBe('10');
+    expect(container.textContent).toContain('ADA');
+    expect(container.textContent).not.toContain('lovelace');
   });
 
   it('keeps large quantities exact instead of rounding the integer part', () => {

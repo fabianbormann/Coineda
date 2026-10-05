@@ -248,15 +248,16 @@ describe('on screen', () => {
         bulkResponse([{ subject: UGLY, name: 'HOSKY Token', ticker: 'HOSKY' }]),
       ),
     );
-    render(
+    const { container } = render(
       <TokenMetaProvider assetIds={[assetId]}>
         <CryptoAmount value="12" assetId={assetId} />
       </TokenMetaProvider>,
     );
-    await waitFor(() =>
-      expect(screen.getByText(/12 HOSKY/)).toBeInTheDocument(),
-    );
-    expect(screen.queryByText(/Hosky_Token_v2/)).toBeNull();
+    // textContent rather than a single text node: the amount and the symbol
+    // are separate spans now that the mark can sit between them.
+    await waitFor(() => expect(container.textContent).toContain('HOSKY'));
+    expect(container.textContent).toContain('12');
+    expect(container.textContent).not.toContain('Hosky_Token_v2');
   });
 
   it('names the asset offline when the registry gives nothing', async () => {
@@ -264,21 +265,24 @@ describe('on screen', () => {
       'fetch',
       vi.fn(async () => bulkResponse([])),
     );
-    render(
+    const { container } = render(
       <TokenMetaProvider assetIds={[NIGHT_ASSET_ID]}>
         <CryptoAmount value="12000000" assetId={NIGHT_ASSET_ID} />
       </TokenMetaProvider>,
     );
     // Decoded straight out of the subject, so this holds with no network at
     // all - and it must never show the 66-character subject.
-    expect(screen.getByText(/12 NIGHT/)).toBeInTheDocument();
-    expect(screen.queryByText(new RegExp(SUBJECT))).toBeNull();
+    expect(container.textContent).toContain('12');
+    expect(container.textContent).toContain('NIGHT');
+    expect(container.textContent).not.toContain(SUBJECT);
   });
 });
 
-describe('icons', () => {
+describe('marks and symbols are alternatives', () => {
   it('draws a vector for a chain it ships support for', () => {
-    const { container } = render(<AssetIcon assetId="bitcoin:native" />);
+    const { container } = render(
+      <AssetIcon assetId="bitcoin:native" label="BTC" />,
+    );
     const svg = container.querySelector('svg');
     expect(svg).not.toBeNull();
     // In brand colour, not currentColor: an identity mark tinted to the
@@ -289,7 +293,7 @@ describe('icons', () => {
 
   it('gives each known chain its own distinct mark', () => {
     const pathOf = (assetId: string) => {
-      const { container } = render(<AssetIcon assetId={assetId} />);
+      const { container } = render(<AssetIcon assetId={assetId} label="x" />);
       return container.querySelector('path')?.getAttribute('d');
     };
     const btc = pathOf('bitcoin:native');
@@ -310,27 +314,71 @@ describe('icons', () => {
     );
     const { container } = render(
       <TokenMetaProvider assetIds={[NIGHT_ASSET_ID]}>
-        <AssetIcon assetId={NIGHT_ASSET_ID} />
+        <AssetIcon assetId={NIGHT_ASSET_ID} label="NIGHT" />
       </TokenMetaProvider>,
     );
     await waitFor(() => expect(container.querySelector('img')).not.toBeNull());
     const img = container.querySelector('img');
     expect(img?.getAttribute('src')).toBe(`data:image/png;base64,${PNG_B64}`);
-    // Decorative: the amount beside it already names the asset.
-    expect(img?.getAttribute('alt')).toBe('');
   });
 
-  it('falls back to a monogram rather than a blank', async () => {
-    // A row with a gap where every sibling has a mark reads as a loading
-    // bug. Most native tokens in a real wallet are unregistered.
+  it('renders no mark at all when there is none to render', () => {
+    // Deliberately nothing, not a monogram. The caller writes the symbol
+    // instead, which is a better answer than initials like "NI".
+    const { container } = render(
+      <AssetIcon assetId={NIGHT_ASSET_ID} label="NIGHT" />,
+    );
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('svg')).toBeNull();
+    expect(container.textContent).toBe('');
+  });
+
+  it('puts the amount first and the mark after it, with no written symbol', () => {
+    // What the figure reads as: "0.3866 <mark>", the way "5 kg" reads. A
+    // logo next to the letters BTC says the same thing twice.
+    const { container } = render(
+      <CryptoAmount value="38660000" assetId="bitcoin:native" />,
+    );
+    const visible = container.textContent ?? '';
+    expect(visible).toContain('0.3866');
+    // The symbol survives only as screen-reader text, never as visible
+    // characters beside the mark.
+    expect(container.querySelector('.sr-only')?.textContent).toBe('BTC');
+    expect(container.querySelector('span:not(.sr-only) > svg')).not.toBeNull();
+
+    // And the mark genuinely comes after the digits in reading order.
+    const text = (container.firstElementChild as HTMLElement).innerHTML;
+    expect(text.indexOf('0.3866')).toBeLessThan(text.indexOf('<svg'));
+  });
+
+  it('writes the symbol out when the asset has no mark', () => {
+    // The unit is never simply missing: no logo means letters.
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => bulkResponse([])),
     );
-    const { container } = render(<AssetIcon assetId={NIGHT_ASSET_ID} />);
-    expect(container.querySelector('img')).toBeNull();
+    render(<CryptoAmount value="12000000" assetId={NIGHT_ASSET_ID} />);
+    expect(screen.getByText(/12/)).toBeInTheDocument();
+    expect(screen.getAllByText('NIGHT').length).toBeGreaterThan(0);
+  });
+
+  it('never leaves a screen reader with a bare number', () => {
+    // The mark replaces the written symbol, so if it carried no accessible
+    // name the unit would be gone entirely for anyone not looking at it.
+    const { container } = render(
+      <CryptoAmount value="38660000" assetId="bitcoin:native" />,
+    );
+    expect(container.textContent).toContain('BTC');
+    expect(container.querySelector('[title="BTC"]')).not.toBeNull();
+  });
+
+  it('writes the symbol when the icon is switched off', () => {
+    const { container } = render(
+      <CryptoAmount value="38660000" assetId="bitcoin:native" icon={false} />,
+    );
     expect(container.querySelector('svg')).toBeNull();
-    expect(container.textContent).toBe('NI');
+    expect(container.querySelector('.sr-only')).toBeNull();
+    expect(container.textContent).toBe('0.3866BTC');
   });
 });
 
