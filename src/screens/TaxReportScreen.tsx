@@ -1,14 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TriangleAlertIcon, Loader2Icon } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,6 +14,7 @@ import { buildDisclaimer, type Disclaimer } from '@/tax/disclaimer';
 import { getSettings, putSettings } from '@/settings/settingsStore';
 import { subtractAmounts } from '@/ledger/amount';
 import { Money } from '@/components/money/Money';
+import { symbolOf } from '@/components/money/asset';
 import { CryptoAmount } from '@/components/money/CryptoAmount';
 import { GainLoss } from '@/components/money/GainLoss';
 import { formatFiat } from '@/components/money/format';
@@ -29,11 +24,6 @@ import type {
   TaxModule,
   UnresolvedItem,
 } from '@/tax/types';
-
-type Props = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-};
 
 type Status = 'idle' | 'loading' | 'error' | 'done';
 
@@ -125,8 +115,9 @@ const groupByKind = (
  * that silently drops disposals is the one failure this screen exists to
  * prevent.
  */
-export const TaxReportDialog = ({ open, onOpenChange }: Props) => {
+export const TaxReportScreen = () => {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
 
   const [module, setModule] = useState<TaxModule | null>(null);
   // Built once, when the jurisdiction is actually chosen (an event
@@ -148,36 +139,29 @@ export const TaxReportDialog = ({ open, onOpenChange }: Props) => {
   const [apiKey, setApiKey] = useState('');
   const [loadedApiKey, setLoadedApiKey] = useState('');
 
-  // Reset to the jurisdiction picker every time the dialog is (re)opened -
-  // the same "adjusting state when a prop changes" pattern AddSourceDialog
-  // and ExportCheckpointDialog use, done during render rather than in a
-  // useEffect so a stale report from a previous open can never flash first.
-  const [prevOpen, setPrevOpen] = useState(open);
-  if (open !== prevOpen) {
-    setPrevOpen(open);
-    if (open) {
-      setModule(null);
-      setDisclaimer(null);
-      setYear(String(new Date().getUTCFullYear()));
-      setRate('');
-      setYearError(false);
-      setStatus('idle');
-      setError(null);
-      setAssessment(null);
-      // Dropping the request is what makes the in-flight run's effect
-      // cleanup run, so a result still on its way cannot land in the state
-      // this block just reset.
-      setRequest(null);
-      // Fire-and-forget: a settings read that fails leaves the EUR default
-      // in place, the same fallback MainScreen uses, rather than blocking
-      // the dialog from opening at all.
-      void getSettings().then((settings) => {
-        setBaseCurrency(settings?.baseCurrency ?? DEFAULT_CURRENCY);
-        setApiKey(settings?.coingeckoApiKey ?? '');
-        setLoadedApiKey(settings?.coingeckoApiKey ?? '');
-      });
-    }
-  }
+  // Settings are read once, on mount. This used to be a reset block keyed
+  // on an `open` prop, re-running every time the dialog reopened; a screen
+  // has no such prop, because navigating here mounts a fresh component and
+  // navigating away unmounts it. The state this screen used to reset by
+  // hand is simply never carried over now, which is the stronger version of
+  // the same guarantee.
+  useEffect(() => {
+    let active = true;
+    // Fire-and-forget: a settings read that fails leaves the EUR default in
+    // place, the same fallback MainScreen uses, rather than blocking the
+    // screen from rendering at all.
+    void getSettings().then((settings) => {
+      if (!active) {
+        return;
+      }
+      setBaseCurrency(settings?.baseCurrency ?? DEFAULT_CURRENCY);
+      setApiKey(settings?.coingeckoApiKey ?? '');
+      setLoadedApiKey(settings?.coingeckoApiKey ?? '');
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const chooseModule = (next: TaxModule) => {
     setModule(next);
@@ -223,12 +207,15 @@ export const TaxReportDialog = ({ open, onOpenChange }: Props) => {
 
   // Runs the requested report. Every setState happens after an `await`,
   // inside the async run's own continuation and behind the `cancelled`
-  // check - never synchronously in the effect body - so a dialog closed,
-  // reopened or switched to another jurisdiction mid-run cannot have the
-  // abandoned result land in its state. `open` is a dependency precisely
-  // so closing the dialog tears the run's state write down.
+  // check - never synchronously in the effect body - so a screen navigated
+  // away from, or switched to another jurisdiction mid-run, cannot have the
+  // abandoned result land in its state.
+  //
+  // Leaving the screen used to be a prop change (`open` going false) that
+  // this effect depended on; it is an unmount now, and React runs the same
+  // cleanup for it. The teardown is if anything more certain than before.
   useEffect(() => {
-    if (!open || !request) {
+    if (!request) {
       return;
     }
     let cancelled = false;
@@ -262,9 +249,10 @@ export const TaxReportDialog = ({ open, onOpenChange }: Props) => {
         if (cancelled) {
           return;
         }
-        // Kept open on failure, per the brief - a slow, failed run (most
-        // likely the year being out of `supportedYears`, which the thrown
-        // message already names) must not lose whatever the user picked.
+        // The screen stays put on failure, per the brief - a slow, failed
+        // run (most likely the year being out of `supportedYears`, which
+        // the thrown message already names) must not lose what the user
+        // picked.
         setError(caught instanceof Error ? caught.message : String(caught));
         setStatus('error');
       }
@@ -273,7 +261,7 @@ export const TaxReportDialog = ({ open, onOpenChange }: Props) => {
     return () => {
       cancelled = true;
     };
-  }, [open, request]);
+  }, [request]);
 
   const formatDate = (timestamp: number): string =>
     new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium' }).format(
@@ -281,16 +269,33 @@ export const TaxReportDialog = ({ open, onOpenChange }: Props) => {
     );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+    // A page, not a dialog. The report is a long, wide document - per
+    // disposal: a date, a venue, an amount, a cost basis, a gain and a
+    // sentence of reasoning - and a dialog capped it at `sm:max-w-2xl`,
+    // 672px, with everything past that clipped behind a horizontal
+    // scrollbar. `min-w-0` is what actually lets the children shrink: a
+    // flex item defaults to `min-width: auto`, so one long unbreakable
+    // string inside would otherwise push the whole column wider than the
+    // viewport instead of wrapping.
+    <div className="flex min-w-0 flex-col gap-4">
+      <div className="flex min-w-0 flex-col gap-4">
         {!module ? (
           <>
-            <DialogHeader>
-              <DialogTitle>{t('Create tax report')}</DialogTitle>
-              <DialogDescription>
+            <div className="flex flex-col gap-1">
+              <Link
+                to="/"
+                className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="size-4" aria-hidden="true" />
+                {t('Back to overview')}
+              </Link>
+              <h2 className="text-lg font-semibold">
+                {t('Create tax report')}
+              </h2>
+              <p className="text-sm text-muted-foreground">
                 {t('Choose a jurisdiction')}
-              </DialogDescription>
-            </DialogHeader>
+              </p>
+            </div>
             <div className="flex flex-col gap-2">
               {taxRegistry.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
@@ -313,9 +318,19 @@ export const TaxReportDialog = ({ open, onOpenChange }: Props) => {
           </>
         ) : (
           <>
-            <DialogHeader>
-              <DialogTitle>{t(module.manifest.jurisdiction)}</DialogTitle>
-            </DialogHeader>
+            <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={goBack}
+                className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="size-4" aria-hidden="true" />
+                {t('Choose a jurisdiction')}
+              </button>
+              <h2 className="text-lg font-semibold">
+                {t(module.manifest.jurisdiction)}
+              </h2>
+            </div>
 
             {/* 1. The disclaimer, above everything else in this dialog, and
                 not dismissible - no collapse, no close affordance of its
@@ -582,7 +597,14 @@ export const TaxReportDialog = ({ open, onOpenChange }: Props) => {
                       <Card key={line.disposalEventId}>
                         <CardContent className="flex flex-col gap-1 text-sm">
                           <p className="font-medium">
-                            {formatDate(line.timestamp)} · {line.assetId}
+                            {/* The symbol, not the raw id. This printed
+                                "cardano:lovelace" beside every disposal -
+                                the same defect CryptoAmount was changed to
+                                prevent, surviving here because this line
+                                shows an asset WITHOUT an amount and so
+                                never went through it. */}
+                            {formatDate(line.timestamp)} ·{' '}
+                            {symbolOf(line.assetId)}
                           </p>
                           <p>
                             {t('Proceeds')}:{' '}
@@ -675,13 +697,22 @@ export const TaxReportDialog = ({ open, onOpenChange }: Props) => {
               </div>
             )}
 
-            <DialogFooter className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={goBack}
-                disabled={status === 'loading'}
-              >
+            {/* Sticky, because the report below runs for pages: the
+                control that starts and re-runs it must not be a scroll away
+                once a user has read down to the disposals. */}
+            {/* Sticky, because the report below runs for pages: the
+                control that starts and re-runs it must not be a scroll away
+                once a user has read down to the disposals.
+
+                Only Run is disabled mid-run. Leaving is NOT: a real run
+                takes minutes, one historical price lookup per disposal, and
+                as a dialog this had Escape and a close button to abandon
+                one. A screen has neither, so disabling both exits - as the
+                first draft of this conversion did - left the only way out
+                being the browser's own back button. The run's effect
+                cleanup is what makes abandoning safe. */}
+            <div className="glass-2 rim-t sticky bottom-0 flex flex-wrap gap-2 py-3">
+              <Button type="button" variant="ghost" onClick={goBack}>
                 {t('Back')}
               </Button>
               <Button
@@ -691,10 +722,18 @@ export const TaxReportDialog = ({ open, onOpenChange }: Props) => {
               >
                 {status === 'loading' ? t('Running…') : t('Run report')}
               </Button>
-            </DialogFooter>
+              <div className="flex-1" />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => navigate('/')}
+              >
+                {t('Back to overview')}
+              </Button>
+            </div>
           </>
         )}
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 };

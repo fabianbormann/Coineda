@@ -3,7 +3,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import 'fake-indexeddb/auto';
 import i18n from '@/i18n';
-import { TaxReportDialog } from '@/screens/TaxReportDialog';
+import { MemoryRouter } from 'react-router-dom';
+import { TaxReportScreen } from '@/screens/TaxReportScreen';
 import { taxRegistry } from '@/tax/registry';
 import germanTax from '@/tax/jurisdictions/de';
 import { openLedger, putEvents } from '@/ledger/db';
@@ -152,8 +153,14 @@ beforeEach(async () => {
   taxRegistry.length = 0;
 });
 
-const renderDialog = () =>
-  render(<TaxReportDialog open onOpenChange={() => {}} />);
+/** The screen needs a router: it links back to the overview and navigates
+ *  there from its footer. */
+const renderScreen = () =>
+  render(
+    <MemoryRouter>
+      <TaxReportScreen />
+    </MemoryRouter>,
+  );
 
 /** Opens the dialog on the given module and runs the report for `year`,
  *  waiting for the result (or the error) to land. */
@@ -174,7 +181,7 @@ describe('running a report', () => {
     taxRegistry.push(makeModule());
     await putEvents([acquisitionEvent, disposalEvent]);
 
-    renderDialog();
+    renderScreen();
     await runReport('2025');
 
     // 200.00 is the fixed figure `assess` returns above - it appears more
@@ -190,7 +197,7 @@ describe('running a report', () => {
     taxRegistry.push(makeModule());
     await putEvents([acquisitionEvent, disposalEvent, unmatchedDisposalEvent]);
 
-    renderDialog();
+    renderScreen();
     await runReport('2025');
 
     const taxableGainLine = (await screen.findByText(/taxable gain/i)).closest(
@@ -209,7 +216,7 @@ describe('running a report', () => {
     taxRegistry.push(makeModule());
     await putEvents([acquisitionEvent, disposalEvent, unmatchedDisposalEvent]);
 
-    renderDialog();
+    renderScreen();
     await runReport('2025');
 
     // The exact diagnostic sentence runTaxReport.ts hardcodes for a
@@ -224,7 +231,7 @@ describe('running a report', () => {
     taxRegistry.push(makeModule());
     await putEvents([acquisitionEvent, disposalEvent, unmatchedDisposalEvent]);
 
-    renderDialog();
+    renderScreen();
     await runReport('2025');
 
     await screen.findByText(/no acquisition on record for this disposal/i);
@@ -243,7 +250,7 @@ describe('running a report', () => {
   it('shows the error, not a blank report, for a year outside supportedYears', async () => {
     taxRegistry.push(makeModule({ supportedYears: { from: 2020, to: 2021 } }));
 
-    renderDialog();
+    renderScreen();
     await runReport('1900');
 
     expect(
@@ -309,7 +316,7 @@ describe('the unresolved list', () => {
         }),
       ]);
 
-      renderDialog();
+      renderScreen();
       await userEvent.click(
         await screen.findByRole('button', { name: /germany/i }),
       );
@@ -362,7 +369,7 @@ describe('unresolved items that are not disposals', () => {
       }),
     ]);
 
-    renderDialog();
+    renderScreen();
     await runReport('2025');
 
     await screen.findByText(/taxable gain/i);
@@ -420,7 +427,7 @@ describe('the CoinGecko API key', () => {
     taxRegistry.push(makeModule());
     await putEvents([cryptoDisposal]);
 
-    renderDialog();
+    renderScreen();
     await userEvent.click(
       await screen.findByRole('button', { name: /testland/i }),
     );
@@ -454,13 +461,9 @@ describe('the CoinGecko API key', () => {
     taxRegistry.push(makeModule());
     await putEvents([cryptoDisposal]);
 
-    // Opened by a transition, the way MainScreen opens it: the stored
-    // settings are read when `open` goes false -> true, so a dialog that
-    // was mounted already-open never reads them at all.
-    const { rerender } = render(
-      <TaxReportDialog open={false} onOpenChange={() => {}} />,
-    );
-    rerender(<TaxReportDialog open onOpenChange={() => {}} />);
+    // Mounting IS the open, now that this is a route rather than a dialog:
+    // the stored settings are read once, in a mount effect.
+    const first = renderScreen();
 
     await userEvent.click(
       await screen.findByRole('button', { name: /testland/i }),
@@ -474,10 +477,11 @@ describe('the CoinGecko API key', () => {
     );
     await screen.findByText(/taxable gain/i);
 
-    // Close and reopen: the key must come back from storage, not from the
-    // component state the reopen just reset.
-    rerender(<TaxReportDialog open={false} onOpenChange={() => {}} />);
-    rerender(<TaxReportDialog open onOpenChange={() => {}} />);
+    // Leave and come back: the key must come back from storage, not from
+    // component state. Navigating away unmounts the screen, which is a
+    // stronger reset than the hand-written one the dialog needed.
+    first.unmount();
+    renderScreen();
     await userEvent.click(
       await screen.findByRole('button', { name: /testland/i }),
     );
@@ -490,7 +494,7 @@ describe('the CoinGecko API key', () => {
   it('masks the key, because it is a credential', async () => {
     taxRegistry.push(makeModule());
 
-    renderDialog();
+    renderScreen();
     await userEvent.click(
       await screen.findByRole('button', { name: /testland/i }),
     );
@@ -507,7 +511,7 @@ describe('the disclaimer', () => {
     const rulesCheckedOn = new Date().toISOString().slice(0, 10);
     taxRegistry.push(makeModule({ rulesCheckedOn }));
 
-    renderDialog();
+    renderScreen();
     await userEvent.click(
       await screen.findByRole('button', { name: /testland/i }),
     );
@@ -526,7 +530,7 @@ describe('the disclaimer', () => {
   it('says how many months stale rules have gone unchecked', async () => {
     taxRegistry.push(makeModule({ rulesCheckedOn: '2000-01-01' }));
 
-    renderDialog();
+    renderScreen();
     await userEvent.click(
       await screen.findByRole('button', { name: /testland/i }),
     );
@@ -541,7 +545,7 @@ describe('the disclaimer', () => {
     const rulesCheckedOn = new Date().toISOString().slice(0, 10);
     taxRegistry.push(makeModule({ rulesCheckedOn }));
 
-    renderDialog();
+    renderScreen();
     await userEvent.click(
       await screen.findByRole('button', { name: /testland/i }),
     );
@@ -550,5 +554,105 @@ describe('the disclaimer', () => {
     expect(
       screen.queryByText(/have not been checked/i),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('the report is a page, not a dialog', () => {
+  it('is not rendered inside a dialog at all', async () => {
+    // The report is a long, wide document - per disposal a date, a venue,
+    // an amount, a cost basis, a gain and a sentence of reasoning. A dialog
+    // capped it at sm:max-w-2xl, 672px, and everything past that was
+    // clipped behind a horizontal scrollbar.
+    taxRegistry.push(makeModule());
+    const { container } = renderScreen();
+    await screen.findByRole('button', { name: /testland/i });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(container.querySelector('[data-slot="dialog-content"]')).toBeNull();
+  });
+
+  it('constrains nothing to a dialog width', async () => {
+    // The specific cause, pinned: a max-w that small on this screen means
+    // the clipping is back.
+    taxRegistry.push(makeModule());
+    const { container } = renderScreen();
+    await screen.findByRole('button', { name: /testland/i });
+    const html = container.innerHTML;
+    expect(html).not.toContain('max-w-2xl');
+    expect(html).not.toContain('max-w-xl');
+    expect(html).not.toContain('max-w-lg');
+  });
+
+  it('offers a way back to the overview', async () => {
+    // A dialog had Escape and a close button for free; a route has to carry
+    // its own exit.
+    renderScreen();
+    expect(
+      await screen.findByRole('link', { name: /back to overview/i }),
+    ).toHaveAttribute('href', '/');
+  });
+
+  /**
+   * A MATCHED pair, both in ADA and on the same venue.
+   *
+   * The pairing is the point: a lone disposal has no cost basis, so the
+   * engine reports it as an unresolved item and no disposal LINE is
+   * rendered at all - and the line is the thing that printed the raw asset
+   * id. An earlier version of this test used a lone disposal and passed
+   * against both the fix and the defect.
+   */
+  const adaLeg = (direction: 'in' | 'out') => ({
+    assetId: 'cardano:lovelace',
+    amount: '1000000',
+    direction,
+    venue: 'wallet-a',
+    role: 'principal' as const,
+  });
+  // Dated inside the last 365 days, and reported for the current year.
+  // Older than that and historical pricing needs a CoinGecko key, so both
+  // events land under "events missing a price" and NO disposal line is
+  // rendered - which is how the first draft of this test passed against
+  // the defect it was written for.
+  const thisYear = new Date().getUTCFullYear();
+  const adaAcquisition = ledgerEvent({
+    id: 'ada-acq',
+    externalId: 'ada-acq',
+    timestamp: Date.UTC(thisYear, 0, 15),
+    legs: [adaLeg('in')],
+  });
+  const adaDisposal = ledgerEvent({
+    id: 'ada-disp',
+    externalId: 'ada-disp',
+    timestamp: Date.UTC(thisYear, 1, 15),
+    legs: [adaLeg('out')],
+  });
+
+  it('names the asset by its symbol, never by its raw id', async () => {
+    // "cardano:lovelace" sat beside every disposal. The same defect
+    // CryptoAmount was changed to prevent - it survived here because this
+    // line shows an asset WITHOUT an amount, so it never went through it.
+    vi.stubGlobal('fetch', flatRange(1));
+    taxRegistry.push(makeModule());
+    await putEvents([adaAcquisition, adaDisposal]);
+
+    const { container } = renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /testland/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /run report/i }),
+    );
+    await screen.findByText(/taxable gain/i);
+
+    // Anchored on the disposal line itself: the page carries amounts
+    // elsewhere that already go through CryptoAmount, so a page-wide query
+    // for "ADA" would pass without the line being fixed. "Cost basis" is
+    // split across elements by its Money child, so this matches on the
+    // card's text rather than on a single node.
+    const line = [
+      ...container.querySelectorAll('[data-slot="card-content"]'),
+    ].find((node) => /Cost basis/.test(node.textContent ?? ''));
+    expect(line).toBeDefined();
+    expect(line?.textContent).toContain('ADA');
+    expect(line?.textContent).not.toContain('cardano:lovelace');
   });
 });

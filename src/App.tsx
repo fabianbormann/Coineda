@@ -7,6 +7,7 @@ import { Toaster } from '@/components/ui/sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OnboardingFlow } from '@/onboarding/OnboardingFlow';
 import { MainScreen } from '@/screens/MainScreen';
+import { TaxReportScreen } from '@/screens/TaxReportScreen';
 import { isOnboarded } from '@/settings/settingsStore';
 
 type OnboardState = 'checking' | 'pending' | 'onboarded';
@@ -59,6 +60,13 @@ const App = () => {
           <AppShell>
             <Routes>
               <Route path="/" element={<MainScreen />} />
+              {/* Its own route rather than a dialog over the overview. A
+                  report is a long, wide document, and a dialog gave it
+                  672px with the rest clipped behind a horizontal
+                  scrollbar. A route also means the back button leaves the
+                  report, and a run in progress is torn down by the unmount
+                  rather than by a prop. */}
+              <Route path="/tax" element={<TaxReportScreen />} />
             </Routes>
           </AppShell>
         </HashRouter>

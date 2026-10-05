@@ -5,6 +5,7 @@ import 'fake-indexeddb/auto';
 import '@/i18n';
 import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import { ConfirmProvider } from '@/components/confirm/ConfirmProvider';
+import { MemoryRouter } from 'react-router-dom';
 import { MainScreen } from '@/screens/MainScreen';
 import { openLedger, putSource, putEvents } from '@/ledger/db';
 import { putSettings } from '@/settings/settingsStore';
@@ -152,7 +153,9 @@ const renderScreen = () =>
   render(
     <ThemeProvider>
       <ConfirmProvider>
-        <MainScreen />
+        <MemoryRouter>
+          <MainScreen />
+        </MemoryRouter>
       </ConfirmProvider>
     </ThemeProvider>,
   );

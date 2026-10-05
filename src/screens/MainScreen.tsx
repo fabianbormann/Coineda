@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
   deleteSourceCascade,
@@ -23,7 +24,6 @@ import type { PricedHolding, SourceSummary } from './SourceRow';
 import { AddSourceDialog } from './AddSourceDialog';
 import { EditSourceDialog } from './EditSourceDialog';
 import { SourceEventsDialog } from './SourceEventsDialog';
-import { TaxReportDialog } from './TaxReportDialog';
 import { JourneyDialog } from '@/journey/JourneyDialog';
 import { TokenMetaProvider } from '@/assets/TokenMetaContext';
 
@@ -31,6 +31,7 @@ const DEFAULT_CURRENCY = 'eur';
 
 export const MainScreen = () => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const confirm = useConfirm();
 
   const [sources, setSources] = useState<SourceRecord[]>([]);
@@ -62,7 +63,6 @@ export const MainScreen = () => {
    */
   const controllersRef = useRef<Map<string, AbortController>>(new Map());
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
-  const [taxReportDialogOpen, setTaxReportDialogOpen] = useState(false);
   const [journeyDialogOpen, setJourneyDialogOpen] = useState(false);
   /** The source whose event log is open, or null. Doubles as the dialog's
    *  open flag: unlike the edit dialog there is nothing in flight to
@@ -601,7 +601,7 @@ export const MainScreen = () => {
           <Button
             type="button"
             variant="outline"
-            onClick={() => setTaxReportDialogOpen(true)}
+            onClick={() => navigate('/tax')}
           >
             {t('Create tax report')}
           </Button>
@@ -635,10 +635,6 @@ export const MainScreen = () => {
         <ExportCheckpointDialog
           open={exportDialogOpen}
           onOpenChange={setExportDialogOpen}
-        />
-        <TaxReportDialog
-          open={taxReportDialogOpen}
-          onOpenChange={setTaxReportDialogOpen}
         />
         <SourceEventsDialog
           open={eventsSource !== null}

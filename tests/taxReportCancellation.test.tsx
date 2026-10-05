@@ -3,7 +3,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import 'fake-indexeddb/auto';
 import '@/i18n';
-import { TaxReportDialog } from '@/screens/TaxReportDialog';
+import { MemoryRouter } from 'react-router-dom';
+import { TaxReportScreen } from '@/screens/TaxReportScreen';
 import { taxRegistry } from '@/tax/registry';
 import { openLedger } from '@/ledger/db';
 import { putSettings } from '@/settings/settingsStore';
@@ -62,7 +63,7 @@ beforeEach(async () => {
 });
 
 describe('a tax report abandoned mid-flight', () => {
-  it('does not render a German result under Austria after a close and reopen', async () => {
+  it('does not render a German result under Austria after switching mid-run', async () => {
     let resolveGerman: (value: TaxAssessment) => void = () => {};
     runTaxReport.mockImplementation(
       () =>
@@ -71,8 +72,10 @@ describe('a tax report abandoned mid-flight', () => {
         }),
     );
 
-    const { rerender } = render(
-      <TaxReportDialog open onOpenChange={() => {}} />,
+    render(
+      <MemoryRouter>
+        <TaxReportScreen />
+      </MemoryRouter>,
     );
 
     // Run Germany, and leave the run hanging.
@@ -84,11 +87,13 @@ describe('a tax report abandoned mid-flight', () => {
     );
     await screen.findByText(/running your tax report/i);
 
-    // Close mid-flight - what Escape does; only Back and Run are disabled.
-    rerender(<TaxReportDialog open={false} onOpenChange={() => {}} />);
-    // Reopen: the reset-on-reopen block clears the state back to the
-    // jurisdiction picker.
-    rerender(<TaxReportDialog open onOpenChange={() => {}} />);
+    // Go BACK to the jurisdiction picker mid-flight, which is the hazard
+    // that still exists on a screen: it keeps the same component instance
+    // alive, so the abandoned run's continuation can still reach this
+    // state. Navigating away cannot be tested this way any more and does
+    // not need to be - React discards updates to an unmounted tree - but
+    // this path has no such protection and relies entirely on the guard.
+    await userEvent.click(screen.getByRole('button', { name: /^back$/i }));
 
     // Pick Austria this time.
     await userEvent.click(
@@ -111,7 +116,11 @@ describe('a tax report abandoned mid-flight', () => {
     // The companion proof: the guard must not swallow the ordinary case.
     runTaxReport.mockResolvedValue(germanAssessment);
 
-    render(<TaxReportDialog open onOpenChange={() => {}} />);
+    render(
+      <MemoryRouter>
+        <TaxReportScreen />
+      </MemoryRouter>,
+    );
 
     await userEvent.click(
       await screen.findByRole('button', { name: /germany/i }),

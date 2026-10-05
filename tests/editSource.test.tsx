@@ -6,6 +6,7 @@ import '@/i18n';
 import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import { ConfirmProvider } from '@/components/confirm/ConfirmProvider';
 import { Toaster } from '@/components/ui/sonner';
+import { MemoryRouter } from 'react-router-dom';
 import { MainScreen } from '@/screens/MainScreen';
 import { openLedger, putSource, putCursor } from '@/ledger/db';
 import * as ledgerDb from '@/ledger/db';
@@ -158,7 +159,9 @@ const renderScreen = () =>
   render(
     <ThemeProvider>
       <ConfirmProvider>
-        <MainScreen />
+        <MemoryRouter>
+          <MainScreen />
+        </MemoryRouter>
         <Toaster />
       </ConfirmProvider>
     </ThemeProvider>,
