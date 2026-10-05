@@ -27,7 +27,7 @@ import { ThemeToggle } from '@/components/theme/ThemeToggle';
  * beside it, so announcing it would read the name twice.
  */
 export const AppHeader = () => (
-  <header className="glass-2 rim-b sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 px-4">
+  <header className="glass-2 rim-b sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 px-4 print:hidden">
     <img
       src={markOnLight}
       alt=""

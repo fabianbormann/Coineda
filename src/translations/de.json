@@ -386,6 +386,9 @@
     "Add the Ethereum address to track, as 0x followed by 40 hex characters.": "Trage die Ethereum-Adresse ein, die verfolgt werden soll - 0x gefolgt von 40 Hex-Zeichen.",
     "Could not reach this Blockscout instance. Check the URL, or try again later.": "Diese Blockscout-Instanz war nicht erreichbar. Prüfe die URL oder versuche es später erneut.",
     "That URL answered, but not like a Blockscout API. Check that it is the API host rather than the web interface.": "Diese URL hat geantwortet, aber nicht wie eine Blockscout-API. Prüfe, ob es der API-Host ist und nicht die Weboberfläche.",
-    "Back to overview": "Zurück zur Übersicht"
+    "Back to overview": "Zurück zur Übersicht",
+    "Print or save as PDF": "Drucken oder als PDF speichern",
+    "Tax year": "Steuerjahr",
+    "Created on {{date}}": "Erstellt am {{date}}"
   }
 }

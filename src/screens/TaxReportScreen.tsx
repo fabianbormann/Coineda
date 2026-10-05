@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TriangleAlertIcon, Loader2Icon } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -263,6 +263,24 @@ export const TaxReportScreen = () => {
     };
   }, [request]);
 
+  /**
+   * Hands the report to the browser's print dialog, which is also where
+   * "Save as PDF" lives on every platform this app runs on.
+   *
+   * No PDF library. One would mean re-describing a layout that already
+   * exists in CSS, in a second dialect that cannot see the stylesheet - so
+   * every change to the report would have to be made twice, and the two
+   * would drift. The print rules in src/index.css do the work instead, and
+   * what the person sees in the preview is the page itself.
+   */
+  const handlePrint = () => {
+    // Guarded: jsdom has no print, and an Electron window without a print
+    // handler would otherwise throw into the click.
+    if (typeof window.print === 'function') {
+      window.print();
+    }
+  };
+
   const formatDate = (timestamp: number): string =>
     new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium' }).format(
       new Date(timestamp),
@@ -345,7 +363,7 @@ export const TaxReportScreen = () => {
                 variant="ghost"
                 size="sm"
                 onClick={goBack}
-                className="-ml-2 w-fit text-muted-foreground"
+                className="-ml-2 w-fit text-muted-foreground print:hidden"
               >
                 <ArrowLeft aria-hidden="true" />
                 {t('Choose a jurisdiction')}
@@ -353,6 +371,20 @@ export const TaxReportScreen = () => {
               <h2 className="text-xl font-semibold">
                 {t(module.manifest.jurisdiction)}
               </h2>
+              {/* Print only. On screen the year and the base currency are
+                  in the form right below, and the date is today; on paper
+                  the sheet has to say what it is and when it was made,
+                  because it outlives the screen it came from. */}
+              {assessment && (
+                <p className="hidden text-sm print:block">
+                  {t('Tax year')}: {assessment.year} ·{' '}
+                  {t('Created on {{date}}', {
+                    date: new Intl.DateTimeFormat(i18n.language, {
+                      dateStyle: 'long',
+                    }).format(new Date()),
+                  })}
+                </p>
+              )}
             </div>
 
             {/* 1. The disclaimer, above everything else in this dialog, and
@@ -734,7 +766,7 @@ export const TaxReportScreen = () => {
                 first draft of this conversion did - left the only way out
                 being the browser's own back button. The run's effect
                 cleanup is what makes abandoning safe. */}
-            <div className="glass-2 rim-t sticky bottom-0 flex flex-wrap gap-2 py-3">
+            <div className="glass-2 rim-t sticky bottom-0 flex flex-wrap gap-2 py-3 print:hidden">
               <Button type="button" variant="ghost" onClick={goBack}>
                 {t('Back')}
               </Button>
@@ -745,6 +777,15 @@ export const TaxReportScreen = () => {
               >
                 {status === 'loading' ? t('Running…') : t('Run report')}
               </Button>
+              {/* Only once there is something to print. A blank form sent
+                  to a printer is pure waste, and the browser's own dialog
+                  gives no hint that the page is empty. */}
+              {assessment && (
+                <Button type="button" variant="outline" onClick={handlePrint}>
+                  <Printer aria-hidden="true" />
+                  {t('Print or save as PDF')}
+                </Button>
+              )}
               <div className="flex-1" />
               <Button
                 type="button"

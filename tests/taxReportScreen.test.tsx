@@ -687,3 +687,78 @@ describe('the report is a page, not a dialog', () => {
     expect(line?.textContent).not.toContain('cardano:lovelace');
   });
 });
+
+describe('printing the report', () => {
+  const runAndPrint = async () => {
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+    const rendered = renderScreen();
+    await runReport('2025');
+    return rendered;
+  };
+
+  it('offers no print control until there is a report to print', async () => {
+    // A blank form sent to a printer is pure waste, and the browser's own
+    // dialog gives no hint that the page is empty.
+    taxRegistry.push(makeModule());
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /testland/i }),
+    );
+    expect(screen.queryByRole('button', { name: /print/i })).toBeNull();
+  });
+
+  it('hands the page to the browser print dialog', async () => {
+    // Which is where "Save as PDF" lives on every platform this app runs
+    // on, so one button covers both.
+    const print = vi.fn();
+    vi.stubGlobal('print', print);
+    await runAndPrint();
+
+    await userEvent.click(screen.getByRole('button', { name: /print/i }));
+    expect(print).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not throw where printing is unavailable', async () => {
+    // jsdom has none, and an Electron window without a print handler would
+    // otherwise throw straight into the click.
+    vi.stubGlobal('print', undefined);
+    await runAndPrint();
+    await userEvent.click(screen.getByRole('button', { name: /print/i }));
+    expect(screen.getByRole('button', { name: /print/i })).toBeInTheDocument();
+  });
+
+  it('keeps the controls off the page but never the disclaimer', async () => {
+    // The disclaimer is the one element this screen exists to keep
+    // attached to its figures - a printed tax document that drops it is
+    // the worst outcome here, worse than printing a stray button.
+    const { container } = await runAndPrint();
+
+    const printButton = screen.getByRole('button', { name: /print/i });
+    expect(printButton.closest('.print\\:hidden')).not.toBeNull();
+
+    const disclaimer = screen.getByText(/not advice from a lawyer/i);
+    expect(disclaimer.closest('.print\\:hidden')).toBeNull();
+
+    // And the figures themselves stay.
+    const gain = screen.getByText(/taxable gain/i);
+    expect(gain.closest('.print\\:hidden')).toBeNull();
+    expect(container.querySelector('.print\\:hidden')).not.toBeNull();
+  });
+
+  it('states the year and the date on paper, where the screen cannot', async () => {
+    // A sheet outlives the screen it came from, so it has to say what it
+    // is. Print-only, because on screen the year is in the form right
+    // above and the date is today.
+    const { container } = await runAndPrint();
+    // Scoped to the print-only element: "Tax year" is also the label of
+    // the form field above, so an unscoped query matches both and the
+    // assertion would hold without the stamp existing at all.
+    const stamp = container.querySelector('.print\\:block');
+    expect(stamp).not.toBeNull();
+    expect(stamp?.textContent).toContain('2025');
+    expect(stamp?.textContent).toMatch(/2026/); // the date it was made
+    // Hidden on screen, where the year is already in the form above.
+    expect(stamp?.className).toContain('hidden');
+  });
+});

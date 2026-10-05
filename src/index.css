@@ -202,3 +202,76 @@
     min-height: 100svh;
   }
 }
+
+/* ---------------------------------------------------------------------
+   Print.
+
+   Everything in this app reads its colour through Lumen's `--lm-*` tokens
+   (see the mapping in :root above), so putting a light, opaque palette
+   there is what turns the whole UI into ink on paper - including the glass
+   surfaces, whose translucency has nothing to sit over once the coloured
+   wash is gone. Hunting individual utilities would have meant finding every
+   one of them, and missing one means a black rectangle on a printed tax
+   document.
+
+   `.dark` is overridden too: a print must not depend on which theme the
+   person happened to be using. A tax report printed from dark mode was
+   white text on a background the printer drops, i.e. a blank page.
+   --------------------------------------------------------------------- */
+@media print {
+  :root,
+  :root.dark {
+    color-scheme: light;
+
+    --lm-bg: #ffffff;
+    --lm-ink: #000000;
+    --lm-mute: #333333;
+    --lm-faint: rgb(0 0 0 / 0.06);
+    --lm-stroke: rgb(0 0 0 / 0.35);
+    --lm-hl: transparent;
+    /* The frosted tiers collapse to nothing: a frosted panel over white
+       paper is just white paper, and leaving them translucent only risks
+       a grey cast. */
+    --lm-glass-1: transparent;
+    --lm-glass-2: transparent;
+    --lm-glass-3: transparent;
+    --lm-fill: #000000;
+    --lm-on-fill: #ffffff;
+    --lm-shadow: transparent;
+    /* The coloured wash behind the page is drawn at this opacity. */
+    --lm-blob: 0;
+  }
+
+  @page {
+    margin: 16mm;
+  }
+
+  html,
+  body {
+    background: #fff;
+  }
+
+  /* Blur and glow carry no information and render unpredictably - or
+     expensively - in a print engine. */
+  *,
+  *::before,
+  *::after {
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* A disposal line split across a page break is unreadable: the figures
+     land on one page and the sentence explaining them on the next. */
+  [data-slot='card'] {
+    border: 1px solid rgb(0 0 0 / 0.25);
+    break-inside: avoid;
+  }
+
+  /* The screen caps itself for reading on a monitor; paper has its own
+     margin from @page and should use the rest. */
+  main > * {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+}

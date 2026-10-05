@@ -318,3 +318,45 @@ describe('app icons', () => {
     expect(ico.length).toBeLessThan(80_000);
   });
 });
+
+describe('the print stylesheet survives the build', () => {
+  const css = (): string => {
+    const dir = path.join(buildDir, 'assets');
+    const file = fs.readdirSync(dir).find((name) => name.endsWith('.css'));
+    if (file === undefined) {
+      throw new Error('no stylesheet in the build output');
+    }
+    return fs.readFileSync(path.join(dir, file), 'utf8');
+  };
+
+  it('repaints the theme tokens for paper, dark mode included', () => {
+    // THE one that matters. Every surface in this app reads its colour
+    // through Lumen's --lm-* tokens, so printing is a token override - and
+    // if `.dark` is not overridden alongside `:root`, a report printed from
+    // dark mode is white text on a background the printer drops, i.e. a
+    // blank sheet with a few invisible figures on it.
+    const sheet = css();
+    const start = sheet.indexOf('--lm-blob:0');
+    expect(start).toBeGreaterThan(-1);
+    const block = sheet.slice(sheet.lastIndexOf('@media print', start), start);
+    expect(block).toContain(':root.dark');
+    expect(block).toContain('--lm-bg:#fff');
+    // The frosted tiers have nothing to sit over on paper.
+    expect(block).toContain('--lm-glass-2:transparent');
+  });
+
+  it('keeps a disposal line whole across a page break', () => {
+    // Split, the figures land on one page and the sentence explaining them
+    // on the next.
+    expect(css()).toContain('break-inside:avoid');
+  });
+
+  it('generates the print-only visibility utilities', () => {
+    // A `print:` variant that Tailwind never saw is a class in the markup
+    // with no rule behind it: the controls would print and the date stamp
+    // would not - silently, and only on paper.
+    const sheet = css();
+    expect(sheet).toMatch(/\.print\\:hidden\{display:none\}/);
+    expect(sheet).toMatch(/\.print\\:block\{display:block\}/);
+  });
+});

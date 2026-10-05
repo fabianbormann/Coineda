@@ -23,7 +23,7 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
     <div className="flex min-h-svh flex-col">
       <AppHeader />
       <main className="flex min-h-0 flex-1 flex-col">{children}</main>
-      <footer className="glass-1 rim-t flex shrink-0 items-center gap-3 px-4 py-2">
+      <footer className="glass-1 rim-t flex shrink-0 items-center gap-3 px-4 py-2 print:hidden">
         <a
           href={`https://github.com/fabianbormann/Coineda/releases/tag/v${APP_VERSION}`}
           target="_blank"
