@@ -121,14 +121,26 @@ export const TaxReportScreen = () => {
   /**
    * Whether to hide unresolved items dated outside the tax year.
    *
-   * Off by default, and deliberately so: an item outside the year is not
-   * automatically irrelevant to it. An unpriced ACQUISITION from three
-   * years ago is exactly why an in-year disposal has no cost basis, so
-   * hiding it by default would hide the reason the figure above is
-   * missing. The noise is real though - a wallet's whole history lands
-   * here - so the choice is offered rather than made.
+   * ON by default, because the list is otherwise O(the whole ledger) and
+   * grows every year forever: runTaxReport reads the entire history (it
+   * must - a lot acquired years ago still has to match a disposal now) and
+   * puts every unpriced or unclassified event from all of it into
+   * `unresolved`, which it never filters by year. Only `omitted`, the
+   * "N disposals could not be computed" figure, is year-scoped.
+   *
+   * An earlier version defaulted this OFF, on the reasoning that an
+   * unpriced ACQUISITION from three years back is why an in-year disposal
+   * has no cost basis, so hiding it would hide the explanation. That
+   * reasoning was wrong: `match` runs on PRICED events only, so such a
+   * disposal already gets its own `needs-cost-basis` item carrying the
+   * DISPOSAL's timestamp - in-year, and visible either way. What the
+   * out-of-year entry adds is which acquisition was unpriceable, which is
+   * useful detail rather than the only trace of the problem.
+   *
+   * Nothing vanishes silently: the count of what is hidden is rendered
+   * below, and one click brings it all back.
    */
-  const [hideOutsideYear, setHideOutsideYear] = useState(false);
+  const [hideOutsideYear, setHideOutsideYear] = useState(true);
 
   const [module, setModule] = useState<TaxModule | null>(null);
   // Built once, when the jurisdiction is actually chosen (an event

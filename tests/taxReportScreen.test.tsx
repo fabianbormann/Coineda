@@ -326,6 +326,15 @@ describe('the unresolved list', () => {
       );
       await screen.findByText(/other unresolved items are not disposals/i);
 
+      // This test is about React keys, not about years: its fixture is
+      // dated 2025 while the form defaults to the current year, so the
+      // unresolved list would hide the very items whose keys are under
+      // test. Showing everything keeps it rendering exactly what it did
+      // before the filter existed.
+      await userEvent.click(
+        screen.getByRole('checkbox', { name: /outside the tax year/i }),
+      );
+
       // Two gaps on one event and one asset, both rendered.
       expect(
         await screen.findAllByText(/no price source is configured/i),
@@ -812,28 +821,40 @@ describe('reading the unresolved list', () => {
     await putEvents([acquisitionEvent, disposalEvent]);
     const { container } = renderScreen();
     await runReport('2025');
+    // All three visible, so the order is observable at all.
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: /outside the tax year/i }),
+    );
 
     expect(renderedOrder(container)).toEqual(['a', 'b', 'c']);
   });
 
-  it('shows every year until asked not to', async () => {
-    // Off by default on purpose: an item outside the year is not
-    // automatically irrelevant to it - an unpriced acquisition from three
-    // years back is exactly why an in-year disposal has no cost basis.
+  it('hides the other years by default, and says how many', async () => {
+    // The list is otherwise O(the whole ledger) and grows every year: the
+    // pipeline reads the ENTIRE history - a lot acquired years ago must
+    // still match a disposal now - and never filters `unresolved` by year.
+    // Only `omitted` is year-scoped.
+    //
+    // Never silently, though: a list that shrank from three entries to one
+    // with nothing explaining it is worse than the noise it replaced.
     taxRegistry.push(withUnresolved(threeYears));
     await putEvents([acquisitionEvent, disposalEvent]);
     const { container } = renderScreen();
     await runReport('2025');
 
-    expect(renderedOrder(container)).toHaveLength(3);
+    expect(renderedOrder(container)).toEqual(['b']);
     expect(
       screen.getByRole('checkbox', { name: /outside the tax year/i }),
-    ).not.toBeChecked();
+    ).toBeChecked();
+    expect(
+      screen.getByText(/2 .*2025.*hidden|2 außerhalb/i),
+    ).toBeInTheDocument();
   });
 
-  it('hides the other years when asked, and says how many', async () => {
-    // Never silently: a list that shrank from three entries to one with
-    // nothing explaining it is worse than the noise it replaced.
+  it('brings every year back in one click', async () => {
+    // Hiding is a default, not a decision taken for the user: an
+    // out-of-year entry says WHICH acquisition could not be priced, which
+    // is the detail behind an in-year cost-basis gap.
     taxRegistry.push(withUnresolved(threeYears));
     await putEvents([acquisitionEvent, disposalEvent]);
     const { container } = renderScreen();
@@ -843,10 +864,7 @@ describe('reading the unresolved list', () => {
       screen.getByRole('checkbox', { name: /outside the tax year/i }),
     );
 
-    expect(renderedOrder(container)).toEqual(['b']);
-    expect(
-      screen.getByText(/2 .*2025.*hidden|2 außerhalb/i),
-    ).toBeInTheDocument();
+    expect(renderedOrder(container)).toEqual(['a', 'b', 'c']);
   });
 
   it('judges the year in UTC, where the boundary actually is', async () => {
@@ -863,9 +881,6 @@ describe('reading the unresolved list', () => {
     const { container } = renderScreen();
     await runReport('2025');
 
-    await userEvent.click(
-      screen.getByRole('checkbox', { name: /outside the tax year/i }),
-    );
     expect(renderedOrder(container)).toEqual(['inyear']);
   });
 });
