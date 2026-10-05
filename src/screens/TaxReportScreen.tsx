@@ -277,26 +277,47 @@ export const TaxReportScreen = () => {
     // flex item defaults to `min-width: auto`, so one long unbreakable
     // string inside would otherwise push the whole column wider than the
     // viewport instead of wrapping.
-    <div className="flex min-w-0 flex-col gap-4">
+    // `p-6` to match MainScreen - the shell deliberately adds no padding of
+    // its own, so each screen owns it, and this one shipped without any:
+    // every line sat flush against the left edge of the viewport.
+    //
+    // `max-w-7xl` keeps the report off the far edge of a wide monitor
+    // without putting it back in a dialog. The point of leaving the dialog
+    // was 672px; 1280px is nearly twice what the widest report line needs.
+    //
+    // `min-w-0` is what actually lets the children shrink: a flex item
+    // defaults to `min-width: auto`, so one long unbreakable string inside
+    // would otherwise push the whole column wider than the viewport
+    // instead of wrapping.
+    <div className="mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-6 p-6">
       <div className="flex min-w-0 flex-col gap-4">
         {!module ? (
           <>
-            <div className="flex flex-col gap-1">
-              <Link
-                to="/"
-                className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            <div className="flex flex-col gap-2">
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className="-ml-2 w-fit text-muted-foreground"
               >
-                <ArrowLeft className="size-4" aria-hidden="true" />
-                {t('Back to overview')}
-              </Link>
-              <h2 className="text-lg font-semibold">
+                <Link to="/">
+                  <ArrowLeft aria-hidden="true" />
+                  {t('Back to overview')}
+                </Link>
+              </Button>
+              <h2 className="text-xl font-semibold">
                 {t('Create tax report')}
               </h2>
               <p className="text-sm text-muted-foreground">
                 {t('Choose a jurisdiction')}
               </p>
             </div>
-            <div className="flex flex-col gap-2">
+            {/* The picker is a short list of choices, not the report, so it
+                gets its own narrow column rather than the page's width: a
+                two-item list stretched across a 1280px page reads as a
+                layout fault, which is what it looked like. The report
+                below keeps the full width it was moved here for. */}
+            <div className="flex w-full max-w-md flex-col gap-2">
               {taxRegistry.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   {t('No tax jurisdictions are available yet.')}
@@ -318,16 +339,18 @@ export const TaxReportScreen = () => {
           </>
         ) : (
           <>
-            <div className="flex flex-col gap-1">
-              <button
+            <div className="flex flex-col gap-2">
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={goBack}
-                className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                className="-ml-2 w-fit text-muted-foreground"
               >
-                <ArrowLeft className="size-4" aria-hidden="true" />
+                <ArrowLeft aria-hidden="true" />
                 {t('Choose a jurisdiction')}
-              </button>
-              <h2 className="text-lg font-semibold">
+              </Button>
+              <h2 className="text-xl font-semibold">
                 {t(module.manifest.jurisdiction)}
               </h2>
             </div>

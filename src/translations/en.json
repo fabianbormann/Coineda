@@ -385,6 +385,7 @@
     "The address to track, as 0x followed by 40 hex characters. Only this address is tracked: ether in another address of yours stays invisible to Coineda until you add it as well. Reading an address reveals nothing private - it is public on the chain - and Coineda can only read.": "The address to track, as 0x followed by 40 hex characters. Only this address is tracked: ether in another address of yours stays invisible to Coineda until you add it as well. Reading an address reveals nothing private - it is public on the chain - and Coineda can only read.",
     "Add the Ethereum address to track, as 0x followed by 40 hex characters.": "Add the Ethereum address to track, as 0x followed by 40 hex characters.",
     "Could not reach this Blockscout instance. Check the URL, or try again later.": "Could not reach this Blockscout instance. Check the URL, or try again later.",
-    "That URL answered, but not like a Blockscout API. Check that it is the API host rather than the web interface.": "That URL answered, but not like a Blockscout API. Check that it is the API host rather than the web interface."
+    "That URL answered, but not like a Blockscout API. Check that it is the API host rather than the web interface.": "That URL answered, but not like a Blockscout API. Check that it is the API host rather than the web interface.",
+    "Back to overview": "Back to overview"
   }
 }

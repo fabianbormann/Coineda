@@ -570,16 +570,47 @@ describe('the report is a page, not a dialog', () => {
     expect(container.querySelector('[data-slot="dialog-content"]')).toBeNull();
   });
 
-  it('constrains nothing to a dialog width', async () => {
-    // The specific cause, pinned: a max-w that small on this screen means
-    // the clipping is back.
+  it('pads its edges and caps itself at a page width, not a dialog width', async () => {
+    // Asserted on the SCREEN'S OWN root rather than by banning strings
+    // anywhere in the tree, which is what an earlier version of this test
+    // did - and that version could not see `max-w-md`, the exact width the
+    // jurisdiction picker inside it legitimately uses.
+    //
+    // The shell adds no padding of its own, so a screen that forgets it
+    // renders flush against the viewport edge. This one did.
     taxRegistry.push(makeModule());
     const { container } = renderScreen();
     await screen.findByRole('button', { name: /testland/i });
-    const html = container.innerHTML;
-    expect(html).not.toContain('max-w-2xl');
-    expect(html).not.toContain('max-w-xl');
-    expect(html).not.toContain('max-w-lg');
+
+    const root = container.firstElementChild as HTMLElement;
+    const classes = (root.getAttribute('class') ?? '').split(/\s+/);
+    expect(classes).toContain('p-6');
+
+    // A cap is fine and desirable; a DIALOG-scale cap is the regression.
+    // 2xl is 672px, the width the report was moved off.
+    const cap = classes.find((name) => name.startsWith('max-w-'));
+    expect(cap).toBeDefined();
+    for (const tooNarrow of [
+      'max-w-sm',
+      'max-w-md',
+      'max-w-lg',
+      'max-w-xl',
+      'max-w-2xl',
+      'max-w-3xl',
+    ]) {
+      expect(cap).not.toBe(tooNarrow);
+    }
+  });
+
+  it('keeps the jurisdiction picker in its own narrow column', async () => {
+    // A two-item list stretched across the whole page reads as a layout
+    // fault. The report below keeps the full width it was moved here for,
+    // so this is a cap on the picker only.
+    taxRegistry.push(makeModule());
+    renderScreen();
+    const choice = await screen.findByRole('button', { name: /testland/i });
+    const column = choice.parentElement as HTMLElement;
+    expect(column.getAttribute('class')).toMatch(/\bmax-w-(xs|sm|md|lg)\b/);
   });
 
   it('offers a way back to the overview', async () => {

@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import en from '../src/translations/en.json';
 import de from '../src/translations/de.json';
 
@@ -88,5 +90,63 @@ describe('the two locale files', () => {
         String((de.translation as Record<string, string>)[key]).trim() === '',
     );
     expect(blank).toEqual([]);
+  });
+});
+
+describe('every literal t() key has an entry', () => {
+  /**
+   * The gap the key-set parity test above cannot see.
+   *
+   * That test proves en.json and de.json hold the SAME keys. A string that
+   * exists in neither is identical in both, so it sails through - and
+   * i18next hands an unknown key straight back, which renders the English
+   * literal. The result is an English sentence in a German UI with nothing
+   * failing anywhere. "Back to overview" shipped exactly that way.
+   *
+   * Only literal single-quoted calls are checkable; `t(source.lastError)`
+   * and `t(KIND_LABELS[event.kind])` pass a value and are skipped by
+   * construction.
+   */
+  const LITERAL_CALL = /\bt\(\s*'((?:[^'\\]|\\.)*)'/g;
+
+  /** i18next resolves a `count` key through its plural forms, so the base
+   *  key legitimately has no entry of its own. */
+  const PLURAL_SUFFIXES = ['_zero', '_one', '_two', '_few', '_many', '_other'];
+
+  const sourceFiles = (dir: string): string[] =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        // Vendored shadcn components carry their own copy strings and are
+        // not part of this app's translated surface.
+        return full.endsWith(path.join('components', 'ui'))
+          ? []
+          : sourceFiles(full);
+      }
+      return /\.tsx?$/.test(entry.name) ? [full] : [];
+    });
+
+  it('finds no key that is missing from en.json', () => {
+    const keys = new Set(Object.keys(en.translation));
+    const known = (key: string) =>
+      keys.has(key) ||
+      PLURAL_SUFFIXES.some((suffix) => keys.has(`${key}${suffix}`));
+
+    const missing: string[] = [];
+    const files = sourceFiles(path.join(__dirname, '..', 'src'));
+    // Guards the scan itself: a glob that silently matched nothing would
+    // make this test pass without checking anything at all.
+    expect(files.length).toBeGreaterThan(20);
+
+    for (const file of files) {
+      const contents = fs.readFileSync(file, 'utf8');
+      for (const match of contents.matchAll(LITERAL_CALL)) {
+        const key = match[1].replace(/\\'/g, "'");
+        if (!known(key)) {
+          missing.push(`${key}  (${path.relative(process.cwd(), file)})`);
+        }
+      }
+    }
+    expect(missing).toEqual([]);
   });
 });
