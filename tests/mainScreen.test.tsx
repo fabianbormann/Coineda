@@ -663,7 +663,15 @@ describe('sync lifecycle', () => {
     );
 
     expect(await screen.findByText(/^Synced Current$/)).toBeInTheDocument();
-    expect(screen.queryByText(/no events at all/i)).not.toBeInTheDocument();
+    // Scoped to THIS source's label. The test above legitimately raises
+    // "Synced Empty, but it has no events at all", and a toast is dismissed
+    // with an exit animation rather than removed outright - so an unscoped
+    // match here picks up the previous test's toast whenever the timing
+    // runs slightly long, which is a failure that says nothing about the
+    // behaviour under test.
+    expect(
+      screen.queryByText(/Synced Current, but it has no events/i),
+    ).not.toBeInTheDocument();
   });
 
   it('offers Stop while a sync is running, not a disabled spinner', async () => {

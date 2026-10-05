@@ -26,6 +26,8 @@ import { EditSourceDialog } from './EditSourceDialog';
 import { SourceEventsDialog } from './SourceEventsDialog';
 import { JourneyDialog } from '@/journey/JourneyDialog';
 import { TokenMetaProvider } from '@/assets/TokenMetaContext';
+import { importFile, UnknownFileFormatError } from '@/sources/csv/importFile';
+import { fileRegistry } from '@/sources/csv/registry';
 
 const DEFAULT_CURRENCY = 'eur';
 
@@ -69,6 +71,9 @@ export const MainScreen = () => {
    *  protect from a reload, so a second piece of state would only be
    *  another thing to keep in step. */
   const [eventsSource, setEventsSource] = useState<SourceRecord | null>(null);
+  /** The hidden file input the Import button clicks for us: a styled
+   *  <input type="file"> is not a thing the platform offers. */
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetches only - no setState here, so this is safe to call directly from
   // the mount effect below without tripping react-hooks' rule against
@@ -249,6 +254,53 @@ export const MainScreen = () => {
     }
     return [...ids];
   }, [events]);
+
+  /**
+   * Reads an exported file and writes what it holds into the ledger.
+   *
+   * The format is recognised from the file's own HEADER rather than from
+   * its name - a user renames a download, and an importer run on the wrong
+   * file produces plausible-looking garbage instead of a refusal.
+   */
+  const handleImportFile = useCallback(
+    async (file: File) => {
+      try {
+        const outcome = await importFile(await file.text());
+        await load();
+        notify.success(
+          t(
+            'Imported {{inserted}} new and {{updated}} updated from {{label}}',
+            {
+              inserted: outcome.inserted,
+              updated: outcome.updated,
+              label: t(outcome.module.manifest.label),
+            },
+          ),
+        );
+        for (const skipped of outcome.skipped) {
+          // Surfaced, not swallowed: a user whose balance looks short needs
+          // to know which rows were left out and why.
+          notify.info(skipped);
+        }
+      } catch (error) {
+        notify.error(
+          error instanceof UnknownFileFormatError
+            ? t(
+                'That is not a file Coineda recognises. It reads: {{formats}}',
+                {
+                  formats: fileRegistry
+                    .map((module) => t(module.manifest.label))
+                    .join(', '),
+                },
+              )
+            : error instanceof Error
+              ? error.message
+              : String(error),
+        );
+      }
+    },
+    [load, t],
+  );
 
   const lastSyncedAt = sources.reduce<number | null>((latest, source) => {
     if (source.lastSyncedAt === undefined) {
@@ -573,6 +625,22 @@ export const MainScreen = () => {
           assetCount={holdings.length}
           sourceCount={sources.length}
         />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv,text/csv,text/plain"
+          className="hidden"
+          onChange={(changed) => {
+            const file = changed.target.files?.[0];
+            // Cleared so importing the SAME file twice still fires a
+            // change event; without it, a user who re-exports over the same
+            // filename gets nothing and no explanation.
+            changed.target.value = '';
+            if (file) {
+              void handleImportFile(file);
+            }
+          }}
+        />
         <SourceList
           sources={sources}
           perSource={perSource}
@@ -589,6 +657,7 @@ export const MainScreen = () => {
           onEditOne={handleOpenEdit}
           onShowEvents={setEventsSource}
           onAddSource={() => setAddDialogOpen(true)}
+          onImportFile={() => fileInputRef.current?.click()}
         />
         <div className="flex flex-wrap gap-2">
           <Button

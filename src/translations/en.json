@@ -391,6 +391,11 @@
     "Created on {{date}}": "Created on {{date}}",
     "Not reached · {{amount}} under the limit": "Not reached · {{amount}} under the limit",
     "Hide transactions outside the tax year": "Hide transactions outside the tax year",
-    "Not included in the figures above ({{total}} total, {{inYear}} in {{year}})": "Not included in the figures above ({{total}} total, {{inYear}} in {{year}})"
+    "Not included in the figures above ({{total}} total, {{inYear}} in {{year}})": "Not included in the figures above ({{total}} total, {{inYear}} in {{year}})",
+    "Import a file": "Import a file",
+    "Kraken (CSV)": "Kraken (CSV)",
+    "In Kraken, open History, then Export, and choose the LEDGERS export - not Trades, which leaves out your deposits and withdrawals and would make your balance look larger than it is. Pick the whole date range. Kraken emails you a zip; the file inside it is what Coineda reads. Nothing leaves this device, and no API key is needed.": "In Kraken, open History, then Export, and choose the LEDGERS export - not Trades, which leaves out your deposits and withdrawals and would make your balance look larger than it is. Pick the whole date range. Kraken emails you a zip; the file inside it is what Coineda reads. Nothing leaves this device, and no API key is needed.",
+    "Imported {{inserted}} new and {{updated}} updated from {{label}}": "Imported {{inserted}} new and {{updated}} updated from {{label}}",
+    "That is not a file Coineda recognises. It reads: {{formats}}": "That is not a file Coineda recognises. It reads: {{formats}}"
   }
 }

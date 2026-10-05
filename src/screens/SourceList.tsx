@@ -1,8 +1,9 @@
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Upload } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { findModule } from '@/sources/registry';
+import { findFileModule } from '@/sources/csv/registry';
 import type { SourceRecord } from '@/ledger/types';
 import { SourceRow } from './SourceRow';
 import type { SourceSummary } from './SourceRow';
@@ -42,6 +43,10 @@ type Props = {
    *  per-row action it is not gated by `busyIds`. */
   onShowEvents: (source: SourceRecord) => void;
   onAddSource: () => void;
+  /** Opens the file picker. Separate from `onAddSource` because the two
+   *  are different acts: one configures something to poll, the other hands
+   *  over a file that already exists. */
+  onImportFile: () => void;
 };
 
 /**
@@ -75,6 +80,7 @@ export const SourceList = ({
   onEditOne,
   onShowEvents,
   onAddSource,
+  onImportFile,
 }: Props) => {
   const { t } = useTranslation();
 
@@ -97,6 +103,10 @@ export const SourceList = ({
               {t('Sync all')}
             </Button>
           )}
+          <Button type="button" variant="outline" onClick={onImportFile}>
+            <Upload aria-hidden="true" />
+            {t('Import a file')}
+          </Button>
           <Button type="button" onClick={onAddSource}>
             {t('Add a data source')}
           </Button>
@@ -112,14 +122,18 @@ export const SourceList = ({
       {sources.length > 0 ? (
         <div className="flex flex-col gap-2">
           {sources.map((source) => {
+            // Looked up in BOTH registries: a file importer is not in the
+            // pull registry, and without this its row would be labelled
+            // with the raw module id.
             const module = findModule(source.moduleId);
+            const fileModule = findFileModule(source.moduleId);
+            const label = module?.manifest.label ?? fileModule?.manifest.label;
             return (
               <SourceRow
                 key={source.id}
                 source={source}
-                moduleLabel={
-                  module ? t(module.manifest.label) : source.moduleId
-                }
+                fileBased={fileModule !== undefined}
+                moduleLabel={label ? t(label) : source.moduleId}
                 summary={perSource.get(source.id)}
                 currency={currency}
                 busy={busyIds.has(source.id)}

@@ -1,5 +1,6 @@
 import { MAX_PAGES } from '@/sources/conformance';
 import { findModule } from '@/sources/registry';
+import { findFileModule } from '@/sources/csv/registry';
 import type { DerivedEvent } from '@/sources/types';
 import {
   deleteDerivedEvents,
@@ -83,6 +84,15 @@ export const syncSource = async (
   // previous sync was still finishing must not kick off a fresh drain.
   if (options?.signal?.aborted) {
     report.cancelled = true;
+    return report;
+  }
+
+  // A file source has nothing to poll: its events arrive when the user
+  // imports an export. Returning an empty report rather than an error is
+  // the point - "Sync all" touches every source, and a file source marked
+  // `unknown module` would sit there with a red diagnostic for doing
+  // exactly what it is supposed to do.
+  if (findFileModule(source.moduleId)) {
     return report;
   }
 

@@ -98,6 +98,15 @@ type Props = {
   onResync: () => void;
   onStop: () => void;
   onRemove: () => void;
+  /**
+   * True for a source whose events come from an imported file rather than
+   * from polling. It has nothing to refresh, nothing to re-drain and no
+   * configuration fields to edit, so those three controls are not rendered
+   * - a disabled button for an action that does not exist is worse than no
+   * button, and Edit would open a form built from a manifest that has no
+   * fields at all.
+   */
+  fileBased?: boolean;
   /** Opens EditSourceDialog for this source. Gated by the same `busy` flag
    *  as Refresh/Resync/Remove - a sync that began before an edit opens must
    *  not race the record a save would write back. */
@@ -121,6 +130,7 @@ export const SourceRow = ({
   moduleLabel,
   summary,
   currency,
+  fileBased = false,
   busy,
   syncing,
   onRefresh,
@@ -221,7 +231,7 @@ export const SourceRow = ({
           >
             <List aria-hidden="true" />
           </Button>
-          {syncing ? (
+          {fileBased ? null : syncing ? (
             <Button
               type="button"
               variant="outline"
@@ -248,28 +258,32 @@ export const SourceRow = ({
               />
             </Button>
           )}
-          <Button
-            type="button"
-            variant="outline"
-            size="icon-sm"
-            disabled={busy}
-            onClick={onResync}
-            aria-label={t('Resync {{label}} from scratch', {
-              label: source.label,
-            })}
-          >
-            <History aria-hidden="true" />
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon-sm"
-            disabled={busy}
-            onClick={onEdit}
-            aria-label={t('Edit {{label}}', { label: source.label })}
-          >
-            <Pencil aria-hidden="true" />
-          </Button>
+          {!fileBased && (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                disabled={busy}
+                onClick={onResync}
+                aria-label={t('Resync {{label}} from scratch', {
+                  label: source.label,
+                })}
+              >
+                <History aria-hidden="true" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                disabled={busy}
+                onClick={onEdit}
+                aria-label={t('Edit {{label}}', { label: source.label })}
+              >
+                <Pencil aria-hidden="true" />
+              </Button>
+            </>
+          )}
           <Button
             type="button"
             variant="outline"
