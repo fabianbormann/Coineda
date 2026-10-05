@@ -52,6 +52,18 @@ export type TokenMeta = {
   decimals: number | null;
   /** Base64 PNG, exactly as the registry serves it. Never SVG - see above. */
   logoPng: string | null;
+  /**
+   * Mean luminance of the logo's visible pixels, 0 to 1, or null when it
+   * could not be measured.
+   *
+   * Filled in by the store rather than by the fetch, because measuring
+   * needs a canvas and this module is pure HTTP. See
+   * src/assets/logoLuminance.ts for why a raster logo has to be measured
+   * at all - 15% of real registry logos are black artwork that disappears
+   * on a dark ground, and 6% are near-white and would disappear on the
+   * plate that fixes the first 15%.
+   */
+  logoLuminance?: number | null;
 };
 
 /** Reads a property that may or may not be wrapped in a signature envelope. */

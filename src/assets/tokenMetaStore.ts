@@ -1,6 +1,7 @@
 import { openLedger } from '@/ledger/db';
 import { fetchTokenMeta, subjectsOf, type TokenMeta } from './tokenRegistry';
 import { parseCardanoAsset } from './cardanoAsset';
+import { measureLogoLuminance } from './logoLuminance';
 
 /**
  * Cached Cardano token metadata.
@@ -101,8 +102,19 @@ export const resolveTokenMeta = async (
   if (stale.length > 0) {
     try {
       const fetched = await fetchTokenMeta(stale, signal);
+      // Measured once, here, and cached with the metadata. Doing it at
+      // render time instead would decode a PNG on every paint and make the
+      // plate appear a frame late.
       for (const [subject, meta] of fetched) {
-        hits.set(subject, meta);
+        const withLuminance: TokenMeta = {
+          ...meta,
+          logoLuminance:
+            meta.logoPng === null
+              ? null
+              : await measureLogoLuminance(meta.logoPng),
+        };
+        fetched.set(subject, withLuminance);
+        hits.set(subject, withLuminance);
       }
       // Every stale subject is written, present in the answer or not, so a
       // miss becomes a recorded miss rather than a permanent re-request.

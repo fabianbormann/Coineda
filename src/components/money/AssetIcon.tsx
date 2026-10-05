@@ -1,5 +1,6 @@
 import { useTokenMetaMap } from '@/assets/TokenMetaContext';
 import type { TokenMeta } from '@/assets/tokenRegistry';
+import { needsLightPlate } from '@/assets/logoLuminance';
 import { cn } from '@/lib/utils';
 import { BitcoinIcon, CardanoIcon, EthereumIcon } from './icons/ChainIcons';
 
@@ -34,7 +35,19 @@ const CHAIN_ICONS: Record<string, Vector | undefined> = {
 };
 
 export type AssetMark =
-  { kind: 'vector'; Icon: Vector } | { kind: 'png'; base64: string };
+  | { kind: 'vector'; Icon: Vector }
+  | {
+      kind: 'png';
+      base64: string;
+      /**
+       * True for a logo dark enough to disappear on this app's dark
+       * surface, which gets a light plate behind it there. Decided per
+       * logo from its own pixels - 15% of real registry logos are black
+       * artwork, and 6% are near-white and would vanish on that same
+       * plate. See src/assets/logoLuminance.ts.
+       */
+      needsPlate: boolean;
+    };
 
 /**
  * The mark for an asset, or null when there is none to show.
@@ -52,7 +65,11 @@ export const assetMarkOf = (
     return { kind: 'vector', Icon };
   }
   if (meta?.logoPng) {
-    return { kind: 'png', base64: meta.logoPng };
+    return {
+      kind: 'png',
+      base64: meta.logoPng,
+      needsPlate: needsLightPlate(meta.logoLuminance),
+    };
   }
   return null;
 };
@@ -91,13 +108,25 @@ export const AssetIcon = ({
     );
   }
 
+  // A dark logo gets a light plate UNDER it, and only in dark mode. The
+  // alternative was inverting it, which turns a black-and-white mark white
+  // correctly and turns a dark-but-coloured one into a different logo. A
+  // plate leaves the artwork exactly as its author published it and simply
+  // restores the light background it was drawn against.
+  //
+  // `box-border` is what keeps the padding from growing the mark: the plate
+  // has to fit the same 1rem box as every sibling icon.
   return (
     <img
       src={`data:image/png;base64,${mark.base64}`}
       alt=""
       aria-hidden="true"
       title={label}
-      className={cn(size, 'rounded-full object-contain')}
+      className={cn(
+        size,
+        'box-border rounded-full object-contain',
+        mark.needsPlate && 'dark:bg-white dark:p-px',
+      )}
     />
   );
 };

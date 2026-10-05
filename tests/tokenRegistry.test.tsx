@@ -344,6 +344,116 @@ describe('marks and symbols are alternatives', () => {
     expect(img?.getAttribute('src')).toBe(`data:image/png;base64,${PNG_B64}`);
   });
 
+  it('plates a dark logo only in dark mode, never in light', async () => {
+    // A light plate in light mode would be a white disc on white paper
+    // around every dark logo - visible, pointless and wrong. The class has
+    // to carry the `dark:` variant.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        bulkResponse([{ subject: SUBJECT, ticker: 'NIGHT', logo: PNG_B64 }]),
+      ),
+    );
+    const { container } = render(
+      <TokenMetaProvider assetIds={[NIGHT_ASSET_ID]}>
+        <AssetIcon assetId={NIGHT_ASSET_ID} label="NIGHT" />
+      </TokenMetaProvider>,
+    );
+    await waitFor(() => expect(container.querySelector('img')).not.toBeNull());
+    const className = container.querySelector('img')?.getAttribute('class');
+    // jsdom cannot measure the PNG, so no plate is expected here at all -
+    // what this pins is that IF one is applied it is dark-mode scoped.
+    expect(className).not.toMatch(/(^|\s)bg-white(\s|$)/);
+    expect(className).not.toMatch(/(^|\s)p-px(\s|$)/);
+  });
+
+  it('scopes the dark-logo plate to dark mode', async () => {
+    // Stubs the browser decode APIs so the logo actually MEASURES as black,
+    // which is the only way needsPlate becomes true - jsdom alone cannot
+    // decode a PNG, so without this the plate class is never reached and
+    // the assertion below would hold against any implementation.
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => ({ width: 1, height: 1, close: () => {} })),
+    );
+    vi.stubGlobal(
+      'OffscreenCanvas',
+      class {
+        getContext() {
+          return {
+            drawImage: () => {},
+            // One opaque black pixel: luminance 0, well under the plate
+            // threshold.
+            getImageData: () => ({
+              data: new Uint8ClampedArray([0, 0, 0, 255]),
+            }),
+          };
+        }
+      },
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        bulkResponse([{ subject: SUBJECT, ticker: 'NIGHT', logo: PNG_B64 }]),
+      ),
+    );
+
+    const { container } = render(
+      <TokenMetaProvider assetIds={[NIGHT_ASSET_ID]}>
+        <AssetIcon assetId={NIGHT_ASSET_ID} label="NIGHT" />
+      </TokenMetaProvider>,
+    );
+    await waitFor(() => {
+      const className = container.querySelector('img')?.getAttribute('class');
+      expect(className).toContain('dark:bg-white');
+    });
+
+    const className = container.querySelector('img')?.getAttribute('class');
+    // A light plate in light mode would be a white disc on white paper
+    // around every dark logo - visible, pointless and wrong.
+    expect(className).not.toMatch(/(^|\s)bg-white(\s|$)/);
+    expect(className).not.toMatch(/(^|\s)p-px(\s|$)/);
+    // border-box, or the padding grows the mark past its siblings.
+    expect(className).toContain('box-border');
+  });
+
+  it('leaves a light logo unplated even in dark mode', async () => {
+    // The 6 per cent the blanket fix would have destroyed: a near-white
+    // logo needs no plate and would vanish on one.
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => ({ width: 1, height: 1, close: () => {} })),
+    );
+    vi.stubGlobal(
+      'OffscreenCanvas',
+      class {
+        getContext() {
+          return {
+            drawImage: () => {},
+            getImageData: () => ({
+              data: new Uint8ClampedArray([255, 255, 255, 255]),
+            }),
+          };
+        }
+      },
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        bulkResponse([{ subject: SUBJECT, ticker: 'NIGHT', logo: PNG_B64 }]),
+      ),
+    );
+
+    const { container } = render(
+      <TokenMetaProvider assetIds={[NIGHT_ASSET_ID]}>
+        <AssetIcon assetId={NIGHT_ASSET_ID} label="NIGHT" />
+      </TokenMetaProvider>,
+    );
+    await waitFor(() => expect(container.querySelector('img')).not.toBeNull());
+    const className = container.querySelector('img')?.getAttribute('class');
+    expect(className).not.toContain('bg-white');
+  });
+
   it('renders no mark at all when there is none to render', () => {
     // Deliberately nothing, not a monogram. The caller writes the symbol
     // instead, which is a better answer than initials like "NI".

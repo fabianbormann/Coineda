@@ -59,7 +59,7 @@ interface LedgerSchema extends DBSchema {
 }
 
 const DB_NAME = 'coineda-v2';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 let connection: Promise<IDBPDatabase<LedgerSchema>> | null = null;
 
@@ -87,6 +87,15 @@ export const openLedger = (): Promise<IDBPDatabase<LedgerSchema>> => {
           db.createObjectStore('settings', { keyPath: 'key' });
         }
         if (oldVersion < 4) {
+          db.createObjectStore('tokenMeta', { keyPath: 'subject' });
+        }
+        if (oldVersion < 5) {
+          // Rebuilt rather than migrated. TokenMeta gained a measured
+          // `logoLuminance`, and rows cached without it would render a
+          // dark logo untreated until their 30-day TTL ran out. This store
+          // is a cache of something re-fetchable, so dropping it costs one
+          // request per token and nothing else.
+          db.deleteObjectStore('tokenMeta');
           db.createObjectStore('tokenMeta', { keyPath: 'subject' });
         }
       },
