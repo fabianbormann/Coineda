@@ -1,0 +1,111 @@
+{
+  "_synthetic": "INVENTED, not recorded. Models GET /api/v2/addresses/{a}/internal-transactions. These are the ether movements a contract made, which never appear in the transactions list - an exchange withdrawal routed through a contract, a DEX payout. Two calls share one parent transaction on purpose: their ids differ only by `index`, and keying on the hash alone would have one overwrite the other.",
+  "call": 2,
+  "url": "https://eth.blockscout.com/api/v2/addresses/0x1111111111111111111111111111111111111111/internal-transactions",
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "transaction_hash": "0xff",
+        "index": 0,
+        "timestamp": "2026-02-06T10:00:00.000000Z",
+        "value": "250000000000000000",
+        "success": true,
+        "type": "call",
+        "from": {
+          "hash": "0x3333333333333333333333333333333333333333",
+          "is_contract": false,
+          "name": null
+        },
+        "to": {
+          "hash": "0x1111111111111111111111111111111111111111",
+          "is_contract": false,
+          "name": null
+        },
+        "block_number": 100,
+        "error": null
+      },
+      {
+        "transaction_hash": "0xff",
+        "index": 1,
+        "timestamp": "2026-02-06T10:00:00.000000Z",
+        "value": "125000000000000000",
+        "success": true,
+        "type": "call",
+        "from": {
+          "hash": "0x3333333333333333333333333333333333333333",
+          "is_contract": false,
+          "name": null
+        },
+        "to": {
+          "hash": "0x1111111111111111111111111111111111111111",
+          "is_contract": false,
+          "name": null
+        },
+        "block_number": 100,
+        "error": null
+      },
+      {
+        "transaction_hash": "0x99",
+        "index": 0,
+        "timestamp": "2026-02-07T10:00:00.000000Z",
+        "value": "4000000000000000000",
+        "success": false,
+        "type": "call",
+        "from": {
+          "hash": "0x3333333333333333333333333333333333333333",
+          "is_contract": false,
+          "name": null
+        },
+        "to": {
+          "hash": "0x1111111111111111111111111111111111111111",
+          "is_contract": false,
+          "name": null
+        },
+        "block_number": 100,
+        "error": null
+      },
+      {
+        "transaction_hash": "0x88",
+        "index": 0,
+        "timestamp": "2026-02-08T10:00:00.000000Z",
+        "value": "0",
+        "success": true,
+        "type": "call",
+        "from": {
+          "hash": "0x3333333333333333333333333333333333333333",
+          "is_contract": false,
+          "name": null
+        },
+        "to": {
+          "hash": "0x1111111111111111111111111111111111111111",
+          "is_contract": false,
+          "name": null
+        },
+        "block_number": 100,
+        "error": null
+      },
+      {
+        "transaction_hash": "0x77",
+        "index": 0,
+        "timestamp": "2026-02-09T10:00:00.000000Z",
+        "value": "6000000000000000000",
+        "success": true,
+        "type": "call",
+        "from": {
+          "hash": "0x3333333333333333333333333333333333333333",
+          "is_contract": false,
+          "name": null
+        },
+        "to": {
+          "hash": "0x2222222222222222222222222222222222222222",
+          "is_contract": false,
+          "name": null
+        },
+        "block_number": 100,
+        "error": null
+      }
+    ],
+    "next_page_params": null
+  }
+}

@@ -2,6 +2,7 @@ import bitcoinEsplora from './bitcoin-esplora';
 import bitpanda from './bitpanda';
 import cardanoBlockfrost from './cardano-blockfrost';
 import cardanoYaci from './cardano-yaci';
+import ethereumBlockscout from './ethereum-blockscout';
 import type { SourceModule } from './types';
 
 /**
@@ -17,6 +18,7 @@ export const registry: SourceModule[] = [
   cardanoYaci,
   cardanoBlockfrost,
   bitcoinEsplora,
+  ethereumBlockscout,
   bitpanda,
 ];
 

@@ -1,0 +1,126 @@
+{
+  "_synthetic": "INVENTED, not recorded. Modelled field for field on a real GET /api/v2/addresses/{a}/transactions response from eth.blockscout.com, measured 2026-10-05. Addresses are placeholders, never the owner's. The cases are the ones that actually decide correctness: an incoming transfer (no fee for us), an outgoing one (value plus gas), a FAILED transaction that still cost gas, a zero-value contract call that cost only gas, and a transaction we merely appear in.",
+  "call": 1,
+  "url": "https://eth.blockscout.com/api/v2/addresses/0x1111111111111111111111111111111111111111/transactions",
+  "status": 200,
+  "body": {
+    "items": [
+      {
+        "hash": "0xaa",
+        "timestamp": "2026-02-01T10:00:00.000000Z",
+        "value": "1000000000000000000",
+        "fee": {
+          "type": "actual",
+          "value": "500000000000000"
+        },
+        "status": "ok",
+        "result": "ok",
+        "from": {
+          "hash": "0x2222222222222222222222222222222222222222",
+          "is_contract": false,
+          "name": null
+        },
+        "to": {
+          "hash": "0x1111111111111111111111111111111111111111",
+          "is_contract": false,
+          "name": null
+        },
+        "block_number": 100,
+        "gas_used": "21000"
+      },
+      {
+        "hash": "0xbb",
+        "timestamp": "2026-02-02T10:00:00.000000Z",
+        "value": "500000000000000000",
+        "fee": {
+          "type": "actual",
+          "value": "100000000000000"
+        },
+        "status": "ok",
+        "result": "ok",
+        "from": {
+          "hash": "0x1111111111111111111111111111111111111111",
+          "is_contract": false,
+          "name": null
+        },
+        "to": {
+          "hash": "0x2222222222222222222222222222222222222222",
+          "is_contract": false,
+          "name": null
+        },
+        "block_number": 100,
+        "gas_used": "21000"
+      },
+      {
+        "hash": "0xcc",
+        "timestamp": "2026-02-03T10:00:00.000000Z",
+        "value": "900000000000000000",
+        "fee": {
+          "type": "actual",
+          "value": "70000000000000"
+        },
+        "status": "error",
+        "result": "error",
+        "from": {
+          "hash": "0x1111111111111111111111111111111111111111",
+          "is_contract": false,
+          "name": null
+        },
+        "to": {
+          "hash": "0x2222222222222222222222222222222222222222",
+          "is_contract": false,
+          "name": null
+        },
+        "block_number": 100,
+        "gas_used": "21000"
+      },
+      {
+        "hash": "0xdd",
+        "timestamp": "2026-02-04T10:00:00.000000Z",
+        "value": "0",
+        "fee": {
+          "type": "actual",
+          "value": "30000000000000"
+        },
+        "status": "ok",
+        "result": "ok",
+        "from": {
+          "hash": "0x1111111111111111111111111111111111111111",
+          "is_contract": false,
+          "name": null
+        },
+        "to": {
+          "hash": "0x3333333333333333333333333333333333333333",
+          "is_contract": false,
+          "name": null
+        },
+        "block_number": 100,
+        "gas_used": "21000"
+      },
+      {
+        "hash": "0xee",
+        "timestamp": "2026-02-05T10:00:00.000000Z",
+        "value": "7000000000000000000",
+        "fee": {
+          "type": "actual",
+          "value": "40000000000000"
+        },
+        "status": "ok",
+        "result": "ok",
+        "from": {
+          "hash": "0x2222222222222222222222222222222222222222",
+          "is_contract": false,
+          "name": null
+        },
+        "to": {
+          "hash": "0x3333333333333333333333333333333333333333",
+          "is_contract": false,
+          "name": null
+        },
+        "block_number": 100,
+        "gas_used": "21000"
+      }
+    ],
+    "next_page_params": null
+  }
+}
