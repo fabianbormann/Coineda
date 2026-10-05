@@ -1,0 +1,10 @@
+You can use this transaction history to generate your required tax reports.
+Coinbase Inc.
+
+ID,Timestamp,Transaction Type,Asset,Quantity Transacted,Price Currency,Price at Transaction,Subtotal,Total (inclusive of fees and/or spread),Fees and/or Spread,Notes
+abc-1,2024-03-11T09:05:00Z,Buy,BTC,0.01000000,EUR,50000.00,500.00,501.50,1.50,Bought 0.01 BTC
+abc-2,2024-06-02T18:40:12Z,Send,BTC,0.00500000,EUR,,,,,Sent to wallet
+abc-3,2024-07-01T00:00:00Z,Staking Income,ADA,2.50000000,EUR,0.40,1.00,1.00,0.00,Staking reward
+abc-4,2024-08-01T00:00:00Z,Sell,BTC,0.00200000,EUR,60000.00,120.00,118.50,1.50,Sold
+abc-5,2024-09-01T00:00:00Z,Buy,DOGE,1000.00000000,EUR,0.10,100.00,101.00,1.00,Unsupported
+abc-6,2024-09-02T00:00:00Z,Mystery,BTC,1.00000000,EUR,,,,,Unknown type

@@ -1,3 +1,5 @@
+import binanceCsv from '@/sources/binance-csv';
+import coinbaseCsv from '@/sources/coinbase-csv';
 import krakenCsv from '@/sources/kraken-csv';
 import type { FileSourceModule } from './types';
 
@@ -6,7 +8,11 @@ import type { FileSourceModule } from './types';
  * - the same rule the pull-source registry follows, and for the same
  * reason: module code runs beside the user's exchange credentials.
  */
-export const fileRegistry: FileSourceModule[] = [krakenCsv];
+export const fileRegistry: FileSourceModule[] = [
+  krakenCsv,
+  binanceCsv,
+  coinbaseCsv,
+];
 
 export const findFileModule = (id: string): FileSourceModule | undefined =>
   fileRegistry.find((module) => module.manifest.id === id);
