@@ -2,10 +2,10 @@ import { getCachedPrice, putCachedPrice } from '@/prices/priceStore';
 import {
   COINGECKO_IDS,
   FREE_TIER_DAYS,
-  fetchHistoricalPrices,
   freeTierCutoff,
   CoinGeckoHistoryError,
 } from '@/prices/coingecko';
+import { fetchHistory } from '@/prices/history';
 import { valueOf } from '@/prices/scale';
 import { getSettings } from '@/settings/settingsStore';
 import { normaliseAmount } from '@/ledger/amount';
@@ -130,26 +130,32 @@ export const resolveValues = async (
     }
   }
 
-  // ONE request per asset, covering every day it still needs, rather than
-  // one request per day. This is the whole reason the batched fetcher
-  // exists: a report needing 80 days priced issued 80 sequential requests,
-  // the free tier answers 429 after about four, and that 429 carries no
-  // CORS header - so the browser reported `TypeError: Failed to fetch`
+  // ONE request for every asset and every day, plus one for the whole FX
+  // span - not one per asset, and certainly not one per day. A report
+  // needing 80 days priced used to issue 80 sequential requests; the
+  // keyless free tier answers 429 after about four, and that 429 carries no
+  // CORS header, so the browser reported `TypeError: Failed to fetch`
   // against most of the user's events with nothing explaining it.
-  // Matches fetchHistoricalPrices: with a key, no day is refused locally.
+  //
+  // fetchHistory tries DefiLlama plus the ECB's rates first and falls back
+  // to CoinGecko for whatever is left. That ordering is what makes a report
+  // over more than a year possible at all without a paid key: CoinGecko's
+  // free tier refuses anything older than 365 days, and an acquisition
+  // three years before its disposal is exactly the figure a cost basis
+  // needs.
+  const { prices: fetched, failures } = await fetchHistory(
+    missing,
+    currency,
+    apiKey,
+  );
+
+  // Still matches the CoinGecko path: with a key, no day is refused locally.
   const cutoff = apiKey ? Number.NEGATIVE_INFINITY : freeTierCutoff();
   for (const [assetId, days] of missing) {
-    let fetched = new Map<string, string>();
-    let failure: unknown = null;
-    try {
-      fetched = await fetchHistoricalPrices(assetId, currency, days, apiKey);
-    } catch (error) {
-      failure = error;
-    }
-
+    const failure = failures.get(assetId) ?? null;
     for (const date of days) {
       const key = pairKey(assetId, date);
-      const price = fetched.get(date);
+      const price = fetched.get(key);
       if (price !== undefined) {
         await putCachedPrice({ assetId, currency, date }, price);
         results.set(key, { price });
@@ -160,8 +166,9 @@ export const resolveValues = async (
         continue;
       }
       // No failure, just no price for this day. A day older than the free
-      // tier is never even requested, so it gets the boundary's own message
-      // rather than a vague "not covered".
+      // tier is never even requested of CoinGecko, so if the deeper source
+      // had nothing either it gets the boundary's own message rather than a
+      // vague "not covered".
       results.set(key, {
         reason:
           Date.parse(`${date}T00:00:00Z`) < cutoff

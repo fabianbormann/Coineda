@@ -26,10 +26,23 @@ const DAY = 86_400_000;
  * to know which days the resolver decided it needed - and so a resolver that
  * asked for the WRONG window produces no price here rather than quietly
  * getting the right one anyway.
+ *
+ * The DEEP sources are refused by default. resolveValues now tries
+ * DefiLlama and the ECB first and only falls back to CoinGecko, so without
+ * this every test below would exercise the new path instead of the one it
+ * was written for. The tests that cover the primary path stub it
+ * explicitly; see `deepStub`.
  */
+const isCoinGecko = (url: string): boolean => url.includes('coingecko.com');
+const isDeepSource = (url: string): boolean =>
+  url.includes('llama.fi') || url.includes('frankfurter');
+
 const rangeStub = (priceFor: (isoDate: string) => number) =>
   vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(
     async (url: string) => {
+      if (isDeepSource(String(url))) {
+        return new Response('upstream unavailable', { status: 503 });
+      }
       const from = Number(/from=(\d+)/.exec(String(url))![1]) * 1000;
       const to = Number(/to=(\d+)/.exec(String(url))![1]) * 1000;
       const prices: [number, number][] = [];
@@ -39,6 +52,11 @@ const rangeStub = (priceFor: (isoDate: string) => number) =>
       return new Response(JSON.stringify({ prices }), { status: 200 });
     },
   );
+
+/** Only the CoinGecko calls, because the deep sources are asked first and
+ *  a raw call count no longer says anything about the fallback's shape. */
+const coinGeckoCalls = (mock: { mock: { calls: unknown[][] } }): string[] =>
+  mock.mock.calls.map((call) => String(call[0])).filter(isCoinGecko);
 
 const flatRange = (eur: number) => rangeStub(() => eur);
 
@@ -115,7 +133,7 @@ describe('resolveValues', () => {
       'eur',
     );
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(coinGeckoCalls(fetchMock)).toHaveLength(1);
   });
 
   it('prices eighty days in ONE request, not eighty', async () => {
@@ -136,7 +154,7 @@ describe('resolveValues', () => {
 
     expect(unpriced).toHaveLength(0);
     expect(valued).toHaveLength(80);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(coinGeckoCalls(fetchMock)).toHaveLength(1);
   });
 
   it('asks one request per asset, not one per asset-day', async () => {
@@ -164,8 +182,10 @@ describe('resolveValues', () => {
       'eur',
     );
 
-    // Two assets, two days each: two requests, because a span is per asset.
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // Two assets, two days each: two CoinGecko requests, because its span
+    // is per asset. The deep sources take both assets in one call, which is
+    // the point of them - see the primary-path tests below.
+    expect(coinGeckoCalls(fetchMock)).toHaveLength(2);
   });
 
   it('serves a second run entirely from cache', async () => {
@@ -175,7 +195,7 @@ describe('resolveValues', () => {
     await resolveValues([event({})], 'eur');
     await resolveValues([event({})], 'eur');
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(coinGeckoCalls(fetchMock)).toHaveLength(1);
   });
 
   it('values the base currency itself at one without asking anybody', async () => {
@@ -259,11 +279,29 @@ describe('resolveValues', () => {
 
     await resolveValues([event({})], 'eur');
 
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    // The CoinGecko call specifically: it is no longer the first request
+    // made, because the deep sources are tried ahead of it.
+    const call = fetchMock.mock.calls.find((entry) =>
+      isCoinGecko(String(entry[0])),
+    ) as [string, RequestInit] | undefined;
+    expect(call).toBeDefined();
+    const [url, init] = call!;
     expect(String(url)).not.toContain('cg-demo-key');
     expect((init.headers as Record<string, string>)['x-cg-demo-api-key']).toBe(
       'cg-demo-key',
     );
+
+    // And the key goes ONLY there. The deep sources are third parties that
+    // were never given it and have no use for it.
+    for (const [other, otherInit] of fetchMock.mock.calls) {
+      if (isCoinGecko(String(other))) {
+        continue;
+      }
+      expect(String(other)).not.toContain('cg-demo-key');
+      expect(
+        JSON.stringify((otherInit as RequestInit)?.headers ?? {}),
+      ).not.toContain('cg-demo-key');
+    }
   });
 
   it('never puts the API key in a reason a user will read', async () => {
