@@ -846,9 +846,32 @@ describe('reading the unresolved list', () => {
     expect(
       screen.getByRole('checkbox', { name: /outside the tax year/i }),
     ).toBeChecked();
-    expect(
-      screen.getByText(/2 .*2025.*hidden|2 außerhalb/i),
-    ).toBeInTheDocument();
+
+    // Nothing disappears silently: the heading states the whole count and
+    // how much of it the year accounts for, so a list showing one row out
+    // of three still says so.
+    const heading = screen.getByText(/not included in the figures above/i);
+    expect(heading.textContent).toMatch(/3/);
+    expect(heading.textContent).toMatch(/1/);
+    expect(heading.textContent).toMatch(/2025/);
+  });
+
+  it('states the plain total when every item is inside the year', async () => {
+    // "3 total, 3 in 2025" says the same thing twice, so the breakdown
+    // appears only when there is one to make.
+    taxRegistry.push(
+      withUnresolved([
+        gap('x', Date.UTC(2025, 1, 1)),
+        gap('y', Date.UTC(2025, 7, 2)),
+      ]),
+    );
+    await putEvents([acquisitionEvent, disposalEvent]);
+    renderScreen();
+    await runReport('2025');
+
+    const heading = screen.getByText(/not included in the figures above/i);
+    expect(heading.textContent).toMatch(/2/);
+    expect(heading.textContent).not.toMatch(/in 2025/);
   });
 
   it('brings every year back in one click', async () => {

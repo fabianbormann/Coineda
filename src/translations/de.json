@@ -391,6 +391,6 @@
     "Created on {{date}}": "Erstellt am {{date}}",
     "Not reached · {{amount}} under the limit": "Nicht erreicht · {{amount}} unter der Grenze",
     "Hide transactions outside the tax year": "Transaktionen außerhalb des Steuerjahrs ausblenden",
-    "{{n}} outside {{year}} are hidden": "{{n}} außerhalb von {{year}} ausgeblendet"
+    "Not included in the figures above ({{total}} total, {{inYear}} in {{year}})": "Nicht in den obigen Zahlen enthalten ({{total}} insgesamt, davon {{inYear}} in {{year}})"
   }
 }

@@ -323,8 +323,22 @@ export const TaxReportScreen = () => {
     return kept.sort((a, b) => a.timestamp - b.timestamp);
   }, [assessment, hideOutsideYear]);
 
-  const hiddenOutsideYear =
-    (assessment?.unresolved.length ?? 0) - shownUnresolved.length;
+  /**
+   * How many unresolved items fall inside the tax year, out of all of them.
+   *
+   * Derived from the whole list rather than from what is on screen. That
+   * happens to give the same number either way - filtering an already
+   * year-filtered list by year changes nothing - so this is for clarity
+   * rather than correctness: the count does not depend on the checkbox,
+   * and reading it off the unfiltered list says so.
+   *
+   * What DOES keep the filter from hiding anything silently is the heading
+   * itself, which carries `assessment.unresolved.length` whatever is being
+   * shown.
+   */
+  const unresolvedInYear = (assessment?.unresolved ?? []).filter(
+    (item) => new Date(item.timestamp).getUTCFullYear() === assessment?.year,
+  ).length;
 
   const formatDate = (timestamp: number): string =>
     new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium' }).format(
@@ -748,10 +762,22 @@ export const TaxReportScreen = () => {
                 {assessment.unresolved.length > 0 && (
                   <div className="flex flex-col gap-3">
                     <h3 className="text-sm font-semibold">
-                      {t(
-                        'Not included in the figures above ({{count}} total)',
-                        { count: assessment.unresolved.length },
-                      )}
+                      {/* The breakdown appears only when there is one to
+                          make. With every item inside the year, "60 total,
+                          60 in 2025" says the same thing twice. */}
+                      {unresolvedInYear === assessment.unresolved.length
+                        ? t(
+                            'Not included in the figures above ({{count}} total)',
+                            { count: assessment.unresolved.length },
+                          )
+                        : t(
+                            'Not included in the figures above ({{total}} total, {{inYear}} in {{year}})',
+                            {
+                              total: assessment.unresolved.length,
+                              inYear: unresolvedInYear,
+                              year: assessment.year,
+                            },
+                          )}
                     </h3>
 
                     {/* Chronological within each kind. The list arrives in
@@ -770,18 +796,6 @@ export const TaxReportScreen = () => {
                       />
                       {t('Hide transactions outside the tax year')}
                     </label>
-                    {hiddenOutsideYear > 0 && (
-                      // Never silently. A list that shrank from 60 entries
-                      // to 4 with nothing saying why is worse than the
-                      // noise it replaced.
-                      <p className="text-sm text-muted-foreground">
-                        {t('{{n}} outside {{year}} are hidden', {
-                          n: hiddenOutsideYear,
-                          year: assessment.year,
-                        })}
-                      </p>
-                    )}
-
                     {groupByKind(shownUnresolved).map(([kind, items]) => (
                       <div key={kind} className="flex flex-col gap-2">
                         <p className="text-sm font-medium">
