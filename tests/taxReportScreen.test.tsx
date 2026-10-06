@@ -7,7 +7,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { TaxReportScreen } from '@/screens/TaxReportScreen';
 import { taxRegistry } from '@/tax/registry';
 import germanTax from '@/tax/jurisdictions/de';
-import { openLedger, putEvents } from '@/ledger/db';
+import { openLedger, putEvents, putSource } from '@/ledger/db';
 import { getSettings, putSettings } from '@/settings/settingsStore';
 import type { LedgerEvent } from '@/ledger/types';
 import { flatRange } from './priceRangeStub';
@@ -1005,5 +1005,46 @@ describe('who the report is for', () => {
       const settings = await getSettings();
       expect(settings?.taxpayer?.name).toBe('Erika Mustermann');
     });
+  });
+});
+
+describe('where the figures come from', () => {
+  it('names each source, its wallets and how much it contributed', async () => {
+    await putSource({
+      id: 's1',
+      moduleId: 'kraken-csv',
+      label: 'My Kraken account',
+      config: { apiKey: 'cg-secret-value' },
+    });
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+
+    // Scoped to the directory: the venue now also appears on every
+    // disposal line, so an unscoped /wallet-a/ matches several elements and
+    // would hold whether or not the directory rendered at all.
+    const directory = await screen.findByTestId('source-directory');
+    expect(directory.textContent).toContain('My Kraken account');
+    expect(directory.textContent).toContain('kraken-csv');
+    expect(directory.textContent).toContain('wallet-a');
+    expect(directory.textContent).toMatch(/2 events/);
+  });
+
+  it('never prints a source credential', async () => {
+    await putSource({
+      id: 's1',
+      moduleId: 'kraken-csv',
+      label: 'My Kraken account',
+      config: { apiKey: 'cg-secret-value' },
+    });
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    const { container } = renderScreen();
+    await runReport('2025');
+
+    expect(container.textContent).not.toContain('cg-secret-value');
   });
 });

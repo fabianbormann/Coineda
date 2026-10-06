@@ -12,6 +12,11 @@ import { taxRegistry } from '@/tax/registry';
 import { runTaxReport } from '@/tax/runTaxReport';
 import { buildDisclaimer, type Disclaimer } from '@/tax/disclaimer';
 import { getSettings, putSettings } from '@/settings/settingsStore';
+import { getAllEvents, getSources } from '@/ledger/db';
+import {
+  buildSourceDirectory,
+  type SourceDirectoryEntry,
+} from '@/tax/sourceDirectory';
 import { isZeroAmount, subtractAmounts } from '@/ledger/amount';
 import { Money } from '@/components/money/Money';
 import { symbolOf } from '@/components/money/asset';
@@ -166,6 +171,13 @@ export const TaxReportScreen = () => {
   // value is only ever read back on the next mount.
   const [taxpayerName, setTaxpayerName] = useState('');
   const [taxNumber, setTaxNumber] = useState('');
+  // Built alongside the report, not on mount: it describes the ledger the
+  // figures were computed from, so it has to be read at the same moment
+  // they were - a source added after a run would otherwise appear on a
+  // sheet it contributed nothing to.
+  const [sourceDirectory, setSourceDirectory] = useState<
+    SourceDirectoryEntry[]
+  >([]);
 
   // Settings are read once, on mount. This used to be a reset block keyed
   // on an `open` prop, re-running every time the dialog reopened; a screen
@@ -281,6 +293,14 @@ export const TaxReportScreen = () => {
         if (cancelled) {
           return;
         }
+        const [sources, events] = await Promise.all([
+          getSources(),
+          getAllEvents(),
+        ]);
+        if (cancelled) {
+          return;
+        }
+        setSourceDirectory(buildSourceDirectory(sources, events));
         setAssessment(result);
         setStatus('done');
       } catch (caught) {
@@ -706,6 +726,58 @@ export const TaxReportScreen = () => {
                     </CardContent>
                   </Card>
                 </div>
+
+                {/* 1b. Which wallets and exchanges the figures came from.
+                    A reader at a tax office has to be able to ask for the
+                    statements behind a number, and cannot do that without
+                    knowing which accounts produced it. Built from the
+                    sources joined to their events - never from
+                    SourceRecord.config, which is documented as possibly
+                    holding credentials and must not reach a printed page. */}
+                {sourceDirectory.length > 0 && (
+                  <div
+                    data-testid="source-directory"
+                    className="flex flex-col gap-2"
+                  >
+                    <h3 className="text-sm font-semibold">
+                      {t('Where these figures come from')}
+                    </h3>
+                    {sourceDirectory.map((entry) => (
+                      <Card key={entry.sourceId ?? 'orphans'}>
+                        <CardContent className="flex flex-col gap-1 text-sm">
+                          <p className="font-medium">
+                            {entry.sourceId === null
+                              ? t(entry.label)
+                              : entry.label}
+                            {entry.moduleId !== null && (
+                              <span className="ml-2 font-normal text-muted-foreground">
+                                {entry.moduleId}
+                              </span>
+                            )}
+                          </p>
+                          {entry.venues.length > 0 && (
+                            <p>
+                              <span className="font-medium">
+                                {t('Wallets and accounts')}:{' '}
+                              </span>
+                              {entry.venues.join(' · ')}
+                            </p>
+                          )}
+                          <p className="text-muted-foreground">
+                            {entry.firstAt !== undefined &&
+                            entry.lastAt !== undefined
+                              ? t('{{count}} events · {{from}} to {{to}}', {
+                                  count: entry.eventCount,
+                                  from: formatDate(entry.firstAt),
+                                  to: formatDate(entry.lastAt),
+                                })
+                              : t('No events from this source yet')}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
 
                 {/* 2. Totals, with `omitted` welded to `taxableGain` in the
                     same paragraph - see the class doc comment above. */}

@@ -472,6 +472,11 @@
     "Your name": "Dein Name",
     "Shown on the printed report so it can be assigned to your file. Stored only on this device.": "Erscheint auf dem gedruckten Report, damit er deinem Steuerfall zugeordnet werden kann. Wird nur auf diesem Gerät gespeichert.",
     "This is a self-prepared report, not a certificate from a bank or an authority.": "Dies ist ein selbst erstellter Report, keine Bescheinigung einer Bank oder Behörde.",
-    "Tax year {{year}} has not ended yet, so this is an interim figure.": "Das Steuerjahr {{year}} ist noch nicht abgelaufen, dies ist daher ein Zwischenstand."
+    "Tax year {{year}} has not ended yet, so this is an interim figure.": "Das Steuerjahr {{year}} ist noch nicht abgelaufen, dies ist daher ein Zwischenstand.",
+    "Where these figures come from": "Woher diese Zahlen stammen",
+    "No configured source": "Keine hinterlegte Datenquelle",
+    "{{count}} events · {{from}} to {{to}}": "{{count}} Buchungen · {{from}} bis {{to}}",
+    "Wallets and accounts": "Wallets und Konten",
+    "No events from this source yet": "Noch keine Buchungen aus dieser Quelle"
   }
 }

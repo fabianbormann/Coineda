@@ -472,6 +472,11 @@
     "Your name": "Your name",
     "Shown on the printed report so it can be assigned to your file. Stored only on this device.": "Shown on the printed report so it can be assigned to your file. Stored only on this device.",
     "This is a self-prepared report, not a certificate from a bank or an authority.": "This is a self-prepared report, not a certificate from a bank or an authority.",
-    "Tax year {{year}} has not ended yet, so this is an interim figure.": "Tax year {{year}} has not ended yet, so this is an interim figure."
+    "Tax year {{year}} has not ended yet, so this is an interim figure.": "Tax year {{year}} has not ended yet, so this is an interim figure.",
+    "Where these figures come from": "Where these figures come from",
+    "No configured source": "No configured source",
+    "{{count}} events · {{from}} to {{to}}": "{{count}} events · {{from}} to {{to}}",
+    "Wallets and accounts": "Wallets and accounts",
+    "No events from this source yet": "No events from this source yet"
   }
 }
