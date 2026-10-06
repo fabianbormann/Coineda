@@ -359,15 +359,20 @@ describe('german rate handling', () => {
     expect(report.estimatedLiability).toBeUndefined();
   });
 
-  it('estimates with the solidarity surcharge when a rate is given', () => {
+  it('estimates the rate alone, adding no surcharge nobody may owe', () => {
     const report = germanTax.assess({
       year: 2024,
       matched: [disposal({ heldDays: 10, gain: '1000' })],
       income: [],
       rate: '42',
     });
-    // 1000 at 42% = 420, plus 5.5% Soli on the tax = 443.1.
-    expect(report.estimatedLiability).toBe('443.1');
+    // 1000 at 42% = 420, exactly. The flat 5.5% Solidaritätszuschlag this
+    // used to add unconditionally is owed only once the ASSESSED INCOME TAX
+    // passes its own Freigrenze - a figure no crypto gain and marginal rate
+    // can produce - so it overstated the estimate for most private
+    // taxpayers. Kirchensteuer and progression are not modelled either, and
+    // the report now says all three in words instead.
+    expect(report.estimatedLiability).toBe('420');
   });
 });
 

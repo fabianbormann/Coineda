@@ -312,13 +312,25 @@ const assess = (input: AssessInput): TaxAssessment => {
 
   let estimatedLiability: string | undefined;
   if (input.rate !== undefined) {
-    // The one place besides `proportion` that touches Big directly: a
-    // personal rate times a gain, plus the 5.5% Solidaritätszuschlag on the
-    // resulting tax. Every intermediate still round-trips through a decimal
-    // string via normaliseAmount before leaving this function.
+    // A marginal rate times the taxable gain, and deliberately nothing
+    // more. This used to multiply by 1.055 for the Solidaritätszuschlag
+    // unconditionally - but the Soli has had a Freigrenze since 2021 and is
+    // owed only once the ASSESSED INCOME TAX passes it, a figure that is
+    // not in this app and cannot be derived from a crypto gain and a
+    // marginal rate. So the surcharge was wrong for most private taxpayers,
+    // and wrong in the direction that overstates. Kirchensteuer is not
+    // modelled either, and neither is the gain's effect on progression.
+    //
+    // The report states all three in words beside the figure rather than
+    // quietly producing a number that looks more complete than it is: a
+    // number that is wrong but labelled is recoverable, one that is wrong
+    // and confident is not.
+    //
+    // Still the one place besides `proportion` that touches Big directly,
+    // and every intermediate still round-trips through a decimal string via
+    // normaliseAmount before leaving this function.
     const tax = new Big(taxableGain).times(new Big(input.rate)).div(100);
-    const withSolidaritySurcharge = tax.times(new Big('1.055'));
-    estimatedLiability = normaliseAmount(withSolidaritySurcharge.toString());
+    estimatedLiability = normaliseAmount(tax.toString());
   }
 
   return {

@@ -717,6 +717,11 @@ export const TaxReportScreen = () => {
                           value={Number(assessment.estimatedLiability)}
                           currency={baseCurrency}
                         />
+                        <span className="ml-2 text-sm text-muted-foreground">
+                          {t(
+                            'Your marginal rate applied to the taxable gain. It does not include solidarity surcharge, church tax, or the effect on your overall progression.',
+                          )}
+                        </span>
                       </p>
                     )}
                   </CardContent>

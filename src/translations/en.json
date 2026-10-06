@@ -464,6 +464,7 @@
     "held {{days}} days": "held {{days}} days",
     "From pooled cost; an averaged holding has no single acquisition date.": "From pooled cost; an averaged holding has no single acquisition date.",
     "Loss to declare": "Loss to declare",
-    "A loss only offsets later gains if you declare it, so it belongs in your return even though no tax is due on it.": "A loss only offsets later gains if you declare it, so it belongs in your return even though no tax is due on it."
+    "A loss only offsets later gains if you declare it, so it belongs in your return even though no tax is due on it.": "A loss only offsets later gains if you declare it, so it belongs in your return even though no tax is due on it.",
+    "Your marginal rate applied to the taxable gain. It does not include solidarity surcharge, church tax, or the effect on your overall progression.": "Your marginal rate applied to the taxable gain. It does not include solidarity surcharge, church tax, or the effect on your overall progression."
   }
 }
