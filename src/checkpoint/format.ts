@@ -56,6 +56,22 @@ export { getSettings, putSettings, isOnboarded, setOnboarded };
 
 const CURRENT_VERSION = 1;
 
+/**
+ * What a checkpoint is FOR, which decides how much of the ledger goes in.
+ *
+ * - `handover`: setting up another device that is in front of you. Carries
+ *   everything no sync reproduces - settings, sources with their
+ *   credentials, authored events, confirmed transfers - and leaves the
+ *   synced history behind, because the sources fetch that again themselves.
+ *   Small enough to travel as a single QR code, which is the whole point.
+ * - `backup`: the ledger outliving its sources. Carries everything.
+ *
+ * The distinction is deliberately NOT a size heuristic. A handover that
+ * happens to be too large for a QR is still a handover; it just has to
+ * travel as a file like any other.
+ */
+export type CheckpointScope = 'handover' | 'backup';
+
 export type Checkpoint = {
   v: 1;
   settings: Settings;
@@ -70,6 +86,16 @@ export type Checkpoint = {
    * overlap: an event is authored or derived, never both.
    */
   derivedEvents?: LedgerEvent[];
+  /**
+   * How many recorded transactions this checkpoint deliberately left out.
+   *
+   * Only a handover sets it. It exists so the receiving device can say
+   * what is missing in a number rather than in the abstract - "your other
+   * device has 12,431 transactions" is something a person can act on,
+   * where "the history is not included" invites them to wonder whether
+   * something broke.
+   */
+  omittedEventCount?: number;
   /**
    * Optional, and the version stays 1 on purpose.
    *
@@ -114,7 +140,9 @@ const portableSource = ({
  * asset id (`fiat:`) that matches nothing - and there is nothing to export
  * before onboarding in the first place.
  */
-export const buildCheckpoint = async (): Promise<Checkpoint> => {
+export const buildCheckpoint = async (
+  scope: CheckpointScope = 'backup',
+): Promise<Checkpoint> => {
   const [settings, sources, events, transferLinks] = await Promise.all([
     getSettings(),
     getSources(),
@@ -126,12 +154,18 @@ export const buildCheckpoint = async (): Promise<Checkpoint> => {
       'cannot build a checkpoint before onboarding: no settings configured yet',
     );
   }
+  const derived = events.filter((event) => event.origin === 'derived');
   return {
     v: CURRENT_VERSION,
     settings,
     sources: sources.map(portableSource),
     authoredEvents: events.filter((event) => event.origin === 'authored'),
-    derivedEvents: events.filter((event) => event.origin === 'derived'),
+    // One of the two, never both and never neither: a handover states what
+    // it left behind, a backup carries it. A payload with both fields set
+    // would be claiming to omit what it also contains.
+    ...(scope === 'backup'
+      ? { derivedEvents: derived }
+      : { omittedEventCount: derived.length }),
     transferLinks,
   };
 };
@@ -167,6 +201,8 @@ export const openCheckpoint = async (
     !Array.isArray(checkpoint.authoredEvents) ||
     (checkpoint.derivedEvents !== undefined &&
       !Array.isArray(checkpoint.derivedEvents)) ||
+    (checkpoint.omittedEventCount !== undefined &&
+      typeof checkpoint.omittedEventCount !== 'number') ||
     // Absent is valid - see the field's comment on `Checkpoint`. Present
     // but not an array is not, and letting it through would reach the
     // restore's `for ... of` as a crash mid-transaction.

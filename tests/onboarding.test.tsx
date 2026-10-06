@@ -421,6 +421,96 @@ describe('importing a checkpoint', () => {
   });
 });
 
+/**
+ * What a device says after restoring a HANDOVER.
+ *
+ * A handover is complete in its own terms and still leaves the ledger
+ * behind. Landing straight on an empty overview gives a person no way to
+ * tell that from a broken import - so the restore explains itself, says
+ * how much is missing, and names both ways to close the gap.
+ */
+describe('restoring a handover', () => {
+  const handover: Checkpoint = {
+    v: 1,
+    settings: { language: 'en', baseCurrency: 'eur' },
+    sources: [],
+    authoredEvents: [],
+    omittedEventCount: 1234,
+  };
+
+  const restoreFromFile = async (checkpoint: Checkpoint) => {
+    const onComplete = renderFlow();
+    const secret = generateTransferSecret();
+    const file = sealedToFile(
+      await sealCheckpoint(checkpoint, secret),
+      'checkpoint.coineda',
+    );
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /have a checkpoint/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /from a file/i }),
+    );
+    await userEvent.upload(
+      await screen.findByLabelText(/checkpoint file/i),
+      file,
+    );
+    await userEvent.type(
+      await screen.findByLabelText(/transfer secret/i),
+      secret,
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /^restore/i }),
+    );
+    return onComplete;
+  };
+
+  it('names what is missing and both ways to get it', async () => {
+    const onComplete = await restoreFromFile(handover);
+
+    expect(
+      await screen.findByText(/1234 recorded transactions/i),
+    ).toBeVisible();
+    // Refetching first: it is the ordinary route and needs nothing from
+    // the other device.
+    expect(
+      screen.getByText(/sync on this device fetches the history/i),
+    ).toBeVisible();
+    // And the file, for the source that cannot be synced any more - the
+    // case the backup scope exists for.
+    expect(screen.getByText(/an exchange that closed/i)).toBeVisible();
+    // Held here deliberately: the flow has NOT completed, because the
+    // person has something to read first.
+    expect(onComplete).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: /got it/i }));
+    expect(onComplete).toHaveBeenCalled();
+  });
+
+  it('is already onboarded while that screen is up', async () => {
+    // The explanation is not a step that can fail or be escaped out of
+    // halfway: the restore itself already committed.
+    await restoreFromFile(handover);
+    await screen.findByText(/1234 recorded transactions/i);
+
+    await waitFor(async () => {
+      expect(await isOnboarded()).toBe(true);
+    });
+  });
+
+  it('does not interrupt a backup, which left nothing behind', async () => {
+    const onComplete = await restoreFromFile({
+      ...handover,
+      omittedEventCount: undefined,
+      derivedEvents: [],
+    });
+
+    await waitFor(() => expect(onComplete).toHaveBeenCalled());
+    expect(screen.queryByText(/recorded transactions/i)).toBeNull();
+  });
+});
+
 describe('decoding a scanned QR frame', () => {
   it('recovers the exact bytes that were encoded, round-tripped through a real QR bitmap', () => {
     // decodeQrPayload is the sole conversion from scanned pixels to the

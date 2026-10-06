@@ -255,7 +255,6 @@
     "Creating your checkpoint…": "Creating your checkpoint…",
     "Could not create a checkpoint. Try again.": "Could not create a checkpoint. Try again.",
     "Checkpoint QR code": "Checkpoint QR code",
-    "Scan this QR code on your other device, then type the transfer secret below into it.": "Scan this QR code on your other device, then type the transfer secret below into it.",
     "Download checkpoint": "Download checkpoint",
     "Try again": "Try again",
     "Done": "Done",
@@ -414,9 +413,22 @@
     "Could not save that. Try again.": "Could not save that. Try again.",
     "Check {{count}} possible transfer_one": "Check {{count}} possible transfer",
     "Check {{count}} possible transfer_other": "Check {{count}} possible transfers",
-    "This checkpoint is too large for a QR code, so it comes as a file. Send the file to your other device, then type the transfer secret below into it.": "This checkpoint is too large for a QR code, so it comes as a file. Send the file to your other device, then type the transfer secret below into it.",
-    "Or download it as a file, if the other device is not in front of you.": "Or download it as a file, if the other device is not in front of you.",
     "This secret travels with neither the code nor the file. Type it on your other device too - without it, what you send over is useless.": "This secret travels with neither the code nor the file. Type it on your other device too - without it, what you send over is useless.",
-    "A checkpoint carries your settings, your data sources and every transaction recorded here - so you can set up another device, and so your history outlives a source that no longer exists.": "A checkpoint carries your settings, your data sources and every transaction recorded here - so you can set up another device, and so your history outlives a source that no longer exists."
+    "A checkpoint carries your settings, your data sources and every transaction recorded here - so you can set up another device, and so your history outlives a data source that one day no longer exists.": "A checkpoint carries your settings, your data sources and every transaction recorded here - so you can set up another device, and so your history outlives a data source that one day no longer exists.",
+    "Set up another device": "Set up another device",
+    "Scan this on your other device, then type the transfer secret below into it. It carries your settings, your data sources and anything you entered yourself.": "Scan this on your other device, then type the transfer secret below into it. It carries your settings, your data sources and anything you entered yourself.",
+    "Your {{count}} recorded transactions do not fit a code and stay behind. The other device fetches them from your sources itself._one": "Your {{count}} recorded transactions do not fit a code and stay behind. The other device fetches them from your sources itself.",
+    "Your {{count}} recorded transactions do not fit a code and stay behind. The other device fetches them from your sources itself._other": "Your {{count}} recorded transactions do not fit a code and stay behind. The other device fetches them from your sources itself.",
+    "Keep a backup": "Keep a backup",
+    "This checkpoint is too large for a code, so it comes as a file. It carries everything, including every recorded transaction.": "This checkpoint is too large for a code, so it comes as a file. It carries everything, including every recorded transaction.",
+    "A file carrying everything, including every recorded transaction - so your history is still here if a data source one day is not.": "A file carrying everything, including every recorded transaction - so your history is still here if a data source one day is not.",
+    "Almost everything is here": "Almost everything is here",
+    "Your settings, your data sources and anything you entered yourself came across.": "Your settings, your data sources and anything you entered yourself came across.",
+    "What did not fit the code: {{count}} recorded transactions. There are two ways to get them here._one": "What did not fit the code: {{count}} recorded transactions. There are two ways to get them here.",
+    "What did not fit the code: {{count}} recorded transactions. There are two ways to get them here._other": "What did not fit the code: {{count}} recorded transactions. There are two ways to get them here.",
+    "Let your sources refetch it": "Let your sources refetch it",
+    "Your data sources came across with their credentials, so a sync on this device fetches the history again by itself. This is the ordinary way, and it needs nothing from your other device.": "Your data sources came across with their credentials, so a sync on this device fetches the history again by itself. This is the ordinary way, and it needs nothing from your other device.",
+    "Or bring a backup file over": "Or bring a backup file over",
+    "For a source that cannot be synced any more - an exchange that closed, an API key that is gone, a file import - create a checkpoint on your other device, download it as a file, and import that file here. It carries every recorded transaction.": "For a source that cannot be synced any more - an exchange that closed, an API key that is gone, a file import - create a checkpoint on your other device, download it as a file, and import that file here. It carries every recorded transaction."
   }
 }

@@ -24,7 +24,24 @@ type Props = {
 };
 
 type Status = 'loading' | 'ready' | 'error';
-type Channel = 'qr' | 'file';
+
+/**
+ * Both artifacts, sealed with ONE secret in one run.
+ *
+ * One object rather than four pieces of state, for the same reason the
+ * secret is generated inside the sealing run: a re-render must never show
+ * a secret that does not match the bytes on screen, and four separate
+ * setStates are four chances to land out of step.
+ */
+type Ready = {
+  secret: string;
+  /** The handover, encoded - or null when it does not fit one code. */
+  qrDataUrl: string | null;
+  /** The full backup, for the file. */
+  backup: Uint8Array;
+  /** Recorded transactions the handover leaves behind. */
+  omitted: number;
+};
 
 const checkpointFilename = (): string => {
   const date = new Date().toISOString().slice(0, 10);
@@ -51,10 +68,7 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
   const { t } = useTranslation();
 
   const [status, setStatus] = useState<Status>('loading');
-  const [channel, setChannel] = useState<Channel | null>(null);
-  const [secret, setSecret] = useState<string | null>(null);
-  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-  const [sealedBytes, setSealedBytes] = useState<Uint8Array | null>(null);
+  const [ready, setReady] = useState<Ready | null>(null);
   // Bumped by the "Try again" button to re-run the effect below without
   // requiring the dialog to be closed and reopened first.
   const [attempt, setAttempt] = useState(0);
@@ -72,10 +86,7 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
     setPrevRun(run);
     if (open) {
       setStatus('loading');
-      setChannel(null);
-      setSecret(null);
-      setQrDataUrl(null);
-      setSealedBytes(null);
+      setReady(null);
     }
   }
 
@@ -90,31 +101,41 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
 
     (async () => {
       try {
-        const checkpoint = await buildCheckpoint();
+        // Both scopes, so the dialog can offer both at once: the handover
+        // is what fits a code, the backup is what survives a dead source.
+        const [handover, backup] = await Promise.all([
+          buildCheckpoint('handover'),
+          buildCheckpoint('backup'),
+        ]);
         // Generated and sealed together, in this one run - see the doc
-        // comment above.
+        // comment above. One secret for both artifacts: two would be two
+        // things to type correctly and no more secure.
         const transferSecret = generateTransferSecret();
-        const sealed = await sealCheckpoint(checkpoint, transferSecret);
-        const { channel: chosenChannel } = chooseChannel(sealed);
+        const [sealedHandover, sealedBackup] = await Promise.all([
+          sealCheckpoint(handover, transferSecret),
+          sealCheckpoint(backup, transferSecret),
+        ]);
 
         // Encoded only when it fits: `chooseChannel` returning 'file'
         // means this payload does not, and a QR is never truncated to
-        // make it - a truncated code scans back into a partial setup
-        // that looks complete.
+        // make one - a truncated code scans back into a partial setup
+        // that looks complete. A handover usually fits; one carrying a
+        // long history of hand-entered events may not, and then the file
+        // is the only way offered.
         const dataUrl =
-          chosenChannel === 'qr' ? await encodeQrPayload(sealed) : null;
+          chooseChannel(sealedHandover).channel === 'qr'
+            ? await encodeQrPayload(sealedHandover)
+            : null;
 
         if (cancelled) {
           return;
         }
-        setQrDataUrl(dataUrl);
-        // Kept whatever the channel. The file is not a fallback for a
-        // checkpoint too big to scan - it is the way to move one between
-        // two devices that are not in the same room, so it is offered
-        // alongside the code rather than instead of it.
-        setSealedBytes(sealed);
-        setSecret(transferSecret);
-        setChannel(chosenChannel);
+        setReady({
+          secret: transferSecret,
+          qrDataUrl: dataUrl,
+          backup: sealedBackup,
+          omitted: handover.omittedEventCount ?? 0,
+        });
         setStatus('ready');
       } catch {
         if (!cancelled) {
@@ -129,15 +150,15 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
   }, [open, attempt]);
 
   const handleDownload = () => {
-    if (!sealedBytes) {
+    if (!ready) {
       return;
     }
-    // Re-wrapped: TS 5's updated typed-array lib types `sealedBytes` as
+    // Re-wrapped: TS 5's updated typed-array lib types the sealed bytes as
     // `Uint8Array<ArrayBufferLike>`, which `BlobPart` (an
     // `ArrayBufferView<ArrayBuffer>`) does not accept as-is. `new
     // Uint8Array(...)` always allocates a fresh, plain `ArrayBuffer`
     // backing store, so the copy's type narrows to what `Blob` wants.
-    const blob = new Blob([new Uint8Array(sealedBytes)]);
+    const blob = new Blob([new Uint8Array(ready.backup)]);
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -153,7 +174,7 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
           <DialogTitle>{t('Create checkpoint')}</DialogTitle>
           <DialogDescription>
             {t(
-              'A checkpoint carries your settings, your data sources and every transaction recorded here - so you can set up another device, and so your history outlives a source that no longer exists.',
+              'A checkpoint carries your settings, your data sources and every transaction recorded here - so you can set up another device, and so your history outlives a data source that one day no longer exists.',
             )}
           </DialogDescription>
         </DialogHeader>
@@ -176,50 +197,70 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
           </p>
         )}
 
-        {status === 'ready' && secret && (
-          <div className="flex flex-col gap-4">
-            {channel === 'qr' && qrDataUrl ? (
-              <>
-                <p className="text-sm text-muted-foreground">
-                  {t(
-                    'Scan this QR code on your other device, then type the transfer secret below into it.',
+        {status === 'ready' && ready && (
+          <div className="flex flex-col gap-6">
+            {/* The handover. First, because it is the case where the two
+                devices are in the same room - and the one a code can
+                actually serve. */}
+            {ready.qrDataUrl !== null && (
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                  <h3 className="text-sm font-medium">
+                    {t('Set up another device')}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {t(
+                      'Scan this on your other device, then type the transfer secret below into it. It carries your settings, your data sources and anything you entered yourself.',
+                    )}
+                  </p>
+                  {ready.omitted > 0 && (
+                    // Said here rather than only on the other device: a
+                    // person who knows what the code leaves behind can
+                    // decide to use the file instead, before scanning.
+                    <p className="text-sm text-muted-foreground">
+                      {t(
+                        'Your {{count}} recorded transactions do not fit a code and stay behind. The other device fetches them from your sources itself.',
+                        { count: ready.omitted },
+                      )}
+                    </p>
                   )}
-                </p>
+                </div>
                 <img
-                  src={qrDataUrl}
+                  src={ready.qrDataUrl}
                   alt={t('Checkpoint QR code')}
                   className="mx-auto h-auto w-full max-w-xs"
                 />
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {t(
-                  'This checkpoint is too large for a QR code, so it comes as a file. Send the file to your other device, then type the transfer secret below into it.',
-                )}
-              </p>
+              </div>
             )}
 
-            <div className="flex flex-col gap-2">
+            {/* The backup. Always, and never a mere fallback: it is the
+                only artifact that outlives the sources it came from. */}
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <h3 className="text-sm font-medium">{t('Keep a backup')}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {ready.qrDataUrl === null
+                    ? t(
+                        'This checkpoint is too large for a code, so it comes as a file. It carries everything, including every recorded transaction.',
+                      )
+                    : t(
+                        'A file carrying everything, including every recorded transaction - so your history is still here if a data source one day is not.',
+                      )}
+                </p>
+              </div>
               <Button
                 type="button"
-                variant={channel === 'qr' ? 'outline' : 'default'}
+                variant={ready.qrDataUrl === null ? 'default' : 'outline'}
                 className="max-w-xs"
                 onClick={handleDownload}
               >
                 {t('Download checkpoint')}
               </Button>
-              {channel === 'qr' && (
-                <p className="text-sm text-muted-foreground">
-                  {t(
-                    'Or download it as a file, if the other device is not in front of you.',
-                  )}
-                </p>
-              )}
             </div>
 
             <div className="flex flex-col gap-2">
               <p className="rounded-md bg-muted px-3 py-2 text-center font-mono text-lg tracking-widest select-all">
-                {secret}
+                {ready.secret}
               </p>
               <p className="text-sm text-muted-foreground">
                 {t(

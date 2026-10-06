@@ -423,3 +423,87 @@ describe('confirmed transfers in a checkpoint', () => {
     );
   });
 });
+
+/**
+ * Two scopes, because a checkpoint answers two different questions.
+ *
+ * A handover sets up a device standing in front of you and has to fit a
+ * single QR code; a backup outlives the sources it came from and cannot.
+ * Pretending one is a degraded version of the other is what hid, from the
+ * person scanning, that the history was being left behind.
+ */
+describe('what each scope carries', () => {
+  const synced = (n: number): LedgerEvent => ({
+    ...authoredEvent(n),
+    id: `synced-${n}`,
+    externalId: `synced-${n}`,
+    sourceId: 'kraken',
+    origin: 'derived',
+  });
+
+  beforeEach(async () => {
+    await putSource({
+      id: 'kraken',
+      moduleId: 'kraken-csv',
+      label: 'Kraken',
+      config: {},
+    });
+    await putManualLink({
+      sourceId: 'kraken',
+      externalId: 'LLSN5F-UR5OY-DD6KMV',
+      txHash: 'a1b2'.repeat(16),
+    });
+    await putEvents([
+      authoredEvent(1),
+      ...Array.from({ length: 5 }, (_, n) => synced(n)),
+    ]);
+  });
+
+  it('leaves the ledger out of a handover and states its size instead', async () => {
+    const handover = await buildCheckpoint('handover');
+
+    expect(handover.derivedEvents).toBeUndefined();
+    expect(handover.omittedEventCount).toBe(5);
+    // Everything no sync reproduces still travels - that is the whole
+    // point of a handover, as against "just the settings".
+    expect(handover.authoredEvents.map((e) => e.id)).toEqual(['authored-1']);
+    expect(handover.transferLinks).toHaveLength(1);
+    expect(handover.sources).toHaveLength(1);
+  });
+
+  it('puts the ledger in a backup and claims nothing missing', async () => {
+    const backup = await buildCheckpoint('backup');
+
+    expect(backup.derivedEvents).toHaveLength(5);
+    // Never both: a payload that carries the events AND says it omitted
+    // them would have the receiving device explain a gap that is not there.
+    expect(backup.omittedEventCount).toBeUndefined();
+  });
+
+  it('defaults to a backup, so a caller that forgets loses nothing', async () => {
+    expect((await buildCheckpoint()).derivedEvents).toHaveLength(5);
+  });
+
+  it('round-trips a handover through the QR channel it is sized for', async () => {
+    const secret = generateTransferSecret();
+    const sealed = await sealCheckpoint(
+      await buildCheckpoint('handover'),
+      secret,
+    );
+
+    expect(chooseChannel(sealed).channel).toBe('qr');
+    const reopened = await openCheckpoint(sealed, secret);
+    expect(reopened.omittedEventCount).toBe(5);
+  });
+
+  it('refuses a payload whose omitted count is not a number', async () => {
+    const secret = generateTransferSecret();
+    const checkpoint = await buildCheckpoint('handover');
+    (checkpoint as { omittedEventCount?: unknown }).omittedEventCount = 'five';
+    const sealed = await sealCheckpoint(checkpoint, secret);
+
+    await expect(openCheckpoint(sealed, secret)).rejects.toThrow(
+      /unexpected shape/i,
+    );
+  });
+});

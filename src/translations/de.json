@@ -255,7 +255,6 @@
     "Creating your checkpoint…": "Checkpoint wird erstellt …",
     "Could not create a checkpoint. Try again.": "Der Checkpoint konnte nicht erstellt werden. Versuche es erneut.",
     "Checkpoint QR code": "Checkpoint-QR-Code",
-    "Scan this QR code on your other device, then type the transfer secret below into it.": "Scanne diesen QR-Code auf deinem anderen Gerät und gib anschließend den unten angezeigten Übertragungscode dort ein.",
     "Download checkpoint": "Checkpoint herunterladen",
     "Try again": "Erneut versuchen",
     "Done": "Fertig",
@@ -414,9 +413,22 @@
     "Could not save that. Try again.": "Das konnte nicht gespeichert werden. Versuche es erneut.",
     "Check {{count}} possible transfer_one": "{{count}} möglichen Transfer prüfen",
     "Check {{count}} possible transfer_other": "{{count}} mögliche Transfers prüfen",
-    "This checkpoint is too large for a QR code, so it comes as a file. Send the file to your other device, then type the transfer secret below into it.": "Dieser Checkpoint ist zu groß für einen QR-Code und kommt daher als Datei. Schick die Datei an dein anderes Gerät und tippe dort das Transfer-Geheimnis von unten ein.",
-    "Or download it as a file, if the other device is not in front of you.": "Oder lade ihn als Datei herunter, wenn das andere Gerät nicht vor dir steht.",
     "This secret travels with neither the code nor the file. Type it on your other device too - without it, what you send over is useless.": "Das Geheimnis reist weder im Code noch in der Datei mit. Tippe es auf deinem anderen Gerät ebenfalls ein – ohne es ist das Übertragene nutzlos.",
-    "A checkpoint carries your settings, your data sources and every transaction recorded here - so you can set up another device, and so your history outlives a source that no longer exists.": "Ein Checkpoint enthält deine Einstellungen, deine Datenquellen und jede hier erfasste Transaktion – damit du ein anderes Gerät einrichten kannst und deine Historie auch dann bleibt, wenn eine Quelle nicht mehr existiert."
+    "A checkpoint carries your settings, your data sources and every transaction recorded here - so you can set up another device, and so your history outlives a data source that one day no longer exists.": "Ein Checkpoint enthält deine Einstellungen, deine Datenquellen und jede hier erfasste Transaktion – damit du ein anderes Gerät einrichten kannst und deine Historie auch dann bleibt, wenn eine Datenquelle eines Tages nicht mehr existiert.",
+    "Set up another device": "Anderes Gerät einrichten",
+    "Scan this on your other device, then type the transfer secret below into it. It carries your settings, your data sources and anything you entered yourself.": "Scanne das auf deinem anderen Gerät und tippe dort das Transfer-Geheimnis von unten ein. Enthalten sind deine Einstellungen, deine Datenquellen und alles, was du selbst eingetragen hast.",
+    "Your {{count}} recorded transactions do not fit a code and stay behind. The other device fetches them from your sources itself._one": "Deine {{count}} erfasste Transaktion passt nicht in einen Code und bleibt hier. Das andere Gerät holt sie selbst aus deinen Quellen.",
+    "Your {{count}} recorded transactions do not fit a code and stay behind. The other device fetches them from your sources itself._other": "Deine {{count}} erfassten Transaktionen passen nicht in einen Code und bleiben hier. Das andere Gerät holt sie selbst aus deinen Quellen.",
+    "Keep a backup": "Backup aufbewahren",
+    "This checkpoint is too large for a code, so it comes as a file. It carries everything, including every recorded transaction.": "Dieser Checkpoint ist zu groß für einen Code und kommt daher als Datei. Enthalten ist alles, inklusive jeder erfassten Transaktion.",
+    "A file carrying everything, including every recorded transaction - so your history is still here if a data source one day is not.": "Eine Datei mit allem, inklusive jeder erfassten Transaktion – damit deine Historie noch da ist, wenn eine Datenquelle es eines Tages nicht mehr ist.",
+    "Almost everything is here": "Fast alles ist da",
+    "Your settings, your data sources and anything you entered yourself came across.": "Deine Einstellungen, deine Datenquellen und alles, was du selbst eingetragen hast, sind mitgekommen.",
+    "What did not fit the code: {{count}} recorded transactions. There are two ways to get them here._one": "Nicht in den Code gepasst hat: {{count}} erfasste Transaktion. Es gibt zwei Wege, sie hierher zu holen.",
+    "What did not fit the code: {{count}} recorded transactions. There are two ways to get them here._other": "Nicht in den Code gepasst haben: {{count}} erfasste Transaktionen. Es gibt zwei Wege, sie hierher zu holen.",
+    "Let your sources refetch it": "Lass deine Quellen sie neu holen",
+    "Your data sources came across with their credentials, so a sync on this device fetches the history again by itself. This is the ordinary way, and it needs nothing from your other device.": "Deine Datenquellen sind samt Zugangsdaten mitgekommen, ein Sync auf diesem Gerät holt die Historie also von selbst wieder. Das ist der normale Weg und braucht nichts von deinem anderen Gerät.",
+    "Or bring a backup file over": "Oder bring eine Backup-Datei herüber",
+    "For a source that cannot be synced any more - an exchange that closed, an API key that is gone, a file import - create a checkpoint on your other device, download it as a file, and import that file here. It carries every recorded transaction.": "Für eine Quelle, die sich nicht mehr synchronisieren lässt – eine geschlossene Börse, ein verlorener API-Key, ein Datei-Import –: erstelle auf dem anderen Gerät einen Checkpoint, lade ihn als Datei herunter und importiere die Datei hier. Sie enthält jede erfasste Transaktion."
   }
 }

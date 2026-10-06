@@ -182,17 +182,108 @@ describe('downloading a checkpoint', () => {
     ).rejects.toThrow();
   });
 
-  it('drops the QR code, but keeps the file, once it is too big to scan', async () => {
+  it('drops the code, but keeps the file, once it is too big to scan', async () => {
+    // Authored events, deliberately: those are the part of a HANDOVER that
+    // is unbounded, so they are what can push even a handover past a code.
     await putEvents(
       Array.from({ length: 400 }, (_, index) => authoredEvent(index)),
     );
 
     openDialog();
 
-    await screen.findByText(/too large for a QR code/i);
+    await screen.findByText(/too large for a code/i);
     expect(screen.queryByAltText(/checkpoint qr code/i)).toBeNull();
     expect(
       screen.getByRole('button', { name: /download checkpoint/i }),
     ).toBeInTheDocument();
+  });
+});
+
+/**
+ * The two artifacts, which answer two different questions.
+ *
+ * The code sets up a device standing in front of you; it cannot carry a
+ * ledger, and the measurements in tests/checkpointExport.test.ts say why.
+ * The file is the one that outlives the sources it came from. Offering one
+ * as a degraded version of the other hid that difference - and hid, in
+ * particular, that scanning the code leaves the history behind.
+ */
+describe('handover beside backup', () => {
+  /** A synced event: the kind a handover leaves behind. */
+  const syncedEvent = (n: number): LedgerEvent => ({
+    ...authoredEvent(n),
+    id: `synced-${n}`,
+    externalId: `synced-${n}`,
+    sourceId: 'cfg-1',
+    origin: 'derived',
+  });
+
+  beforeEach(async () => {
+    await putSource({
+      id: 'cfg-1',
+      moduleId: 'test',
+      label: 'My Wallet',
+      config: { apiKey: 'secret-value' },
+    });
+  });
+
+  it('says how many transactions the code leaves behind', async () => {
+    await putEvents(Array.from({ length: 3 }, (_, n) => syncedEvent(n)));
+
+    openDialog();
+    await screen.findByAltText(/checkpoint qr code/i);
+
+    // The number, on the sending device, BEFORE the user scans - so they
+    // can reach for the file instead if that is what they wanted.
+    expect(await screen.findByText(/3 recorded transactions/i)).toBeVisible();
+  });
+
+  it('encodes the handover, not the backup', async () => {
+    // Pins the wiring without decoding the image, which jsdom cannot do:
+    // 400 synced events make a BACKUP far too large for any code, so a
+    // component that encoded the wrong payload would render no image at
+    // all. The image appearing is the assertion.
+    await putEvents(Array.from({ length: 400 }, (_, n) => syncedEvent(n)));
+
+    openDialog();
+
+    expect(await screen.findByAltText(/checkpoint qr code/i)).toBeVisible();
+    expect(await screen.findByText(/400 recorded transactions/i)).toBeVisible();
+  });
+
+  it('keeps the file complete while the code carries none of it', async () => {
+    await putEvents(Array.from({ length: 3 }, (_, n) => syncedEvent(n)));
+
+    openDialog();
+    await screen.findByAltText(/checkpoint qr code/i);
+    const secret = shownSecret();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /download checkpoint/i }),
+    );
+    await waitFor(() => expect(saved[0]?.bytes.byteLength).toBeGreaterThan(0));
+
+    const backup = await openCheckpoint(saved[0].bytes, secret);
+    expect(backup.derivedEvents).toHaveLength(3);
+    // A backup states nothing about leftovers, because it has none.
+    expect(backup.omittedEventCount).toBeUndefined();
+    expect(backup.sources).toEqual([
+      {
+        id: 'cfg-1',
+        moduleId: 'test',
+        label: 'My Wallet',
+        config: { apiKey: 'secret-value' },
+      },
+    ]);
+  });
+
+  it('says nothing about leftovers when there are none', async () => {
+    // A fresh install has no history to leave behind, and a sentence
+    // about zero transactions would be noise at exactly the moment the
+    // user is being asked to trust the thing.
+    openDialog();
+    await screen.findByAltText(/checkpoint qr code/i);
+
+    expect(screen.queryByText(/recorded transactions do not fit/i)).toBeNull();
   });
 });

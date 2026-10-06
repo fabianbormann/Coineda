@@ -21,7 +21,7 @@ type Props = {
   onBack: () => void;
 };
 
-type Step = 'choice' | 'scan' | 'file';
+type Step = 'choice' | 'scan' | 'file' | 'restored';
 
 /**
  * `openCheckpoint` throws three distinct failures - a newer format version,
@@ -87,6 +87,18 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
   const [secret, setSecret] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  /**
+   * Recorded transactions the restored checkpoint deliberately left out,
+   * which is what a handover does.
+   *
+   * Drives the step after a successful restore. A handover is complete in
+   * its own terms - settings, sources, confirmations, everything no sync
+   * reproduces - but a person who restored one and landed straight on an
+   * empty overview has no way to tell that from a broken import. So when
+   * the number is above zero, the restore explains itself before handing
+   * over.
+   */
+  const [omitted, setOmitted] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -274,6 +286,12 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
       // fresh `t` - and the confirmation of a restore is the one string
       // that should definitely already be in the restored language.
       notify.success(i18n.t('Checkpoint restored. Welcome back!'));
+      const missing = checkpoint.omittedEventCount ?? 0;
+      if (missing > 0) {
+        setOmitted(missing);
+        setStep('restored');
+        return;
+      }
       onComplete();
     } catch (error) {
       setFormError(describeOpenError(error, t));
@@ -281,6 +299,50 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
       setSubmitting(false);
     }
   };
+
+  if (step === 'restored') {
+    return (
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>{t('Almost everything is here')}</CardTitle>
+          <CardDescription>
+            {t(
+              'Your settings, your data sources and anything you entered yourself came across.',
+            )}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4 text-sm">
+          <p>
+            {t(
+              'What did not fit the code: {{count}} recorded transactions. There are two ways to get them here.',
+              { count: omitted },
+            )}
+          </p>
+          <div className="flex flex-col gap-1">
+            <h3 className="font-medium">{t('Let your sources refetch it')}</h3>
+            <p className="text-muted-foreground">
+              {t(
+                'Your data sources came across with their credentials, so a sync on this device fetches the history again by itself. This is the ordinary way, and it needs nothing from your other device.',
+              )}
+            </p>
+          </div>
+          <div className="flex flex-col gap-1">
+            <h3 className="font-medium">{t('Or bring a backup file over')}</h3>
+            <p className="text-muted-foreground">
+              {t(
+                'For a source that cannot be synced any more - an exchange that closed, an API key that is gone, a file import - create a checkpoint on your other device, download it as a file, and import that file here. It carries every recorded transaction.',
+              )}
+            </p>
+          </div>
+        </CardContent>
+        <CardFooter>
+          <Button type="button" onClick={onComplete}>
+            {t('Got it')}
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  }
 
   if (step === 'scan') {
     return (
