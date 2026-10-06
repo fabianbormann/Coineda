@@ -32,9 +32,10 @@ const checkpointFilename = (): string => {
 };
 
 /**
- * Builds, seals and - depending on size - either renders a QR code or
- * offers a file download for a fresh checkpoint, every time this dialog is
- * opened. This is the only place in the app that can produce a checkpoint -
+ * Builds, seals and hands over a fresh checkpoint, every time this dialog
+ * is opened: a QR code when the payload fits one, and a file download
+ * always. Both, because they answer different situations - the code is for
+ * two devices in the same room, the file for a device that is not. This is the only place in the app that can produce a checkpoint -
  * Task 9 built the whole sealing pipeline and Task 10 built the import
  * side, but neither of them gave the user a way to actually create one.
  *
@@ -96,24 +97,22 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
         const sealed = await sealCheckpoint(checkpoint, transferSecret);
         const { channel: chosenChannel } = chooseChannel(sealed);
 
-        if (chosenChannel === 'qr') {
-          const dataUrl = await encodeQrPayload(sealed);
-          if (cancelled) {
-            return;
-          }
-          setQrDataUrl(dataUrl);
-        } else {
-          if (cancelled) {
-            return;
-          }
-          // Never truncated, never rendered as a QR - chooseChannel already
-          // decided this payload only fits the file channel.
-          setSealedBytes(sealed);
-        }
+        // Encoded only when it fits: `chooseChannel` returning 'file'
+        // means this payload does not, and a QR is never truncated to
+        // make it - a truncated code scans back into a partial setup
+        // that looks complete.
+        const dataUrl =
+          chosenChannel === 'qr' ? await encodeQrPayload(sealed) : null;
 
         if (cancelled) {
           return;
         }
+        setQrDataUrl(dataUrl);
+        // Kept whatever the channel. The file is not a fallback for a
+        // checkpoint too big to scan - it is the way to move one between
+        // two devices that are not in the same room, so it is offered
+        // alongside the code rather than instead of it.
+        setSealedBytes(sealed);
         setSecret(transferSecret);
         setChannel(chosenChannel);
         setStatus('ready');
@@ -177,48 +176,54 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
           </p>
         )}
 
-        {status === 'ready' && channel === 'qr' && qrDataUrl && secret && (
+        {status === 'ready' && secret && (
           <div className="flex flex-col gap-4">
-            <p className="text-sm text-muted-foreground">
-              {t(
-                'Scan this QR code on your other device, then type the transfer secret below into it.',
-              )}
-            </p>
-            <img
-              src={qrDataUrl}
-              alt={t('Checkpoint QR code')}
-              className="mx-auto h-auto w-full max-w-xs"
-            />
-            <div className="flex flex-col gap-2">
-              <p className="rounded-md bg-muted px-3 py-2 text-center font-mono text-lg tracking-widest select-all">
-                {secret}
-              </p>
+            {channel === 'qr' && qrDataUrl ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  {t(
+                    'Scan this QR code on your other device, then type the transfer secret below into it.',
+                  )}
+                </p>
+                <img
+                  src={qrDataUrl}
+                  alt={t('Checkpoint QR code')}
+                  className="mx-auto h-auto w-full max-w-xs"
+                />
+              </>
+            ) : (
               <p className="text-sm text-muted-foreground">
                 {t(
-                  'This secret is not part of the QR code. Type it on your other device too - without it, the code alone is useless.',
+                  'This checkpoint is too large for a QR code, so it comes as a file. Send the file to your other device, then type the transfer secret below into it.',
                 )}
               </p>
-            </div>
-          </div>
-        )}
+            )}
 
-        {status === 'ready' && channel === 'file' && secret && (
-          <div className="flex flex-col gap-4">
-            <p className="text-sm text-muted-foreground">
-              {t(
-                'This checkpoint was too large for a QR code, so it was saved as a file instead. Send the file to your other device, then type the transfer secret below into it.',
+            <div className="flex flex-col gap-2">
+              <Button
+                type="button"
+                variant={channel === 'qr' ? 'outline' : 'default'}
+                className="max-w-xs"
+                onClick={handleDownload}
+              >
+                {t('Download checkpoint')}
+              </Button>
+              {channel === 'qr' && (
+                <p className="text-sm text-muted-foreground">
+                  {t(
+                    'Or download it as a file, if the other device is not in front of you.',
+                  )}
+                </p>
               )}
-            </p>
-            <Button type="button" onClick={handleDownload}>
-              {t('Download checkpoint')}
-            </Button>
+            </div>
+
             <div className="flex flex-col gap-2">
               <p className="rounded-md bg-muted px-3 py-2 text-center font-mono text-lg tracking-widest select-all">
                 {secret}
               </p>
               <p className="text-sm text-muted-foreground">
                 {t(
-                  'This secret is not part of the file. Type it on your other device too - without it, the file alone is useless.',
+                  'This secret travels with neither the code nor the file. Type it on your other device too - without it, what you send over is useless.',
                 )}
               </p>
             </div>

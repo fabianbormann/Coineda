@@ -257,9 +257,6 @@
     "Could not create a checkpoint. Try again.": "Der Checkpoint konnte nicht erstellt werden. Versuche es erneut.",
     "Checkpoint QR code": "Checkpoint-QR-Code",
     "Scan this QR code on your other device, then type the transfer secret below into it.": "Scanne diesen QR-Code auf deinem anderen Gerät und gib anschließend den unten angezeigten Übertragungscode dort ein.",
-    "This secret is not part of the QR code. Type it on your other device too - without it, the code alone is useless.": "Dieser Code ist nicht im QR-Code enthalten. Gib ihn zusätzlich auf deinem anderen Gerät ein - ohne ihn ist der QR-Code allein nutzlos.",
-    "This checkpoint was too large for a QR code, so it was saved as a file instead. Send the file to your other device, then type the transfer secret below into it.": "Dieser Checkpoint war zu groß für einen QR-Code und wurde deshalb als Datei gespeichert. Übertrage die Datei auf dein anderes Gerät und gib anschließend den unten angezeigten Übertragungscode dort ein.",
-    "This secret is not part of the file. Type it on your other device too - without it, the file alone is useless.": "Dieser Code ist nicht in der Datei enthalten. Gib ihn zusätzlich auf deinem anderen Gerät ein - ohne ihn ist die Datei allein nutzlos.",
     "Download checkpoint": "Checkpoint herunterladen",
     "Try again": "Erneut versuchen",
     "Done": "Fertig",
@@ -417,6 +414,9 @@
     "Recorded as a transfer between your own venues.": "Als Transfer zwischen deinen eigenen Konten gespeichert.",
     "Could not save that. Try again.": "Das konnte nicht gespeichert werden. Versuche es erneut.",
     "Check {{count}} possible transfer_one": "{{count}} möglichen Transfer prüfen",
-    "Check {{count}} possible transfer_other": "{{count}} mögliche Transfers prüfen"
+    "Check {{count}} possible transfer_other": "{{count}} mögliche Transfers prüfen",
+    "This checkpoint is too large for a QR code, so it comes as a file. Send the file to your other device, then type the transfer secret below into it.": "Dieser Checkpoint ist zu groß für einen QR-Code und kommt daher als Datei. Schick die Datei an dein anderes Gerät und tippe dort das Transfer-Geheimnis von unten ein.",
+    "Or download it as a file, if the other device is not in front of you.": "Oder lade ihn als Datei herunter, wenn das andere Gerät nicht vor dir steht.",
+    "This secret travels with neither the code nor the file. Type it on your other device too - without it, what you send over is useless.": "Das Geheimnis reist weder im Code noch in der Datei mit. Tippe es auf deinem anderen Gerät ebenfalls ein – ohne es ist das Übertragene nutzlos."
   }
 }

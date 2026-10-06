@@ -3,10 +3,12 @@
  * imports from here, not from `crypto.ts` or `channel.ts` directly.
  *
  * A checkpoint carries what cannot be re-derived: settings, configured
- * sources (with their credentials), and authored events. Derived events
- * stay out and reload from their sources on the next sync. Authored events
- * - bank movements, manual corrections - have no source to reload from, so
- * leaving them out would lose them on every restore.
+ * sources (with their credentials), authored events, and the transfers the
+ * user confirmed by hand. Derived events stay out and reload from their
+ * sources on the next sync. Authored events - bank movements, manual
+ * corrections - have no source to reload from, so leaving them out would
+ * lose them on every restore. Confirmed transfers are the same kind of
+ * thing: a judgement only the user could make, which no sync reproduces.
  *
  * Because the credentials travel with it, a checkpoint is always encrypted.
  */
@@ -16,6 +18,12 @@ import {
   getSources,
   openLedger,
 } from '@/ledger/db';
+import {
+  assertValidManualLink,
+  getManualLinks,
+  manualLinkRow,
+  type ManualTransferLink,
+} from '@/ledger/manualLinks';
 import type { LedgerEvent, SourceRecord } from '@/ledger/types';
 import {
   getSettings,
@@ -45,6 +53,16 @@ export type Checkpoint = {
   settings: Settings;
   sources: SourceRecord[];
   authoredEvents: LedgerEvent[];
+  /**
+   * Optional, and the version stays 1 on purpose.
+   *
+   * A checkpoint written before this field existed simply has none, and a
+   * build that predates it ignores one that does - losing a confirmation
+   * costs the user one re-confirmation, while bumping the version would
+   * make an older install refuse the whole checkpoint and lose the
+   * settings and credentials with it.
+   */
+  transferLinks?: ManualTransferLink[];
 };
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
@@ -80,10 +98,11 @@ const portableSource = ({
  * before onboarding in the first place.
  */
 export const buildCheckpoint = async (): Promise<Checkpoint> => {
-  const [settings, sources, events] = await Promise.all([
+  const [settings, sources, events, transferLinks] = await Promise.all([
     getSettings(),
     getSources(),
     getAllEvents(),
+    getManualLinks(),
   ]);
   if (settings === null) {
     throw new Error(
@@ -95,6 +114,7 @@ export const buildCheckpoint = async (): Promise<Checkpoint> => {
     settings,
     sources: sources.map(portableSource),
     authoredEvents: events.filter((event) => event.origin === 'authored'),
+    transferLinks,
   };
 };
 
@@ -126,7 +146,12 @@ export const openCheckpoint = async (
     checkpoint.v !== CURRENT_VERSION ||
     !isPlainObject(checkpoint.settings) ||
     !Array.isArray(checkpoint.sources) ||
-    !Array.isArray(checkpoint.authoredEvents)
+    !Array.isArray(checkpoint.authoredEvents) ||
+    // Absent is valid - see the field's comment on `Checkpoint`. Present
+    // but not an array is not, and letting it through would reach the
+    // restore's `for ... of` as a crash mid-transaction.
+    (checkpoint.transferLinks !== undefined &&
+      !Array.isArray(checkpoint.transferLinks))
   ) {
     throw new Error('malformed checkpoint: unexpected shape after decrypting');
   }
@@ -177,9 +202,15 @@ export const restoreCheckpoint = async (
   for (const event of checkpoint.authoredEvents) {
     assertValidEvent(event);
   }
+  for (const link of checkpoint.transferLinks ?? []) {
+    assertValidManualLink(link);
+  }
 
   const db = await openLedger();
-  const tx = db.transaction(['settings', 'sources', 'events'], 'readwrite');
+  const tx = db.transaction(
+    ['settings', 'sources', 'events', 'transferLinks'],
+    'readwrite',
+  );
 
   try {
     await tx.objectStore('settings').put({
@@ -191,6 +222,11 @@ export const restoreCheckpoint = async (
     }
     for (const event of checkpoint.authoredEvents) {
       await tx.objectStore('events').put(event);
+    }
+    // Built through the store's own row builder rather than spread in
+    // here, so the key cannot drift from the one `putManualLink` writes.
+    for (const link of checkpoint.transferLinks ?? []) {
+      await tx.objectStore('transferLinks').put(manualLinkRow(link));
     }
     // Last, in this same transaction: see the doc comment above.
     await tx.objectStore('settings').put({ key: ONBOARDED_KEY, value: true });

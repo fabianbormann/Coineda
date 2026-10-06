@@ -35,6 +35,40 @@ export type ManualTransferLink = {
 const keyOf = (sourceId: string, externalId: string) =>
   `${sourceId}|${externalId}`;
 
+/**
+ * A stored row from a link.
+ *
+ * Exported because `restoreCheckpoint` writes links directly into the
+ * store inside its own transaction, and has to derive the key exactly the
+ * way `putManualLink` does - a second copy of that formula is a key that
+ * could drift and silently stop matching.
+ */
+export const manualLinkRow = (link: ManualTransferLink) => ({
+  key: keyOf(link.sourceId, link.externalId),
+  sourceId: link.sourceId,
+  externalId: link.externalId,
+  txHash: link.txHash,
+  confirmedAt: link.confirmedAt,
+});
+
+/**
+ * Rejects a link that would store cleanly and then never apply.
+ *
+ * The same shape and the same reason as `assertValidEvent`: a restore
+ * validates before opening its transaction, so a bad payload is refused
+ * whole rather than half-written. An empty `externalId` or `txHash` is the
+ * case that matters - it stores without complaint, matches nothing, and
+ * leaves the user re-confirming a pair they already confirmed with no way
+ * to see why.
+ */
+export const assertValidManualLink = (link: ManualTransferLink): void => {
+  for (const field of ['sourceId', 'externalId', 'txHash'] as const) {
+    if (typeof link[field] !== 'string' || link[field] === '') {
+      throw new Error(`manual transfer link has no ${field}`);
+    }
+  }
+};
+
 export const getManualLinks = async (): Promise<ManualTransferLink[]> =>
   (await (await openLedger()).getAll('transferLinks')).map(
     ({ sourceId, externalId, txHash, confirmedAt }) => ({
@@ -51,13 +85,10 @@ export const putManualLink = async (
 ): Promise<void> => {
   await (
     await openLedger()
-  ).put('transferLinks', {
-    key: keyOf(link.sourceId, link.externalId),
-    sourceId: link.sourceId,
-    externalId: link.externalId,
-    txHash: link.txHash,
-    confirmedAt: link.confirmedAt ?? Date.now(),
-  });
+  ).put(
+    'transferLinks',
+    manualLinkRow({ ...link, confirmedAt: link.confirmedAt ?? Date.now() }),
+  );
 };
 
 export const deleteManualLink = async (

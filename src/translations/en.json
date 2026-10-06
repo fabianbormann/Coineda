@@ -257,9 +257,6 @@
     "Could not create a checkpoint. Try again.": "Could not create a checkpoint. Try again.",
     "Checkpoint QR code": "Checkpoint QR code",
     "Scan this QR code on your other device, then type the transfer secret below into it.": "Scan this QR code on your other device, then type the transfer secret below into it.",
-    "This secret is not part of the QR code. Type it on your other device too - without it, the code alone is useless.": "This secret is not part of the QR code. Type it on your other device too - without it, the code alone is useless.",
-    "This checkpoint was too large for a QR code, so it was saved as a file instead. Send the file to your other device, then type the transfer secret below into it.": "This checkpoint was too large for a QR code, so it was saved as a file instead. Send the file to your other device, then type the transfer secret below into it.",
-    "This secret is not part of the file. Type it on your other device too - without it, the file alone is useless.": "This secret is not part of the file. Type it on your other device too - without it, the file alone is useless.",
     "Download checkpoint": "Download checkpoint",
     "Try again": "Try again",
     "Done": "Done",
@@ -417,6 +414,9 @@
     "Recorded as a transfer between your own venues.": "Recorded as a transfer between your own venues.",
     "Could not save that. Try again.": "Could not save that. Try again.",
     "Check {{count}} possible transfer_one": "Check {{count}} possible transfer",
-    "Check {{count}} possible transfer_other": "Check {{count}} possible transfers"
+    "Check {{count}} possible transfer_other": "Check {{count}} possible transfers",
+    "This checkpoint is too large for a QR code, so it comes as a file. Send the file to your other device, then type the transfer secret below into it.": "This checkpoint is too large for a QR code, so it comes as a file. Send the file to your other device, then type the transfer secret below into it.",
+    "Or download it as a file, if the other device is not in front of you.": "Or download it as a file, if the other device is not in front of you.",
+    "This secret travels with neither the code nor the file. Type it on your other device too - without it, what you send over is useless.": "This secret travels with neither the code nor the file. Type it on your other device too - without it, what you send over is useless."
   }
 }

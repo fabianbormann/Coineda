@@ -10,7 +10,13 @@ import {
   encodeQrPayload,
   generateTransferSecret,
   QR_BYTE_LIMIT,
+  restoreCheckpoint,
 } from '@/checkpoint/format';
+import {
+  getLinkedEvents,
+  getManualLinks,
+  putManualLink,
+} from '@/ledger/manualLinks';
 import { putSettings } from '@/settings/settingsStore';
 import { openLedger, putSource, putEvents } from '@/ledger/db';
 import type { LedgerEvent } from '@/ledger/types';
@@ -85,7 +91,13 @@ const authoredEvent = (n: number): LedgerEvent => ({
 // fighting the memoised connection.
 beforeEach(async () => {
   const db = await openLedger();
-  for (const store of ['events', 'sources', 'cursors', 'settings'] as const) {
+  for (const store of [
+    'events',
+    'sources',
+    'cursors',
+    'settings',
+    'transferLinks',
+  ] as const) {
     await db.clear(store);
   }
   await putSettings({ language: 'en', baseCurrency: 'eur' });
@@ -242,5 +254,114 @@ describe('checkpoint export', () => {
     const db = await openLedger();
     await db.clear('settings');
     await expect(buildCheckpoint()).rejects.toThrow(/onboarding/);
+  });
+});
+
+/**
+ * Transfers the user confirmed by hand have to travel with a checkpoint.
+ *
+ * They are a judgement no sync reproduces: the exchange's export never
+ * carried the chain hash, which is why the person had to supply it. Left
+ * out, a restored device shows the same withdrawals as disposals again,
+ * and a tax report run there disagrees with the one run here - for a
+ * reason nothing on screen would explain.
+ */
+describe('confirmed transfers in a checkpoint', () => {
+  const link = {
+    sourceId: 'kraken',
+    externalId: 'LLSN5F-UR5OY-DD6KMV',
+    txHash: 'a1b2'.repeat(16),
+    confirmedAt: 1_740_000_000_000,
+  };
+
+  it('carries them, and restores them on the other device', async () => {
+    await putManualLink(link);
+
+    const secret = generateTransferSecret();
+    const sealed = await sealCheckpoint(await buildCheckpoint(), secret);
+    const reopened = await openCheckpoint(sealed, secret);
+    expect(reopened.transferLinks).toEqual([link]);
+
+    // Restored into an empty store, the way the other device would be.
+    await (await openLedger()).clear('transferLinks');
+    expect(await getManualLinks()).toEqual([]);
+
+    await restoreCheckpoint(reopened);
+    expect(await getManualLinks()).toEqual([link]);
+  });
+
+  it('applies a restored confirmation to the event it belongs to', async () => {
+    // The whole point: the hash has to land on the ledger row, or the
+    // restored link is a stored row that changes nothing.
+    await putEvents([
+      {
+        id: 'kraken-in',
+        sourceId: 'kraken',
+        externalId: 'LLSN5F-UR5OY-DD6KMV',
+        timestamp: 1_740_000_000_000,
+        kind: 'transfer',
+        origin: 'derived',
+        legs: [
+          {
+            assetId: 'bitcoin:native',
+            amount: '7545306',
+            direction: 'in',
+            venue: 'kraken',
+            role: 'principal',
+          },
+        ],
+      },
+    ]);
+    expect((await getLinkedEvents())[0].txHash).toBeUndefined();
+
+    await restoreCheckpoint({
+      v: 1,
+      settings: { language: 'en', baseCurrency: 'eur' },
+      sources: [],
+      authoredEvents: [],
+      transferLinks: [link],
+    });
+
+    expect((await getLinkedEvents())[0].txHash).toBe(link.txHash);
+  });
+
+  it('accepts a checkpoint written before the field existed', async () => {
+    // An older export has no `transferLinks` at all. Refusing it would
+    // cost the user their settings and credentials to save them one
+    // re-confirmation.
+    const secret = generateTransferSecret();
+    const checkpoint = await buildCheckpoint();
+    delete (checkpoint as { transferLinks?: unknown }).transferLinks;
+    const sealed = await sealCheckpoint(checkpoint, secret);
+
+    const reopened = await openCheckpoint(sealed, secret);
+    expect(reopened.transferLinks).toBeUndefined();
+    await expect(restoreCheckpoint(reopened)).resolves.toBeUndefined();
+  });
+
+  it('refuses a link that would store cleanly and never apply', async () => {
+    // Validated BEFORE the transaction opens, like authored events, so a
+    // bad payload cannot leave a half-restored install behind.
+    await expect(
+      restoreCheckpoint({
+        v: 1,
+        settings: { language: 'en', baseCurrency: 'eur' },
+        sources: [],
+        authoredEvents: [],
+        transferLinks: [{ ...link, txHash: '' }],
+      }),
+    ).rejects.toThrow(/txHash/);
+    expect(await getManualLinks()).toEqual([]);
+  });
+
+  it('refuses a payload whose links are not a list', async () => {
+    const secret = generateTransferSecret();
+    const checkpoint = await buildCheckpoint();
+    (checkpoint as { transferLinks?: unknown }).transferLinks = 'nope';
+    const sealed = await sealCheckpoint(checkpoint, secret);
+
+    await expect(openCheckpoint(sealed, secret)).rejects.toThrow(
+      /unexpected shape/i,
+    );
   });
 });
