@@ -392,7 +392,6 @@
     "Not reached · {{amount}} under the limit": "Not reached · {{amount}} under the limit",
     "Hide transactions outside the tax year": "Hide transactions outside the tax year",
     "Not included in the figures above ({{total}} total, {{inYear}} in {{year}})": "Not included in the figures above ({{total}} total, {{inYear}} in {{year}})",
-    "Import a file": "Import a file",
     "Kraken (CSV)": "Kraken (CSV)",
     "In Kraken, open History, then Export, and choose the LEDGERS export - not Trades, which leaves out your deposits and withdrawals and would make your balance look larger than it is. Pick the whole date range. Kraken emails you a zip; the file inside it is what Coineda reads. Nothing leaves this device, and no API key is needed.": "In Kraken, open History, then Export, and choose the LEDGERS export - not Trades, which leaves out your deposits and withdrawals and would make your balance look larger than it is. Pick the whole date range. Kraken emails you a zip; the file inside it is what Coineda reads. Nothing leaves this device, and no API key is needed.",
     "Imported {{inserted}} new and {{updated}} updated from {{label}}": "Imported {{inserted}} new and {{updated}} updated from {{label}}",
@@ -400,6 +399,12 @@
     "Binance (CSV)": "Binance (CSV)",
     "In Binance, open Orders, then Transaction History, and use Export Transaction Records. Choose the widest date range it allows and repeat for each year you need - Binance caps one export at twelve months. Nothing leaves this device, and no API key is needed.": "In Binance, open Orders, then Transaction History, and use Export Transaction Records. Choose the widest date range it allows and repeat for each year you need - Binance caps one export at twelve months. Nothing leaves this device, and no API key is needed.",
     "Coinbase (CSV)": "Coinbase (CSV)",
-    "In Coinbase, open your profile, then Reports, and generate a transaction history report as CSV for all assets and the whole date range. Use the full transaction history rather than a tax report: a tax summary leaves out the movements Coineda needs to work out a cost basis. Nothing leaves this device, and no API key is needed.": "In Coinbase, open your profile, then Reports, and generate a transaction history report as CSV for all assets and the whole date range. Use the full transaction history rather than a tax report: a tax summary leaves out the movements Coineda needs to work out a cost basis. Nothing leaves this device, and no API key is needed."
+    "In Coinbase, open your profile, then Reports, and generate a transaction history report as CSV for all assets and the whole date range. Use the full transaction history rather than a tax report: a tax summary leaves out the movements Coineda needs to work out a cost basis. Nothing leaves this device, and no API key is needed.": "In Coinbase, open your profile, then Reports, and generate a transaction history report as CSV for all assets and the whole date range. Use the full transaction history rather than a tax report: a tax summary leaves out the movements Coineda needs to work out a cost basis. Nothing leaves this device, and no API key is needed.",
+    "Connect automatically": "Connect automatically",
+    "Import an export file": "Import an export file",
+    "These refuse a browser outright, so Coineda reads a file you export instead. No API key, and nothing leaves this device.": "These refuse a browser outright, so Coineda reads a file you export instead. No API key, and nothing leaves this device.",
+    "Export the file, then drop it here": "Export the file, then drop it here",
+    "Drop the file here, or click to choose one": "Drop the file here, or click to choose one",
+    "How to export it": "How to export it"
   }
 }

@@ -14,6 +14,9 @@ import { notify } from '@/lib/notify';
 import { putSource } from '@/ledger/db';
 import type { SourceRecord } from '@/ledger/types';
 import { registry } from '@/sources/registry';
+import { fileRegistry } from '@/sources/csv/registry';
+import type { FileSourceModule } from '@/sources/csv/types';
+import { FileDropArea } from '@/components/files/FileDropArea';
 import type { SourceModule } from '@/sources/types';
 import { SourceForm } from './SourceForm';
 
@@ -26,6 +29,12 @@ type Props = {
    *  WHICH source to sync - picking "the newest" would be a guess that
    *  breaks the moment two are added quickly. */
   onCreated: (source: SourceRecord) => void | Promise<void>;
+  /** Reads one exported file into the ledger. Rejects with a message the
+   *  dialog shows in place, rather than resolving to a failure the caller
+   *  has to inspect - the instructions for getting the right export are on
+   *  this screen, and that is where a complaint about the wrong one
+   *  belongs. */
+  onImportFile: (file: File) => Promise<void>;
 };
 
 /**
@@ -36,11 +45,26 @@ type Props = {
  * point of the module interface (src/sources/types.ts) is that a new
  * source needs no change to this dialog.
  */
-export const AddSourceDialog = ({ open, onOpenChange, onCreated }: Props) => {
+export const AddSourceDialog = ({
+  open,
+  onOpenChange,
+  onCreated,
+  onImportFile,
+}: Props) => {
   const { t } = useTranslation();
   const confirm = useConfirm();
 
   const [module, setModule] = useState<SourceModule | null>(null);
+  /**
+   * The file importer chosen instead, when one was.
+   *
+   * A separate piece of state rather than a union with `module`: the two
+   * take completely different second steps - one a credential form that
+   * ends in `probe`, the other a drop area that ends in a parse - and
+   * collapsing them would mean a type guard at every use.
+   */
+  const [fileModule, setFileModule] = useState<FileSourceModule | null>(null);
+  const [importing, setImporting] = useState(false);
   const [label, setLabel] = useState('');
   const [config, setConfig] = useState<Record<string, string>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({});
@@ -58,6 +82,8 @@ export const AddSourceDialog = ({ open, onOpenChange, onCreated }: Props) => {
     setPrevOpen(open);
     if (open) {
       setModule(null);
+      setFileModule(null);
+      setImporting(false);
       setLabel('');
       setConfig({});
       setFieldErrors({});
@@ -65,6 +91,28 @@ export const AddSourceDialog = ({ open, onOpenChange, onCreated }: Props) => {
       setSaving(false);
     }
   }
+
+  const chooseFileModule = (next: FileSourceModule) => {
+    setFileModule(next);
+    setFormError(null);
+  };
+
+  const handleFile = async (file: File) => {
+    setImporting(true);
+    setFormError(null);
+    try {
+      await onImportFile(file);
+      onOpenChange(false);
+    } catch (error) {
+      // Kept open on failure, and the reason shown HERE rather than only as
+      // a toast: the instructions for getting the right export are on this
+      // screen, and "that was the trades file, not the ledger" is only
+      // actionable while they are in front of the person.
+      setFormError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const chooseModule = (next: SourceModule) => {
     setModule(next);
@@ -152,7 +200,7 @@ export const AddSourceDialog = ({ open, onOpenChange, onCreated }: Props) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        {!module ? (
+        {!module && !fileModule ? (
           <>
             <DialogHeader>
               <DialogTitle>{t('Add a data source')}</DialogTitle>
@@ -160,29 +208,107 @@ export const AddSourceDialog = ({ open, onOpenChange, onCreated }: Props) => {
                 {t('Choose a data source type')}
               </DialogDescription>
             </DialogHeader>
-            <div className="flex flex-col gap-2">
-              {registry.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  {t(
-                    'No source types are available yet. Check back after an update adds one.',
-                  )}
+            <div className="flex flex-col gap-4">
+              {/* Two routes in, named for what they ARE rather than for how
+                  they are built. A person looking for Kraken does not know
+                  or care that it arrives by file while Bitpanda arrives by
+                  API; they know only that one of them will ask for a
+                  download. Hiding the importers behind a separate button
+                  elsewhere meant looking for Kraken in the list, not
+                  finding it, and concluding it was unsupported. */}
+              <div className="flex flex-col gap-2">
+                <p className="text-sm font-medium">
+                  {t('Connect automatically')}
                 </p>
-              ) : (
-                registry.map((candidate) => (
-                  <Button
-                    key={candidate.manifest.id}
-                    type="button"
-                    variant="outline"
-                    className="justify-start"
-                    onClick={() => chooseModule(candidate)}
-                  >
-                    {t(candidate.manifest.label)}
-                  </Button>
-                ))
+                {registry.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {t(
+                      'No source types are available yet. Check back after an update adds one.',
+                    )}
+                  </p>
+                ) : (
+                  registry.map((candidate) => (
+                    <Button
+                      key={candidate.manifest.id}
+                      type="button"
+                      variant="outline"
+                      className="justify-start"
+                      onClick={() => chooseModule(candidate)}
+                    >
+                      {t(candidate.manifest.label)}
+                    </Button>
+                  ))
+                )}
+              </div>
+
+              {fileRegistry.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm font-medium">
+                    {t('Import an export file')}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {t(
+                      'These refuse a browser outright, so Coineda reads a file you export instead. No API key, and nothing leaves this device.',
+                    )}
+                  </p>
+                  {fileRegistry.map((candidate) => (
+                    <Button
+                      key={candidate.manifest.id}
+                      type="button"
+                      variant="outline"
+                      className="justify-start"
+                      onClick={() => chooseFileModule(candidate)}
+                    >
+                      {t(candidate.manifest.label)}
+                    </Button>
+                  ))}
+                </div>
               )}
             </div>
           </>
-        ) : (
+        ) : fileModule ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>{t(fileModule.manifest.label)}</DialogTitle>
+              <DialogDescription>
+                {t('Export the file, then drop it here')}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col gap-4">
+              {/* The instructions sit NEXT to the drop area rather than
+                  behind a link: which export to pick is the one thing that
+                  goes wrong, and for Kraken picking the wrong one produces
+                  a balance that looks right and is not. */}
+              <p className="text-sm text-muted-foreground">
+                {t(fileModule.manifest.help)}
+              </p>
+              <FileDropArea onFile={handleFile} disabled={importing} />
+              <a
+                href={fileModule.manifest.docsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="w-fit text-sm text-muted-foreground underline hover:text-foreground"
+              >
+                {t('How to export it')}
+              </a>
+              {formError && (
+                <p className="text-sm text-destructive" role="alert">
+                  {formError}
+                </p>
+              )}
+            </div>
+            <DialogFooter className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setFileModule(null)}
+                disabled={importing}
+              >
+                {t('Back')}
+              </Button>
+            </DialogFooter>
+          </>
+        ) : module ? (
           <>
             <DialogHeader>
               <DialogTitle>{t(module.manifest.label)}</DialogTitle>
@@ -219,7 +345,7 @@ export const AddSourceDialog = ({ open, onOpenChange, onCreated }: Props) => {
               </Button>
             </DialogFooter>
           </>
-        )}
+        ) : null}
       </DialogContent>
     </Dialog>
   );

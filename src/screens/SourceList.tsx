@@ -1,4 +1,4 @@
-import { RefreshCw, Upload } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -43,10 +43,6 @@ type Props = {
    *  per-row action it is not gated by `busyIds`. */
   onShowEvents: (source: SourceRecord) => void;
   onAddSource: () => void;
-  /** Opens the file picker. Separate from `onAddSource` because the two
-   *  are different acts: one configures something to poll, the other hands
-   *  over a file that already exists. */
-  onImportFile: () => void;
 };
 
 /**
@@ -80,7 +76,6 @@ export const SourceList = ({
   onEditOne,
   onShowEvents,
   onAddSource,
-  onImportFile,
 }: Props) => {
   const { t } = useTranslation();
 
@@ -103,10 +98,6 @@ export const SourceList = ({
               {t('Sync all')}
             </Button>
           )}
-          <Button type="button" variant="outline" onClick={onImportFile}>
-            <Upload aria-hidden="true" />
-            {t('Import a file')}
-          </Button>
           <Button type="button" onClick={onAddSource}>
             {t('Add a data source')}
           </Button>

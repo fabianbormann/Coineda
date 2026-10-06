@@ -71,9 +71,6 @@ export const MainScreen = () => {
    *  protect from a reload, so a second piece of state would only be
    *  another thing to keep in step. */
   const [eventsSource, setEventsSource] = useState<SourceRecord | null>(null);
-  /** The hidden file input the Import button clicks for us: a styled
-   *  <input type="file"> is not a thing the platform offers. */
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetches only - no setState here, so this is safe to call directly from
   // the mount effect below without tripping react-hooks' rule against
@@ -261,42 +258,43 @@ export const MainScreen = () => {
    * The format is recognised from the file's own HEADER rather than from
    * its name - a user renames a download, and an importer run on the wrong
    * file produces plausible-looking garbage instead of a refusal.
+   *
+   * THROWS rather than reporting its own failure. The dialog that calls
+   * this is showing the instructions for getting the right export, so a
+   * complaint about the wrong one belongs on that screen, next to them -
+   * not in a toast that slides away from it.
    */
   const handleImportFile = useCallback(
     async (file: File) => {
+      let outcome;
       try {
-        const outcome = await importFile(await file.text());
-        await load();
-        notify.success(
-          t(
-            'Imported {{inserted}} new and {{updated}} updated from {{label}}',
-            {
-              inserted: outcome.inserted,
-              updated: outcome.updated,
-              label: t(outcome.module.manifest.label),
-            },
-          ),
-        );
-        for (const skipped of outcome.skipped) {
-          // Surfaced, not swallowed: a user whose balance looks short needs
-          // to know which rows were left out and why.
-          notify.info(skipped);
-        }
+        outcome = await importFile(await file.text());
       } catch (error) {
-        notify.error(
-          error instanceof UnknownFileFormatError
-            ? t(
-                'That is not a file Coineda recognises. It reads: {{formats}}',
-                {
-                  formats: fileRegistry
-                    .map((module) => t(module.manifest.label))
-                    .join(', '),
-                },
-              )
-            : error instanceof Error
-              ? error.message
-              : String(error),
-        );
+        if (error instanceof UnknownFileFormatError) {
+          throw new Error(
+            t('That is not a file Coineda recognises. It reads: {{formats}}', {
+              formats: fileRegistry
+                .map((module) => t(module.manifest.label))
+                .join(', '),
+            }),
+            { cause: error },
+          );
+        }
+        throw error;
+      }
+
+      await load();
+      notify.success(
+        t('Imported {{inserted}} new and {{updated}} updated from {{label}}', {
+          inserted: outcome.inserted,
+          updated: outcome.updated,
+          label: t(outcome.module.manifest.label),
+        }),
+      );
+      for (const skipped of outcome.skipped) {
+        // Surfaced, not swallowed: a user whose balance looks short needs
+        // to know which rows were left out and why.
+        notify.info(skipped);
       }
     },
     [load, t],
@@ -625,22 +623,6 @@ export const MainScreen = () => {
           assetCount={holdings.length}
           sourceCount={sources.length}
         />
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".csv,text/csv,text/plain"
-          className="hidden"
-          onChange={(changed) => {
-            const file = changed.target.files?.[0];
-            // Cleared so importing the SAME file twice still fires a
-            // change event; without it, a user who re-exports over the same
-            // filename gets nothing and no explanation.
-            changed.target.value = '';
-            if (file) {
-              void handleImportFile(file);
-            }
-          }}
-        />
         <SourceList
           sources={sources}
           perSource={perSource}
@@ -657,7 +639,6 @@ export const MainScreen = () => {
           onEditOne={handleOpenEdit}
           onShowEvents={setEventsSource}
           onAddSource={() => setAddDialogOpen(true)}
-          onImportFile={() => fileInputRef.current?.click()}
         />
         <div className="flex flex-wrap gap-2">
           <Button
@@ -685,6 +666,7 @@ export const MainScreen = () => {
         <AddSourceDialog
           open={addDialogOpen}
           onOpenChange={setAddDialogOpen}
+          onImportFile={handleImportFile}
           onCreated={async (created) => {
             setAddDialogOpen(false);
             await load();
