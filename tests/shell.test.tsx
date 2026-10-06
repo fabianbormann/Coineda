@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { ThemeProvider } from '@/components/theme/ThemeProvider';
 
@@ -16,12 +18,16 @@ beforeEach(() => {
   );
 });
 
-const renderShell = () =>
+/** The shell links home from its masthead, so it genuinely lives inside a
+ *  router now. */
+const renderShell = (initial = '/tax') =>
   render(
     <ThemeProvider>
-      <AppShell>
-        <div data-testid="page" />
-      </AppShell>
+      <MemoryRouter initialEntries={[initial]}>
+        <AppShell>
+          <div data-testid="page" />
+        </AppShell>
+      </MemoryRouter>
     </ThemeProvider>,
   );
 
@@ -90,5 +96,63 @@ describe('the header mark', () => {
       expect(mark.getAttribute('aria-hidden')).toBe('true');
     }
     expect(screen.getAllByText('Coineda')).toHaveLength(1);
+  });
+});
+
+describe('the masthead', () => {
+  it('links home, so the logo gets you back to the overview', () => {
+    // The whole masthead is one link, the way a site's is - not a picture
+    // beside a title that does nothing.
+    renderShell('/tax');
+    const home = screen.getByRole('link', { name: /coineda/i });
+    expect(home).toHaveAttribute('href', '/');
+  });
+
+  it('puts both the mark and the wordmark inside that link', () => {
+    const { container } = renderShell();
+    const home = screen.getByRole('link', { name: /coineda/i });
+    expect(home.querySelectorAll('img')).toHaveLength(2);
+    expect(home.querySelector('h1')?.textContent).toBe('Coineda');
+    // And the marks are still the only images in the header.
+    expect(container.querySelectorAll('header img')).toHaveLength(2);
+  });
+
+  it('names the link once, not twice', () => {
+    // The marks stay aria-hidden: the heading inside the link already
+    // gives it its name, and announcing the logo as well would read
+    // "Coineda Coineda".
+    renderShell();
+    for (const mark of screen
+      .getByRole('link', { name: /coineda/i })
+      .querySelectorAll('img')) {
+      expect(mark.getAttribute('aria-hidden')).toBe('true');
+    }
+    expect(screen.getAllByText('Coineda')).toHaveLength(1);
+  });
+});
+
+describe('clicking the masthead', () => {
+  it('actually navigates back to the overview', async () => {
+    // The href alone only proves the markup. This proves the behaviour:
+    // starting on another route, clicking the logo swaps the page.
+    render(
+      <ThemeProvider>
+        <MemoryRouter initialEntries={['/tax']}>
+          <AppShell>
+            <Routes>
+              <Route path="/" element={<div>overview page</div>} />
+              <Route path="/tax" element={<div>tax page</div>} />
+            </Routes>
+          </AppShell>
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByText('tax page')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('link', { name: /coineda/i }));
+
+    expect(await screen.findByText('overview page')).toBeInTheDocument();
+    expect(screen.queryByText('tax page')).toBeNull();
   });
 });

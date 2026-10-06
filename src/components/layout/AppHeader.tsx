@@ -1,5 +1,6 @@
 import markOnDark from '@/assets/logo/coineda-mark-on-dark.svg';
 import markOnLight from '@/assets/logo/coineda-mark-on-light.svg';
+import { Link } from 'react-router-dom';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 
 /**
@@ -28,19 +29,29 @@ import { ThemeToggle } from '@/components/theme/ThemeToggle';
  */
 export const AppHeader = () => (
   <header className="glass-2 rim-b sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 px-4 print:hidden">
-    <img
-      src={markOnLight}
-      alt=""
-      aria-hidden="true"
-      className="h-6 w-auto dark:hidden"
-    />
-    <img
-      src={markOnDark}
-      alt=""
-      aria-hidden="true"
-      className="hidden h-6 w-auto dark:block"
-    />
-    <h1 className="truncate font-serif text-lg">Coineda</h1>
+    {/* The mark and the wordmark are ONE link, the way a site's masthead
+        conventionally is: the whole thing is the way home, not a small
+        image beside a title that is not. Its accessible name comes from
+        the heading inside it, which is why the marks stay aria-hidden -
+        otherwise the link would announce the name twice. */}
+    <Link
+      to="/"
+      className="flex min-w-0 items-center gap-2 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <img
+        src={markOnLight}
+        alt=""
+        aria-hidden="true"
+        className="h-6 w-auto dark:hidden"
+      />
+      <img
+        src={markOnDark}
+        alt=""
+        aria-hidden="true"
+        className="hidden h-6 w-auto dark:block"
+      />
+      <h1 className="truncate font-serif text-lg">Coineda</h1>
+    </Link>
     <div className="flex-1" />
     <ThemeToggle />
   </header>
