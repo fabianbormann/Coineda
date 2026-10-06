@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils';
  */
 export const FileDropArea = ({
   onFile,
-  accept = '.csv,text/csv,text/plain',
+  accept = '.csv,.zip,text/csv,text/plain,application/zip',
   disabled = false,
 }: {
   onFile: (file: File) => void;

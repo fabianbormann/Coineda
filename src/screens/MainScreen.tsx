@@ -26,7 +26,12 @@ import { EditSourceDialog } from './EditSourceDialog';
 import { SourceEventsDialog } from './SourceEventsDialog';
 import { JourneyDialog } from '@/journey/JourneyDialog';
 import { TokenMetaProvider } from '@/assets/TokenMetaContext';
-import { importFile, UnknownFileFormatError } from '@/sources/csv/importFile';
+import {
+  EmptyArchiveError,
+  importFile,
+  textFromFile,
+  UnknownFileFormatError,
+} from '@/sources/csv/importFile';
 import { fileRegistry } from '@/sources/csv/registry';
 
 const DEFAULT_CURRENCY = 'eur';
@@ -268,8 +273,22 @@ export const MainScreen = () => {
     async (file: File) => {
       let outcome;
       try {
-        outcome = await importFile(await file.text());
+        // Unpacks a zip on the way in. Kraken and the others deliver one,
+        // and making a person extract it first is a step the app can take
+        // for them - a plain CSV still goes straight through.
+        outcome = await importFile(await textFromFile(file));
       } catch (error) {
+        if (error instanceof EmptyArchiveError) {
+          throw new Error(
+            t(
+              'That archive holds nothing Coineda can read. It contains: {{names}}',
+              {
+                names: error.names.join(', ') || '(nothing)',
+              },
+            ),
+            { cause: error },
+          );
+        }
         if (error instanceof UnknownFileFormatError) {
           throw new Error(
             t('That is not a file Coineda recognises. It reads: {{formats}}', {

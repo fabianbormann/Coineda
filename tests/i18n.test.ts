@@ -150,3 +150,49 @@ describe('every literal t() key has an entry', () => {
     expect(missing).toEqual([]);
   });
 });
+
+describe('instructions name the menu a user actually sees', () => {
+  /**
+   * An export instruction is only useful if it names the label on screen.
+   * Kraken's German interface calls the ledgers export "Hauptbuch", so a
+   * German string telling someone to look for "Ledgers" sends them hunting
+   * for a word their screen does not contain - and the consequence is not
+   * cosmetic: picking "Trades" instead yields a balance that looks right
+   * and is larger than it is, because it leaves out every withdrawal.
+   *
+   * Checked here rather than in a rendered test, because the dialog test
+   * renders in English and can never see this string at all.
+   */
+  // Indexed through a widened view: the JSON import is typed as a literal
+  // object, so a key looked up at runtime is not one TypeScript knows.
+  const english = en.translation as Record<string, string>;
+  const german = de.translation as Record<string, string>;
+  const krakenKey = Object.keys(english).find((key) =>
+    key.startsWith('In Kraken, open Exports'),
+  );
+
+  it('has the Kraken instruction in both locales', () => {
+    expect(krakenKey).toBeDefined();
+    expect(german[krakenKey!]).toBeDefined();
+  });
+
+  it('uses the German menu labels in the German instruction', () => {
+    const text = german[krakenKey!];
+    // The one to pick, as Kraken labels it in German.
+    expect(text).toContain('Hauptbuch');
+    // And the three it must not be confused with.
+    for (const wrong of ['Trades', 'Guthaben', 'Kontoauszug']) {
+      expect(text).toContain(wrong);
+    }
+    // Never the English name for the one to pick.
+    expect(text).not.toMatch(/\bLedgers\b/);
+  });
+
+  it('uses the English menu labels in the English instruction', () => {
+    const text = english[krakenKey!];
+    expect(text).toContain('"Ledgers"');
+    for (const wrong of ['"Trades"', '"Balances"', '"Account statement"']) {
+      expect(text).toContain(wrong);
+    }
+  });
+});

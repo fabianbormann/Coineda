@@ -393,7 +393,6 @@
     "Hide transactions outside the tax year": "Hide transactions outside the tax year",
     "Not included in the figures above ({{total}} total, {{inYear}} in {{year}})": "Not included in the figures above ({{total}} total, {{inYear}} in {{year}})",
     "Kraken (CSV)": "Kraken (CSV)",
-    "In Kraken, open History, then Export, and choose the LEDGERS export - not Trades, which leaves out your deposits and withdrawals and would make your balance look larger than it is. Pick the whole date range. Kraken emails you a zip; the file inside it is what Coineda reads. Nothing leaves this device, and no API key is needed.": "In Kraken, open History, then Export, and choose the LEDGERS export - not Trades, which leaves out your deposits and withdrawals and would make your balance look larger than it is. Pick the whole date range. Kraken emails you a zip; the file inside it is what Coineda reads. Nothing leaves this device, and no API key is needed.",
     "Imported {{inserted}} new and {{updated}} updated from {{label}}": "Imported {{inserted}} new and {{updated}} updated from {{label}}",
     "That is not a file Coineda recognises. It reads: {{formats}}": "That is not a file Coineda recognises. It reads: {{formats}}",
     "Binance (CSV)": "Binance (CSV)",
@@ -405,6 +404,8 @@
     "These refuse a browser outright, so Coineda reads a file you export instead. No API key, and nothing leaves this device.": "These refuse a browser outright, so Coineda reads a file you export instead. No API key, and nothing leaves this device.",
     "Export the file, then drop it here": "Export the file, then drop it here",
     "Drop the file here, or click to choose one": "Drop the file here, or click to choose one",
-    "How to export it": "How to export it"
+    "How to export it": "How to export it",
+    "In Kraken, open Exports, choose New export, and pick \"Ledgers\" as the export type - not \"Trades\", \"Balances\" or \"Account statement\". Trades alone leaves out your deposits and withdrawals, which would make your balance look larger than it is. Choose the whole date range. Kraken prepares a zip for download; drop the zip in as it is, and Coineda will find the file inside it. Nothing leaves this device, and no API key is needed.": "In Kraken, open Exports, choose New export, and pick \"Ledgers\" as the export type - not \"Trades\", \"Balances\" or \"Account statement\". Trades alone leaves out your deposits and withdrawals, which would make your balance look larger than it is. Choose the whole date range. Kraken prepares a zip for download; drop the zip in as it is, and Coineda will find the file inside it. Nothing leaves this device, and no API key is needed.",
+    "That archive holds nothing Coineda can read. It contains: {{names}}": "That archive holds nothing Coineda can read. It contains: {{names}}"
   }
 }

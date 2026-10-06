@@ -98,8 +98,16 @@ describe('choosing a file importer', () => {
     // picking Trades instead of Ledgers produces a balance that looks right
     // and is not.
     const dialog = await openKraken();
-    expect(within(dialog).getByText(/LEDGERS/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/not Trades/i)).toBeInTheDocument();
+    const help = dialog.textContent ?? '';
+    // This renders in ENGLISH, so it checks the English labels only. An
+    // earlier version matched /Ledgers|Hauptbuch/, which reads as covering
+    // both locales and covers neither extra - the German string is never
+    // on screen here. tests/i18n.test.ts checks that one directly.
+    expect(help).toMatch(/"Ledgers"/);
+    // The wrong choices are named too, because picking one fails SILENTLY:
+    // Trades alone yields a balance that looks right and is too large.
+    expect(help).toMatch(/"Trades"/);
+    expect(help).toMatch(/"Balances"/);
   });
 
   it('offers a drop area that is also a button', async () => {
@@ -111,6 +119,17 @@ describe('choosing a file importer', () => {
       name: /drop the file here|hier ablegen/i,
     });
     expect(drop.tagName).toBe('BUTTON');
+  });
+
+  it('accepts a zip as well as a csv, because that is what arrives', async () => {
+    // Kraken hands over a zip. A picker that only offers .csv greys out the
+    // very file the instructions above told the person to download.
+    const dialog = await openKraken();
+    const input = within(dialog)
+      .getByRole('button', { name: /drop the file here|hier ablegen/i })
+      .querySelector('input[type="file"]') as HTMLInputElement;
+    expect(input.accept).toMatch(/\.zip/);
+    expect(input.accept).toMatch(/\.csv/);
   });
 
   it('hands a dropped file straight to the importer', async () => {

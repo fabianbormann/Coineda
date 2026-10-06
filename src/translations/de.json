@@ -393,7 +393,6 @@
     "Hide transactions outside the tax year": "Transaktionen außerhalb des Steuerjahrs ausblenden",
     "Not included in the figures above ({{total}} total, {{inYear}} in {{year}})": "Nicht in den obigen Zahlen enthalten ({{total}} insgesamt, davon {{inYear}} in {{year}})",
     "Kraken (CSV)": "Kraken (CSV)",
-    "In Kraken, open History, then Export, and choose the LEDGERS export - not Trades, which leaves out your deposits and withdrawals and would make your balance look larger than it is. Pick the whole date range. Kraken emails you a zip; the file inside it is what Coineda reads. Nothing leaves this device, and no API key is needed.": "Öffne in Kraken den Verlauf, dann Export, und wähle den LEDGERS-Export - nicht Trades, der lässt Ein- und Auszahlungen weg und würde deinen Bestand größer aussehen lassen, als er ist. Wähle den gesamten Zeitraum. Kraken schickt dir eine Zip-Datei per E-Mail; die Datei darin liest Coineda. Nichts verlässt dieses Gerät, und ein API-Schlüssel wird nicht gebraucht.",
     "Imported {{inserted}} new and {{updated}} updated from {{label}}": "{{inserted}} neu importiert und {{updated}} aktualisiert aus {{label}}",
     "That is not a file Coineda recognises. It reads: {{formats}}": "Diese Datei kennt Coineda nicht. Gelesen werden: {{formats}}",
     "Binance (CSV)": "Binance (CSV)",
@@ -405,6 +404,8 @@
     "These refuse a browser outright, so Coineda reads a file you export instead. No API key, and nothing leaves this device.": "Diese verweigern einem Browser den Zugriff grundsätzlich, deshalb liest Coineda stattdessen eine Datei, die du exportierst. Kein API-Schlüssel, und nichts verlässt dieses Gerät.",
     "Export the file, then drop it here": "Datei exportieren und hier ablegen",
     "Drop the file here, or click to choose one": "Datei hier ablegen oder klicken, um eine auszuwählen",
-    "How to export it": "Anleitung zum Export"
+    "How to export it": "Anleitung zum Export",
+    "In Kraken, open Exports, choose New export, and pick \"Ledgers\" as the export type - not \"Trades\", \"Balances\" or \"Account statement\". Trades alone leaves out your deposits and withdrawals, which would make your balance look larger than it is. Choose the whole date range. Kraken prepares a zip for download; drop the zip in as it is, and Coineda will find the file inside it. Nothing leaves this device, and no API key is needed.": "Öffne in Kraken „Exporte\", wähle „Neuer Export\" und als Exporttyp „Hauptbuch\" - nicht „Trades\", „Guthaben\" oder „Kontoauszug\". Trades allein lässt Ein- und Auszahlungen weg, wodurch dein Bestand größer aussähe, als er ist. Wähle den gesamten Zeitraum. Kraken stellt eine Zip-Datei zum Download bereit; leg die Zip-Datei einfach so ab, Coineda findet die Datei darin. Nichts verlässt dieses Gerät, und ein API-Schlüssel wird nicht gebraucht.",
+    "That archive holds nothing Coineda can read. It contains: {{names}}": "Dieses Archiv enthält nichts, was Coineda lesen kann. Enthalten sind: {{names}}"
   }
 }

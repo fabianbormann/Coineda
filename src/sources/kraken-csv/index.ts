@@ -23,7 +23,7 @@ export const krakenCsv: FileSourceModule = {
     id: 'kraken-csv',
     kind: 'file',
     label: 'Kraken (CSV)',
-    help: 'In Kraken, open History, then Export, and choose the LEDGERS export - not Trades, which leaves out your deposits and withdrawals and would make your balance look larger than it is. Pick the whole date range. Kraken emails you a zip; the file inside it is what Coineda reads. Nothing leaves this device, and no API key is needed.',
+    help: 'In Kraken, open Exports, choose New export, and pick "Ledgers" as the export type - not "Trades", "Balances" or "Account statement". Trades alone leaves out your deposits and withdrawals, which would make your balance look larger than it is. Choose the whole date range. Kraken prepares a zip for download; drop the zip in as it is, and Coineda will find the file inside it. Nothing leaves this device, and no API key is needed.',
     emits: ['trade', 'transfer', 'reward'],
     docsUrl:
       'https://support.kraken.com/articles/360001169383-how-to-export-ledgers',
