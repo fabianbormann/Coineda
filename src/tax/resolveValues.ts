@@ -9,7 +9,23 @@ import { fetchHistory } from '@/prices/history';
 import { valueOf } from '@/prices/scale';
 import { getSettings } from '@/settings/settingsStore';
 import { normaliseAmount } from '@/ledger/amount';
-import type { TaxEvent, UnresolvedItem } from '@/tax/types';
+import type { TaxEvent, TaxReason, UnresolvedItem } from '@/tax/types';
+
+/**
+ * The reason keys this module can emit.
+ *
+ * A provider's own message is never a key - it is an outage, a rate limit
+ * or a status line, and nobody can enumerate those in advance - so it rides
+ * as `params.detail` inside a wrapper that IS keyed. That is the same split
+ * the rest of the app already applies to `source.lastError`, made
+ * structural here rather than left to whoever renders it.
+ */
+export const PRICE_REASON_KEYS = [
+  'Historical prices before {{cutoff}} need a CoinGecko API key: the free tier covers only the last {{days}} days.',
+  'No price source is configured for {{asset}}.',
+  'No price for {{asset}} on {{date}}.',
+  'The price provider could not answer: {{detail}}',
+] as const;
 
 /** The UTC calendar day a timestamp falls on, as YYYY-MM-DD - matches
  *  PriceKey.date. Local time is deliberately never used: a local reading
@@ -35,27 +51,34 @@ const pairKey = (assetId: string, date: string): string => `${assetId}|${date}`;
  * hit it: a provider 401 for an old day, and a day this code declined to
  * request at all because it already knew the answer.
  */
-const freeTierReason = (): string => {
-  const cutoff = new Date(freeTierCutoff()).toISOString().slice(0, 10);
-  return `historical prices before ${cutoff} need a CoinGecko API key: the free tier covers only the last ${FREE_TIER_DAYS} days`;
-};
+const freeTierReason = (): TaxReason => ({
+  key: PRICE_REASON_KEYS[0],
+  params: {
+    cutoff: new Date(freeTierCutoff()).toISOString().slice(0, 10),
+    days: FREE_TIER_DAYS,
+  },
+});
 
-const describeFailure = (error: unknown, date: string): string => {
+const describeFailure = (error: unknown, date: string): TaxReason => {
   if (error instanceof CoinGeckoHistoryError) {
     const cutoff = new Date(freeTierCutoff()).toISOString().slice(0, 10);
     const isBeforeFreeTier = date < cutoff;
     if ((error.status === 401 || error.status === 403) && isBeforeFreeTier) {
       return freeTierReason();
     }
-    return error.message;
   }
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
+  // The provider's own words, wrapped rather than reproduced bare. Built in
+  // fetchHistoricalPrice without ever including the API key, so it stays
+  // safe to show - see the credential note on the key input.
+  return {
+    key: PRICE_REASON_KEYS[3],
+    params: {
+      detail: error instanceof Error ? error.message : String(error),
+    },
+  };
 };
 
-type DayResult = { price: string } | { reason: string };
+type DayResult = { price: string } | { reason: TaxReason };
 
 /**
  * Values each event in the base currency, at the price its asset had on
@@ -118,7 +141,10 @@ export const resolveValues = async (
     }
     if (!COINGECKO_IDS[assetId]) {
       results.set(key, {
-        reason: `no price source is configured for ${assetId}`,
+        reason: {
+          key: PRICE_REASON_KEYS[1],
+          params: { asset: assetId },
+        },
       });
       continue;
     }
@@ -173,7 +199,10 @@ export const resolveValues = async (
         reason:
           Date.parse(`${date}T00:00:00Z`) < cutoff
             ? freeTierReason()
-            : `no price for ${assetId} on ${date}`,
+            : {
+                key: PRICE_REASON_KEYS[2],
+                params: { asset: assetId, date },
+              },
       });
     }
   }
@@ -201,9 +230,10 @@ export const resolveValues = async (
       amount: taxEvent.amount,
       venue: taxEvent.venue,
       timestamp: taxEvent.timestamp,
-      reason:
-        result?.reason ??
-        `no price source is configured for ${taxEvent.assetId}`,
+      reason: result?.reason ?? {
+        key: PRICE_REASON_KEYS[1],
+        params: { asset: taxEvent.assetId },
+      },
       resolutions: [{ kind: 'record-purchase', marketPriceAt: undefined }],
     });
   }

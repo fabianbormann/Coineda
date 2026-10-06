@@ -442,6 +442,12 @@
     "Held one year or less, so the gain is taxable under §23 Abs. 1 Nr. 2 EStG.": "Held one year or less, so the gain is taxable under §23 Abs. 1 Nr. 2 EStG.",
     "Split disposal: the lots held more than one year are tax-free under §23 Abs. 1 Nr. 2 EStG, the rest was held one year or less and is taxable.": "Split disposal: the lots held more than one year are tax-free under §23 Abs. 1 Nr. 2 EStG, the rest was held one year or less and is taxable.",
     "Altvermögen (acquired before 1 March 2021): exempt from KESt under §27b EStG.": "Altvermögen (acquired before 1 March 2021): exempt from KESt under §27b EStG.",
-    "Neuvermögen: taxable at the flat 27.5% KESt under §27a Abs. 1 EStG. No holding-period exemption applies.": "Neuvermögen: taxable at the flat 27.5% KESt under §27a Abs. 1 EStG. No holding-period exemption applies."
+    "Neuvermögen: taxable at the flat 27.5% KESt under §27a Abs. 1 EStG. No holding-period exemption applies.": "Neuvermögen: taxable at the flat 27.5% KESt under §27a Abs. 1 EStG. No holding-period exemption applies.",
+    "This jurisdiction has no rule for a {{kind}} event.": "This jurisdiction has no rule for a {{kind}} event.",
+    "No acquisition is on record for this disposal.": "No acquisition is on record for this disposal.",
+    "Historical prices before {{cutoff}} need a CoinGecko API key: the free tier covers only the last {{days}} days.": "Historical prices before {{cutoff}} need a CoinGecko API key: the free tier covers only the last {{days}} days.",
+    "No price source is configured for {{asset}}.": "No price source is configured for {{asset}}.",
+    "No price for {{asset}} on {{date}}.": "No price for {{asset}} on {{date}}.",
+    "The price provider could not answer: {{detail}}": "The price provider could not answer: {{detail}}"
   }
 }

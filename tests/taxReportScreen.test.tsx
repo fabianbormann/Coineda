@@ -223,18 +223,21 @@ describe('running a report', () => {
     );
   });
 
-  it('shows an unresolved item with its raw reason, verbatim', async () => {
+  it('shows an unresolved item with its reason, translated', async () => {
     taxRegistry.push(makeModule());
     await putEvents([acquisitionEvent, disposalEvent, unmatchedDisposalEvent]);
 
     renderScreen();
     await runReport('2025');
 
-    // The exact diagnostic sentence runTaxReport.ts hardcodes for a
-    // shortfall - a raw string, not a translation key, framed in translated
-    // wrapper text the same way SourceRow frames source.lastError.
+    // The shortfall reason runTaxReport.ts emits, resolved THROUGH i18n
+    // and framed in the translated wrapper. Asserting the rendered sentence
+    // rather than the key is what proves the key actually reaches `t`: a
+    // reason that never got translated would render identically to one that
+    // did only while the locale under test is English, so this pairs with
+    // the conformance gate, which is what catches a key missing from de.json.
     expect(
-      await screen.findByText(/no acquisition on record for this disposal/i),
+      await screen.findByText(/no acquisition is on record for this disposal/i),
     ).toBeInTheDocument();
   });
 
@@ -245,7 +248,7 @@ describe('running a report', () => {
     renderScreen();
     await runReport('2025');
 
-    await screen.findByText(/no acquisition on record for this disposal/i);
+    await screen.findByText(/no acquisition is on record for this disposal/i);
 
     // Resolving an unresolved item (recording a purchase, adding a source
     // for the venue) is explicitly a later milestone - this screen must
@@ -805,7 +808,7 @@ describe('reading the unresolved list', () => {
     amount: '1000000',
     venue: 'wallet-a',
     timestamp,
-    reason: `gap ${label}`,
+    reason: { key: `gap ${label}` },
     taxEventKind: 'acquisition',
     resolutions: [],
     ...overrides,

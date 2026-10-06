@@ -829,7 +829,10 @@ export const TaxReportScreen = () => {
                               </p>
                               <p className="text-destructive" role="alert">
                                 {t('Could not be computed: {{detail}}', {
-                                  detail: item.reason,
+                                  detail: t(
+                                    item.reason.key,
+                                    item.reason.params,
+                                  ),
                                 })}
                               </p>
                             </CardContent>

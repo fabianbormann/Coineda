@@ -230,7 +230,8 @@ describe('resolveValues', () => {
 
     expect(valued).toHaveLength(0);
     expect(unpriced).toHaveLength(1);
-    expect(unpriced[0].reason).toMatch(/365|historical/i);
+    expect(unpriced[0].reason.key).toMatch(/historical prices before/i);
+    expect(unpriced[0].reason.params).toMatchObject({ days: 365 });
   });
 
   it('reports an unmapped asset rather than pricing it at nothing', async () => {
@@ -321,6 +322,6 @@ describe('resolveValues', () => {
 
     const { unpriced } = await resolveValues([event({})], 'eur');
 
-    expect(unpriced[0].reason).not.toContain('cg-secret');
+    expect(JSON.stringify(unpriced[0].reason)).not.toContain('cg-secret');
   });
 });

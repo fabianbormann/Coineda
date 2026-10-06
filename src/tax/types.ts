@@ -97,11 +97,23 @@ export type UnresolvedItem = {
   amount: string;
   venue: string;
   timestamp: number;
-  /** A raw diagnostic sentence, not a translation key - it names a
-   *  provider limitation or a missing acquisition, neither of which maps
-   *  to a static key. The UI frames it in translated wrapper text, the same
-   *  rule SyncReport.error follows. */
-  reason: string;
+  /**
+   * Why this could not be computed, as a key plus parameters.
+   *
+   * This used to be a raw sentence, on the reasoning that it names a
+   * provider limitation or a missing acquisition and neither maps to a
+   * static key. Half of that was right: a provider's own message really is
+   * raw - an outage, a rate limit, a status line nobody can enumerate in
+   * advance. The other half was not, and the half that was wrong is the
+   * one a reader sees most: "no acquisition on record for this disposal"
+   * is a fixed sentence this host writes itself, and it printed in English
+   * in the middle of a German tax document.
+   *
+   * So the split the old comment described - raw text framed by translated
+   * wrapper text - becomes structural instead of conventional: the wrapper
+   * IS the key, and the provider's text rides in `params.detail`.
+   */
+  reason: TaxReason;
   /**
    * Which tax event this gap sits on, when there was one.
    *

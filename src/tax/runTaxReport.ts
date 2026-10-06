@@ -39,6 +39,18 @@ export type RunTaxReportOptions = {
 export const taxYearOf = (timestamp: number): number =>
   new Date(timestamp).getUTCFullYear();
 
+/**
+ * The reason keys this host itself can emit.
+ *
+ * Exported so the conformance gate can assert they are keyed in every
+ * locale without having to run a whole report to discover them - the same
+ * reason a jurisdiction's own keys are reachable through `assess`.
+ */
+export const HOST_REASON_KEYS = [
+  'This jurisdiction has no rule for a {{kind}} event.',
+  'No acquisition is on record for this disposal.',
+] as const;
+
 /** A ledger event the module's `classify` produced nothing for. Recorded
  *  so a new `EventKind` the module has not been taught about cannot vanish
  *  from a report silently - it shows up as something to resolve instead.
@@ -53,7 +65,10 @@ const unclassifiedToUnresolved = (event: LedgerEvent): UnresolvedItem => {
     amount: leg?.amount ?? '0',
     venue: leg?.venue ?? 'unknown',
     timestamp: event.timestamp,
-    reason: `unclassified ledger event kind '${event.kind}'`,
+    reason: {
+      key: 'This jurisdiction has no rule for a {{kind}} event.',
+      params: { kind: event.kind },
+    },
     resolutions: [],
   };
 };
@@ -71,7 +86,7 @@ const shortfallToUnresolved = (event: TaxEvent): UnresolvedItem => ({
   amount: event.amount,
   venue: event.venue,
   timestamp: event.timestamp,
-  reason: 'no acquisition on record for this disposal',
+  reason: { key: 'No acquisition is on record for this disposal.' },
   resolutions: [
     { kind: 'add-source-for-venue', venue: event.venue },
     { kind: 'record-purchase' },

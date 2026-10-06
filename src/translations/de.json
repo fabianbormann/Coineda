@@ -442,6 +442,12 @@
     "Held one year or less, so the gain is taxable under §23 Abs. 1 Nr. 2 EStG.": "Ein Jahr oder kürzer gehalten, der Gewinn ist daher nach §23 Abs. 1 Nr. 2 EStG steuerpflichtig.",
     "Split disposal: the lots held more than one year are tax-free under §23 Abs. 1 Nr. 2 EStG, the rest was held one year or less and is taxable.": "Geteilte Veräußerung: die länger als ein Jahr gehaltenen Bestände sind nach §23 Abs. 1 Nr. 2 EStG steuerfrei, der Rest wurde ein Jahr oder kürzer gehalten und ist steuerpflichtig.",
     "Altvermögen (acquired before 1 March 2021): exempt from KESt under §27b EStG.": "Altvermögen (vor dem 1. März 2021 angeschafft): nach §27b EStG von der KESt befreit.",
-    "Neuvermögen: taxable at the flat 27.5% KESt under §27a Abs. 1 EStG. No holding-period exemption applies.": "Neuvermögen: mit dem besonderen Steuersatz von 27,5 % KESt nach §27a Abs. 1 EStG steuerpflichtig. Eine Behaltefrist-Befreiung besteht nicht."
+    "Neuvermögen: taxable at the flat 27.5% KESt under §27a Abs. 1 EStG. No holding-period exemption applies.": "Neuvermögen: mit dem besonderen Steuersatz von 27,5 % KESt nach §27a Abs. 1 EStG steuerpflichtig. Eine Behaltefrist-Befreiung besteht nicht.",
+    "This jurisdiction has no rule for a {{kind}} event.": "Für ein Ereignis der Art „{{kind}}“ hat dieses Steuerland keine Regel.",
+    "No acquisition is on record for this disposal.": "Zu dieser Veräußerung ist keine Anschaffung erfasst.",
+    "Historical prices before {{cutoff}} need a CoinGecko API key: the free tier covers only the last {{days}} days.": "Für historische Kurse vor dem {{cutoff}} wird ein CoinGecko-API-Schlüssel benötigt: die kostenlose Stufe deckt nur die letzten {{days}} Tage ab.",
+    "No price source is configured for {{asset}}.": "Für {{asset}} ist keine Kursquelle hinterlegt.",
+    "No price for {{asset}} on {{date}}.": "Kein Kurs für {{asset}} am {{date}}.",
+    "The price provider could not answer: {{detail}}": "Die Kursquelle konnte nicht antworten: {{detail}}"
   }
 }

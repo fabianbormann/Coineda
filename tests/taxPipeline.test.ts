@@ -404,7 +404,7 @@ describe('runTaxReport', () => {
     });
 
     const unresolved = report.unresolved.find((item) =>
-      /unclassified/i.test(item.reason),
+      item.reason.key.includes('{{kind}}'),
     );
     expect(unresolved?.kind).toBe('unclassified');
     expect(unresolved?.resolutions).toEqual([]);
@@ -560,8 +560,68 @@ describe('runTaxReport', () => {
     });
 
     const unresolved = report.unresolved.find((item) =>
-      /unclassified/i.test(item.reason),
+      item.reason.key.includes('{{kind}}'),
     );
     expect(unresolved?.kind).toBe('unclassified');
+  });
+});
+
+describe('reasons the host itself writes', () => {
+  it('names the unhandled kind as a parameter, not inside an English sentence', async () => {
+    const ignoring: TaxModule = {
+      ...stubModule,
+      handles: [],
+      classify: () => [],
+    };
+
+    await putEvents([
+      ledgerEvent({
+        id: 'odd-kind',
+        externalId: 'odd-kind',
+        kind: 'fee',
+        timestamp: Date.UTC(2025, 0, 1),
+      }),
+    ]);
+
+    const report = await runTaxReport(ignoring, {
+      year: 2025,
+      baseCurrency: 'eur',
+    });
+
+    const item = report.unresolved.find((u) => u.kind === 'unclassified');
+    expect(item?.reason).toEqual({
+      key: 'This jurisdiction has no rule for a {{kind}} event.',
+      params: { kind: 'fee' },
+    });
+  });
+
+  it('keys the missing-acquisition reason rather than writing a sentence', async () => {
+    await putEvents([
+      ledgerEvent({
+        id: 'naked-sale',
+        externalId: 'naked-sale',
+        kind: 'trade',
+        timestamp: Date.UTC(2025, 2, 1),
+        legs: [
+          {
+            assetId: 'fiat:eur',
+            amount: '100',
+            direction: 'out',
+            venue: 'wallet-a',
+            role: 'principal',
+          },
+        ],
+      }),
+    ]);
+
+    const report = await runTaxReport(stubModule, {
+      year: 2025,
+      baseCurrency: 'eur',
+    });
+
+    const item = report.unresolved.find((u) => u.kind === 'needs-cost-basis');
+    expect(item?.reason).toEqual({
+      key: 'No acquisition is on record for this disposal.',
+    });
   });
 });
