@@ -50,6 +50,32 @@ interface LedgerSchema extends DBSchema {
    * again about every token it will never know. See
    * src/assets/tokenMetaStore.ts.
    */
+  /**
+   * Transfers the user confirmed by hand, because no source reported a
+   * common on-chain hash for them.
+   *
+   * Keyed on `${sourceId}|${externalId}` - the event's IDENTITY, not its
+   * id. A full resync deletes and re-derives rows, and `putEvents` only
+   * preserves an id for a row it still finds by that same identity, so a
+   * link keyed on the id would survive a resync in some cases and not
+   * others. The identity is what the source itself reproduces.
+   *
+   * See src/ledger/manualLinks.ts.
+   */
+  transferLinks: {
+    key: string;
+    value: {
+      key: string;
+      sourceId: string;
+      externalId: string;
+      /** The chain transaction this row is part of. Overlaid onto the
+       *  event as `txHash` on load, which is all the ordinary exact
+       *  linker needs. */
+      txHash: string;
+      confirmedAt: number;
+    };
+    indexes: { sourceId: string };
+  };
   tokenMeta: {
     key: string;
     value: { subject: string; fetchedAt: number } & (
@@ -59,7 +85,7 @@ interface LedgerSchema extends DBSchema {
 }
 
 const DB_NAME = 'coineda-v2';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 let connection: Promise<IDBPDatabase<LedgerSchema>> | null = null;
 
@@ -97,6 +123,16 @@ export const openLedger = (): Promise<IDBPDatabase<LedgerSchema>> => {
           // request per token and nothing else.
           db.deleteObjectStore('tokenMeta');
           db.createObjectStore('tokenMeta', { keyPath: 'subject' });
+        }
+        if (oldVersion < 6) {
+          const links = db.createObjectStore('transferLinks', {
+            keyPath: 'key',
+          });
+          // Indexed by source so removing a source can drop its links in
+          // the same transaction - a link to an event that no longer
+          // exists would quietly re-apply itself if that source were
+          // added back with different data.
+          links.createIndex('sourceId', 'sourceId');
         }
       },
     });
@@ -318,7 +354,10 @@ export const deleteSource = async (id: string): Promise<void> => {
  */
 export const deleteSourceCascade = async (sourceId: string): Promise<void> => {
   const db = await openLedger();
-  const tx = db.transaction(['events', 'cursors', 'sources'], 'readwrite');
+  const tx = db.transaction(
+    ['events', 'cursors', 'sources', 'transferLinks'],
+    'readwrite',
+  );
 
   try {
     const eventsStore = tx.objectStore('events');
@@ -331,6 +370,12 @@ export const deleteSourceCascade = async (sourceId: string): Promise<void> => {
     // A source that was added but never synced has no cursor row yet -
     // deleting a key IndexedDB doesn't have is a no-op, not an error.
     await tx.objectStore('cursors').delete(sourceId);
+
+    const links = tx.objectStore('transferLinks');
+    for (const key of await links.index('sourceId').getAllKeys(sourceId)) {
+      await links.delete(key);
+    }
+
     await tx.objectStore('sources').delete(sourceId);
 
     await tx.done;

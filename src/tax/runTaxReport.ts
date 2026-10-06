@@ -1,4 +1,4 @@
-import { getAllEvents } from '@/ledger/db';
+import { getLinkedEvents } from '@/ledger/manualLinks';
 import {
   foldDisposals,
   isInternalTransfer,
@@ -124,7 +124,7 @@ export const runTaxReport = async (
     );
   }
 
-  const allEvents = await getAllEvents();
+  const allEvents = await getLinkedEvents();
   const ownedVenues = ownedVenuesOf(allEvents);
   // Transfers between the user's own venues, in BOTH shapes.
   //

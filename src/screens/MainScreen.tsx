@@ -4,11 +4,13 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
   deleteSourceCascade,
-  getAllEvents,
   getEventsBySource,
   getSources,
 } from '@/ledger/db';
 import { foldHoldings, ownedVenuesOf } from '@/ledger/balances';
+import { getLinkedEvents } from '@/ledger/manualLinks';
+import { linkInternalTransfers, linkedEventIds } from '@/ledger/transfers';
+import { proposeTransfers } from '@/ledger/proposeTransfers';
 import { resolveSpotPrices, totalValue } from '@/prices/priceStore';
 import { valueOf } from '@/prices/scale';
 import { compareAmounts, sumAmounts } from '@/ledger/amount';
@@ -25,6 +27,7 @@ import { AddSourceDialog } from './AddSourceDialog';
 import { EditSourceDialog } from './EditSourceDialog';
 import { SourceEventsDialog } from './SourceEventsDialog';
 import { JourneyDialog } from '@/journey/JourneyDialog';
+import { ReviewTransfersDialog } from './ReviewTransfersDialog';
 import { TokenMetaProvider } from '@/assets/TokenMetaContext';
 import {
   EmptyArchiveError,
@@ -71,6 +74,7 @@ export const MainScreen = () => {
   const controllersRef = useRef<Map<string, AbortController>>(new Map());
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [journeyDialogOpen, setJourneyDialogOpen] = useState(false);
+  const [transfersDialogOpen, setTransfersDialogOpen] = useState(false);
   /** The source whose event log is open, or null. Doubles as the dialog's
    *  open flag: unlike the edit dialog there is nothing in flight to
    *  protect from a reload, so a second piece of state would only be
@@ -83,7 +87,7 @@ export const MainScreen = () => {
   const fetchAll = useCallback(async () => {
     const [nextSources, nextEvents, settings] = await Promise.all([
       getSources(),
-      getAllEvents(),
+      getLinkedEvents(),
       getSettings(),
     ]);
     return {
@@ -144,6 +148,25 @@ export const MainScreen = () => {
   // same one - deriving it per slice is what makes a transfer between two
   // of the user's own sources read as a disposal on one side.
   const ownedVenues = useMemo(() => ownedVenuesOf(events), [events]);
+
+  /**
+   * Movements that look like two halves of one transfer but share no
+   * on-chain hash, usually because an exchange's export does not carry one.
+   *
+   * Computed here rather than inside the dialog so the button can say how
+   * many there are, and so it can stay hidden when there are none - a
+   * permanent "check your transfers" button that is almost always empty
+   * teaches people to ignore it.
+   */
+  const transferProposals = useMemo(
+    () =>
+      proposeTransfers(
+        events,
+        ownedVenues,
+        linkedEventIds(linkInternalTransfers(events, ownedVenues)),
+      ),
+    [events, ownedVenues],
+  );
 
   const holdings = useMemo(
     () => foldHoldings(events, ownedVenues),
@@ -681,6 +704,17 @@ export const MainScreen = () => {
           >
             {t('Create journey video')}
           </Button>
+          {transferProposals.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setTransfersDialogOpen(true)}
+            >
+              {t('Check {{count}} possible transfer', {
+                count: transferProposals.length,
+              })}
+            </Button>
+          )}
         </div>
         <AddSourceDialog
           open={addDialogOpen}
@@ -720,6 +754,15 @@ export const MainScreen = () => {
         <JourneyDialog
           open={journeyDialogOpen}
           onOpenChange={setJourneyDialogOpen}
+        />
+        <ReviewTransfersDialog
+          open={transfersDialogOpen}
+          onOpenChange={setTransfersDialogOpen}
+          events={events}
+          sources={sources}
+          proposals={transferProposals}
+          ownedVenues={ownedVenues}
+          onConfirmed={load}
         />
       </div>
     </TokenMetaProvider>

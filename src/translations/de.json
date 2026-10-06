@@ -406,6 +406,17 @@
     "Drop the file here, or click to choose one": "Datei hier ablegen oder klicken, um eine auszuwählen",
     "How to export it": "Anleitung zum Export",
     "In Kraken, open Exports, choose New export, and pick \"Ledgers\" as the export type - not \"Trades\", \"Balances\" or \"Account statement\". Trades alone leaves out your deposits and withdrawals, which would make your balance look larger than it is. Choose the whole date range. Kraken prepares a zip for download; drop the zip in as it is, and Coineda will find the file inside it. Nothing leaves this device, and no API key is needed.": "Öffne in Kraken „Exporte\", wähle „Neuer Export\" und als Exporttyp „Hauptbuch\" - nicht „Trades\", „Guthaben\" oder „Kontoauszug\". Trades allein lässt Ein- und Auszahlungen weg, wodurch dein Bestand größer aussähe, als er ist. Wähle den gesamten Zeitraum. Kraken stellt eine Zip-Datei zum Download bereit; leg die Zip-Datei einfach so ab, Coineda findet die Datei darin. Nichts verlässt dieses Gerät, und ein API-Schlüssel wird nicht gebraucht.",
-    "That archive holds nothing Coineda can read. It contains: {{names}}": "Dieses Archiv enthält nichts, was Coineda lesen kann. Enthalten sind: {{names}}"
+    "That archive holds nothing Coineda can read. It contains: {{names}}": "Dieses Archiv enthält nichts, was Coineda lesen kann. Enthalten sind: {{names}}",
+    "Check for internal transfers": "Interne Transfers prüfen",
+    "Some exchanges do not report the blockchain transaction behind a withdrawal, so Coineda cannot tell on its own that the money arrived in your own wallet. These pairs look like one movement. Confirming one records it as an internal transfer instead of a sale.": "Manche Börsen nennen in ihrem Export die Blockchain-Transaktion hinter einer Auszahlung nicht, deshalb kann Coineda von allein nicht erkennen, dass das Geld in deiner eigenen Wallet angekommen ist. Diese Paare sehen wie eine einzige Bewegung aus. Wenn du eines bestätigst, wird es als interner Transfer statt als Verkauf geführt.",
+    "Nothing to check - every transfer is already accounted for.": "Nichts zu prüfen – jeder Transfer ist bereits zugeordnet.",
+    "Difference": "Differenz",
+    "(the network fee, if these are the same movement)": "(die Netzwerkgebühr, falls das dieselbe Bewegung ist)",
+    "Yes, this is one transfer": "Ja, das ist ein Transfer",
+    "Saving…": "Speichern…",
+    "Recorded as a transfer between your own venues.": "Als Transfer zwischen deinen eigenen Konten gespeichert.",
+    "Could not save that. Try again.": "Das konnte nicht gespeichert werden. Versuche es erneut.",
+    "Check {{count}} possible transfer_one": "{{count}} möglichen Transfer prüfen",
+    "Check {{count}} possible transfer_other": "{{count}} mögliche Transfers prüfen"
   }
 }

@@ -406,6 +406,17 @@
     "Drop the file here, or click to choose one": "Drop the file here, or click to choose one",
     "How to export it": "How to export it",
     "In Kraken, open Exports, choose New export, and pick \"Ledgers\" as the export type - not \"Trades\", \"Balances\" or \"Account statement\". Trades alone leaves out your deposits and withdrawals, which would make your balance look larger than it is. Choose the whole date range. Kraken prepares a zip for download; drop the zip in as it is, and Coineda will find the file inside it. Nothing leaves this device, and no API key is needed.": "In Kraken, open Exports, choose New export, and pick \"Ledgers\" as the export type - not \"Trades\", \"Balances\" or \"Account statement\". Trades alone leaves out your deposits and withdrawals, which would make your balance look larger than it is. Choose the whole date range. Kraken prepares a zip for download; drop the zip in as it is, and Coineda will find the file inside it. Nothing leaves this device, and no API key is needed.",
-    "That archive holds nothing Coineda can read. It contains: {{names}}": "That archive holds nothing Coineda can read. It contains: {{names}}"
+    "That archive holds nothing Coineda can read. It contains: {{names}}": "That archive holds nothing Coineda can read. It contains: {{names}}",
+    "Check for internal transfers": "Check for internal transfers",
+    "Some exchanges do not report the blockchain transaction behind a withdrawal, so Coineda cannot tell on its own that the money arrived in your own wallet. These pairs look like one movement. Confirming one records it as an internal transfer instead of a sale.": "Some exchanges do not report the blockchain transaction behind a withdrawal, so Coineda cannot tell on its own that the money arrived in your own wallet. These pairs look like one movement. Confirming one records it as an internal transfer instead of a sale.",
+    "Nothing to check - every transfer is already accounted for.": "Nothing to check - every transfer is already accounted for.",
+    "Difference": "Difference",
+    "(the network fee, if these are the same movement)": "(the network fee, if these are the same movement)",
+    "Yes, this is one transfer": "Yes, this is one transfer",
+    "Saving…": "Saving…",
+    "Recorded as a transfer between your own venues.": "Recorded as a transfer between your own venues.",
+    "Could not save that. Try again.": "Could not save that. Try again.",
+    "Check {{count}} possible transfer_one": "Check {{count}} possible transfer",
+    "Check {{count}} possible transfer_other": "Check {{count}} possible transfers"
   }
 }

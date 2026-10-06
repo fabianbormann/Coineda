@@ -221,6 +221,7 @@ describe('the v1 to current schema upgrade', () => {
       'settings',
       'sources',
       'tokenMeta',
+      'transferLinks',
     ]);
     const source = await upgraded.get('sources', 'src-a');
     expect(source?.label).toBe('My wallet');

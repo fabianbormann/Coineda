@@ -175,6 +175,16 @@ const runReport = async (year: string) => {
   await userEvent.click(
     await screen.findByRole('button', { name: /run report/i }),
   );
+  // Waits for the run to be OVER, not merely started. Clicking used to be
+  // the whole helper, and the tests below that query the result
+  // synchronously passed only because the report happened to settle inside
+  // userEvent's own flush - one extra awaited read inside runTaxReport was
+  // enough to make several of them fail at random under load. Waiting on
+  // the loading line disappearing covers the error path too, where no
+  // figures ever arrive.
+  await waitFor(() =>
+    expect(screen.queryByText(/running your tax report/i)).toBeNull(),
+  );
 };
 
 describe('running a report', () => {

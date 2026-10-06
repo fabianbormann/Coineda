@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { getAllEvents } from '@/ledger/db';
+import { getLinkedEvents } from '@/ledger/manualLinks';
 import { getSettings } from '@/settings/settingsStore';
 import { buildJourneySeries } from './series';
 import type { JourneySeries } from './series';
@@ -109,7 +109,7 @@ export const JourneyDialog = ({ open, onOpenChange }: Props) => {
     (async () => {
       try {
         const [events, settings] = await Promise.all([
-          getAllEvents(),
+          getLinkedEvents(),
           getSettings(),
         ]);
         const baseCurrency = settings?.baseCurrency ?? DEFAULT_CURRENCY;
