@@ -44,6 +44,13 @@ const ALTVERMOEGEN_CUTOFF = Date.UTC(2021, 2, 1);
  *  caller-supplied rate the way Germany's income-dependent rate is. */
 const KEST_RATE = '27.5';
 
+/** What the figure IS, in Austria's own words. The screen used to print
+ *  Germany's caveat here - a marginal rate the user never entered, minus a
+ *  Solidaritätszuschlag, a Kirchensteuer and a progression effect none of
+ *  which exist under §27a. */
+const LIABILITY_NOTE =
+  'The statutory 27.5% KESt on the taxable gain. It is a final tax, so it does not depend on your other income.';
+
 const PARTITION_ALT = 'alt';
 const PARTITION_NEU = 'neu';
 
@@ -269,6 +276,7 @@ const assess = (input: AssessInput): TaxAssessment => {
     },
     thresholds: [],
     estimatedLiability,
+    liabilityNote: LIABILITY_NOTE,
     unresolved: [],
   };
 };

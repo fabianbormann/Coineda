@@ -68,8 +68,12 @@ const unclassifiedToUnresolved = (event: LedgerEvent): UnresolvedItem => {
     amount: leg?.amount ?? '0',
     venue: leg?.venue ?? 'unknown',
     timestamp: event.timestamp,
+    // Indexed into the exported constant, never retyped: the conformance
+    // gate asserts the CONSTANT is keyed in both locales, so a literal
+    // repeated here could drift from it by one character and the gate would
+    // stay green while the report printed an untranslated key.
     reason: {
-      key: 'This jurisdiction has no rule for a {{kind}} event.',
+      key: HOST_REASON_KEYS[0],
       params: { kind: event.kind },
     },
     resolutions: [],
@@ -89,7 +93,7 @@ const shortfallToUnresolved = (event: TaxEvent): UnresolvedItem => ({
   amount: event.amount,
   venue: event.venue,
   timestamp: event.timestamp,
-  reason: { key: 'No acquisition is on record for this disposal.' },
+  reason: { key: HOST_REASON_KEYS[1] },
   resolutions: [
     { kind: 'add-source-for-venue', venue: event.venue },
     { kind: 'record-purchase' },

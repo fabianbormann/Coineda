@@ -480,6 +480,8 @@
     "No events from this source yet": "Noch keine Buchungen aus dieser Quelle",
     "Tax-free loss": "Steuerfreier Verlust",
     "Taxable income": "Steuerpflichtige Einkünfte",
-    "This limit covers every private sale you made in the year, not only crypto.": "Diese Grenze gilt für alle privaten Veräußerungsgeschäfte des Jahres, nicht nur für Kryptowerte."
+    "This limit covers every private sale you made in the year, not only crypto.": "Diese Grenze gilt für alle privaten Veräußerungsgeschäfte des Jahres, nicht nur für Kryptowerte.",
+    "The statutory 27.5% KESt on the taxable gain. It is a final tax, so it does not depend on your other income.": "Die gesetzliche KESt von 27,5 % auf den steuerpflichtigen Gewinn. Sie ist eine Endbesteuerung und hängt daher nicht von deinen übrigen Einkünften ab.",
+    "{{count}} other unresolved items are not disposals in this year": "{{count}} weitere offene Punkte sind keine Veräußerungen in diesem Jahr"
   }
 }

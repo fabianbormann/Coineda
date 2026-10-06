@@ -265,3 +265,23 @@ describe('austrian loss handling', () => {
     expect(report.estimatedLiability).toBe('0');
   });
 });
+
+describe('what the austrian liability figure is', () => {
+  it('describes the statutory KESt, not a German marginal rate', () => {
+    // Austria computes estimatedLiability unconditionally from the
+    // statutory 27.5% KESt - the user supplies no rate. Printing Germany's
+    // caveat beside it claimed a marginal rate the user never entered, and
+    // disclaimed a Solidaritätszuschlag, a Kirchensteuer and a progression
+    // effect that do not exist here. KESt is an Endbesteuerung.
+    const report = austrianTax.assess({
+      year: 2024,
+      matched: [disposalFrom(Date.UTC(2022, 0, 1), '1000')],
+      income: [],
+    });
+
+    expect(report.estimatedLiability).toBe('275');
+    expect(report.liabilityNote).toBe(
+      'The statutory 27.5% KESt on the taxable gain. It is a final tax, so it does not depend on your other income.',
+    );
+  });
+});

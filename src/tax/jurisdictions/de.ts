@@ -40,6 +40,12 @@ const ONE_YEAR_DAYS = 365;
 
 const PRIVATE_SALE_THRESHOLD_LABEL =
   'Tax-free threshold for private sales (§23 EStG)';
+/** Attached to the §23 threshold ONLY. The §22 Nr. 3 Freigrenze below is
+ *  not a private-sale limit and must never carry this. */
+const PRIVATE_SALE_SCOPE_NOTE =
+  'This limit covers every private sale you made in the year, not only crypto.';
+const LIABILITY_NOTE =
+  'Your marginal rate applied to the taxable gain. It does not include solidarity surcharge, church tax, or the effect on your overall progression.';
 const STAKING_INCOME_THRESHOLD_LABEL =
   'Tax-free threshold for staking income (§22 Nr. 3 EStG)';
 
@@ -293,6 +299,7 @@ const assess = (input: AssessInput): TaxAssessment => {
     actual: rawTaxableGain,
     exceeded: gainExceeded,
     kind: 'freigrenze',
+    scopeNote: PRIVATE_SALE_SCOPE_NOTE,
   };
 
   // §22 Nr. 3 EStG's own €256 Freigrenze, assessed independently of §23 -
@@ -311,7 +318,9 @@ const assess = (input: AssessInput): TaxAssessment => {
   };
 
   let estimatedLiability: string | undefined;
+  let liabilityNote: string | undefined;
   if (input.rate !== undefined) {
+    liabilityNote = LIABILITY_NOTE;
     // A marginal rate times the taxable gain, and deliberately nothing
     // more. This used to multiply by 1.055 for the Solidaritätszuschlag
     // unconditionally - but the Soli has had a Freigrenze since 2021 and is
@@ -348,6 +357,7 @@ const assess = (input: AssessInput): TaxAssessment => {
     },
     thresholds: [gainThreshold, incomeThreshold],
     estimatedLiability,
+    liabilityNote,
     unresolved: [],
   };
 };

@@ -8,6 +8,8 @@ import { TaxReportScreen } from '@/screens/TaxReportScreen';
 import { taxRegistry } from '@/tax/registry';
 import germanTax from '@/tax/jurisdictions/de';
 import { openLedger, putEvents, putSource } from '@/ledger/db';
+import * as settingsStore from '@/settings/settingsStore';
+import type { Settings } from '@/settings/settingsStore';
 import { getSettings, putSettings } from '@/settings/settingsStore';
 import type { LedgerEvent } from '@/ledger/types';
 import { flatRange } from './priceRangeStub';
@@ -1163,18 +1165,152 @@ describe('labels that match their sign and their scope', () => {
     expect(screen.queryByText(/tax-free gain/i)).not.toBeInTheDocument();
   });
 
-  it('says a threshold covers more than crypto, so it is not read as clearance', async () => {
-    // "1.000,00 EUR under the limit" reads as "nothing to declare". The
-    // §23 Freigrenze spans EVERY private sale in the year - gold, art, a
-    // property inside ten years - and this app sees only the crypto.
-    taxRegistry.push(makeModule());
+  it('prints a threshold scope note only where the jurisdiction supplies one', async () => {
+    // "1.000,00 EUR under the limit" reads as "nothing to declare", so a
+    // limit wider than crypto has to say so. But the note belongs to the
+    // THRESHOLD, not to the screen: Germany returns two thresholds and only
+    // §23's is about private sales - printed under the §22 Nr. 3 staking
+    // Freigrenze the same sentence claims staking income consumes a
+    // private-sale allowance. This asserts the screen renders what it is
+    // given, and nothing where it is given nothing.
+    const base = makeModule();
+    taxRegistry.push({
+      ...base,
+      assess: (input) => {
+        const assessed = base.assess(input);
+        return {
+          ...assessed,
+          thresholds: [
+            { ...assessed.thresholds[0], scopeNote: 'Covers more than crypto' },
+            { ...assessed.thresholds[0], label: 'Second threshold' },
+          ],
+        };
+      },
+    });
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    const { container } = renderScreen();
+    await runReport('2025');
+
+    expect(
+      await screen.findByText(/covers more than crypto/i),
+    ).toBeInTheDocument();
+    // Exactly one, not one per threshold card.
+    expect(
+      [...container.querySelectorAll('p')].filter((node) =>
+        /covers more than crypto/i.test(node.textContent ?? ''),
+      ),
+    ).toHaveLength(1);
+  });
+});
+
+/** A module whose unresolved items sit outside the tax year, so the
+ *  screen's default filter hides them while the totals card still counts
+ *  them. */
+const gapAt = (timestamp: number, label: string): UnresolvedItem => ({
+  kind: 'needs-price',
+  sourceEventId: label,
+  assetId: 'cardano:lovelace',
+  amount: '1000000',
+  venue: 'wallet-a',
+  timestamp,
+  reason: { key: `gap ${label}` },
+  taxEventKind: 'acquisition',
+  resolutions: [],
+});
+
+const withUnresolvedOutsideYear = (items: UnresolvedItem[]): TaxModule => {
+  const base = makeModule();
+  return {
+    ...base,
+    assess: (input) => ({ ...base.assess(input), unresolved: items }),
+  };
+};
+
+describe('what the totals card promises about the list below it', () => {
+  it('does not promise every item is listed while the filter hides some', async () => {
+    // The printed half of this was fixed by rendering a complete list for
+    // paper. On screen the filter is ON by default, so the same sentence
+    // promised 64 rows above a list showing none of them - the recorded
+    // report's own contradiction, surviving in the medium it was found in.
+    taxRegistry.push(
+      withUnresolvedOutsideYear([
+        gapAt(Date.UTC(2023, 0, 1), 'older'),
+        gapAt(Date.UTC(2022, 0, 1), 'oldest'),
+      ]),
+    );
     await putEvents([acquisitionEvent, disposalEvent]);
 
     renderScreen();
     await runReport('2025');
 
+    await screen.findByText(/other unresolved items/i);
     expect(
-      await screen.findByText(/every private sale you made in the year/i),
+      screen.queryByText(/each one is listed below/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it('promises it once nothing is hidden', async () => {
+    taxRegistry.push(
+      withUnresolvedOutsideYear([
+        gapAt(Date.UTC(2023, 0, 1), 'older'),
+        gapAt(Date.UTC(2022, 0, 1), 'oldest'),
+      ]),
+    );
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: /outside the tax year/i }),
+    );
+
+    expect(
+      await screen.findByText(/each one is listed below/i),
     ).toBeInTheDocument();
+  });
+});
+
+describe('the taxpayer identity survives a slow or failed settings read', () => {
+  it('does not overwrite a stored name before settings have loaded', async () => {
+    await putSettings({
+      taxpayer: { name: 'Erika Mustermann', taxNumber: '12/345/67890' },
+    });
+    taxRegistry.push(makeModule());
+
+    // The read is held open for the whole interaction, which is the state
+    // the screen is genuinely in on a slow device - and the state a failed
+    // read leaves it in permanently. Without a guard, blurring the field
+    // while `taxpayerName` is still '' writes two empty strings over a
+    // stored identity, and `putSettings` replaces the taxpayer object
+    // wholesale rather than merging into it.
+    let release: (value: Settings | null) => void = () => {};
+    const held = new Promise<Settings | null>((resolve) => {
+      release = resolve;
+    });
+    const spy = vi
+      .spyOn(settingsStore, 'getSettings')
+      .mockReturnValueOnce(held);
+
+    try {
+      renderScreen();
+      await userEvent.click(
+        await screen.findByRole('button', { name: /testland/i }),
+      );
+
+      // Focus and blur without typing - what a user does tabbing through
+      // the form.
+      const nameInput = await screen.findByLabelText(/your name/i);
+      await userEvent.click(nameInput);
+      await userEvent.tab();
+
+      release(null);
+    } finally {
+      spy.mockRestore();
+    }
+
+    const settings = await getSettings();
+    expect(settings?.taxpayer?.name).toBe('Erika Mustermann');
+    expect(settings?.taxpayer?.taxNumber).toBe('12/345/67890');
   });
 });

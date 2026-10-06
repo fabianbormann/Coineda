@@ -190,6 +190,18 @@ export type ThresholdOutcome = {
    * accident.
    */
   kind: 'freigrenze' | 'freibetrag';
+  /**
+   * Optional translation key qualifying what this limit covers.
+   *
+   * Only the jurisdiction knows. Germany's §23 Freigrenze spans every
+   * private sale in the year - gold, art, a property sold inside ten years
+   * - while its §22 Nr. 3 Freigrenze covers Einkünfte aus Leistungen and
+   * nothing of the sort. A note the SCREEN printed under every threshold
+   * told a reader that staking income consumed a private-sale allowance,
+   * which is wrong in both directions. Prose about a jurisdiction's rules
+   * belongs to that jurisdiction, the same way `partitionLabel` does.
+   */
+  scopeNote?: string;
 };
 
 export type TaxAssessment = {
@@ -218,6 +230,17 @@ export type TaxAssessment = {
   };
   thresholds: ThresholdOutcome[];
   estimatedLiability?: string;
+  /**
+   * Translation key saying what `estimatedLiability` is and what it leaves
+   * out. Present exactly when `estimatedLiability` is.
+   *
+   * Jurisdiction-supplied for the same reason `scopeNote` is: Germany's
+   * figure is a caller-supplied marginal rate excluding Solidaritätszuschlag
+   * and Kirchensteuer, Austria's is the statutory 27.5% KESt and a final
+   * tax. A single sentence written at the screen described one of them and
+   * printed on both.
+   */
+  liabilityNote?: string;
   unresolved: UnresolvedItem[];
 };
 

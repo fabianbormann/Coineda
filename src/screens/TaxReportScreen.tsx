@@ -228,6 +228,13 @@ export const TaxReportScreen = () => {
   // value is only ever read back on the next mount.
   const [taxpayerName, setTaxpayerName] = useState('');
   const [taxNumber, setTaxNumber] = useState('');
+  // Whether the settings read has landed. `persistTaxpayer` fires on blur,
+  // and a blur can happen first - on a slow device, or permanently if the
+  // read fails, which this screen deliberately does not treat as fatal.
+  // Writing then would put two empty strings over a stored identity, and
+  // putSettings replaces the taxpayer object wholesale rather than merging
+  // into it. This is the same guard `loadedApiKey` exists for one field up.
+  const [taxpayerLoaded, setTaxpayerLoaded] = useState(false);
   // Built alongside the report, not on mount: it describes the ledger the
   // figures were computed from, so it has to be read at the same moment
   // they were - a source added after a run would otherwise appear on a
@@ -256,6 +263,7 @@ export const TaxReportScreen = () => {
       setLoadedApiKey(settings?.coingeckoApiKey ?? '');
       setTaxpayerName(settings?.taxpayer?.name ?? '');
       setTaxNumber(settings?.taxpayer?.taxNumber ?? '');
+      setTaxpayerLoaded(true);
     });
     return () => {
       active = false;
@@ -265,6 +273,9 @@ export const TaxReportScreen = () => {
   /** Written on blur, merging rather than replacing: the two fields have
    *  separate inputs and a write of one must not erase the other. */
   const persistTaxpayer = () => {
+    if (!taxpayerLoaded) {
+      return;
+    }
     void putSettings({
       taxpayer: { name: taxpayerName, taxNumber },
     });
@@ -878,8 +889,19 @@ export const TaxReportScreen = () => {
                     {assessment.unresolved.length - assessment.totals.omitted >
                       0 && (
                       <p className="text-sm text-muted-foreground">
+                        {/* The promise is conditional, because on screen it
+                            is not always true: the filter below is ON by
+                            default and hides every out-of-year item, which
+                            is most of them. The recorded report said "65
+                            ... each one is listed below" above a list
+                            showing one. Print renders a complete list and
+                            so always keeps the promise - but this sentence
+                            is shared, so it has to be told which list it
+                            sits above. */}
                         {t(
-                          '{{count}} other unresolved items are not disposals in this year - each one is listed below',
+                          hideOutsideYear
+                            ? '{{count}} other unresolved items are not disposals in this year'
+                            : '{{count}} other unresolved items are not disposals in this year - each one is listed below',
                           {
                             count:
                               assessment.unresolved.length -
@@ -948,11 +970,17 @@ export const TaxReportScreen = () => {
                           value={Number(assessment.estimatedLiability)}
                           currency={baseCurrency}
                         />
-                        <span className="ml-2 text-sm text-muted-foreground">
-                          {t(
-                            'Your marginal rate applied to the taxable gain. It does not include solidarity surcharge, church tax, or the effect on your overall progression.',
-                          )}
-                        </span>
+                        {/* The jurisdiction's own words. This sentence used
+                            to be written here and printed beside EVERY
+                            figure - and Austria's is a statutory 27.5% KESt
+                            with no caller-supplied rate, no surcharge, no
+                            church tax and no progression to disclaim, so
+                            all three clauses were false there. */}
+                        {assessment.liabilityNote && (
+                          <span className="ml-2 text-sm text-muted-foreground">
+                            {t(assessment.liabilityNote)}
+                          </span>
+                        )}
                       </p>
                     )}
                   </CardContent>
@@ -987,16 +1015,17 @@ export const TaxReportScreen = () => {
                               currency={baseCurrency}
                             />
                           </p>
-                          {/* A limit this app can only test against the
-                              crypto it can see. §23's Freigrenze spans
-                              EVERY private sale in the year - gold, art, a
-                              property sold inside ten years - so "under the
-                              limit" must not read as "nothing to declare". */}
-                          <p className="text-muted-foreground">
-                            {t(
-                              'This limit covers every private sale you made in the year, not only crypto.',
-                            )}
-                          </p>
+                          {/* Supplied per threshold by the jurisdiction,
+                              never written here. Germany returns TWO
+                              thresholds - §23 private sales and §22 Nr. 3
+                              staking income - and an unconditional note
+                              told the reader that staking income consumed a
+                              private-sale allowance. */}
+                          {threshold.scopeNote && (
+                            <p className="text-muted-foreground">
+                              {t(threshold.scopeNote)}
+                            </p>
+                          )}
                           {threshold.exceeded ? (
                             <p className="font-medium text-destructive">
                               {t('Limit reached')}

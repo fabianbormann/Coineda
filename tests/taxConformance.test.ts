@@ -167,6 +167,56 @@ describe.each(taxRegistry.map((m) => [m.manifest.id, m] as const))(
       }
     });
 
+    it('keys every scope note and liability note it can emit', () => {
+      // Jurisdiction-supplied prose about a jurisdiction's own rules -
+      // which limits cover what, and what an estimated liability is - is
+      // under exactly the same obligation as a disposal's reason. These
+      // arrived later than `reason` did, and the first version of the
+      // scope note was written at the screen and printed under every
+      // threshold, including one it was false for.
+      const keys = new Set<string>();
+      for (const matched of reasonFixtures) {
+        for (const rate of [undefined, '42']) {
+          const assessed = module.assess({
+            year: 2024,
+            matched: [matched],
+            income: [],
+            rate,
+          });
+          for (const threshold of assessed.thresholds) {
+            if (threshold.scopeNote !== undefined) {
+              keys.add(threshold.scopeNote);
+            }
+            keys.add(threshold.label);
+          }
+          if (assessed.liabilityNote !== undefined) {
+            keys.add(assessed.liabilityNote);
+          }
+        }
+      }
+
+      for (const key of keys) {
+        expect(en[key], `missing from en.json: ${key}`).toBeDefined();
+        expect(de[key], `missing from de.json: ${key}`).toBeDefined();
+      }
+    });
+
+    it('offers a liability note exactly when it offers a liability', () => {
+      // A figure with no note is the state this milestone replaced; a note
+      // with no figure would render beside nothing.
+      for (const rate of [undefined, '42']) {
+        const assessed = module.assess({
+          year: 2024,
+          matched: [reasonFixtures[0]],
+          income: [],
+          rate,
+        });
+        expect(assessed.liabilityNote !== undefined).toBe(
+          assessed.estimatedLiability !== undefined,
+        );
+      }
+    });
+
     it('describes its partition rule with a key in both locales', () => {
       // A report that states FIFO without stating its SCOPE has not stated
       // the method: per-wallet and portfolio-wide FIFO give different

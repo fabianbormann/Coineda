@@ -460,3 +460,51 @@ describe('german loss handling', () => {
     expect(report.totals.loss).toBe('0');
   });
 });
+
+describe('german threshold scope notes', () => {
+  it('scopes the "all private sales" note to §23, never to §22 Nr. 3 income', () => {
+    // The §23 Freigrenze really does span every private sale in the year -
+    // gold, art, a property sold inside ten years. The §22 Nr. 3 Freigrenze
+    // covers Einkünfte aus Leistungen and nothing of the sort, and this
+    // module's own assess() keeps the two independent. A note printed under
+    // both tells the reader that staking income consumes a private-sale
+    // allowance, which is wrong in both directions.
+    const report = germanTax.assess({
+      year: 2024,
+      matched: [disposal({ heldDays: 10, gain: '500' })],
+      income: [],
+    });
+
+    const [privateSale, staking] = report.thresholds;
+    expect(privateSale.scopeNote).toBe(
+      'This limit covers every private sale you made in the year, not only crypto.',
+    );
+    expect(staking.scopeNote).toBeUndefined();
+  });
+});
+
+describe('what the estimated liability leaves out', () => {
+  it('says in its own words what is not in the figure', () => {
+    const report = germanTax.assess({
+      year: 2024,
+      matched: [disposal({ heldDays: 10, gain: '2000' })],
+      income: [],
+      rate: '42',
+    });
+
+    expect(report.liabilityNote).toBe(
+      'Your marginal rate applied to the taxable gain. It does not include solidarity surcharge, church tax, or the effect on your overall progression.',
+    );
+  });
+
+  it('offers no note when it offers no figure', () => {
+    const report = germanTax.assess({
+      year: 2024,
+      matched: [disposal({ heldDays: 10, gain: '2000' })],
+      income: [],
+    });
+
+    expect(report.estimatedLiability).toBeUndefined();
+    expect(report.liabilityNote).toBeUndefined();
+  });
+});
