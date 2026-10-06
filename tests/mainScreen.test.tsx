@@ -403,6 +403,62 @@ describe('the source list', () => {
   });
 });
 
+/**
+ * Where the whole-portfolio actions sit.
+ *
+ * They used to sit UNDER the source list, which is the one part of this
+ * screen that grows without bound: a person with a dozen wallets had to
+ * scroll past all of them to reach a tax report. Asserted on document
+ * order rather than on anything visual, because that is what decides
+ * whether they are reachable without scrolling.
+ */
+describe('the action row', () => {
+  const order = (first: HTMLElement, second: HTMLElement) =>
+    // DOCUMENT_POSITION_FOLLOWING: `second` comes after `first`.
+    Boolean(
+      first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+
+  beforeEach(async () => {
+    await putSource({
+      id: 'cfg-1',
+      moduleId: 'test-exchange',
+      label: 'Main',
+      config: {},
+    });
+    await putEvents([heldEvent()]);
+  });
+
+  it('comes before the source list, not after it', async () => {
+    renderScreen();
+
+    const taxReport = await screen.findByRole('button', {
+      name: /create tax report/i,
+    });
+    const list = (await screen.findByText('Main')).closest(
+      '[data-slot="card"]',
+    ) as HTMLElement;
+
+    expect(order(taxReport, list)).toBe(true);
+    // And the other way round is NOT also true - compareDocumentPosition
+    // would report both for a node containing the other, which is exactly
+    // the mistake this assertion could otherwise hide.
+    expect(order(list, taxReport)).toBe(false);
+  });
+
+  it('comes after the balance, which is what the screen is about', async () => {
+    renderScreen();
+
+    // The 'Assets' figure, which lives inside the balance header.
+    const balance = await screen.findByText('Assets');
+    const checkpoint = await screen.findByRole('button', {
+      name: /create checkpoint/i,
+    });
+
+    expect(order(balance, checkpoint)).toBe(true);
+  });
+});
+
 describe('adding a source', () => {
   it('renders the manifest fields, masks secrets, and names the required scopes', async () => {
     renderScreen();

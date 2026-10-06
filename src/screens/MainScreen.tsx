@@ -665,23 +665,11 @@ export const MainScreen = () => {
           assetCount={holdings.length}
           sourceCount={sources.length}
         />
-        <SourceList
-          sources={sources}
-          perSource={perSource}
-          currency={currency}
-          loadError={loadError}
-          syncingAll={syncingAll}
-          busyIds={busyIds}
-          syncingIds={syncingIds}
-          onRefreshAll={handleRefreshAll}
-          onRefreshOne={handleRefreshOne}
-          onResyncOne={handleResyncOne}
-          onStop={handleStop}
-          onRemove={handleRemove}
-          onEditOne={handleOpenEdit}
-          onShowEvents={setEventsSource}
-          onAddSource={() => setAddDialogOpen(true)}
-        />
+        {/* Above the list, not below it. These act on the whole
+            portfolio rather than on any one source, and a list that
+            grows with every wallet pushed them off the bottom of the
+            screen - so the two things a person comes here to do, a tax
+            report and a checkpoint, were the hardest to reach. */}
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
@@ -716,6 +704,23 @@ export const MainScreen = () => {
             </Button>
           )}
         </div>
+        <SourceList
+          sources={sources}
+          perSource={perSource}
+          currency={currency}
+          loadError={loadError}
+          syncingAll={syncingAll}
+          busyIds={busyIds}
+          syncingIds={syncingIds}
+          onRefreshAll={handleRefreshAll}
+          onRefreshOne={handleRefreshOne}
+          onResyncOne={handleResyncOne}
+          onStop={handleStop}
+          onRemove={handleRemove}
+          onEditOne={handleOpenEdit}
+          onShowEvents={setEventsSource}
+          onAddSource={() => setAddDialogOpen(true)}
+        />
         <AddSourceDialog
           open={addDialogOpen}
           onOpenChange={setAddDialogOpen}
