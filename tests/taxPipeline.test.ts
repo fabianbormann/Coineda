@@ -626,3 +626,81 @@ describe('reasons the host itself writes', () => {
     });
   });
 });
+
+describe('provenance on every reported disposal', () => {
+  it('carries the quantity, venue and consumed lots the host already holds', async () => {
+    await putEvents([
+      ledgerEvent({
+        id: 'buy',
+        externalId: 'buy',
+        timestamp: Date.UTC(2024, 0, 1),
+        legs: [
+          {
+            assetId: 'fiat:eur',
+            amount: '400',
+            direction: 'in',
+            venue: 'wallet-a',
+            role: 'principal',
+          },
+        ],
+      }),
+      ledgerEvent({
+        id: 'sell',
+        externalId: 'sell',
+        timestamp: Date.UTC(2025, 0, 1),
+        legs: [
+          {
+            assetId: 'fiat:eur',
+            amount: '400',
+            direction: 'out',
+            venue: 'wallet-a',
+            role: 'principal',
+          },
+        ],
+      }),
+    ]);
+
+    const report = await runTaxReport(stubModule, {
+      year: 2025,
+      baseCurrency: 'eur',
+    });
+
+    const line = report.lines[0];
+    expect(line.amount).toBe('400');
+    expect(line.venue).toBe('wallet-a');
+    expect(line.consumed).toHaveLength(1);
+    expect(line.consumed[0].acquiredAt).toBe(Date.UTC(2024, 0, 1));
+    expect(line.consumed[0].heldDays).toBe(366);
+  });
+
+  it('refuses a module line that matches no disposal it was handed', async () => {
+    // A line with no matching MatchedDisposal would render with blanks
+    // exactly where an acquisition date belongs - a tax document that looks
+    // complete and silently proves nothing. The host would rather produce
+    // no report at all, which is the same call runTaxReport already makes
+    // when a module throws while classifying.
+    const inventing: TaxModule = {
+      ...stubModule,
+      assess: (input) => ({
+        ...stubModule.assess(input),
+        lines: [
+          {
+            disposalEventId: 'not-a-real-disposal',
+            assetId: 'fiat:eur',
+            timestamp: Date.UTC(2025, 0, 1),
+            proceeds: '1',
+            costBasis: '0',
+            gain: '1',
+            exempt: '0',
+            taxable: '1',
+            reason: { key: 'invented' },
+          },
+        ],
+      }),
+    };
+
+    await expect(
+      runTaxReport(inventing, { year: 2025, baseCurrency: 'eur' }),
+    ).rejects.toThrow(/not-a-real-disposal/);
+  });
+});

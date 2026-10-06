@@ -12,9 +12,10 @@ import { resolveValues } from './resolveValues';
 import type {
   LotMove,
   MatchingMethod,
-  TaxAssessment,
+  ReportedDisposal,
   TaxEvent,
   TaxModule,
+  TaxReport,
   UnresolvedItem,
 } from './types';
 
@@ -130,7 +131,7 @@ const shortfallToUnresolved = (event: TaxEvent): UnresolvedItem => ({
 export const runTaxReport = async (
   module: TaxModule,
   options: RunTaxReportOptions,
-): Promise<TaxAssessment> => {
+): Promise<TaxReport> => {
   const { from, to } = module.manifest.supportedYears;
   if (options.year < from || (to !== undefined && options.year > to)) {
     const range = to === undefined ? `${from} or later` : `${from}-${to}`;
@@ -272,8 +273,36 @@ export const runTaxReport = async (
     return item.taxEventKind === 'disposal';
   }).length;
 
+  // Joined on disposalEventId, never by position: `assess` is free to drop,
+  // reorder or merge the lines it returns, and a positional join would
+  // silently attach one disposal's acquisition dates to another's figures -
+  // a wrong holding period that reads as entirely plausible on paper, which
+  // is the worst kind of wrong a tax document can be.
+  const byDisposalId = new Map(
+    yearMatched.map((disposal) => [disposal.disposalEventId, disposal]),
+  );
+
+  const lines: ReportedDisposal[] = assessment.lines.map((line) => {
+    const disposal = byDisposalId.get(line.disposalEventId);
+    if (!disposal) {
+      // No report at all, rather than one line that renders blanks where an
+      // acquisition date belongs - the same call this function already
+      // makes when a module throws while classifying.
+      throw new Error(
+        `tax module "${module.manifest.id}" assessed a disposal it was not handed: ${line.disposalEventId}`,
+      );
+    }
+    return {
+      ...line,
+      amount: disposal.amount,
+      venue: disposal.venue,
+      consumed: disposal.consumed,
+    };
+  });
+
   return {
     ...assessment,
+    lines,
     unresolved: [...assessment.unresolved, ...hostUnresolved],
     totals: {
       ...assessment.totals,

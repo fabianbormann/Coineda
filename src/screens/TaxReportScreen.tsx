@@ -19,9 +19,9 @@ import { CryptoAmount } from '@/components/money/CryptoAmount';
 import { GainLoss } from '@/components/money/GainLoss';
 import { formatFiat } from '@/components/money/format';
 import type {
-  TaxAssessment,
   TaxManifest,
   TaxModule,
+  TaxReport,
   UnresolvedItem,
 } from '@/tax/types';
 
@@ -154,7 +154,7 @@ export const TaxReportScreen = () => {
   const [baseCurrency, setBaseCurrency] = useState(DEFAULT_CURRENCY);
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
-  const [assessment, setAssessment] = useState<TaxAssessment | null>(null);
+  const [assessment, setAssessment] = useState<TaxReport | null>(null);
   const [request, setRequest] = useState<RunRequest | null>(null);
   // The CoinGecko key, and what was loaded from settings, so the run only
   // writes it back when the user actually changed it - a failed settings

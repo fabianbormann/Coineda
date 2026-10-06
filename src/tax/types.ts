@@ -209,6 +209,51 @@ export type TaxAssessment = {
   unresolved: UnresolvedItem[];
 };
 
+/**
+ * One disposal as the REPORT shows it: what the jurisdiction assessed, plus
+ * the provenance the host already holds.
+ *
+ * Deliberately NOT fields on `AssessedDisposal`. Every module is handed
+ * exactly these three on the `MatchedDisposal` it assesses, so putting them
+ * in the module's own return type would mean every contributor copying
+ * three fields by hand - and one of them eventually forgetting. A disposal
+ * printed without its acquisition date is the single defect that made the
+ * printed report unusable to a tax office: it asserts a holding period and
+ * offers nothing to check it against. The host joins them on
+ * `disposalEventId` instead, where it cannot be skipped.
+ */
+export type ReportedDisposal = AssessedDisposal & {
+  /** How much of the asset left, in its own units. */
+  amount: string;
+  /** Which wallet or exchange it left from. */
+  venue: string;
+  /**
+   * The lots consumed, in consumption order.
+   *
+   * For a moving-average jurisdiction this is ONE synthetic pooled lot
+   * whose `acquiredAt` is the disposal's own timestamp and whose
+   * `heldDays` is 0, because an averaged pool has no acquisition date. A
+   * renderer must branch on `ReportMethod.matching` rather than printing
+   * that as an acquisition date - doing so would put a falsehood in a
+   * document filed with an authority.
+   */
+  consumed: ConsumedLot[];
+};
+
+/**
+ * What `runTaxReport` returns: a module's assessment plus everything only
+ * the host knows.
+ *
+ * The host already returned something richer than `TaxAssessment` - it
+ * recomputes `totals.omitted` and appends its own `unresolved` items - so
+ * the old return type was quietly misstating where its fields came from.
+ * Naming the two separately is what lets the report grow provenance and a
+ * method sheet without widening the contract every contributor implements.
+ */
+export type TaxReport = Omit<TaxAssessment, 'lines'> & {
+  lines: ReportedDisposal[];
+};
+
 export type AssessInput = {
   year: number;
   matched: MatchedDisposal[];
