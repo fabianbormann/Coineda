@@ -12,7 +12,7 @@ import { taxRegistry } from '@/tax/registry';
 import { runTaxReport } from '@/tax/runTaxReport';
 import { buildDisclaimer, type Disclaimer } from '@/tax/disclaimer';
 import { getSettings, putSettings } from '@/settings/settingsStore';
-import { subtractAmounts } from '@/ledger/amount';
+import { isZeroAmount, subtractAmounts } from '@/ledger/amount';
 import { Money } from '@/components/money/Money';
 import { symbolOf } from '@/components/money/asset';
 import { CryptoAmount } from '@/components/money/CryptoAmount';
@@ -670,6 +670,26 @@ export const TaxReportScreen = () => {
                               assessment.totals.omitted,
                           },
                         )}
+                      </p>
+                    )}
+                    {/* A loss is not a zero. The figure above is what is
+                        TAXED; this is what has to be declared to be usable
+                        later, and the two were indistinguishable while both
+                        printed as 0,00 EUR. */}
+                    {!isZeroAmount(assessment.totals.loss) && (
+                      <p>
+                        <span className="font-medium">
+                          {t('Loss to declare')}:{' '}
+                        </span>
+                        <Money
+                          value={Number(assessment.totals.loss)}
+                          currency={baseCurrency}
+                        />
+                        <span className="ml-2 text-sm text-muted-foreground">
+                          {t(
+                            'A loss only offsets later gains if you declare it, so it belongs in your return even though no tax is due on it.',
+                          )}
+                        </span>
                       </p>
                     )}
                     <p>

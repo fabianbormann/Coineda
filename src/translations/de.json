@@ -462,6 +462,8 @@
     "Acquired {{date}}": "Angeschafft am {{date}}",
     "cost": "Anschaffungskosten",
     "held {{days}} days": "{{days}} Tage gehalten",
-    "From pooled cost; an averaged holding has no single acquisition date.": "Aus gemittelten Anschaffungskosten; ein gemittelter Bestand hat kein einzelnes Anschaffungsdatum."
+    "From pooled cost; an averaged holding has no single acquisition date.": "Aus gemittelten Anschaffungskosten; ein gemittelter Bestand hat kein einzelnes Anschaffungsdatum.",
+    "Loss to declare": "Zu erklärender Verlust",
+    "A loss only offsets later gains if you declare it, so it belongs in your return even though no tax is due on it.": "Ein Verlust mindert spätere Gewinne nur, wenn er erklärt wird - er gehört also in die Steuererklärung, obwohl darauf keine Steuer anfällt."
   }
 }

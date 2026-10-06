@@ -44,6 +44,7 @@ const germanAssessment: TaxReport = {
     taxableGain: GERMAN_TAXABLE_GAIN,
     exemptGain: '0',
     income: '0',
+    loss: '0',
     computedFrom: 1,
     omitted: 0,
   },

@@ -52,6 +52,7 @@ const stubModule: TaxModule = {
       taxableGain: '0',
       exemptGain: '0',
       income: String(income.length),
+      loss: '0',
       computedFrom: matched.length,
       omitted: 0,
     },

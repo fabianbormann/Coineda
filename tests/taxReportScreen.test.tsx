@@ -57,6 +57,7 @@ const assess = (input: AssessInput): TaxAssessment => ({
     taxableGain: input.matched.length > 0 ? '200' : '0',
     exemptGain: '0',
     income: '0',
+    loss: '0',
     computedFrom: input.matched.length,
     omitted: 0,
   },

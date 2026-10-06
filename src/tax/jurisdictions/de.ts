@@ -3,6 +3,7 @@ import {
   addAmounts,
   compareAmounts,
   isZeroAmount,
+  negateAmount,
   normaliseAmount,
   subtractAmounts,
   sumAmounts,
@@ -277,6 +278,15 @@ const assess = (input: AssessInput): TaxAssessment => {
   const gainExceeded = compareAmounts(rawTaxableGain, gainLimit) >= 0;
   const taxableGain = gainExceeded ? rawTaxableGain : '0';
 
+  // A negative year is NOT the same thing as a year under the Freigrenze,
+  // even though the old code gave both the same taxableGain of '0'. One
+  // owes nothing and carries nothing; the other owes nothing but carries a
+  // loss forward, and only if it is declared.
+  const loss =
+    compareAmounts(rawTaxableGain, '0') < 0
+      ? negateAmount(rawTaxableGain)
+      : '0';
+
   const gainThreshold: ThresholdOutcome = {
     label: PRIVATE_SALE_THRESHOLD_LABEL,
     limit: gainLimit,
@@ -318,6 +328,7 @@ const assess = (input: AssessInput): TaxAssessment => {
       taxableGain,
       exemptGain,
       income,
+      loss,
       // The host (runTaxReport) recomputes `omitted` from what it could not
       // resolve; this module only knows the disposals it was handed.
       computedFrom: input.matched.length,

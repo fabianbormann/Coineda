@@ -1,5 +1,10 @@
 import Big from 'big.js';
-import { normaliseAmount, sumAmounts } from '@/ledger/amount';
+import {
+  compareAmounts,
+  negateAmount,
+  normaliseAmount,
+  sumAmounts,
+} from '@/ledger/amount';
 import { isFiatAsset } from '@/ledger/balances';
 import type { Leg, LedgerEvent } from '@/ledger/types';
 import type {
@@ -232,7 +237,16 @@ const assess = (input: AssessInput): TaxAssessment => {
   const lines = input.matched.map(assessDisposal);
 
   const exemptGain = sumAmounts(lines.map((line) => line.exempt));
-  const taxableGain = sumAmounts(lines.map((line) => line.taxable));
+  // Clamped at zero, with the shortfall reported as a loss instead. The
+  // unclamped sum fed straight into the KESt multiplication below and
+  // produced a NEGATIVE estimated liability - a report telling an Austrian
+  // taxpayer the state owes them 27.5% of their losses. §27 has its own
+  // Verlustausgleich rules, which this module does not model; what it can
+  // do honestly is report the loss rather than invent a refund.
+  const rawGain = sumAmounts(lines.map((line) => line.taxable));
+  const isLoss = compareAmounts(rawGain, '0') < 0;
+  const taxableGain = isLoss ? '0' : rawGain;
+  const loss = isLoss ? negateAmount(rawGain) : '0';
   const income = sumAmounts(input.income.map((event) => event.value ?? '0'));
 
   // The one place besides big.js's own default this module touches it
@@ -249,6 +263,7 @@ const assess = (input: AssessInput): TaxAssessment => {
       taxableGain,
       exemptGain,
       income,
+      loss,
       computedFrom: input.matched.length,
       omitted: 0,
     },

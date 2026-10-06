@@ -251,3 +251,17 @@ describe('austrian rationales', () => {
     });
   });
 });
+
+describe('austrian loss handling', () => {
+  it('never estimates a negative KESt', () => {
+    const report = austrianTax.assess({
+      year: 2024,
+      matched: [disposalFrom(Date.UTC(2022, 0, 1), '-750')],
+      income: [],
+    });
+
+    expect(report.totals.taxableGain).toBe('0');
+    expect(report.totals.loss).toBe('750');
+    expect(report.estimatedLiability).toBe('0');
+  });
+});

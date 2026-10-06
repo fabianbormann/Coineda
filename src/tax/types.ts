@@ -199,6 +199,18 @@ export type TaxAssessment = {
     taxableGain: string;
     exemptGain: string;
     income: string;
+    /**
+     * The year's loss, as a POSITIVE number, or '0'.
+     *
+     * Deliberately kept OUT of `taxableGain`, which stays "what is
+     * actually taxed". A §23 loss offsets only other private-sale gains,
+     * and only once it has been DECLARED (§23 Abs. 3 Satz 7-8 EStG) - so a
+     * report that folds a negative year into the same "0" it prints for a
+     * year under the Freigrenze silently costs the user the entire
+     * carry-forward, while looking perfectly reassuring. That is the most
+     * expensive thing this report can do to someone.
+     */
+    loss: string;
     /** Disposals included in the figures above. */
     computedFrom: number;
     /** Disposals that stayed unresolved and are NOT in the figures above. */

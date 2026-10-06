@@ -426,3 +426,32 @@ describe('german rationales', () => {
     );
   });
 });
+
+describe('german loss handling', () => {
+  it('reports a losing year as a declarable loss, not as a tax-free zero', () => {
+    // §23 Abs. 3 Satz 7-8 EStG: a private-sale loss offsets other
+    // private-sale gains, carried back or forward - but only once it has
+    // been DECLARED. A report that folds a negative year into the same
+    // "0,00 €" it shows for a year under the Freigrenze costs the user the
+    // whole carry-forward while looking entirely reassuring.
+    const report = germanTax.assess({
+      year: 2024,
+      matched: [disposal({ heldDays: 10, gain: '-750' })],
+      income: [],
+    });
+
+    expect(report.totals.taxableGain).toBe('0');
+    expect(report.totals.loss).toBe('750');
+  });
+
+  it('reports no loss for a year that is merely under the threshold', () => {
+    const report = germanTax.assess({
+      year: 2024,
+      matched: [disposal({ heldDays: 10, gain: '300' })],
+      income: [],
+    });
+
+    expect(report.totals.taxableGain).toBe('0');
+    expect(report.totals.loss).toBe('0');
+  });
+});
