@@ -41,3 +41,19 @@ describe('buildDisclaimer', () => {
     expect(disclaimer.noticeKey).toBeTruthy();
   });
 });
+
+describe('the German module cites what is in force', () => {
+  it('names the BMF letter currently in force, not the one it replaced', () => {
+    // The 2022 letter was re-issued on 2025-03-06. Citing the superseded
+    // one while `rulesCheckedOn` claimed a 2026 review was a contradiction
+    // the disclaimer surface exists to prevent: the freshness signal was
+    // true and the citation behind it was three years stale.
+    const references = germanTax.manifest.references.join(' ');
+    expect(references).toContain('BMF 06.03.2025');
+    expect(references).not.toContain('BMF 10.05.2022');
+  });
+
+  it('cites the loss-carry-forward rule it now implements', () => {
+    expect(germanTax.manifest.references).toContain('§23 Abs. 3 Satz 7-8 EStG');
+  });
+});

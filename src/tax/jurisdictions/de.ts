@@ -363,8 +363,21 @@ const germanTax: TaxModule = {
     references: [
       '§23 Abs. 1 Nr. 2 EStG',
       '§23 Abs. 3 Satz 5 EStG',
+      // The loss carry-forward this module now reports through
+      // `totals.loss` rather than folding into a tax-free zero.
+      '§23 Abs. 3 Satz 7-8 EStG',
       '§22 Nr. 3 EStG',
-      'BMF 10.05.2022',
+      // Re-issued 2025-03-06, replacing the 10.05.2022 letter this cited
+      // for three years while `rulesCheckedOn` claimed a current review -
+      // a contradiction the disclaimer surface exists to prevent, since
+      // the freshness signal was true and the citation behind it was not.
+      //
+      // Two parts of it bear directly on this report: Rn. 87 onward is the
+      // record-keeping section its reader will be measured against, and
+      // Rn. 29b addresses tax reports like this one, making the point this
+      // module's own notice makes - such a report resembles a bank's
+      // Steuerbescheinigung in form and carries none of its authority.
+      'BMF 06.03.2025 (IV C 1 - S 2256/00042/064/043)',
     ],
     supportedYears: { from: 2020 },
   },
