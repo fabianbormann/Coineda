@@ -264,6 +264,8 @@ const austrianTax: TaxModule = {
     jurisdiction: 'Austria',
     contributor: 'Fabian Bormann',
     rulesCheckedOn: '2026-10-01',
+    partitionLabel:
+      'Cost is pooled per asset across the portfolio, split only between Altvermögen and Neuvermögen.',
     references: ['ÖkoStRefG 2022', '§27a Abs. 4 Z 3 EStG', '§27b EStG'],
     supportedYears: { from: 2022 },
   },

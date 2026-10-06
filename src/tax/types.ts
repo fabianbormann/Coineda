@@ -228,6 +228,17 @@ export type TaxManifest = {
   rulesCheckedOn: string;
   /** Citations so a reader can verify rather than trust. */
   references: string[];
+  /**
+   * Translation key describing what `partitionBy` means, in words a reader
+   * of the printed report can check - "per wallet", "by acquisition era".
+   *
+   * Only the jurisdiction knows what its own partition key stands for, and
+   * a tax document that states FIFO without stating its SCOPE has not
+   * stated the method: per-wallet and portfolio-wide FIFO give materially
+   * different answers from identical trades. A reader who cannot tell which
+   * one produced a figure cannot check the figure.
+   */
+  partitionLabel: string;
   supportedYears: { from: number; to?: number };
 };
 

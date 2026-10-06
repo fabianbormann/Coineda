@@ -335,6 +335,8 @@ const germanTax: TaxModule = {
     jurisdiction: 'Germany',
     contributor: 'Fabian Bormann',
     rulesCheckedOn: '2026-10-01',
+    partitionLabel:
+      'Lots are matched per wallet or exchange, not pooled across the portfolio.',
     references: [
       '§23 Abs. 1 Nr. 2 EStG',
       '§23 Abs. 3 Satz 5 EStG',

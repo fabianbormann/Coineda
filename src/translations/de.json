@@ -448,6 +448,8 @@
     "Historical prices before {{cutoff}} need a CoinGecko API key: the free tier covers only the last {{days}} days.": "Für historische Kurse vor dem {{cutoff}} wird ein CoinGecko-API-Schlüssel benötigt: die kostenlose Stufe deckt nur die letzten {{days}} Tage ab.",
     "No price source is configured for {{asset}}.": "Für {{asset}} ist keine Kursquelle hinterlegt.",
     "No price for {{asset}} on {{date}}.": "Kein Kurs für {{asset}} am {{date}}.",
-    "The price provider could not answer: {{detail}}": "Die Kursquelle konnte nicht antworten: {{detail}}"
+    "The price provider could not answer: {{detail}}": "Die Kursquelle konnte nicht antworten: {{detail}}",
+    "Lots are matched per wallet or exchange, not pooled across the portfolio.": "Bestände werden je Wallet bzw. Börse zugeordnet, nicht über das gesamte Portfolio zusammengefasst.",
+    "Cost is pooled per asset across the portfolio, split only between Altvermögen and Neuvermögen.": "Die Anschaffungskosten werden je Kryptowert über das gesamte Portfolio gemittelt, getrennt nur nach Alt- und Neuvermögen."
   }
 }

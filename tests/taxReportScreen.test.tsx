@@ -78,6 +78,7 @@ const baseManifest: TaxManifest = {
   jurisdiction: 'Testland',
   contributor: 'Test Suite',
   rulesCheckedOn: '2025-01-01',
+  partitionLabel: 'Test partition',
   references: ['Test Statute §1'],
   supportedYears: { from: 2020, to: 2030 },
 };

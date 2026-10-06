@@ -448,6 +448,8 @@
     "Historical prices before {{cutoff}} need a CoinGecko API key: the free tier covers only the last {{days}} days.": "Historical prices before {{cutoff}} need a CoinGecko API key: the free tier covers only the last {{days}} days.",
     "No price source is configured for {{asset}}.": "No price source is configured for {{asset}}.",
     "No price for {{asset}} on {{date}}.": "No price for {{asset}} on {{date}}.",
-    "The price provider could not answer: {{detail}}": "The price provider could not answer: {{detail}}"
+    "The price provider could not answer: {{detail}}": "The price provider could not answer: {{detail}}",
+    "Lots are matched per wallet or exchange, not pooled across the portfolio.": "Lots are matched per wallet or exchange, not pooled across the portfolio.",
+    "Cost is pooled per asset across the portfolio, split only between Altvermögen and Neuvermögen.": "Cost is pooled per asset across the portfolio, split only between Altvermögen and Neuvermögen."
   }
 }
