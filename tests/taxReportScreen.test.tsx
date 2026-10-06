@@ -935,3 +935,35 @@ describe('the threshold line', () => {
     expect(line.textContent).not.toMatch(/-\s*\d/);
   });
 });
+
+describe('the lots behind a disposal', () => {
+  it('names the acquisition date, quantity and holding period of each lot', async () => {
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+
+    // Acquired 2025-06-01, disposed 2025-07-01: 30 days. A §23 holding
+    // period is a claim about WHEN something was bought, and this is the
+    // only thing on the sheet a reader can check that claim against.
+    expect(await screen.findByText(/Acquired/)).toBeInTheDocument();
+    expect(screen.getByText(/30 days/)).toBeInTheDocument();
+  });
+
+  it('never prints an acquisition date for an averaged pool', async () => {
+    // matchMovingAverage gives its synthetic lot the DISPOSAL's own
+    // timestamp as acquiredAt and heldDays 0, because an averaged pool has
+    // no acquisition date. Printing that as "Acquired 01.07.2025" on a
+    // disposal dated 01.07.2025 would put a falsehood in a document filed
+    // with an authority.
+    taxRegistry.push({ ...makeModule(), defaultMatching: 'moving-average' });
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+
+    expect(await screen.findByText(/pooled cost/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Acquired/)).not.toBeInTheDocument();
+  });
+});

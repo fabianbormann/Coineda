@@ -458,6 +458,10 @@
     "Each event is valued at its asset's price on the UTC calendar day it happened, not at the price when this report was run.": "Each event is valued at its asset's price on the UTC calendar day it happened, not at the price when this report was run.",
     "Price sources": "Price sources",
     "Produced by": "Produced by",
-    "{{count}} ledger events were considered; {{netted}} movements between your own wallets were netted out rather than treated as sales.": "{{count}} ledger events were considered; {{netted}} movements between your own wallets were netted out rather than treated as sales."
+    "{{count}} ledger events were considered; {{netted}} movements between your own wallets were netted out rather than treated as sales.": "{{count}} ledger events were considered; {{netted}} movements between your own wallets were netted out rather than treated as sales.",
+    "Acquired {{date}}": "Acquired {{date}}",
+    "cost": "cost",
+    "held {{days}} days": "held {{days}} days",
+    "From pooled cost; an averaged holding has no single acquisition date.": "From pooled cost; an averaged holding has no single acquisition date."
   }
 }

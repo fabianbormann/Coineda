@@ -776,7 +776,12 @@ export const TaxReportScreen = () => {
                                 shows an asset WITHOUT an amount and so
                                 never went through it. */}
                             {formatDate(line.timestamp)} ·{' '}
-                            {symbolOf(line.assetId)}
+                            {symbolOf(line.assetId)} ·{' '}
+                            <CryptoAmount
+                              value={line.amount}
+                              assetId={line.assetId}
+                            />{' '}
+                            · {line.venue}
                           </p>
                           <p>
                             {t('Proceeds')}:{' '}
@@ -810,6 +815,53 @@ export const TaxReportScreen = () => {
                           <p className="text-muted-foreground">
                             {t(line.reason.key, line.reason.params)}
                           </p>
+                          {/* The lots behind the figures.
+                              A holding period is a claim about WHEN
+                              something was bought, and a report that states
+                              the outcome without the date gives a reader
+                              nothing to check it against - the single
+                              reason the printed report was unusable to a
+                              tax office.
+
+                              Branching on the matching method is not
+                              cosmetic. A moving-average jurisdiction's
+                              `consumed` holds ONE synthetic lot whose
+                              acquiredAt is the DISPOSAL's own timestamp and
+                              whose heldDays is 0, because an averaged pool
+                              has no acquisition date. Printing that as an
+                              acquisition date would put a falsehood in a
+                              document filed with an authority. */}
+                          {assessment.method.matching === 'moving-average' ? (
+                            <p className="text-muted-foreground">
+                              {t(
+                                'From pooled cost; an averaged holding has no single acquisition date.',
+                              )}
+                            </p>
+                          ) : (
+                            <ul className="flex flex-col gap-0.5 text-muted-foreground">
+                              {line.consumed.map((lot, index) => (
+                                <li key={`${lot.acquisitionEventId}-${index}`}>
+                                  {t('Acquired {{date}}', {
+                                    date: formatDate(lot.acquiredAt),
+                                  })}{' '}
+                                  ·{' '}
+                                  <CryptoAmount
+                                    value={lot.amount}
+                                    assetId={line.assetId}
+                                  />{' '}
+                                  · {t('cost')}:{' '}
+                                  <Money
+                                    value={Number(lot.costBasis)}
+                                    currency={baseCurrency}
+                                  />{' '}
+                                  ·{' '}
+                                  {t('held {{days}} days', {
+                                    days: lot.heldDays,
+                                  })}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                         </CardContent>
                       </Card>
                     ))

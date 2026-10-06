@@ -458,6 +458,10 @@
     "Each event is valued at its asset's price on the UTC calendar day it happened, not at the price when this report was run.": "Jedes Ereignis wird mit dem Kurs seines Kryptowerts am UTC-Kalendertag des Ereignisses bewertet, nicht mit dem Kurs zum Zeitpunkt der Berichtserstellung.",
     "Price sources": "Kursquellen",
     "Produced by": "Erstellt mit",
-    "{{count}} ledger events were considered; {{netted}} movements between your own wallets were netted out rather than treated as sales.": "{{count}} Buchungen wurden berücksichtigt; {{netted}} Bewegungen zwischen eigenen Wallets wurden saldiert statt als Verkauf behandelt."
+    "{{count}} ledger events were considered; {{netted}} movements between your own wallets were netted out rather than treated as sales.": "{{count}} Buchungen wurden berücksichtigt; {{netted}} Bewegungen zwischen eigenen Wallets wurden saldiert statt als Verkauf behandelt.",
+    "Acquired {{date}}": "Angeschafft am {{date}}",
+    "cost": "Anschaffungskosten",
+    "held {{days}} days": "{{days}} Tage gehalten",
+    "From pooled cost; an averaged holding has no single acquisition date.": "Aus gemittelten Anschaffungskosten; ein gemittelter Bestand hat kein einzelnes Anschaffungsdatum."
   }
 }
