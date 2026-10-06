@@ -477,6 +477,9 @@
     "No configured source": "No configured source",
     "{{count}} events · {{from}} to {{to}}": "{{count}} events · {{from}} to {{to}}",
     "Wallets and accounts": "Wallets and accounts",
-    "No events from this source yet": "No events from this source yet"
+    "No events from this source yet": "No events from this source yet",
+    "Tax-free loss": "Tax-free loss",
+    "Taxable income": "Taxable income",
+    "This limit covers every private sale you made in the year, not only crypto.": "This limit covers every private sale you made in the year, not only crypto."
   }
 }

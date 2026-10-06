@@ -238,9 +238,13 @@ describe('running a report', () => {
     // reason that never got translated would render identically to one that
     // did only while the locale under test is English, so this pairs with
     // the conformance gate, which is what catches a key missing from de.json.
-    expect(
-      await screen.findByText(/no acquisition is on record for this disposal/i),
-    ).toBeInTheDocument();
+    // Scoped to the screen list: the document renders a second, unfiltered
+    // copy of every unresolved item for print, so an unscoped query now
+    // matches both.
+    const list = await screen.findByTestId('unresolved-screen');
+    expect(list.textContent).toMatch(
+      /no acquisition is on record for this disposal/i,
+    );
   });
 
   it('offers no resolution action for an unresolved item', async () => {
@@ -250,7 +254,7 @@ describe('running a report', () => {
     renderScreen();
     await runReport('2025');
 
-    await screen.findByText(/no acquisition is on record for this disposal/i);
+    await screen.findByTestId('unresolved-screen');
 
     // Resolving an unresolved item (recording a purchase, adding a source
     // for the venue) is explicitly a later milestone - this screen must
@@ -350,9 +354,15 @@ describe('the unresolved list', () => {
         screen.getByRole('checkbox', { name: /outside the tax year/i }),
       );
 
-      // Two gaps on one event and one asset, both rendered.
+      // Two gaps on one event and one asset, both rendered. Counted in the
+      // screen list alone: the document renders a second, unfiltered copy
+      // for print, and an unscoped count would be 4 whether or not React
+      // dropped a row from each.
+      const list = await screen.findByTestId('unresolved-screen');
       expect(
-        await screen.findAllByText(/no price source is configured/i),
+        [...list.querySelectorAll('[role="alert"]')].filter((node) =>
+          /no price source is configured/i.test(node.textContent ?? ''),
+        ),
       ).toHaveLength(2);
       const keyWarnings = errors
         .map((args) => args.map(String).join(' '))
@@ -407,9 +417,10 @@ describe('unresolved items that are not disposals', () => {
     expect(
       await screen.findByText(/other unresolved items are not disposals/i),
     ).toBeInTheDocument();
-    expect(
-      await screen.findByText(/no price source is configured/i),
-    ).toBeInTheDocument();
+    // Scoped: the same item is rendered a second time in the print-only
+    // copy of the list, so an unscoped query matches both.
+    const list = await screen.findByTestId('unresolved-screen');
+    expect(list.textContent).toMatch(/no price source is configured/i);
   });
 });
 
@@ -820,9 +831,17 @@ describe('reading the unresolved list', () => {
     ...overrides,
   });
 
-  /** The reasons, in the order they are rendered. */
+  /** The reasons, in the order the SCREEN renders them.
+   *
+   *  Scoped to the screen list on purpose: the document renders a second,
+   *  unfiltered copy for print, so an unscoped query returns both and every
+   *  assertion about the filter's effect would read the two concatenated. */
   const renderedOrder = (container: HTMLElement): string[] =>
-    [...container.querySelectorAll('[role="alert"]')]
+    [
+      ...(container
+        .querySelector('[data-testid="unresolved-screen"]')
+        ?.querySelectorAll('[role="alert"]') ?? []),
+    ]
       .map((node) => node.textContent ?? '')
       .map((text) => /gap (\S+)/.exec(text)?.[1] ?? '')
       .filter(Boolean);
@@ -832,6 +851,34 @@ describe('reading the unresolved list', () => {
     gap('a', Date.UTC(2023, 5, 1)),
     gap('b', Date.UTC(2025, 3, 9)),
   ];
+
+  it('prints every unresolved item even while the screen filter hides some', async () => {
+    // The heading states a total. A sheet that states 65 and shows 1 - which
+    // is what the filter did to the printed document - is the thing that
+    // invites an estimate under §162 AO.
+    taxRegistry.push(
+      withUnresolved([
+        gap('in-year', Date.UTC(2025, 0, 1)),
+        gap('older', Date.UTC(2023, 0, 1)),
+        gap('oldest', Date.UTC(2022, 0, 1)),
+      ]),
+    );
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    const { container } = renderScreen();
+    await runReport('2025');
+
+    // The filter is ON by default, so the screen list is already reduced.
+    const screenList = container.querySelector(
+      '[data-testid="unresolved-screen"]',
+    );
+    const printList = container.querySelector(
+      '[data-testid="unresolved-print"]',
+    );
+    expect(screenList?.querySelectorAll('[data-slot="card"]')).toHaveLength(1);
+    expect(printList?.querySelectorAll('[data-slot="card"]')).toHaveLength(3);
+    expect(screenList?.className).toContain('print:hidden');
+  });
 
   it('lists them in date order, not in the order the engine produced them', async () => {
     // A wallet's whole history lands here, and the engine's own order is
@@ -1046,5 +1093,88 @@ describe('where the figures come from', () => {
     await runReport('2025');
 
     expect(container.textContent).not.toContain('cg-secret-value');
+  });
+});
+
+describe('what reaches the paper', () => {
+  it('keeps the input form off the printed page', async () => {
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    const { container } = renderScreen();
+    await runReport('2025');
+
+    // An empty API-key field, its help text and a tax-rate box are controls
+    // for running the report, not statements about it. They printed.
+    const form = container.querySelector('[data-testid="report-form"]');
+    expect(form).not.toBeNull();
+    expect(form?.className).toContain('print:hidden');
+    expect(form?.textContent).toMatch(/CoinGecko/);
+  });
+
+  it('says so when the tax year has not ended yet', async () => {
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    // 2026 is the current year under the system clock these tests run on.
+    await runReport(String(new Date().getUTCFullYear()));
+
+    expect(await screen.findByText(/has not ended yet/i)).toBeInTheDocument();
+  });
+
+  it('does not call a year that has ended an interim figure', async () => {
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+
+    expect(screen.queryByText(/has not ended yet/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('labels that match their sign and their scope', () => {
+  /** A module whose exempt side is a LOSS: lots held past the holding
+   *  period that lost money. Printing that under the word "gain" is what
+   *  produced "Steuerfreier Gewinn: -9,10 EUR" on the recorded report. */
+  const withExemptLoss = (): TaxModule => {
+    const base = makeModule();
+    return {
+      ...base,
+      assess: (input) => ({
+        ...base.assess(input),
+        totals: {
+          ...base.assess(input).totals,
+          exemptGain: '-9.1',
+        },
+      }),
+    };
+  };
+
+  it('calls a negative tax-free figure a loss, not a gain', async () => {
+    taxRegistry.push(withExemptLoss());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+
+    expect(await screen.findByText(/tax-free loss/i)).toBeInTheDocument();
+    expect(screen.queryByText(/tax-free gain/i)).not.toBeInTheDocument();
+  });
+
+  it('says a threshold covers more than crypto, so it is not read as clearance', async () => {
+    // "1.000,00 EUR under the limit" reads as "nothing to declare". The
+    // §23 Freigrenze spans EVERY private sale in the year - gold, art, a
+    // property inside ten years - and this app sees only the crypto.
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+
+    expect(
+      await screen.findByText(/every private sale you made in the year/i),
+    ).toBeInTheDocument();
   });
 });

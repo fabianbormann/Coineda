@@ -17,7 +17,7 @@ import {
   buildSourceDirectory,
   type SourceDirectoryEntry,
 } from '@/tax/sourceDirectory';
-import { isZeroAmount, subtractAmounts } from '@/ledger/amount';
+import { compareAmounts, isZeroAmount, subtractAmounts } from '@/ledger/amount';
 import { Money } from '@/components/money/Money';
 import { symbolOf } from '@/components/money/asset';
 import { CryptoAmount } from '@/components/money/CryptoAmount';
@@ -104,6 +104,63 @@ const groupByKind = (
     ])
     .filter(([, group]) => group.length > 0);
 };
+
+/**
+ * The unresolved items, grouped by kind.
+ *
+ * Extracted so the screen and the printed page render the SAME rows from
+ * the same data - the screen's filtered view and the document's complete
+ * one differ in which items they are handed, and in nothing else. Inlining
+ * it twice would have been two copies of the row markup, free to drift
+ * until the paper said something the screen did not.
+ *
+ * `t` and `formatDate` are passed rather than taken from a hook, so this
+ * stays a plain presentational component with no opinion about where the
+ * locale comes from.
+ */
+const UnresolvedGroups = ({
+  items,
+  t,
+  formatDate,
+}: {
+  items: UnresolvedItem[];
+  t: (key: string, params?: Record<string, unknown>) => string;
+  formatDate: (timestamp: number) => string;
+}) => (
+  <div className="flex flex-col gap-3">
+    {groupByKind(items).map(([kind, group]) => (
+      <div key={kind} className="flex flex-col gap-2">
+        <p className="text-sm font-medium">
+          {kindHeading(kind, t)} ({group.length})
+        </p>
+        {group.map((item, index) => (
+          // The position within the group is part of the key:
+          // resolveValues emits one item per TAX EVENT, and one ledger
+          // event can produce several for the same asset (a net principal
+          // leg and a fee leg of one transaction), so sourceEventId plus
+          // assetId is not unique - the recorded report had 56 items and
+          // 30 distinct keys, which let React drop rows the user is meant
+          // to read. Each list is rendered from one finished assessment
+          // and is never reordered within itself, so the position is
+          // stable for as long as the key has to be.
+          <Card key={`${item.sourceEventId}-${item.assetId}-${index}`}>
+            <CardContent className="flex flex-col gap-1 text-sm">
+              <p>
+                {formatDate(item.timestamp)} · {item.venue} ·{' '}
+                <CryptoAmount value={item.amount} assetId={item.assetId} />
+              </p>
+              <p className="text-destructive" role="alert">
+                {t('Could not be computed: {{detail}}', {
+                  detail: t(item.reason.key, item.reason.params),
+                })}
+              </p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    ))}
+  </div>
+);
 
 /**
  * The tax report screen: pick a jurisdiction from `taxRegistry`, pick a
@@ -557,7 +614,16 @@ export const TaxReportScreen = () => {
             )}
 
             <div className="flex flex-col gap-4">
-              <div className="flex flex-wrap gap-4">
+              {/* Controls for RUNNING the report, not statements about it.
+                  These printed: an empty CoinGecko API-key box with its
+                  help text, a tax-rate field and a year spinner, in the
+                  middle of a document handed to a tax office. Nothing here
+                  is lost on paper - the year, the base currency and the
+                  taxpayer are all restated by the document header above. */}
+              <div
+                data-testid="report-form"
+                className="flex flex-wrap gap-4 print:hidden"
+              >
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="tax-report-year">{t('Tax Year')}</Label>
                   <Input
@@ -842,17 +908,32 @@ export const TaxReportScreen = () => {
                         </span>
                       </p>
                     )}
+                    {/* Labelled by sign. The exempt side is a NET, so a
+                        year whose long-held lots lost money puts a negative
+                        number here - and the recorded report printed
+                        "Steuerfreier Gewinn: -9,10 EUR", a contradiction in
+                        terms sitting in a document filed with an authority. */}
                     <p>
                       <span className="font-medium">
-                        {t('Tax-free gain')}:{' '}
+                        {compareAmounts(assessment.totals.exemptGain, '0') < 0
+                          ? t('Tax-free loss')
+                          : t('Tax-free gain')}
+                        :{' '}
                       </span>
                       <Money
-                        value={Number(assessment.totals.exemptGain)}
+                        value={Math.abs(Number(assessment.totals.exemptGain))}
                         currency={baseCurrency}
                       />
                     </p>
+                    {/* "Taxable", not bare "Income": this figure is zero
+                        once a Freigrenze applies, while the threshold block
+                        below reports what was actually received. The two
+                        read as a contradiction unless this one says which
+                        of the pair it is. */}
                     <p>
-                      <span className="font-medium">{t('Income')}: </span>
+                      <span className="font-medium">
+                        {t('Taxable income')}:{' '}
+                      </span>
                       <Money
                         value={Number(assessment.totals.income)}
                         currency={baseCurrency}
@@ -905,6 +986,16 @@ export const TaxReportScreen = () => {
                               value={Number(threshold.actual)}
                               currency={baseCurrency}
                             />
+                          </p>
+                          {/* A limit this app can only test against the
+                              crypto it can see. §23's Freigrenze spans
+                              EVERY private sale in the year - gold, art, a
+                              property sold inside ten years - so "under the
+                              limit" must not read as "nothing to declare". */}
+                          <p className="text-muted-foreground">
+                            {t(
+                              'This limit covers every private sale you made in the year, not only crypto.',
+                            )}
                           </p>
                           {threshold.exceeded ? (
                             <p className="font-medium text-destructive">
@@ -1083,48 +1174,39 @@ export const TaxReportScreen = () => {
                       />
                       {t('Hide transactions outside the tax year')}
                     </label>
-                    {groupByKind(shownUnresolved).map(([kind, items]) => (
-                      <div key={kind} className="flex flex-col gap-2">
-                        <p className="text-sm font-medium">
-                          {kindHeading(kind, t)} ({items.length})
-                        </p>
-                        {items.map((item, index) => (
-                          // The position within the group is part of the
-                          // key: resolveValues emits one item per TAX
-                          // EVENT, and one ledger event can produce several
-                          // for the same asset (a net principal leg and a
-                          // fee leg of one transaction), so sourceEventId
-                          // plus assetId is not unique - the recorded
-                          // report had 56 items and 30 distinct keys, which
-                          // let React drop rows the user is meant to read.
-                          // The list is rendered from one finished
-                          // assessment and is never reordered or filtered,
-                          // so the position is stable for as long as the
-                          // key has to be.
-                          <Card
-                            key={`${item.sourceEventId}-${item.assetId}-${index}`}
-                          >
-                            <CardContent className="flex flex-col gap-1 text-sm">
-                              <p>
-                                {formatDate(item.timestamp)} · {item.venue} ·{' '}
-                                <CryptoAmount
-                                  value={item.amount}
-                                  assetId={item.assetId}
-                                />
-                              </p>
-                              <p className="text-destructive" role="alert">
-                                {t('Could not be computed: {{detail}}', {
-                                  detail: t(
-                                    item.reason.key,
-                                    item.reason.params,
-                                  ),
-                                })}
-                              </p>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    ))}
+                    {/* Two lists, one source.
+                        The screen's filter is a reading aid for a list that
+                        can run to dozens of rows. The printed document must
+                        carry every one of them: the heading right above
+                        states a TOTAL, and the recorded report stated 65
+                        while showing 1, because the checkbox was
+                        `print:hidden` but its effect was not. A sheet that
+                        contradicts itself about what it omitted is what
+                        invites an estimate under §162 AO.
+
+                        Both lists go through the same `UnresolvedGroups`
+                        with the same data, so they can differ only in which
+                        rows they include - never in what a row says. */}
+                    <div
+                      data-testid="unresolved-screen"
+                      className="print:hidden"
+                    >
+                      <UnresolvedGroups
+                        items={shownUnresolved}
+                        t={t}
+                        formatDate={formatDate}
+                      />
+                    </div>
+                    <div
+                      data-testid="unresolved-print"
+                      className="hidden print:block"
+                    >
+                      <UnresolvedGroups
+                        items={assessment.unresolved}
+                        t={t}
+                        formatDate={formatDate}
+                      />
+                    </div>
                   </div>
                 )}
               </div>
