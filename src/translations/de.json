@@ -465,6 +465,13 @@
     "From pooled cost; an averaged holding has no single acquisition date.": "Aus gemittelten Anschaffungskosten; ein gemittelter Bestand hat kein einzelnes Anschaffungsdatum.",
     "Loss to declare": "Zu erklärender Verlust",
     "A loss only offsets later gains if you declare it, so it belongs in your return even though no tax is due on it.": "Ein Verlust mindert spätere Gewinne nur, wenn er erklärt wird - er gehört also in die Steuererklärung, obwohl darauf keine Steuer anfällt.",
-    "Your marginal rate applied to the taxable gain. It does not include solidarity surcharge, church tax, or the effect on your overall progression.": "Dein Grenzsteuersatz auf den steuerpflichtigen Gewinn. Solidaritätszuschlag, Kirchensteuer und die Wirkung auf deine Progression sind nicht enthalten."
+    "Your marginal rate applied to the taxable gain. It does not include solidarity surcharge, church tax, or the effect on your overall progression.": "Dein Grenzsteuersatz auf den steuerpflichtigen Gewinn. Solidaritätszuschlag, Kirchensteuer und die Wirkung auf deine Progression sind nicht enthalten.",
+    "For": "Für",
+    "not stated": "nicht angegeben",
+    "Tax number": "Steuernummer",
+    "Your name": "Dein Name",
+    "Shown on the printed report so it can be assigned to your file. Stored only on this device.": "Erscheint auf dem gedruckten Report, damit er deinem Steuerfall zugeordnet werden kann. Wird nur auf diesem Gerät gespeichert.",
+    "This is a self-prepared report, not a certificate from a bank or an authority.": "Dies ist ein selbst erstellter Report, keine Bescheinigung einer Bank oder Behörde.",
+    "Tax year {{year}} has not ended yet, so this is an interim figure.": "Das Steuerjahr {{year}} ist noch nicht abgelaufen, dies ist daher ein Zwischenstand."
   }
 }

@@ -8,7 +8,7 @@ import { TaxReportScreen } from '@/screens/TaxReportScreen';
 import { taxRegistry } from '@/tax/registry';
 import germanTax from '@/tax/jurisdictions/de';
 import { openLedger, putEvents } from '@/ledger/db';
-import { putSettings } from '@/settings/settingsStore';
+import { getSettings, putSettings } from '@/settings/settingsStore';
 import type { LedgerEvent } from '@/ledger/types';
 import { flatRange } from './priceRangeStub';
 import type {
@@ -771,20 +771,24 @@ describe('printing the report', () => {
     expect(container.querySelector('.print\\:hidden')).not.toBeNull();
   });
 
-  it('states the year and the date on paper, where the screen cannot', async () => {
+  it('states the year, the date and the software on paper, where the screen cannot', async () => {
     // A sheet outlives the screen it came from, so it has to say what it
-    // is. Print-only, because on screen the year is in the form right
-    // above and the date is today.
+    // is, when it was made and what made it. Print-only, because on screen
+    // the year is in the form right above and the date is today.
     const { container } = await runAndPrint();
-    // Scoped to the print-only element: "Tax year" is also the label of
-    // the form field above, so an unscoped query matches both and the
-    // assertion would hold without the stamp existing at all.
-    const stamp = container.querySelector('.print\\:block');
-    expect(stamp).not.toBeNull();
-    expect(stamp?.textContent).toContain('2025');
-    expect(stamp?.textContent).toMatch(/2026/); // the date it was made
+    // Scoped by testid rather than by a Tailwind class: "Tax year" is also
+    // the label of the form field above, so an unscoped query matches both
+    // and the assertion would hold without the header existing at all - and
+    // the previous version of this test, which scoped by `.print:block`,
+    // broke the moment the header became a flex column without anything
+    // about its behaviour changing.
+    const header = container.querySelector('[data-testid="report-header"]');
+    expect(header).not.toBeNull();
+    expect(header?.textContent).toContain('2025');
+    expect(header?.textContent).toMatch(/2026/); // the date it was made
+    expect(header?.textContent).toMatch(/Coineda/);
     // Hidden on screen, where the year is already in the form above.
-    expect(stamp?.className).toContain('hidden');
+    expect(header?.className).toContain('hidden');
   });
 });
 
@@ -966,5 +970,40 @@ describe('the lots behind a disposal', () => {
 
     expect(await screen.findByText(/pooled cost/i)).toBeInTheDocument();
     expect(screen.queryByText(/Acquired/)).not.toBeInTheDocument();
+  });
+});
+
+describe('who the report is for', () => {
+  it('prints the taxpayer and labels what was not given', async () => {
+    await putSettings({ taxpayer: { name: 'Erika Mustermann' } });
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+
+    // A sheet nobody can assign to a Steuerfall is worthless, and a field
+    // left out silently reads as a field that does not exist - so an
+    // unstated tax number prints as a labelled blank the taxpayer can fill
+    // in by hand, not as nothing at all.
+    expect(await screen.findByText(/Erika Mustermann/)).toBeInTheDocument();
+    expect(screen.getByText(/not stated/i)).toBeInTheDocument();
+  });
+
+  it('keeps what it has been told, so it need only be typed once', async () => {
+    taxRegistry.push(makeModule());
+    renderScreen();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /testland/i }),
+    );
+    const nameInput = await screen.findByLabelText(/your name/i);
+    await userEvent.type(nameInput, 'Erika Mustermann');
+    await userEvent.tab();
+
+    await waitFor(async () => {
+      const settings = await getSettings();
+      expect(settings?.taxpayer?.name).toBe('Erika Mustermann');
+    });
   });
 });

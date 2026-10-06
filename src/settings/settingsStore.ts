@@ -17,6 +17,26 @@ export type Settings = {
    * below - unlike baseCurrency, this is a credential and case matters.
    */
   coingeckoApiKey?: string;
+  /**
+   * Who the printed tax report is for. Optional, and empty by default.
+   *
+   * Personal data, so it is held exactly the way every other setting here
+   * is: in this device's IndexedDB, leaving only inside an encrypted
+   * checkpoint, never sent anywhere. The trade is deliberate - a printed
+   * sheet a tax office cannot assign to a file is worthless, and the
+   * alternative (writing it on by hand after every print) is what stops
+   * people printing the report at all.
+   *
+   * Deliberately NOT normalised by normalizeSettings: a name's casing is
+   * the person's own, and a Steuernummer's formatting differs per
+   * Bundesland.
+   */
+  taxpayer?: {
+    name?: string;
+    /** Steuernummer or equivalent. Free text - the format differs per
+     *  Bundesland and no validation here could be right for all of them. */
+    taxNumber?: string;
+  };
 };
 
 /**

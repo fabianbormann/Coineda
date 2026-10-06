@@ -161,6 +161,11 @@ export const TaxReportScreen = () => {
   // read must not let an empty input clobber a stored key.
   const [apiKey, setApiKey] = useState('');
   const [loadedApiKey, setLoadedApiKey] = useState('');
+  // Who the printed sheet is for. Persisted on blur rather than on every
+  // keystroke: this is a settings write per character otherwise, and the
+  // value is only ever read back on the next mount.
+  const [taxpayerName, setTaxpayerName] = useState('');
+  const [taxNumber, setTaxNumber] = useState('');
 
   // Settings are read once, on mount. This used to be a reset block keyed
   // on an `open` prop, re-running every time the dialog reopened; a screen
@@ -180,11 +185,21 @@ export const TaxReportScreen = () => {
       setBaseCurrency(settings?.baseCurrency ?? DEFAULT_CURRENCY);
       setApiKey(settings?.coingeckoApiKey ?? '');
       setLoadedApiKey(settings?.coingeckoApiKey ?? '');
+      setTaxpayerName(settings?.taxpayer?.name ?? '');
+      setTaxNumber(settings?.taxpayer?.taxNumber ?? '');
     });
     return () => {
       active = false;
     };
   }, []);
+
+  /** Written on blur, merging rather than replacing: the two fields have
+   *  separate inputs and a write of one must not erase the other. */
+  const persistTaxpayer = () => {
+    void putSettings({
+      taxpayer: { name: taxpayerName, taxNumber },
+    });
+  };
 
   const chooseModule = (next: TaxModule) => {
     setModule(next);
@@ -430,19 +445,53 @@ export const TaxReportScreen = () => {
               <h2 className="text-xl font-semibold">
                 {t(module.manifest.jurisdiction)}
               </h2>
-              {/* Print only. On screen the year and the base currency are
-                  in the form right below, and the date is today; on paper
-                  the sheet has to say what it is and when it was made,
-                  because it outlives the screen it came from. */}
+              {/* Print only: the document's own header.
+                  On screen the year, the base currency and the taxpayer are
+                  all in the form below and the date is today. On paper none
+                  of that is true - the sheet outlives the screen it came
+                  from, and a reader at a tax office has to be able to
+                  assign it to a file, date it, and see which software
+                  produced it. A field left out silently reads as a field
+                  that does not exist, so anything unstated prints as a
+                  labelled blank the taxpayer can complete by hand. */}
               {assessment && (
-                <p className="hidden text-sm print:block">
-                  {t('Tax year')}: {assessment.year} ·{' '}
-                  {t('Created on {{date}}', {
-                    date: new Intl.DateTimeFormat(i18n.language, {
-                      dateStyle: 'long',
-                    }).format(new Date()),
-                  })}
-                </p>
+                <div
+                  data-testid="report-header"
+                  className="hidden flex-col gap-1 print:flex"
+                >
+                  <p>
+                    <span className="font-medium">{t('For')}: </span>
+                    {taxpayerName || t('not stated')}
+                    {' · '}
+                    <span className="font-medium">{t('Tax number')}: </span>
+                    {taxNumber || t('not stated')}
+                  </p>
+                  <p className="text-sm">
+                    {t('Tax year')}: {assessment.year} ·{' '}
+                    {t('Created on {{date}}', {
+                      date: new Intl.DateTimeFormat(i18n.language, {
+                        dateStyle: 'long',
+                      }).format(new Date()),
+                    })}
+                    {' · '}Coineda {assessment.method.appVersion}
+                  </p>
+                  {/* Decided in UTC, matching taxYearOf: a local reading of
+                      a late-December instant can report the wrong year, and
+                      this notice is about exactly that boundary. */}
+                  {assessment.year >= new Date().getUTCFullYear() && (
+                    <p className="text-sm">
+                      {t(
+                        'Tax year {{year}} has not ended yet, so this is an interim figure.',
+                        { year: assessment.year },
+                      )}
+                    </p>
+                  )}
+                  <p className="text-sm">
+                    {t(
+                      'This is a self-prepared report, not a certificate from a bank or an authority.',
+                    )}
+                  </p>
+                </div>
               )}
             </div>
 
@@ -543,6 +592,35 @@ export const TaxReportScreen = () => {
                       "Optional. Needed only to price tax events more than 365 days old - CoinGecko's free tier only covers the last year of history.",
                     )}
                   </p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="tax-report-taxpayer-name">
+                    {t('Your name')}
+                  </Label>
+                  <Input
+                    id="tax-report-taxpayer-name"
+                    value={taxpayerName}
+                    onChange={(event) => setTaxpayerName(event.target.value)}
+                    onBlur={persistTaxpayer}
+                    disabled={status === 'loading'}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    {t(
+                      'Shown on the printed report so it can be assigned to your file. Stored only on this device.',
+                    )}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="tax-report-tax-number">
+                    {t('Tax number')}
+                  </Label>
+                  <Input
+                    id="tax-report-tax-number"
+                    value={taxNumber}
+                    onChange={(event) => setTaxNumber(event.target.value)}
+                    onBlur={persistTaxpayer}
+                    disabled={status === 'loading'}
+                  />
                 </div>
               </div>
 

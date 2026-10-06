@@ -351,12 +351,40 @@ describe('the print stylesheet survives the build', () => {
     expect(css()).toContain('break-inside:avoid');
   });
 
-  it('generates the print-only visibility utilities', () => {
+  it('generates a rule for every print variant the source actually uses', () => {
     // A `print:` variant that Tailwind never saw is a class in the markup
-    // with no rule behind it: the controls would print and the date stamp
-    // would not - silently, and only on paper.
+    // with no rule behind it: the controls would print and the document
+    // header would not - silently, and only on paper.
+    //
+    // Derived from the source rather than hardcoded. The hardcoded version
+    // listed `print:hidden` and `print:block`, and broke the day the
+    // document header became a flex column - a true regression report about
+    // nothing, while a genuinely new variant used in one place would have
+    // slipped past it unnoticed. What matters is the invariant: whatever
+    // the markup asks for, the stylesheet has.
     const sheet = css();
-    expect(sheet).toMatch(/\.print\\:hidden\{display:none\}/);
-    expect(sheet).toMatch(/\.print\\:block\{display:block\}/);
+    const used = new Set<string>();
+    const walk = (dir: string): void => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          walk(full);
+        } else if (/\.tsx?$/.test(entry.name)) {
+          for (const match of fs
+            .readFileSync(full, 'utf8')
+            .matchAll(/\bprint:([a-z0-9-]+)\b/g)) {
+            used.add(match[1]);
+          }
+        }
+      }
+    };
+    walk(path.join(import.meta.dirname, '..', 'src'));
+
+    expect(used.size).toBeGreaterThan(0);
+    for (const variant of used) {
+      expect(sheet, `no rule generated for print:${variant}`).toContain(
+        `.print\\:${variant}{`,
+      );
+    }
   });
 });
