@@ -120,6 +120,31 @@ export type UnresolvedItem = {
   resolutions: Resolution[];
 };
 
+/**
+ * Why a jurisdiction reached an outcome, as a translation key and its
+ * parameters.
+ *
+ * This reverses the decision recorded below in the first version of
+ * `AssessedDisposal.reason`, which argued that a reason must be raw prose
+ * because its content is assembled from a computed split rather than drawn
+ * from a fixed set of sentences. That argument holds only while the
+ * computed part cannot be separated from the sentence. It can: the split is
+ * a PARAMETER, and the sentences around it genuinely are a fixed, small set
+ * per jurisdiction - three for Germany, two for Austria.
+ *
+ * What the raw version actually produced was English paragraphs inside a
+ * German tax document, printed and handed to the one audience this field
+ * exists for.
+ *
+ * `params` carries numbers and decimal strings only, never pre-formatted
+ * text: formatting is the renderer's job, and a pre-formatted value would
+ * re-introduce the same language problem one level down.
+ */
+export type TaxReason = {
+  key: string;
+  params?: Record<string, string | number>;
+};
+
 /** One line of the report: a disposal and what the jurisdiction made of it. */
 export type AssessedDisposal = {
   disposalEventId: string;
@@ -133,8 +158,9 @@ export type AssessedDisposal = {
   exempt: string;
   /** The remainder, which the threshold is then tested against. */
   taxable: string;
-  /** Why, in words, for the audit trail. Display only, never parsed. */
-  reason: string;
+  /** Why, for the audit trail: a key into every locale file, with the
+   *  computed figures as parameters. Display only, never parsed. */
+  reason: TaxReason;
 };
 
 export type ThresholdOutcome = {

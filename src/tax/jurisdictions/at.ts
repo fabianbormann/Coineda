@@ -9,6 +9,7 @@ import type {
   TaxAssessment,
   TaxEvent,
   TaxModule,
+  TaxReason,
 } from '@/tax/types';
 
 /**
@@ -194,6 +195,15 @@ const classify = (event: LedgerEvent): TaxEvent[] => {
  * signal that correctly carries the Altvermögen/Neuvermögen distinction
  * through to assess().
  */
+const altvermoegenReason = (isAltvermoegen: boolean): TaxReason =>
+  isAltvermoegen
+    ? {
+        key: 'Altvermögen (acquired before 1 March 2021): exempt from KESt under §27b EStG.',
+      }
+    : {
+        key: 'Neuvermögen: taxable at the flat 27.5% KESt under §27a Abs. 1 EStG. No holding-period exemption applies.',
+      };
+
 const assessDisposal = (disposal: MatchedDisposal): AssessedDisposal => {
   const isAltvermoegen = disposal.partition === PARTITION_ALT;
   const exempt = isAltvermoegen ? disposal.gain : '0';
@@ -208,9 +218,7 @@ const assessDisposal = (disposal: MatchedDisposal): AssessedDisposal => {
     gain: disposal.gain,
     exempt,
     taxable,
-    reason: isAltvermoegen
-      ? 'Altvermögen (acquired before 1 March 2021): exempt from KESt under §27b EStG.'
-      : 'Neuvermögen: taxable at the flat 27.5% KESt under §27a Abs. 1 EStG. No holding-period exemption applies.',
+    reason: altvermoegenReason(isAltvermoegen),
   };
 };
 

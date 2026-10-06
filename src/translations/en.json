@@ -437,6 +437,11 @@
     "Let your sources refetch it": "Let your sources refetch it",
     "Your data sources came across with their credentials, so a sync on this device fetches the history again by itself. This is the ordinary way, and it needs nothing from your other device.": "Your data sources came across with their credentials, so a sync on this device fetches the history again by itself. This is the ordinary way, and it needs nothing from your other device.",
     "Or bring a backup file over": "Or bring a backup file over",
-    "For a source that cannot be synced any more - an exchange that closed, an API key that is gone, a file import - create a checkpoint on your other device, download it as a file, and import that file here. It carries every recorded transaction.": "For a source that cannot be synced any more - an exchange that closed, an API key that is gone, a file import - create a checkpoint on your other device, download it as a file, and import that file here. It carries every recorded transaction."
+    "For a source that cannot be synced any more - an exchange that closed, an API key that is gone, a file import - create a checkpoint on your other device, download it as a file, and import that file here. It carries every recorded transaction.": "For a source that cannot be synced any more - an exchange that closed, an API key that is gone, a file import - create a checkpoint on your other device, download it as a file, and import that file here. It carries every recorded transaction.",
+    "Held more than one year, so the gain is tax-free under §23 Abs. 1 Nr. 2 EStG.": "Held more than one year, so the gain is tax-free under §23 Abs. 1 Nr. 2 EStG.",
+    "Held one year or less, so the gain is taxable under §23 Abs. 1 Nr. 2 EStG.": "Held one year or less, so the gain is taxable under §23 Abs. 1 Nr. 2 EStG.",
+    "Split disposal: the lots held more than one year are tax-free under §23 Abs. 1 Nr. 2 EStG, the rest was held one year or less and is taxable.": "Split disposal: the lots held more than one year are tax-free under §23 Abs. 1 Nr. 2 EStG, the rest was held one year or less and is taxable.",
+    "Altvermögen (acquired before 1 March 2021): exempt from KESt under §27b EStG.": "Altvermögen (acquired before 1 March 2021): exempt from KESt under §27b EStG.",
+    "Neuvermögen: taxable at the flat 27.5% KESt under §27a Abs. 1 EStG. No holding-period exemption applies.": "Neuvermögen: taxable at the flat 27.5% KESt under §27a Abs. 1 EStG. No holding-period exemption applies."
   }
 }

@@ -44,7 +44,7 @@ const stubModule: TaxModule = {
       gain: m.gain,
       exempt: '0',
       taxable: m.gain,
-      reason: 'stub',
+      reason: { key: 'stub' },
     })),
     totals: {
       taxableGain: '0',

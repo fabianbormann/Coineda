@@ -370,3 +370,59 @@ describe('german rate handling', () => {
     expect(report.estimatedLiability).toBe('443.1');
   });
 });
+
+describe('german rationales', () => {
+  it('states a fully exempt holding period as a translatable key', () => {
+    const report = germanTax.assess({
+      year: 2024,
+      matched: [disposal({ heldDays: 400, gain: '500' })],
+      income: [],
+    });
+
+    expect(report.lines[0].reason).toEqual({
+      key: 'Held more than one year, so the gain is tax-free under §23 Abs. 1 Nr. 2 EStG.',
+    });
+  });
+
+  it('states a fully taxable holding period as a translatable key', () => {
+    const report = germanTax.assess({
+      year: 2024,
+      matched: [disposal({ heldDays: 10, gain: '500' })],
+      income: [],
+    });
+
+    expect(report.lines[0].reason).toEqual({
+      key: 'Held one year or less, so the gain is taxable under §23 Abs. 1 Nr. 2 EStG.',
+    });
+  });
+
+  it('names both sides when a disposal straddles the one-year boundary', () => {
+    const split = disposal({ heldDays: 400, gain: '600' });
+    split.consumed = [
+      {
+        acquisitionEventId: 'old',
+        amount: '5',
+        costBasis: '200',
+        acquiredAt: Date.UTC(2024, 5, 1) - 400 * 86_400_000,
+        heldDays: 400,
+      },
+      {
+        acquisitionEventId: 'new',
+        amount: '5',
+        costBasis: '200',
+        acquiredAt: Date.UTC(2024, 5, 1) - 10 * 86_400_000,
+        heldDays: 10,
+      },
+    ];
+
+    const report = germanTax.assess({
+      year: 2024,
+      matched: [split],
+      income: [],
+    });
+
+    expect(report.lines[0].reason.key).toBe(
+      'Split disposal: the lots held more than one year are tax-free under §23 Abs. 1 Nr. 2 EStG, the rest was held one year or less and is taxable.',
+    );
+  });
+});

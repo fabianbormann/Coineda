@@ -51,7 +51,7 @@ const assess = (input: AssessInput): TaxAssessment => ({
     gain: '200',
     exempt: '0',
     taxable: '200',
-    reason: 'Fully taxable test disposal',
+    reason: { key: 'Fully taxable test disposal' },
   })),
   totals: {
     taxableGain: input.matched.length > 0 ? '200' : '0',

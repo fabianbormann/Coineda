@@ -225,3 +225,29 @@ describe('austrian assessment', () => {
     expect(austrianTax.manifest.supportedYears.from).toBe(2022);
   });
 });
+
+describe('austrian rationales', () => {
+  it('states Altvermögen as a translatable key', () => {
+    const report = austrianTax.assess({
+      year: 2024,
+      matched: [disposalFrom(Date.UTC(2020, 0, 1), '1000')],
+      income: [],
+    });
+
+    expect(report.lines[0].reason).toEqual({
+      key: 'Altvermögen (acquired before 1 March 2021): exempt from KESt under §27b EStG.',
+    });
+  });
+
+  it('states Neuvermögen as a translatable key', () => {
+    const report = austrianTax.assess({
+      year: 2024,
+      matched: [disposalFrom(Date.UTC(2022, 0, 1), '1000')],
+      income: [],
+    });
+
+    expect(report.lines[0].reason).toEqual({
+      key: 'Neuvermögen: taxable at the flat 27.5% KESt under §27a Abs. 1 EStG. No holding-period exemption applies.',
+    });
+  });
+});

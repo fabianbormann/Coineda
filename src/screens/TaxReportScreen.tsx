@@ -749,7 +749,9 @@ export const TaxReportScreen = () => {
                               currency={baseCurrency}
                             />
                           </p>
-                          <p className="text-muted-foreground">{line.reason}</p>
+                          <p className="text-muted-foreground">
+                            {t(line.reason.key, line.reason.params)}
+                          </p>
                         </CardContent>
                       </Card>
                     ))

@@ -16,6 +16,7 @@ import type {
   TaxAssessment,
   TaxEvent,
   TaxModule,
+  TaxReason,
   ThresholdOutcome,
 } from '@/tax/types';
 
@@ -183,21 +184,27 @@ const proportion = (
       .toString(),
   );
 
-/** Explains, per disposal, which §23 Abs. 1 Nr. 2 EStG outcome applied. A
- *  raw diagnostic sentence for the audit trail - not a translation key, the
- *  same choice already made for UnresolvedItem.reason, because the content
- *  is assembled from the computed split rather than being one of a fixed set
- *  of sentences. */
-const describeHoldingPeriod = (exempt: string, taxable: string): string => {
+/** Explains, per disposal, which §23 Abs. 1 Nr. 2 EStG outcome applied.
+ *  A translation key rather than the raw sentence this used to return: the
+ *  outcome is one of exactly three, and the document it lands in is read by
+ *  a German tax office. See TaxReason in src/tax/types.ts for why the
+ *  earlier "assembled from a computed split" argument did not survive. */
+const describeHoldingPeriod = (exempt: string, taxable: string): TaxReason => {
   const hasExempt = !isZeroAmount(exempt);
   const hasTaxable = !isZeroAmount(taxable);
   if (hasExempt && hasTaxable) {
-    return 'Split disposal: the lots held more than one year are tax-free under §23 Abs. 1 Nr. 2 EStG, the rest was held one year or less and is taxable.';
+    return {
+      key: 'Split disposal: the lots held more than one year are tax-free under §23 Abs. 1 Nr. 2 EStG, the rest was held one year or less and is taxable.',
+    };
   }
   if (hasExempt) {
-    return 'Held more than one year, so the gain is tax-free under §23 Abs. 1 Nr. 2 EStG.';
+    return {
+      key: 'Held more than one year, so the gain is tax-free under §23 Abs. 1 Nr. 2 EStG.',
+    };
   }
-  return 'Held one year or less, so the gain is taxable under §23 Abs. 1 Nr. 2 EStG.';
+  return {
+    key: 'Held one year or less, so the gain is taxable under §23 Abs. 1 Nr. 2 EStG.',
+  };
 };
 
 /**
