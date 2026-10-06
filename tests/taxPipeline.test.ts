@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
+import { APP_VERSION } from '@/global/version';
 import { runTaxReport, taxYearOf } from '@/tax/runTaxReport';
 import { openLedger, putEvents } from '@/ledger/db';
 import austrianTax from '@/tax/jurisdictions/at';
@@ -702,5 +703,58 @@ describe('provenance on every reported disposal', () => {
     await expect(
       runTaxReport(inventing, { year: 2025, baseCurrency: 'eur' }),
     ).rejects.toThrow(/not-a-real-disposal/);
+  });
+});
+
+describe('the method sheet', () => {
+  it('states the method, its scope, the valuation day and the price sources', async () => {
+    await putEvents([
+      ledgerEvent({
+        id: 'buy',
+        externalId: 'buy',
+        timestamp: Date.UTC(2025, 0, 1),
+        legs: [
+          {
+            assetId: 'fiat:eur',
+            amount: '400',
+            direction: 'in',
+            venue: 'wallet-a',
+            role: 'principal',
+          },
+        ],
+      }),
+    ]);
+
+    const report = await runTaxReport(stubModule, {
+      year: 2025,
+      baseCurrency: 'eur',
+    });
+
+    expect(report.method).toMatchObject({
+      matching: 'fifo',
+      partitionLabel: 'Test partition',
+      valuation: 'utc-day',
+      baseCurrency: 'eur',
+      appVersion: APP_VERSION,
+    });
+    expect(report.method.priceSources).toEqual([
+      'DefiLlama',
+      'ECB',
+      'CoinGecko',
+    ]);
+    expect(report.method.eventsConsidered).toBe(1);
+  });
+
+  it('reports the matching method actually used, not the module default', async () => {
+    // `options.matching` overrides a module's own defaultMatching, and the
+    // document has to state what produced ITS figures - a sheet claiming
+    // FIFO over moving-average numbers is worse than no sheet.
+    const report = await runTaxReport(stubModule, {
+      year: 2025,
+      baseCurrency: 'eur',
+      matching: 'moving-average',
+    });
+
+    expect(report.method.matching).toBe('moving-average');
   });
 });

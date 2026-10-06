@@ -10,7 +10,7 @@ import { openLedger } from '@/ledger/db';
 import { putSettings } from '@/settings/settingsStore';
 import germanTax from '@/tax/jurisdictions/de';
 import austrianTax from '@/tax/jurisdictions/at';
-import type { TaxAssessment } from '@/tax/types';
+import type { TaxReport } from '@/tax/types';
 
 /**
  * A report computed for one jurisdiction must never render under another.
@@ -37,7 +37,7 @@ vi.mock('@/tax/runTaxReport', () => ({
  *  anywhere on screen after the switch to Austria, the leak happened. */
 const GERMAN_TAXABLE_GAIN = '999999';
 
-const germanAssessment: TaxAssessment = {
+const germanAssessment: TaxReport = {
   year: 2024,
   lines: [],
   totals: {
@@ -49,6 +49,21 @@ const germanAssessment: TaxAssessment = {
   },
   thresholds: [],
   unresolved: [],
+  // Typed as the host's own return value rather than a jurisdiction's
+  // TaxReport: this mock stands in for runTaxReport, and the screen
+  // reads the method sheet off it. `vi.fn()` takes any argument, so
+  // nothing but this annotation makes the mock keep up with the contract
+  // it is impersonating.
+  method: {
+    matching: 'fifo',
+    partitionLabel: 'Test partition',
+    baseCurrency: 'eur',
+    valuation: 'utc-day',
+    priceSources: ['DefiLlama', 'ECB', 'CoinGecko'],
+    appVersion: '0.0.0-test',
+    eventsConsidered: 1,
+    internalTransfersNetted: 0,
+  },
 };
 
 beforeEach(async () => {
@@ -64,10 +79,10 @@ beforeEach(async () => {
 
 describe('a tax report abandoned mid-flight', () => {
   it('does not render a German result under Austria after switching mid-run', async () => {
-    let resolveGerman: (value: TaxAssessment) => void = () => {};
+    let resolveGerman: (value: TaxReport) => void = () => {};
     runTaxReport.mockImplementation(
       () =>
-        new Promise<TaxAssessment>((resolve) => {
+        new Promise<TaxReport>((resolve) => {
           resolveGerman = resolve;
         }),
     );

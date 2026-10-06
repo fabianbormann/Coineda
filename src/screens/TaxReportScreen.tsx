@@ -571,6 +571,64 @@ export const TaxReportScreen = () => {
               <div className="flex flex-col gap-4">
                 <Separator />
 
+                {/* 1a. How the figures below were produced.
+                    Above the totals, not in an appendix: a reader who has
+                    not been told the matching method, its scope and the
+                    price convention cannot check a single number further
+                    down, and the first figure they meet is the one they
+                    are most likely to act on. */}
+                <div className="flex flex-col gap-2">
+                  <h3 className="text-sm font-semibold">
+                    {t('How these figures were produced')}
+                  </h3>
+                  <Card>
+                    <CardContent className="flex flex-col gap-1 text-sm">
+                      <p>
+                        <span className="font-medium">
+                          {t('Matching method')}:{' '}
+                        </span>
+                        {assessment.method.matching === 'fifo'
+                          ? t('First in, first out (FIFO)')
+                          : t('Moving average')}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {t(assessment.method.partitionLabel)}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {t(
+                          "Each event is valued at its asset's price on the UTC calendar day it happened, not at the price when this report was run.",
+                        )}
+                      </p>
+                      <p>
+                        <span className="font-medium">
+                          {t('Price sources')}:{' '}
+                        </span>
+                        {assessment.method.priceSources.join(' · ')}
+                      </p>
+                      <p>
+                        <span className="font-medium">
+                          {t('Base currency')}:{' '}
+                        </span>
+                        {assessment.method.baseCurrency.toUpperCase()}
+                        {' · '}
+                        <span className="font-medium">
+                          {t('Produced by')}:{' '}
+                        </span>
+                        Coineda {assessment.method.appVersion}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {t(
+                          '{{count}} ledger events were considered; {{netted}} movements between your own wallets were netted out rather than treated as sales.',
+                          {
+                            count: assessment.method.eventsConsidered,
+                            netted: assessment.method.internalTransfersNetted,
+                          },
+                        )}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+
                 {/* 2. Totals, with `omitted` welded to `taxableGain` in the
                     same paragraph - see the class doc comment above. */}
                 <Card>

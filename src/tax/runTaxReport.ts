@@ -9,10 +9,12 @@ import type { LedgerEvent } from '@/ledger/types';
 import { linkInternalTransfers, linkedEventIds } from '@/ledger/transfers';
 import { match } from './matching';
 import { resolveValues } from './resolveValues';
+import { APP_VERSION } from '@/global/version';
 import type {
   LotMove,
   MatchingMethod,
   ReportedDisposal,
+  ReportMethod,
   TaxEvent,
   TaxModule,
   TaxReport,
@@ -219,9 +221,15 @@ export const runTaxReport = async (
   );
   hostUnresolved.push(...unpriced);
 
+  // Resolved once and reused, rather than read twice: the method the
+  // matcher ran under and the method the document states must be the same
+  // value, not two reads of the same expression that a later edit could
+  // separate.
+  const matching = options.matching ?? module.defaultMatching;
+
   const { matched, shortfalls } = match(
     valued,
-    options.matching ?? module.defaultMatching,
+    matching,
     module.partitionBy,
     lotMoves,
   );
@@ -300,9 +308,24 @@ export const runTaxReport = async (
     };
   });
 
+  const method: ReportMethod = {
+    matching,
+    partitionLabel: module.manifest.partitionLabel,
+    baseCurrency: options.baseCurrency,
+    valuation: 'utc-day',
+    // Named here rather than imported from the price layer: this is the
+    // list a reader checks a figure against, and it has to stay accurate to
+    // what fetchHistory actually tries, in the order it tries them.
+    priceSources: ['DefiLlama', 'ECB', 'CoinGecko'],
+    appVersion: APP_VERSION,
+    eventsConsidered: consideredEvents.length,
+    internalTransfersNetted: allEvents.length - consideredEvents.length,
+  };
+
   return {
     ...assessment,
     lines,
+    method,
     unresolved: [...assessment.unresolved, ...hostUnresolved],
     totals: {
       ...assessment.totals,

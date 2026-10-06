@@ -450,6 +450,14 @@
     "No price for {{asset}} on {{date}}.": "No price for {{asset}} on {{date}}.",
     "The price provider could not answer: {{detail}}": "The price provider could not answer: {{detail}}",
     "Lots are matched per wallet or exchange, not pooled across the portfolio.": "Lots are matched per wallet or exchange, not pooled across the portfolio.",
-    "Cost is pooled per asset across the portfolio, split only between Altvermögen and Neuvermögen.": "Cost is pooled per asset across the portfolio, split only between Altvermögen and Neuvermögen."
+    "Cost is pooled per asset across the portfolio, split only between Altvermögen and Neuvermögen.": "Cost is pooled per asset across the portfolio, split only between Altvermögen and Neuvermögen.",
+    "How these figures were produced": "How these figures were produced",
+    "First in, first out (FIFO)": "First in, first out (FIFO)",
+    "Moving average": "Moving average",
+    "Matching method": "Matching method",
+    "Each event is valued at its asset's price on the UTC calendar day it happened, not at the price when this report was run.": "Each event is valued at its asset's price on the UTC calendar day it happened, not at the price when this report was run.",
+    "Price sources": "Price sources",
+    "Produced by": "Produced by",
+    "{{count}} ledger events were considered; {{netted}} movements between your own wallets were netted out rather than treated as sales.": "{{count}} ledger events were considered; {{netted}} movements between your own wallets were netted out rather than treated as sales."
   }
 }

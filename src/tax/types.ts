@@ -241,6 +241,39 @@ export type ReportedDisposal = AssessedDisposal & {
 };
 
 /**
+ * Everything the printed report has to say about how it was produced.
+ *
+ * A figure without its method is not checkable, and the facts a reader
+ * needs - which lots were matched against which, over what scope, and at
+ * which price on which day - are each decided in a different file. Carrying
+ * them as data rather than as prose inside the screen is what stops the
+ * printed statement from drifting away from what the engine actually does:
+ * a sheet that claims FIFO over moving-average numbers is worse than a
+ * sheet that claims nothing.
+ */
+export type ReportMethod = {
+  matching: MatchingMethod;
+  /** Translation key from the jurisdiction's manifest. */
+  partitionLabel: string;
+  baseCurrency: string;
+  /**
+   * A typed value, not prose, so a later second-precise mode arrives as a
+   * new variant rather than a reworded sentence nobody notices changing.
+   * See BMF 06.03.2025 Rn. 43, 58 and 91 on daily versus second-precise
+   * rates - the convention this app picks silently today.
+   */
+  valuation: 'utc-day';
+  priceSources: string[];
+  appVersion: string;
+  /** Ledger events the jurisdiction was asked to classify, after internal
+   *  transfers were removed. */
+  eventsConsidered: number;
+  /** Movements between the user's own venues, netted out before
+   *  classification rather than reported as sales. */
+  internalTransfersNetted: number;
+};
+
+/**
  * What `runTaxReport` returns: a module's assessment plus everything only
  * the host knows.
  *
@@ -252,6 +285,7 @@ export type ReportedDisposal = AssessedDisposal & {
  */
 export type TaxReport = Omit<TaxAssessment, 'lines'> & {
   lines: ReportedDisposal[];
+  method: ReportMethod;
 };
 
 export type AssessInput = {
