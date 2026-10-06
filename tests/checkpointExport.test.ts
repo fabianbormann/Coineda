@@ -18,7 +18,7 @@ import {
   putManualLink,
 } from '@/ledger/manualLinks';
 import { putSettings } from '@/settings/settingsStore';
-import { openLedger, putSource, putEvents } from '@/ledger/db';
+import { getAllEvents, openLedger, putSource, putEvents } from '@/ledger/db';
 import type { LedgerEvent } from '@/ledger/types';
 
 /**
@@ -186,8 +186,9 @@ describe('checkpoint export', () => {
   });
 
   it('routes an oversized checkpoint to the file channel instead of truncating', async () => {
-    // Authored events are the one unbounded part of a checkpoint. Enough of
-    // them must switch channel, never silently produce a QR that scans back
+    // Events are the unbounded part of a checkpoint, and now that synced
+    // ones travel too, most real checkpoints are files. Enough of them
+    // must switch channel, never silently produce a QR that scans back
     // into a partial setup looking complete.
     await putEvents(Array.from({ length: 400 }, (_, n) => authoredEvent(n)));
     const sealed = await sealCheckpoint(
@@ -198,16 +199,59 @@ describe('checkpoint export', () => {
     expect(chooseChannel(sealed).channel).toBe('file');
   });
 
-  it('carries authored events but not synced ones', async () => {
-    // The settled model: the tx log reloads from its sources, so only what
-    // the user typed themselves has to travel. A checkpoint that carried
-    // synced history would duplicate it against a re-sync on the new device.
+  it('carries synced events too, each in its own list', async () => {
+    // Synced events used to be left out, on the reasoning that they reload
+    // from their sources. They do - while the source exists. An exchange
+    // that shuts down takes the history with it, and in a tax tool the
+    // history IS the asset: a disposal's cost basis comes from an
+    // acquisition years earlier. So a checkpoint is a backup, not only a
+    // handover.
+    //
+    // Two lists rather than one, and asserted as two: an older build
+    // reads `authoredEvents` and must still find exactly what it knows
+    // there, with nothing of the other kind mixed in.
     await putEvents([
       authoredEvent(1),
       { ...authoredEvent(2), id: 'derived-1', origin: 'derived' },
     ]);
     const checkpoint = await buildCheckpoint();
+
     expect(checkpoint.authoredEvents.map((e) => e.id)).toEqual(['authored-1']);
+    expect(checkpoint.derivedEvents?.map((e) => e.id)).toEqual(['derived-1']);
+  });
+
+  it('survives the source it came from disappearing', async () => {
+    // THE case this change exists for. Kraken shuts down, the API key is
+    // revoked, a provider drops an endpoint - the source cannot be synced
+    // again, and what the checkpoint carries is all there is.
+    await putSource({
+      id: 'kraken',
+      moduleId: 'kraken-csv',
+      label: 'Kraken',
+      config: {},
+    });
+    await putEvents([
+      {
+        ...authoredEvent(7),
+        id: 'kraken-1',
+        sourceId: 'kraken',
+        origin: 'derived',
+      },
+    ]);
+
+    const secret = generateTransferSecret();
+    const sealed = await sealCheckpoint(await buildCheckpoint(), secret);
+
+    // The device is wiped: no events, no sources, nothing to sync from.
+    const db = await openLedger();
+    await db.clear('events');
+    await db.clear('sources');
+
+    await restoreCheckpoint(await openCheckpoint(sealed, secret));
+
+    const restored = await getAllEvents();
+    expect(restored.map((event) => event.id)).toEqual(['kraken-1']);
+    expect(restored[0].legs[0].amount).toBe('1000000');
   });
 
   it("leaves this device's sync state out of the checkpoint", async () => {
@@ -352,6 +396,20 @@ describe('confirmed transfers in a checkpoint', () => {
       }),
     ).rejects.toThrow(/txHash/);
     expect(await getManualLinks()).toEqual([]);
+  });
+
+  it('refuses a payload whose synced events are not a list', async () => {
+    // Without the shape check this reaches the restore's spread as a
+    // string and fails there instead - safely, but with an error about a
+    // leg rather than about a malformed checkpoint.
+    const secret = generateTransferSecret();
+    const checkpoint = await buildCheckpoint();
+    (checkpoint as { derivedEvents?: unknown }).derivedEvents = 'nope';
+    const sealed = await sealCheckpoint(checkpoint, secret);
+
+    await expect(openCheckpoint(sealed, secret)).rejects.toThrow(
+      /unexpected shape/i,
+    );
   });
 
   it('refuses a payload whose links are not a list', async () => {

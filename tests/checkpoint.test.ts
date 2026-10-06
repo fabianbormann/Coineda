@@ -312,41 +312,51 @@ describe('restoring', () => {
     expect(await isOnboarded()).toBe(false);
   });
 
-  it('rolls back a failure that happens inside the transaction, after earlier writes already ran', async () => {
-    // The test above proves pre-transaction validation stops a bad payload
-    // before any write happens - a real guarantee, but not the one this
-    // module actually claims: that restore uses ONE transaction spanning
-    // settings/sources/events, so a failure partway through is rolled back
-    // by IndexedDB itself. Two authored events sharing one identity
-    // ([sourceId, externalId]) each pass assertValidEvent individually, then
-    // the second event's put() throws IndexedDB's own ConstraintError on the
-    // unique 'identity' index - inside the transaction, after the settings
-    // write, the source write and the first event's write have already
-    // executed. A source is included so getSources() below is a real
-    // assertion, not a vacuous one against an empty fixture.
-    const first = authored('dup');
-    const second = authored('dup');
+  it('merges onto a row the device already has, rather than failing whole', async () => {
+    // This replaces a test that forced IndexedDB's own ConstraintError on
+    // the unique 'identity' index by restoring two events with one
+    // identity. That failure is no longer reachable: restore writes
+    // THROUGH that index, the way putEvents does, because a checkpoint now
+    // carries synced events too - and restoring a backup onto a device
+    // that already synced the same source is the ordinary case, not an
+    // error. The two rows carry the same [sourceId, externalId] under
+    // different ids, so a bare put would collide and abort the whole
+    // restore.
+    //
+    // The transaction's rollback behaviour is still covered, by the test
+    // below: a plain JS throw mid-transaction, which is the failure mode
+    // that remains after this.
+    const local = { ...authored('shared'), id: 'local-id' };
+    await putEvents([local]);
+
+    const incoming = {
+      ...authored('shared'),
+      id: 'checkpoint-id',
+      legs: [
+        {
+          assetId: 'fiat:eur',
+          amount: '900',
+          direction: 'in' as const,
+          venue: 'bank',
+          role: 'principal' as const,
+        },
+      ],
+    };
 
     await expect(
       restoreCheckpoint({
         v: 1,
         settings: { language: 'de', baseCurrency: 'eur' },
-        sources: [
-          {
-            id: 'cfg-1',
-            moduleId: 'cardano-blockfrost',
-            label: 'Main',
-            config: { address: 'addr1' },
-          },
-        ],
-        authoredEvents: [first, second],
+        sources: [],
+        authoredEvents: [incoming],
       }),
-    ).rejects.toThrow();
+    ).resolves.toBeUndefined();
 
-    expect(await getSources()).toHaveLength(0);
-    expect(await getAllEvents()).toHaveLength(0);
-    expect(await getSettings()).toBeNull();
-    expect(await isOnboarded()).toBe(false);
+    const rows = await getAllEvents();
+    expect(rows).toHaveLength(1);
+    // The device's own id survives, the checkpoint's content wins.
+    expect(rows[0].id).toBe('local-id');
+    expect(rows[0].legs[0].amount).toBe('900');
   });
 
   it('rolls back a plain JS throw after an awaited put, not just a failed IDB request', async () => {

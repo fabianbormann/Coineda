@@ -252,7 +252,6 @@
     "The address to track. Coineda only ever reads this address - it never asks for a private key.": "Die zu verfolgende Adresse. Coineda liest diese Adresse ausschließlich - niemals wird ein privater Schlüssel abgefragt.",
     "Could not reach the Yaci Store instance.": "Die Yaci-Store-Instanz konnte nicht erreicht werden.",
     "Create checkpoint": "Checkpoint erstellen",
-    "A checkpoint carries your settings, your data sources and anything you entered yourself, so you can set up another device.": "Ein Checkpoint enthält deine Einstellungen, deine Datenquellen und alles, was du selbst erfasst hast, damit du ein weiteres Gerät einrichten kannst.",
     "Creating your checkpoint…": "Checkpoint wird erstellt …",
     "Could not create a checkpoint. Try again.": "Der Checkpoint konnte nicht erstellt werden. Versuche es erneut.",
     "Checkpoint QR code": "Checkpoint-QR-Code",
@@ -417,6 +416,7 @@
     "Check {{count}} possible transfer_other": "{{count}} mögliche Transfers prüfen",
     "This checkpoint is too large for a QR code, so it comes as a file. Send the file to your other device, then type the transfer secret below into it.": "Dieser Checkpoint ist zu groß für einen QR-Code und kommt daher als Datei. Schick die Datei an dein anderes Gerät und tippe dort das Transfer-Geheimnis von unten ein.",
     "Or download it as a file, if the other device is not in front of you.": "Oder lade ihn als Datei herunter, wenn das andere Gerät nicht vor dir steht.",
-    "This secret travels with neither the code nor the file. Type it on your other device too - without it, what you send over is useless.": "Das Geheimnis reist weder im Code noch in der Datei mit. Tippe es auf deinem anderen Gerät ebenfalls ein – ohne es ist das Übertragene nutzlos."
+    "This secret travels with neither the code nor the file. Type it on your other device too - without it, what you send over is useless.": "Das Geheimnis reist weder im Code noch in der Datei mit. Tippe es auf deinem anderen Gerät ebenfalls ein – ohne es ist das Übertragene nutzlos.",
+    "A checkpoint carries your settings, your data sources and every transaction recorded here - so you can set up another device, and so your history outlives a source that no longer exists.": "Ein Checkpoint enthält deine Einstellungen, deine Datenquellen und jede hier erfasste Transaktion – damit du ein anderes Gerät einrichten kannst und deine Historie auch dann bleibt, wenn eine Quelle nicht mehr existiert."
   }
 }

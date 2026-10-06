@@ -2,13 +2,21 @@
  * The checkpoint module's public surface. Every consumer and every test
  * imports from here, not from `crypto.ts` or `channel.ts` directly.
  *
- * A checkpoint carries what cannot be re-derived: settings, configured
- * sources (with their credentials), authored events, and the transfers the
- * user confirmed by hand. Derived events stay out and reload from their
- * sources on the next sync. Authored events - bank movements, manual
- * corrections - have no source to reload from, so leaving them out would
- * lose them on every restore. Confirmed transfers are the same kind of
- * thing: a judgement only the user could make, which no sync reproduces.
+ * A checkpoint carries the whole of it: settings, configured sources (with
+ * their credentials), every recorded event, and the transfers the user
+ * confirmed by hand.
+ *
+ * Synced events used to stay out, on the reasoning that they reload from
+ * their sources. They do - while the source still exists. An exchange
+ * shutting down, an API losing its free tier, a provider dropping an
+ * endpoint: after any of those the history is gone, and in a tax tool
+ * history is the asset, because a disposal's cost basis comes from an
+ * acquisition years earlier. So a checkpoint is a backup, not only a
+ * handover, and the events travel with it.
+ *
+ * Authored events - bank movements, manual corrections - and confirmed
+ * transfers are the same kind of thing for a stronger reason: no sync
+ * reproduces them at all.
  *
  * Because the credentials travel with it, a checkpoint is always encrypted.
  */
@@ -53,6 +61,15 @@ export type Checkpoint = {
   settings: Settings;
   sources: SourceRecord[];
   authoredEvents: LedgerEvent[];
+  /**
+   * Everything the sources recorded.
+   *
+   * Optional and separate from `authoredEvents` rather than one combined
+   * list, so a build that predates this field still restores what it knows
+   * and an older checkpoint still restores here. The two lists never
+   * overlap: an event is authored or derived, never both.
+   */
+  derivedEvents?: LedgerEvent[];
   /**
    * Optional, and the version stays 1 on purpose.
    *
@@ -114,6 +131,7 @@ export const buildCheckpoint = async (): Promise<Checkpoint> => {
     settings,
     sources: sources.map(portableSource),
     authoredEvents: events.filter((event) => event.origin === 'authored'),
+    derivedEvents: events.filter((event) => event.origin === 'derived'),
     transferLinks,
   };
 };
@@ -147,6 +165,8 @@ export const openCheckpoint = async (
     !isPlainObject(checkpoint.settings) ||
     !Array.isArray(checkpoint.sources) ||
     !Array.isArray(checkpoint.authoredEvents) ||
+    (checkpoint.derivedEvents !== undefined &&
+      !Array.isArray(checkpoint.derivedEvents)) ||
     // Absent is valid - see the field's comment on `Checkpoint`. Present
     // but not an array is not, and letting it through would reach the
     // restore's `for ... of` as a crash mid-transaction.
@@ -199,7 +219,11 @@ export const openCheckpoint = async (
 export const restoreCheckpoint = async (
   checkpoint: Checkpoint,
 ): Promise<void> => {
-  for (const event of checkpoint.authoredEvents) {
+  const events = [
+    ...checkpoint.authoredEvents,
+    ...(checkpoint.derivedEvents ?? []),
+  ];
+  for (const event of events) {
     assertValidEvent(event);
   }
   for (const link of checkpoint.transferLinks ?? []) {
@@ -220,8 +244,20 @@ export const restoreCheckpoint = async (
     for (const source of checkpoint.sources) {
       await tx.objectStore('sources').put(source);
     }
-    for (const event of checkpoint.authoredEvents) {
-      await tx.objectStore('events').put(event);
+    // Through the identity index, exactly as `putEvents` does, NOT a bare
+    // put. The 'events' store has a UNIQUE index on
+    // [sourceId, externalId], so restoring onto a device that already
+    // synced the same source would collide - the two rows carry the same
+    // identity under different ids - and a failed request aborts the whole
+    // transaction. That turns an ordinary "restore my backup onto a device
+    // I already set up" into a restore that fails entirely. Keeping the
+    // existing id also means anything already referring to that row stays
+    // valid.
+    const eventStore = tx.objectStore('events');
+    const identity = eventStore.index('identity');
+    for (const event of events) {
+      const existing = await identity.get([event.sourceId, event.externalId]);
+      await eventStore.put(existing ? { ...event, id: existing.id } : event);
     }
     // Built through the store's own row builder rather than spread in
     // here, so the key cannot drift from the one `putManualLink` writes.

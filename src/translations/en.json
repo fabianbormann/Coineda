@@ -252,7 +252,6 @@
     "The address to track. Coineda only ever reads this address - it never asks for a private key.": "The address to track. Coineda only ever reads this address - it never asks for a private key.",
     "Could not reach the Yaci Store instance.": "Could not reach the Yaci Store instance.",
     "Create checkpoint": "Create checkpoint",
-    "A checkpoint carries your settings, your data sources and anything you entered yourself, so you can set up another device.": "A checkpoint carries your settings, your data sources and anything you entered yourself, so you can set up another device.",
     "Creating your checkpoint…": "Creating your checkpoint…",
     "Could not create a checkpoint. Try again.": "Could not create a checkpoint. Try again.",
     "Checkpoint QR code": "Checkpoint QR code",
@@ -417,6 +416,7 @@
     "Check {{count}} possible transfer_other": "Check {{count}} possible transfers",
     "This checkpoint is too large for a QR code, so it comes as a file. Send the file to your other device, then type the transfer secret below into it.": "This checkpoint is too large for a QR code, so it comes as a file. Send the file to your other device, then type the transfer secret below into it.",
     "Or download it as a file, if the other device is not in front of you.": "Or download it as a file, if the other device is not in front of you.",
-    "This secret travels with neither the code nor the file. Type it on your other device too - without it, what you send over is useless.": "This secret travels with neither the code nor the file. Type it on your other device too - without it, what you send over is useless."
+    "This secret travels with neither the code nor the file. Type it on your other device too - without it, what you send over is useless.": "This secret travels with neither the code nor the file. Type it on your other device too - without it, what you send over is useless.",
+    "A checkpoint carries your settings, your data sources and every transaction recorded here - so you can set up another device, and so your history outlives a source that no longer exists.": "A checkpoint carries your settings, your data sources and every transaction recorded here - so you can set up another device, and so your history outlives a source that no longer exists."
   }
 }

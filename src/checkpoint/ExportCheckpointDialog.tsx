@@ -153,7 +153,7 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
           <DialogTitle>{t('Create checkpoint')}</DialogTitle>
           <DialogDescription>
             {t(
-              'A checkpoint carries your settings, your data sources and anything you entered yourself, so you can set up another device.',
+              'A checkpoint carries your settings, your data sources and every transaction recorded here - so you can set up another device, and so your history outlives a source that no longer exists.',
             )}
           </DialogDescription>
         </DialogHeader>
