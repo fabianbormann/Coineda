@@ -842,9 +842,6 @@ export const TaxReportScreen = () => {
 
             {/* Sticky, because the report below runs for pages: the
                 control that starts and re-runs it must not be a scroll away
-                once a user has read down to the disposals. */}
-            {/* Sticky, because the report below runs for pages: the
-                control that starts and re-runs it must not be a scroll away
                 once a user has read down to the disposals.
 
                 Only Run is disabled mid-run. Leaving is NOT: a real run
@@ -853,8 +850,16 @@ export const TaxReportScreen = () => {
                 one. A screen has neither, so disabling both exits - as the
                 first draft of this conversion did - left the only way out
                 being the browser's own back button. The run's effect
-                cleanup is what makes abandoning safe. */}
-            <div className="glass-2 rim-t sticky bottom-0 flex flex-wrap gap-2 py-3 print:hidden">
+                cleanup is what makes abandoning safe.
+
+                `glass-chrome`, not `glass-2`: the report scrolls UNDER
+                this bar, and a 55% film let its lines slide through as a
+                blurred smear. `-mx-6 px-6` widens it back over the page's
+                own padding - contained inside it, the two 24px gutters
+                stayed uncovered and text scrolled past either side of the
+                bar. `z-10` states what document order was already giving
+                it, so a later positioned sibling cannot land on top. */}
+            <div className="glass-chrome rim-t sticky bottom-0 z-10 -mx-6 flex flex-wrap gap-2 px-6 py-3 print:hidden">
               <Button type="button" variant="ghost" onClick={goBack}>
                 {t('Back')}
               </Button>

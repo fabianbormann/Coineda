@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { StartFresh } from './StartFresh';
 import { ImportCheckpoint } from './ImportCheckpoint';
 
@@ -71,7 +72,14 @@ export const OnboardingFlow = ({ onComplete }: { onComplete: () => void }) => {
   })();
 
   return (
-    <div className="flex min-h-svh w-full items-center justify-center p-6">
+    <div className="relative flex min-h-svh w-full items-center justify-center p-6">
+      {/* Top right, where the shell keeps it once onboarding is done - this
+          is the only screen the shell does not wrap, so without it here
+          the very first thing a dark-mode user sees is the one screen they
+          cannot change. */}
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       {content}
     </div>
   );

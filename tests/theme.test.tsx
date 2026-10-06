@@ -203,3 +203,59 @@ describe('pre-paint theme script logic', () => {
     expect(runScript()).toBe(false);
   });
 });
+
+/**
+ * What the BROWSER paints, which no class in this app can reach: the
+ * caret, the selection pair, scrollbars, the controls inside a native
+ * input. All of it resolves light unless `color-scheme` says otherwise,
+ * and the app ships a dark theme.
+ */
+describe('color-scheme', () => {
+  const css = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'index.css'),
+    'utf8',
+  );
+
+  it('is declared for both themes, not left to the default', () => {
+    expect(css).toMatch(/:root\s*\{[^}]*color-scheme:\s*light/);
+    expect(css).toMatch(/\.dark\s*\{\s*color-scheme:\s*dark/);
+  });
+});
+
+/**
+ * A field must never hide what is typed into it.
+ *
+ * shadcn's Input carried `selection:text-primary-foreground`, and that
+ * token is Lumen's `--lm-on-fill` - the inverse of the page text, #f6f7fa
+ * in light mode and #0b0c10 in dark. It pairs with the solid `bg-primary`
+ * highlight, but Android renders text being composed in a highlight that
+ * takes the colour WITHOUT that background: every character came out
+ * near-white on white, or black on a dark field. Reported twice from a
+ * real phone before it was found.
+ */
+describe('the text field', () => {
+  const sourceFiles = (dir: string): string[] =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = path.join(dir, entry.name);
+      return entry.isDirectory()
+        ? sourceFiles(full)
+        : /\.tsx?$/.test(entry.name)
+          ? [full]
+          : [];
+    });
+
+  it('sets no selection colour of its own, anywhere in the app', () => {
+    // Every field, not just the Input: SourceForm keeps its own copy of
+    // these classes for a textarea, and it shipped the same pair.
+    const source = sourceFiles(path.join(__dirname, '..', 'src'))
+      .map((file) => fs.readFileSync(file, 'utf8'))
+      .join('\n');
+    // Comments stripped first: the one above the component names the
+    // classes it removed and why, which a raw scan would read as the
+    // classes still being there.
+    const code = source
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '');
+    expect(code.match(/selection:[\w/[\]-]+/g) ?? []).toEqual([]);
+  });
+});

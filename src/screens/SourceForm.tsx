@@ -25,8 +25,17 @@ type Props = {
 const inputTypeFor = (field: ManifestField): string =>
   field.type === 'apiKey' || field.type === 'secret' ? 'password' : 'text';
 
+/**
+ * The Input component's classes, minus the height, for a textarea.
+ *
+ * It styles no ::selection colour of its own, for the reason spelled out
+ * on the Input itself (src/components/ui/input.tsx): the on-fill text
+ * colour is the inverse of the page text, and Android paints text being
+ * composed in a highlight that takes that colour without its background -
+ * so an address pasted in here was invisible while being typed.
+ */
 const textAreaClassName =
-  'w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40';
+  'w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40';
 
 /**
  * Renders a module's label input plus every manifest field, the

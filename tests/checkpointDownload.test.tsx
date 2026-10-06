@@ -287,3 +287,52 @@ describe('handover beside backup', () => {
     expect(screen.queryByText(/recorded transactions do not fit/i)).toBeNull();
   });
 });
+
+/**
+ * Where the secret sits on screen.
+ *
+ * Scanning the code is only half an instruction - the other device then
+ * asks for a transfer secret. Stacked below a code that filled the dialog,
+ * the secret was off the bottom of a desktop window, so someone who had
+ * never heard of one scanned, got asked, and never found out the answer
+ * was on the screen in front of them.
+ *
+ * jsdom applies no CSS, so what is asserted is the STRUCTURE the layout
+ * rests on: the secret and the code are in one container, and the secret
+ * comes before the rest of the dialog rather than after it.
+ */
+describe('the transfer secret', () => {
+  it('sits in the same block as the code it belongs to', async () => {
+    openDialog();
+    const code = await screen.findByAltText(/checkpoint qr code/i);
+    const secret = screen.getByText(/^[A-Z2-7]{8}$/);
+
+    expect(code.parentElement).not.toBeNull();
+    expect(code.parentElement!.contains(secret)).toBe(true);
+  });
+
+  it('is not left below everything else', async () => {
+    openDialog();
+    await screen.findByAltText(/checkpoint qr code/i);
+    const secret = screen.getByText(/^[A-Z2-7]{8}$/);
+    const download = screen.getByRole('button', {
+      name: /download checkpoint/i,
+    });
+
+    // DOCUMENT_POSITION_FOLLOWING: the download button comes after the
+    // secret, i.e. the secret is not the last thing in the dialog.
+    expect(
+      secret.compareDocumentPosition(download) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('is shown once, not once per artifact', async () => {
+    // Two copies read as two different secrets, and the sealing run only
+    // ever produces one.
+    openDialog();
+    await screen.findByAltText(/checkpoint qr code/i);
+
+    expect(screen.getAllByText(/^[A-Z2-7]{8}$/)).toHaveLength(1);
+  });
+});

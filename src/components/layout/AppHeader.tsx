@@ -8,10 +8,13 @@ import { ThemeToggle } from '@/components/theme/ThemeToggle';
  * sidebar itself - see AppShell. A toggle for a panel with nothing in it
  * was worse than no toggle.
  *
- * glass-2 rather than a tinted background: `bg-background/95` resolved to
- * Lumen's near-black base in dark mode, so the bar read as a solid black
- * panel sitting on top of a coloured page. The glass tier brings its own
- * translucency and blur, so the wash behind it shows through.
+ * glass-chrome rather than a tinted background: `bg-background/95` resolved
+ * to Lumen's near-black base in dark mode, so the bar read as a solid black
+ * panel sitting on top of a coloured page. Nor one of Lumen's own tiers:
+ * `glass-2` is sheer enough that the page's body text slid visibly through
+ * this bar as it scrolled under it, blurred into a smear that moved with
+ * the scroll. `glass-chrome` (src/index.css) is the surface for exactly
+ * this - near-opaque, and still tinted by the wash behind it.
  *
  * The edge is rim-b rather than Lumen's `rim`: a full perimeter is right for
  * a floating card and wrong for a bar running to both screen edges, where it
@@ -28,7 +31,7 @@ import { ThemeToggle } from '@/components/theme/ThemeToggle';
  * beside it, so announcing it would read the name twice.
  */
 export const AppHeader = () => (
-  <header className="glass-2 rim-b sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 px-4 print:hidden">
+  <header className="glass-chrome rim-b sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 px-4 print:hidden">
     {/* The mark and the wordmark are ONE link, the way a site's masthead
         conventionally is: the whole thing is the way home, not a small
         image beside a title that is not. Its accessible name comes from

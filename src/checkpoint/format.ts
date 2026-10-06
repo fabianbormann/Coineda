@@ -43,11 +43,19 @@ import {
   ONBOARDED_KEY,
   type Settings,
 } from '@/settings/settingsStore';
-import { generateTransferSecret, seal, unseal } from './crypto';
+import {
+  generateTransferSecret,
+  normalizeTransferSecret,
+  seal,
+  TRANSFER_SECRET_LENGTH,
+  unseal,
+} from './crypto';
 import { chooseChannel, encodeQrPayload, QR_BYTE_LIMIT } from './channel';
 
 export {
   generateTransferSecret,
+  normalizeTransferSecret,
+  TRANSFER_SECRET_LENGTH,
   chooseChannel,
   QR_BYTE_LIMIT,
   encodeQrPayload,

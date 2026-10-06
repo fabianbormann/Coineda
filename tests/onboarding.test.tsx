@@ -109,6 +109,50 @@ const renderFlow = (onComplete = vi.fn()) => {
   return onComplete;
 };
 
+/**
+ * The start screen is the one screen the shell does not wrap, so the
+ * header's theme toggle is not there - and a dark-mode user met the app
+ * for the first time on the one screen they could not change.
+ */
+describe('the start screen', () => {
+  it('offers the theme toggle the shell carries everywhere else', async () => {
+    renderFlow();
+
+    expect(
+      await screen.findByRole('group', { name: /theme/i }),
+    ).toBeInTheDocument();
+    for (const name of [/light/i, /dark/i, /system/i]) {
+      expect(screen.getByRole('button', { name })).toBeInTheDocument();
+    }
+  });
+
+  it('switches the theme from there, rather than only showing the control', async () => {
+    renderFlow();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /^dark$/i }),
+    );
+
+    await waitFor(() =>
+      expect(document.documentElement.classList.contains('dark')).toBe(true),
+    );
+    // The choice is persisted and the class is on <html>, both of which
+    // outlive this test - the rest of the file renders in light mode.
+    document.documentElement.classList.remove('dark');
+    localStorage.clear();
+  });
+
+  it('keeps it reachable on the restore step too', async () => {
+    // It sits on the flow's own frame, not inside the choice card, so
+    // stepping into a route does not take it away.
+    renderFlow();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /have a checkpoint/i }),
+    );
+
+    expect(screen.getByRole('group', { name: /theme/i })).toBeInTheDocument();
+  });
+});
+
 describe('locale defaults', () => {
   it('maps a known locale to its language and currency', () => {
     expect(defaultsForLocale('de-DE')).toEqual({
@@ -540,5 +584,189 @@ describe('decoding a scanned QR frame', () => {
       height: 100,
     };
     expect(decodeQrPayload(blank)).toBeNull();
+  });
+});
+
+/**
+ * The camera route, end to end, against a real sealed checkpoint - the
+ * route the flow presents FIRST and the only one none of the tests above
+ * drive past the permission prompt.
+ *
+ * Everything jsdom does not have is stubbed at the edges: a stream object,
+ * a video that reports itself ready, and a 2D context handing back a real
+ * rasterized QR (`rasterizeQr` above) instead of pixels from a camera.
+ * What runs in between - the constraints asked for, the scan loop, the
+ * state it lands in, the field it exposes and the restore it performs - is
+ * the component's own.
+ */
+describe('scanning a checkpoint', () => {
+  const fakeCamera = () => {
+    const stopTrack = vi.fn();
+    const getUserMedia = vi.fn().mockResolvedValue({
+      getTracks: () => [{ stop: stopTrack }],
+    } as unknown as MediaStream);
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      mediaDevices: { getUserMedia },
+    });
+    return { getUserMedia, stopTrack };
+  };
+
+  /**
+   * Makes the scan loop see one frame containing `sealed`.
+   *
+   * `scanFrame` bails out and reschedules itself until the video reports
+   * HAVE_ENOUGH_DATA, so the readiness getters are what let it run at all;
+   * jsdom's `getContext` throws "not implemented", so the context is the
+   * other half. Returns a restore function - these are prototype-level and
+   * would otherwise leak into every later test in the file.
+   */
+  const showQrToTheCamera = (sealed: Uint8Array) => {
+    const frame = rasterizeQr(sealed);
+    const spies = [
+      vi
+        .spyOn(HTMLMediaElement.prototype, 'readyState', 'get')
+        .mockReturnValue(4),
+      vi
+        .spyOn(HTMLVideoElement.prototype, 'videoWidth', 'get')
+        .mockReturnValue(frame.width),
+      vi
+        .spyOn(HTMLVideoElement.prototype, 'videoHeight', 'get')
+        .mockReturnValue(frame.height),
+      vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined),
+      vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+        drawImage: () => {},
+        getImageData: () => frame,
+      } as unknown as CanvasRenderingContext2D),
+    ];
+    return () => spies.forEach((spy) => spy.mockRestore());
+  };
+
+  it('asks for the rear camera, not the one pointing at the user', async () => {
+    // A phone's default is the front camera, which leaves someone trying
+    // to scan their other device looking at their own face.
+    const { getUserMedia } = fakeCamera();
+    const restore = showQrToTheCamera(
+      await sealCheckpoint(emptyCheckpoint, 'AAAAAAAA'),
+    );
+    try {
+      renderFlow();
+      await userEvent.click(
+        await screen.findByRole('button', { name: /have a checkpoint/i }),
+      );
+      await userEvent.click(
+        await screen.findByRole('button', { name: /scan/i }),
+      );
+
+      await waitFor(() => expect(getUserMedia).toHaveBeenCalled());
+      expect(getUserMedia).toHaveBeenCalledWith({
+        video: { facingMode: { ideal: 'environment' } },
+      });
+    } finally {
+      restore();
+    }
+  });
+
+  it('replaces the preview with the secret field once the code is read', async () => {
+    // The preview is a square the width of the card: left on screen, it
+    // pushed the field below the fold and a phone's keyboard covered what
+    // was left of it, so the one thing being typed into was the one thing
+    // not visible.
+    fakeCamera();
+    const secret = generateTransferSecret();
+    const restore = showQrToTheCamera(
+      await sealCheckpoint(emptyCheckpoint, secret),
+    );
+    try {
+      const onComplete = renderFlow();
+      await userEvent.click(
+        await screen.findByRole('button', { name: /have a checkpoint/i }),
+      );
+      await userEvent.click(
+        await screen.findByRole('button', { name: /scan/i }),
+      );
+
+      const field = await screen.findByLabelText(/transfer secret/i);
+      expect(document.querySelector('video')).toBeNull();
+
+      // And it restores from there, which nothing else proves for the
+      // scanned payload: `decodeQrPayload`'s own test stops at the bytes.
+      await userEvent.type(field, secret);
+      await userEvent.click(
+        await screen.findByRole('button', { name: /^restore/i }),
+      );
+      // findAll: sonner's toasts outlive the test that raised them, and
+      // every restore in this file raises this same one.
+      expect(
+        (await screen.findAllByText(/welcome back/i)).length,
+      ).toBeGreaterThan(0);
+      await waitFor(() => expect(onComplete).toHaveBeenCalled());
+      expect(await isOnboarded()).toBe(true);
+    } finally {
+      restore();
+    }
+  });
+});
+
+/**
+ * A secret is upper-case base32, and the thing typing it is usually a
+ * phone keyboard that disagrees.
+ */
+describe('typing a transfer secret', () => {
+  const openFileRoute = async () => {
+    renderFlow();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /have a checkpoint/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /from a file/i }),
+    );
+    return screen.findByLabelText(/transfer secret/i);
+  };
+
+  it('keeps every keystroke exactly as typed', async () => {
+    // The field used to normalise on every keystroke, which means a
+    // controlled input handing the keyboard back something other than
+    // what it just sent. On Android that lands in the middle of composing
+    // a character, and what the person typed never appeared at all.
+    const field = await openFileRoute();
+    await userEvent.type(field, 'ab2cdefg');
+
+    expect(field).toHaveValue('ab2cdefg');
+  });
+
+  it('tidies the field up once you leave it', async () => {
+    const field = await openFileRoute();
+    await userEvent.type(field, 'ab2 cd-ef');
+    await userEvent.tab();
+
+    expect(field).toHaveValue('AB2CDEF');
+  });
+
+  it('opens a checkpoint from a secret typed in lower case', async () => {
+    // The point of all of the above. Android drops back to lower case
+    // after the first character, and the secret it then sends fails
+    // AES-GCM authentication - which the form can only report as "that
+    // transfer secret is wrong", to someone who read it off the other
+    // screen correctly.
+    const secret = generateTransferSecret();
+    const sealed = await sealCheckpoint(emptyCheckpoint, secret);
+
+    const field = await openFileRoute();
+    await userEvent.upload(
+      await screen.findByLabelText(/checkpoint file/i),
+      sealedToFile(sealed, 'checkpoint.coineda'),
+    );
+    await userEvent.type(field, secret.toLowerCase());
+    await userEvent.click(
+      await screen.findByRole('button', { name: /^restore/i }),
+    );
+
+    expect(
+      (await screen.findAllByText(/welcome back/i)).length,
+    ).toBeGreaterThan(0);
+    await waitFor(async () => {
+      expect(await isOnboarded()).toBe(true);
+    });
   });
 });

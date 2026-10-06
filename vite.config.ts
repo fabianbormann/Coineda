@@ -4,6 +4,26 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import basicSsl from '@vitejs/plugin-basic-ssl';
+
+/**
+ * TLS on the dev server, for testing on a real phone over the LAN.
+ *
+ * `getUserMedia` - the QR scanner in the restore flow - is gated on a
+ * secure context, and `http://<lan-ip>:3000` is not one: only localhost
+ * gets the exemption, so the camera is blocked on every other device on
+ * the network. Vite has no `--https` flag (it was removed in v5); a
+ * certificate is required, and this plugin generates and caches a
+ * self-signed one.
+ *
+ * Opt-in rather than always on, because a self-signed certificate costs
+ * something: the browser interstitial has to be clicked through on every
+ * device, and `npm start` on this machine needs none of it. `npm run
+ * dev:expose:https` sets the variable; everything else - plain `vite`,
+ * `electron-dev`, the production build, CI - is untouched. (POSIX shell
+ * syntax in that script, which is what this repo is developed on.)
+ */
+const devHttps = process.env.COINEDA_DEV_HTTPS === '1';
 
 export default defineConfig({
   // Relative base: one build has to work from Electron's file:// window AND
@@ -13,6 +33,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    ...(devHttps ? [basicSsl()] : []),
     VitePWA({
       // autoUpdate + skipWaiting: a returning user must never be pinned to a
       // stale app shell, because there is no in-app update prompt to rescue them.

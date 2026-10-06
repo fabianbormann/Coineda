@@ -154,7 +154,7 @@ const renderScreen = () =>
     <ThemeProvider>
       <ConfirmProvider>
         <MemoryRouter>
-          <MainScreen />
+          <MainScreen onReset={vi.fn()} />
         </MemoryRouter>
       </ConfirmProvider>
     </ThemeProvider>,

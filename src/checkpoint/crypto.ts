@@ -20,6 +20,9 @@ const PBKDF2_ITERATIONS = 600_000;
 
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
+/** How many characters a secret has - the one place that decides it. */
+export const TRANSFER_SECRET_LENGTH = 8;
+
 /**
  * Eight base32 characters (~40 bits) - a six-digit PIN is a million
  * combinations and brute-forceable offline in hours if a QR image leaks;
@@ -33,7 +36,7 @@ export const generateTransferSecret = (): string => {
   const rejectAt = 256 - (256 % alphabetSize);
   const byte = new Uint8Array(1);
   let secret = '';
-  while (secret.length < 8) {
+  while (secret.length < TRANSFER_SECRET_LENGTH) {
     crypto.getRandomValues(byte);
     if (byte[0] >= rejectAt) {
       continue;
@@ -42,6 +45,30 @@ export const generateTransferSecret = (): string => {
   }
   return secret;
 };
+
+/**
+ * Turns what someone typed into what `generateTransferSecret` can actually
+ * have produced, so the import form cannot be failed by a keyboard.
+ *
+ * A secret is upper-case base32 and nothing else, but the thing typing it
+ * is usually a phone: Android's keyboard drops back to lower case after
+ * the first character, and a long-pressed paste can arrive with spaces or
+ * dashes in it. Every one of those produces a secret that is *right* and
+ * still fails AES-GCM authentication - which the form can only report as
+ * "that transfer secret is wrong", the single most misleading thing it
+ * could say to someone who copied it correctly.
+ *
+ * Characters outside the alphabet are dropped rather than mapped (a typed
+ * `0` is not silently read as `O`): the secret is shown, not remembered,
+ * so a wrong character is a mis-read to correct, not an ambiguity to
+ * guess at. Lives here, next to the alphabet it is derived from, so the
+ * two cannot drift apart.
+ */
+export const normalizeTransferSecret = (typed: string): string =>
+  Array.from(typed.toUpperCase())
+    .filter((character) => BASE32_ALPHABET.includes(character))
+    .join('')
+    .slice(0, TRANSFER_SECRET_LENGTH);
 
 const deriveKey = async (
   secret: string,

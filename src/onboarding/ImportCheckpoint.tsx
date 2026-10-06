@@ -14,7 +14,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { notify } from '@/lib/notify';
-import { openCheckpoint, restoreCheckpoint } from '@/checkpoint/format';
+import {
+  normalizeTransferSecret,
+  openCheckpoint,
+  restoreCheckpoint,
+} from '@/checkpoint/format';
 
 type Props = {
   onComplete: () => void;
@@ -77,6 +81,59 @@ export const decodeQrPayload = (imageData: {
     return null;
   }
   return new Uint8Array(result.binaryData);
+};
+
+/**
+ * The one place a transfer secret gets typed - both routes into this
+ * screen (a scanned code and a chosen file) need exactly the same field,
+ * and the hints below are the whole reason it is shared rather than
+ * written out twice.
+ *
+ * A secret is upper-case base32, and the field reaches that WITHOUT
+ * rewriting the value on every keystroke. It did at first, and a
+ * controlled input whose value comes back changed is a fight with the
+ * phone keyboard that typed it: on Android the character being composed
+ * gets re-set under the keyboard's feet. So the value stays exactly what
+ * was typed, `uppercase` shows it in the shape the other device displays,
+ * blurring normalises what is in the field, and `openCheckpoint` is handed
+ * a normalised copy either way - a secret typed in lower case, or pasted
+ * with spaces or dashes in it, opens the checkpoint.
+ *
+ * `autoCapitalize="characters"` keeps an Android keyboard in upper case
+ * rather than dropping back after the first character. Autocorrect and
+ * spellcheck are off because an 8-character nonsense word is precisely
+ * what a phone keyboard likes to "fix". `placeholder:normal-case` because
+ * `uppercase` would otherwise shout the placeholder sentence.
+ */
+const TransferSecretField = ({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  onChange: (secret: string) => void;
+}) => {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-col gap-2">
+      <Label htmlFor={id}>{t('Transfer secret')}</Label>
+      <Input
+        id={id}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={() => onChange(normalizeTransferSecret(value))}
+        placeholder={t(
+          'Enter the 8-character transfer secret shown on your other device.',
+        )}
+        autoCapitalize="characters"
+        autoCorrect="off"
+        autoComplete="off"
+        spellCheck={false}
+        className="font-mono uppercase placeholder:normal-case"
+      />
+    </div>
+  );
 };
 
 export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
@@ -173,8 +230,14 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
       if (!navigator.mediaDevices?.getUserMedia) {
         throw new Error('camera unavailable');
       }
+      // `facingMode: environment` is the rear camera - the one pointing
+      // at the other device's screen. Without it a phone opens the front
+      // camera and the user is scanning their own face. `ideal` rather
+      // than `exact`: a laptop has only one camera, and asking for a
+      // facing mode it cannot satisfy would reject the whole request and
+      // send a desktop user to the file route for no reason.
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
+        video: { facingMode: { ideal: 'environment' } },
       });
       if (cancelledRef.current) {
         // Unmounted while the permission prompt was open - this stream
@@ -259,7 +322,12 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
       // restoreCheckpoint owns setting `onboarded` - it does so last, inside
       // its own atomic transaction, so any failure anywhere in this
       // sequence leaves the install un-onboarded rather than half-applied.
-      const checkpoint = await openCheckpoint(payload, secret);
+      // Normalised here rather than in the field: see TransferSecretField
+      // above - what is in state is what was typed.
+      const checkpoint = await openCheckpoint(
+        payload,
+        normalizeTransferSecret(secret),
+      );
       await restoreCheckpoint(checkpoint);
       // Apply the restored language, the same way StartFresh applies the
       // chosen one. Nothing reads settings.language back on boot and this
@@ -349,12 +417,20 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>{t('Restore a checkpoint')}</CardTitle>
-          {!cameraError && (
+          {payload ? (
             <CardDescription>
               {t(
-                'Point your camera at the QR code shown on your other device.',
+                'Code scanned. Now type the transfer secret shown on your other device.',
               )}
             </CardDescription>
+          ) : (
+            !cameraError && (
+              <CardDescription>
+                {t(
+                  'Point your camera at the QR code shown on your other device.',
+                )}
+              </CardDescription>
+            )
           )}
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -363,26 +439,28 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
               {cameraError}
             </p>
           ) : (
-            <video
-              ref={videoRef}
-              className="aspect-square w-full rounded-md bg-muted"
-              muted
-              playsInline
-            />
+            // The preview goes away the moment a code has been read, and
+            // not only because it has nothing left to show: it is a
+            // square the width of the card, so on a phone it pushed the
+            // secret field below the fold, and the on-screen keyboard
+            // that opens on focus then covered what was left. The field
+            // has to be the thing on screen while it is being typed into.
+            !payload && (
+              <video
+                ref={videoRef}
+                className="aspect-square w-full rounded-md bg-muted"
+                muted
+                playsInline
+              />
+            )
           )}
           <canvas ref={canvasRef} className="hidden" />
           {payload && (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="transfer-secret-scan">
-                {t('Transfer secret')}
-              </Label>
-              <Input
+              <TransferSecretField
                 id="transfer-secret-scan"
                 value={secret}
-                onChange={(event) => setSecret(event.target.value)}
-                placeholder={t(
-                  'Enter the 8-character transfer secret shown on your other device.',
-                )}
+                onChange={setSecret}
               />
               {formError && (
                 <p className="text-sm text-destructive" role="alert">
@@ -437,17 +515,11 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
               onChange={handleFileChosen}
             />
           </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="transfer-secret-file">{t('Transfer secret')}</Label>
-            <Input
-              id="transfer-secret-file"
-              value={secret}
-              onChange={(event) => setSecret(event.target.value)}
-              placeholder={t(
-                'Enter the 8-character transfer secret shown on your other device.',
-              )}
-            />
-          </div>
+          <TransferSecretField
+            id="transfer-secret-file"
+            value={secret}
+            onChange={setSecret}
+          />
           {formError && (
             <p className="text-sm text-destructive" role="alert">
               {formError}

@@ -59,7 +59,17 @@ const App = () => {
         <HashRouter>
           <AppShell>
             <Routes>
-              <Route path="/" element={<MainScreen />} />
+              <Route
+                path="/"
+                element={
+                  /* The gate this component owns is also the way back from
+                     a reset: an emptied ledger has no `onboarded` flag any
+                     more, so the app has to show onboarding again - and
+                     flipping the state here does it without a page
+                     reload. */
+                  <MainScreen onReset={() => setState('pending')} />
+                }
+              />
               {/* Its own route rather than a dialog over the overview. A
                   report is a long, wide document, and a dialog gave it
                   672px with the rest clipped behind a horizontal

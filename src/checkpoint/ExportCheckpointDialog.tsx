@@ -167,9 +167,32 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
     URL.revokeObjectURL(url);
   };
 
+  /**
+   * The secret, wherever it belongs on screen.
+   *
+   * It is needed by whichever artifact the user reaches for, so it sits
+   * next to the code when there is one and on its own when there is not -
+   * never once per artifact, which would read as two different secrets.
+   */
+  const transferSecret = ready && (
+    <div className="flex min-w-0 flex-col gap-2">
+      <h4 className="text-sm font-medium">{t('Transfer secret')}</h4>
+      <p className="rounded-md bg-muted px-3 py-2 text-center font-mono text-lg tracking-widest select-all">
+        {ready.secret}
+      </p>
+      <p className="text-sm text-muted-foreground">
+        {t(
+          'This secret travels with neither the code nor the file. Type it on your other device too - without it, what you send over is useless.',
+        )}
+      </p>
+    </div>
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      {/* Wider than the default dialog so the code and the secret fit
+          side by side rather than stacking into a scroll. */}
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{t('Create checkpoint')}</DialogTitle>
           <DialogDescription>
@@ -225,11 +248,26 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
                     </p>
                   )}
                 </div>
-                <img
-                  src={ready.qrDataUrl}
-                  alt={t('Checkpoint QR code')}
-                  className="mx-auto h-auto w-full max-w-xs"
-                />
+                {/* Code and secret in one row, because they are one
+                    instruction: scan this, then type that. Stacked, the
+                    code alone filled the dialog and the secret sat below
+                    the fold - so someone who had never heard of a
+                    transfer secret scanned the code, was asked for one on
+                    their phone, and had no idea the screen in front of
+                    them was showing it. */}
+                <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+                  <img
+                    src={ready.qrDataUrl}
+                    alt={t('Checkpoint QR code')}
+                    // 288px, not smaller: a checkpoint close to the QR byte
+                    // limit encodes as a version-40 code, 177 modules
+                    // across, and shrinking it to make room would put a
+                    // module under two device pixels and stop it
+                    // scanning.
+                    className="h-auto w-full max-w-72 shrink-0 rounded-md sm:w-72"
+                  />
+                  {transferSecret}
+                </div>
               </div>
             )}
 
@@ -258,16 +296,9 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
               </Button>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <p className="rounded-md bg-muted px-3 py-2 text-center font-mono text-lg tracking-widest select-all">
-                {ready.secret}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {t(
-                  'This secret travels with neither the code nor the file. Type it on your other device too - without it, what you send over is useless.',
-                )}
-              </p>
-            </div>
+            {/* No code to sit beside: the file is the only route, and
+                the secret belongs under it. */}
+            {ready.qrDataUrl === null && transferSecret}
           </div>
         )}
 

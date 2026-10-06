@@ -76,6 +76,15 @@
 }
 
 :root {
+  /* Declared, because the browser paints things this stylesheet cannot
+     reach: the caret, the selection pair, scrollbars, and the native
+     controls inside a date or file input. Undeclared, they all resolve
+     light - so in dark mode the app had a light scrollbar and, worse, a
+     selection pair meant for a white page. This is also what makes the
+     UA's `highlight`/`highlighttext` legible on a dark field, which is
+     what src/components/ui/input.tsx now relies on. */
+  color-scheme: light;
+
   /* Lumen is a sharp-cornered system; its own @theme resets --radius-*, and
      these are the shadcn-derived scale that would otherwise re-round every
      component. */
@@ -136,6 +145,8 @@
 }
 
 .dark {
+  color-scheme: dark;
+
   /* Zinc-950/900 range rather than pure black: pure black produces
      halation and smeared contrast on OLED panels. */
   /* Everything Lumen owns is already swapped: its own --lm-* tokens change
@@ -173,6 +184,35 @@
     opacity: var(--lm-rim-opacity, 0.6);
     pointer-events: none;
   }
+}
+
+/* The surface for chrome that page content scrolls UNDER - the sticky
+   header, the tax report's sticky action bar.
+
+   Lumen's own tiers are too sheer for this. `glass-2` is a 55% white film
+   in light mode and a 9% one in dark, which is right for a card sitting
+   still on the page: whatever is behind it does not move, so the
+   translucency reads as material. Under a scrolling page it reads as a
+   fault - body text slides through the bar, blurred into a grey smear that
+   follows the scroll, and in dark mode the film is so thin that the text
+   stays almost legible through it.
+
+   Opaque is not the answer either: `bg-background/95` was tried on the
+   header and resolved to Lumen's near-black base, so the bar read as a
+   solid black panel laid over a coloured page (see AppHeader).
+
+   So: the page's OWN base colour at 88%, with the glass-1 film over it and
+   the blur kept. Together that is ~92% coverage - enough that nothing
+   behind is recognisable - while the remaining sliver of blurred wash
+   keeps the bar tinted by the page it belongs to rather than flat. */
+@utility glass-chrome {
+  position: relative;
+  background:
+    linear-gradient(var(--lm-glass-1), var(--lm-glass-1)),
+    color-mix(in oklch, var(--lm-bg) 88%, transparent);
+  backdrop-filter: blur(28px) saturate(150%);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+  box-shadow: var(--lm-glow);
 }
 
 @utility rim-t {

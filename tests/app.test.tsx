@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import 'fake-indexeddb/auto';
 import App from '../src/App';
 import { notify } from '@/lib/notify';
 import { openLedger } from '@/ledger/db';
-import { setOnboarded } from '@/settings/settingsStore';
+import { isOnboarded, setOnboarded } from '@/settings/settingsStore';
 
 beforeEach(async () => {
   localStorage.clear();
@@ -47,6 +48,23 @@ describe('App', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /dark/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /system/i })).toBeInTheDocument();
+  });
+
+  it('goes back to the welcome screen after a confirmed reset', async () => {
+    // The gate and the reset are in two different places - App owns
+    // `isOnboarded()`, MainScreen owns the button - and the wiring between
+    // them is the whole point: wiping the ledger while the app keeps
+    // showing an emptied overview is the failure this guards against.
+    render(<App />);
+    await userEvent.click(
+      await screen.findByRole('button', { name: /reset this device/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /reset everything/i }),
+    );
+
+    expect(await screen.findByText(/welcome to coineda/i)).toBeInTheDocument();
+    expect(await isOnboarded()).toBe(false);
   });
 
   it('mounts a Toaster subscribed to notify.*, unconditionally rather than nested inside a route', async () => {

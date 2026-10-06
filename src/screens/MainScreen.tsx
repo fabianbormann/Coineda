@@ -16,6 +16,7 @@ import { valueOf } from '@/prices/scale';
 import { compareAmounts, sumAmounts } from '@/ledger/amount';
 import { syncAll, syncSource } from '@/sync/syncSource';
 import { getSettings } from '@/settings/settingsStore';
+import { resetDevice } from '@/settings/resetDevice';
 import { useConfirm } from '@/components/confirm/ConfirmProvider';
 import { notify } from '@/lib/notify';
 import { ExportCheckpointDialog } from '@/checkpoint/ExportCheckpointDialog';
@@ -39,7 +40,22 @@ import { fileRegistry } from '@/sources/csv/registry';
 
 const DEFAULT_CURRENCY = 'eur';
 
-export const MainScreen = () => {
+type Props = {
+  /**
+   * Called once this device has actually been wiped, so the app can go
+   * back to onboarding.
+   *
+   * A prop rather than something this screen does for itself: `App` owns
+   * the `isOnboarded()` gate, and the screen that happens to host the
+   * button is not the right place to decide what the app shows next. It
+   * also means no page reload is needed to get there - this component
+   * unmounts, and every piece of state it was holding about the ledger
+   * goes with it.
+   */
+  onReset: () => void;
+};
+
+export const MainScreen = ({ onReset }: Props) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const confirm = useConfirm();
@@ -58,6 +74,7 @@ export const MainScreen = () => {
   const [syncingAll, setSyncingAll] = useState(false);
   const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set());
   const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
+  const [resetting, setResetting] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   /** The source EditSourceDialog is currently open for. Kept separate from
@@ -612,6 +629,37 @@ export const MainScreen = () => {
     }
   };
 
+  const handleReset = async () => {
+    const proceed = await confirm({
+      title: t('Reset this device?'),
+      // Spells out all three things it takes and that none of them are
+      // recoverable, because none of that is guessable from the label and
+      // there is no server-side copy to fall back on.
+      description: t(
+        'This deletes every data source, every transaction and every setting stored here, and starts over at the welcome screen. Nothing is stored anywhere else, so only a checkpoint you already created can bring it back.',
+      ),
+      confirmLabel: t('Reset everything'),
+      cancelLabel: t('Cancel'),
+      destructive: true,
+    });
+    if (!proceed) {
+      return;
+    }
+    setResetting(true);
+    try {
+      await resetDevice();
+      // Raised before handing over: `onReset` unmounts this screen, and
+      // the onboarding flow that replaces it says nothing about where it
+      // came from, so without this a confirmed reset and a crash back to
+      // the welcome screen would look identical.
+      notify.success(t('This device has been reset.'));
+      onReset();
+    } catch {
+      notify.error(t('Could not reset this device. Try again.'));
+      setResetting(false);
+    }
+  };
+
   const handleRemove = async (source: SourceRecord) => {
     if (busyIds.has(source.id)) {
       return;
@@ -760,6 +808,28 @@ export const MainScreen = () => {
           open={journeyDialogOpen}
           onOpenChange={setJourneyDialogOpen}
         />
+        {/* Last on the page, below the list and well away from the four
+            "create" actions at the top: it is the only control here that
+            destroys anything, and the one nobody should reach by aiming
+            for something else. The sentence is not decoration - someone
+            who reads only the button has no idea a checkpoint is the one
+            thing that would have saved them. */}
+        <div className="flex flex-col items-start gap-2 pt-2">
+          <p className="text-sm text-muted-foreground">
+            {t(
+              'Deleting everything on this device starts it over at the welcome screen. Create a checkpoint first if you want any of it back.',
+            )}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="text-destructive"
+            onClick={handleReset}
+            disabled={resetting}
+          >
+            {t('Reset this device')}
+          </Button>
+        </div>
         <ReviewTransfersDialog
           open={transfersDialogOpen}
           onOpenChange={setTransfersDialogOpen}
