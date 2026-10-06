@@ -117,7 +117,7 @@ export const SourceEventsDialog = ({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{source?.label ?? t('Events')}</DialogTitle>
           <DialogDescription>

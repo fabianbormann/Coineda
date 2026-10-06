@@ -59,12 +59,30 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "glass-3 rim rim-strong fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 p-6 duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
+          // `overflow-hidden` and the height cap live HERE, on the bordered
+          // box, while the scrolling happens on the wrapper below.
+          //
+          // They cannot share an element. `rim` draws its border as an
+          // absolutely positioned pseudo-element at `inset: 0`, and on a
+          // scroll container that resolves against the SCROLLABLE area, not
+          // the visible one - so the frame gets drawn around the full
+          // content height and its edges cut across the middle of the view
+          // as you scroll. The close button, also absolutely positioned,
+          // scrolls away with it for the same reason.
+          "glass-3 rim rim-strong fixed top-[50%] left-[50%] z-50 flex max-h-[85vh] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] flex-col overflow-hidden p-6 duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
           className
         )}
         {...props}
       >
-        {children}
+        {/* `min-h-0` is what actually lets this shrink: a flex item defaults
+            to `min-height: auto`, so without it the wrapper grows to its
+            content and the cap above never bites. */}
+        <div
+          data-slot="dialog-body"
+          className="grid min-h-0 gap-4 overflow-y-auto"
+        >
+          {children}
+        </div>
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
