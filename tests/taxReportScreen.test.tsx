@@ -1120,18 +1120,26 @@ describe('where the figures come from', () => {
 
 describe('what reaches the paper', () => {
   it('keeps the input form off the printed page', async () => {
+    // An empty API-key box, its help text and a tax-rate field printed in
+    // the middle of a document handed to a tax office.
+    //
+    // This used to assert the form carried `print:hidden`. It no longer
+    // carries anything, because the form and the report are separate steps
+    // and the form is not rendered at all once the report is showing -
+    // which is the same guarantee reached structurally rather than by a
+    // class that a later edit could drop. Asserted over the whole tree, so
+    // a field reintroduced anywhere on this step fails it.
     taxRegistry.push(makeModule());
     await putEvents([acquisitionEvent, disposalEvent]);
 
     const { container } = renderScreen();
     await runReport('2025');
 
-    // An empty API-key field, its help text and a tax-rate box are controls
-    // for running the report, not statements about it. They printed.
-    const form = container.querySelector('[data-testid="report-form"]');
-    expect(form).not.toBeNull();
-    expect(form?.className).toContain('print:hidden');
-    expect(form?.textContent).toMatch(/CoinGecko/);
+    expect(container.querySelector('[data-testid="report-form"]')).toBeNull();
+    expect(container.querySelectorAll('input')).toHaveLength(0);
+    expect(screen.queryByLabelText(/coingecko/i)).toBeNull();
+    // And the document itself is there.
+    expect(screen.getByText(/taxable gain/i)).toBeInTheDocument();
   });
 
   it('says so when the tax year has not ended yet', async () => {
@@ -1383,5 +1391,106 @@ describe('what the sheet says about its own origin', () => {
     const mark = container.querySelector('[data-print="mark"]');
     expect(mark?.tagName).toBe('IMG');
     expect(mark?.getAttribute('src')).toMatch(/coineda-mark/);
+  });
+});
+
+describe('the form and the report are separate steps', () => {
+  it('replaces the form with the report once the run finishes', async () => {
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+
+    // Appending a document under a form it does not belong to is what made
+    // the screen read as "content suddenly appeared": the controls that
+    // produced the figures stayed above them, and a stale result sat under
+    // a form showing different inputs.
+    expect(screen.queryByLabelText(/^steuerjahr$|^tax year$/i)).toBeNull();
+    expect(screen.queryByLabelText(/coingecko/i)).toBeNull();
+    expect(screen.getByText(/taxable gain/i)).toBeInTheDocument();
+  });
+
+  it('returns to the form with the values still in it', async () => {
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: /change your answers|eingaben ändern/i,
+      }),
+    );
+
+    expect(await screen.findByLabelText(/^tax year$/i)).toHaveValue(2025);
+    expect(screen.queryByText(/taxable gain/i)).toBeNull();
+  });
+
+  it('offers the finished report again without recomputing it', async () => {
+    // A run takes minutes - one historical price lookup per disposal - so
+    // stepping back to read an input must not cost one.
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: /change your answers|eingaben ändern/i,
+      }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: /view the report|zum report/i,
+      }),
+    );
+
+    expect(await screen.findByText(/taxable gain/i)).toBeInTheDocument();
+  });
+
+  it('discards the result when an input that feeds it changes', async () => {
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: /change your answers|eingaben ändern/i,
+      }),
+    );
+
+    const year = await screen.findByLabelText(/^tax year$/i);
+    await userEvent.clear(year);
+    await userEvent.type(year, '2024');
+
+    // No way forward to a report computed for a different year.
+    expect(
+      screen.queryByRole('button', { name: /view the report|zum report/i }),
+    ).toBeNull();
+  });
+
+  it('keeps the result when only the printed identity changes', async () => {
+    // The name and the tax number appear on the sheet and in no figure, so
+    // correcting a typo must not cost a recomputation.
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: /change your answers|eingaben ändern/i,
+      }),
+    );
+    await userEvent.type(
+      await screen.findByLabelText(/your name/i),
+      'Erika Mustermann',
+    );
+
+    expect(
+      screen.getByRole('button', { name: /view the report|zum report/i }),
+    ).toBeInTheDocument();
   });
 });

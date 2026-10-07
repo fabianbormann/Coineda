@@ -205,6 +205,18 @@ export const TaxReportScreen = () => {
    */
   const [hideOutsideYear, setHideOutsideYear] = useState(true);
 
+  /**
+   * Which of the two screens inside a chosen jurisdiction is showing.
+   *
+   * Explicit state rather than derived from `assessment`, because the two
+   * transitions it has to support pull in opposite directions: stepping
+   * back from a finished report must KEEP that report (a run is one
+   * historical price lookup per disposal and takes minutes, so re-reading
+   * an input cannot cost one), while changing an input that feeds it must
+   * drop it. Derived from `assessment !== null`, the first of those would
+   * be impossible.
+   */
+  const [step, setStep] = useState<'form' | 'report'>('form');
   const [module, setModule] = useState<TaxModule | null>(null);
   // Built once, when the jurisdiction is actually chosen (an event
   // handler, not render), because `buildDisclaimer` takes the current time
@@ -271,6 +283,22 @@ export const TaxReportScreen = () => {
     };
   }, []);
 
+  /**
+   * Discards a finished report, because an input that feeds it changed.
+   *
+   * A report is only ever valid for the inputs that produced it, and the
+   * screen used to keep showing one while the form above it said something
+   * else - a 2025 report under a form reading 2026. Only the three inputs
+   * the RUN consumes do this: the taxpayer's name and tax number are
+   * printed on the sheet and enter no figure, so correcting a typo in one
+   * must not cost a recomputation.
+   */
+  const invalidateReport = () => {
+    setAssessment(null);
+    setStatus('idle');
+    setStep('form');
+  };
+
   /** Written on blur, merging rather than replacing: the two fields have
    *  separate inputs and a write of one must not erase the other. */
   const persistTaxpayer = () => {
@@ -288,6 +316,7 @@ export const TaxReportScreen = () => {
     setStatus('idle');
     setError(null);
     setAssessment(null);
+    setStep('form');
     // Switching jurisdiction abandons any run in flight, for the same
     // reason reopening does: its result was computed under different rules.
     setRequest(null);
@@ -372,6 +401,7 @@ export const TaxReportScreen = () => {
         setSourceDirectory(buildSourceDirectory(sources, events));
         setAssessment(result);
         setStatus('done');
+        setStep('report');
       } catch (caught) {
         if (cancelled) {
           return;
@@ -568,7 +598,7 @@ export const TaxReportScreen = () => {
                   dialog's "background graphics" box is ticked - unlike the
                   gradient rule below it, which is decoration and is allowed
                   to be absent. */}
-              {assessment && (
+              {step === 'report' && assessment && (
                 <div
                   data-print="letterhead"
                   className="hidden flex-col gap-2 print:flex"
@@ -600,7 +630,7 @@ export const TaxReportScreen = () => {
                   produced it. A field left out silently reads as a field
                   that does not exist, so anything unstated prints as a
                   labelled blank the taxpayer can complete by hand. */}
-              {assessment && (
+              {step === 'report' && assessment && (
                 <div
                   data-testid="report-header"
                   className="hidden flex-col gap-1 print:flex"
@@ -682,125 +712,141 @@ export const TaxReportScreen = () => {
               </Card>
             )}
 
-            <div className="flex flex-col gap-4">
-              {/* Controls for RUNNING the report, not statements about it.
+            {/* The form is a STEP, not a header above the result.
+                Appending a finished document underneath the controls that
+                produced it read as "content suddenly appeared", and a
+                result left standing while the form above it said something
+                else was worse than confusing - it was wrong. */}
+            {step === 'form' && (
+              <div className="flex flex-col gap-4">
+                {/* Controls for RUNNING the report, not statements about it.
                   These printed: an empty CoinGecko API-key box with its
                   help text, a tax-rate field and a year spinner, in the
                   middle of a document handed to a tax office. Nothing here
                   is lost on paper - the year, the base currency and the
                   taxpayer are all restated by the document header above. */}
-              <div
-                data-testid="report-form"
-                className="flex flex-wrap gap-4 print:hidden"
-              >
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="tax-report-year">{t('Tax Year')}</Label>
-                  <Input
-                    id="tax-report-year"
-                    type="number"
-                    value={year}
-                    aria-invalid={yearError || undefined}
-                    onChange={(event) => setYear(event.target.value)}
-                    disabled={status === 'loading'}
-                  />
-                  {yearError && (
-                    <p className="text-sm text-destructive" role="alert">
-                      {t('Enter a valid year')}
-                    </p>
-                  )}
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="tax-report-rate">
-                    {t('Your personal tax rate (optional)')}
-                  </Label>
-                  <Input
-                    id="tax-report-rate"
-                    inputMode="decimal"
-                    placeholder="42"
-                    value={rate}
-                    onChange={(event) => setRate(event.target.value)}
-                    disabled={status === 'loading'}
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    {t(
-                      'A percentage, e.g. 42. Used only to estimate what you would owe - leave it empty to skip that figure.',
+                <div
+                  data-testid="report-form"
+                  className="flex flex-wrap gap-4 print:hidden"
+                >
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="tax-report-year">{t('Tax Year')}</Label>
+                    <Input
+                      id="tax-report-year"
+                      type="number"
+                      value={year}
+                      aria-invalid={yearError || undefined}
+                      onChange={(event) => {
+                        setYear(event.target.value);
+                        invalidateReport();
+                      }}
+                      disabled={status === 'loading'}
+                    />
+                    {yearError && (
+                      <p className="text-sm text-destructive" role="alert">
+                        {t('Enter a valid year')}
+                      </p>
                     )}
-                  </p>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="tax-report-coingecko-key">
-                    {t('CoinGecko API key')}
-                  </Label>
-                  {/* A credential: masked, and never put in a URL, a log or
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="tax-report-rate">
+                      {t('Your personal tax rate (optional)')}
+                    </Label>
+                    <Input
+                      id="tax-report-rate"
+                      inputMode="decimal"
+                      placeholder="42"
+                      value={rate}
+                      onChange={(event) => {
+                        setRate(event.target.value);
+                        invalidateReport();
+                      }}
+                      disabled={status === 'loading'}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      {t(
+                        'A percentage, e.g. 42. Used only to estimate what you would owe - leave it empty to skip that figure.',
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="tax-report-coingecko-key">
+                      {t('CoinGecko API key')}
+                    </Label>
+                    {/* A credential: masked, and never put in a URL, a log or
                       an UnresolvedItem.reason. fetchHistoricalPrice sends it
                       only as the x-cg-demo-api-key header. */}
-                  <Input
-                    id="tax-report-coingecko-key"
-                    type="password"
-                    autoComplete="off"
-                    value={apiKey}
-                    onChange={(event) => setApiKey(event.target.value)}
-                    disabled={status === 'loading'}
-                  />
-                  <p className="text-sm text-muted-foreground">
+                    <Input
+                      id="tax-report-coingecko-key"
+                      type="password"
+                      autoComplete="off"
+                      value={apiKey}
+                      onChange={(event) => {
+                        setApiKey(event.target.value);
+                        invalidateReport();
+                      }}
+                      disabled={status === 'loading'}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      {t(
+                        "Optional. Needed only to price tax events more than 365 days old - CoinGecko's free tier only covers the last year of history.",
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="tax-report-taxpayer-name">
+                      {t('Your name')}
+                    </Label>
+                    <Input
+                      id="tax-report-taxpayer-name"
+                      value={taxpayerName}
+                      onChange={(event) => setTaxpayerName(event.target.value)}
+                      onBlur={persistTaxpayer}
+                      disabled={status === 'loading'}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      {t(
+                        'Shown on the printed report so it can be assigned to your file. Stored only on this device.',
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="tax-report-tax-number">
+                      {t('Tax number')}
+                    </Label>
+                    <Input
+                      id="tax-report-tax-number"
+                      value={taxNumber}
+                      onChange={(event) => setTaxNumber(event.target.value)}
+                      onBlur={persistTaxpayer}
+                      disabled={status === 'loading'}
+                    />
+                  </div>
+                </div>
+
+                {status === 'loading' && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2Icon
+                      className="size-4 animate-spin"
+                      aria-hidden="true"
+                    />
                     {t(
-                      "Optional. Needed only to price tax events more than 365 days old - CoinGecko's free tier only covers the last year of history.",
+                      'Running your tax report… this can take a while because historical prices are looked up one at a time.',
                     )}
+                  </div>
+                )}
+
+                {status === 'error' && error && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {t('Could not run the report: {{detail}}', {
+                      detail: error,
+                    })}
                   </p>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="tax-report-taxpayer-name">
-                    {t('Your name')}
-                  </Label>
-                  <Input
-                    id="tax-report-taxpayer-name"
-                    value={taxpayerName}
-                    onChange={(event) => setTaxpayerName(event.target.value)}
-                    onBlur={persistTaxpayer}
-                    disabled={status === 'loading'}
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    {t(
-                      'Shown on the printed report so it can be assigned to your file. Stored only on this device.',
-                    )}
-                  </p>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="tax-report-tax-number">
-                    {t('Tax number')}
-                  </Label>
-                  <Input
-                    id="tax-report-tax-number"
-                    value={taxNumber}
-                    onChange={(event) => setTaxNumber(event.target.value)}
-                    onBlur={persistTaxpayer}
-                    disabled={status === 'loading'}
-                  />
-                </div>
+                )}
               </div>
+            )}
 
-              {status === 'loading' && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2Icon
-                    className="size-4 animate-spin"
-                    aria-hidden="true"
-                  />
-                  {t(
-                    'Running your tax report… this can take a while because historical prices are looked up one at a time.',
-                  )}
-                </div>
-              )}
-
-              {status === 'error' && error && (
-                <p className="text-sm text-destructive" role="alert">
-                  {t('Could not run the report: {{detail}}', {
-                    detail: error,
-                  })}
-                </p>
-              )}
-            </div>
-
-            {status === 'done' && assessment && (
+            {step === 'report' && assessment && (
               <div className="flex flex-col gap-4">
                 <Separator />
 
@@ -1382,7 +1428,7 @@ export const TaxReportScreen = () => {
                 plainly what produced it, that the rules and the arithmetic
                 are open to inspection, and where to find them - written out
                 as a URL, because a hyperlink on paper is not one. */}
-            {assessment && (
+            {step === 'report' && assessment && (
               <div
                 data-print="colophon"
                 className="hidden flex-col gap-1 print:flex"
@@ -1425,24 +1471,49 @@ export const TaxReportScreen = () => {
                 bar. `z-10` states what document order was already giving
                 it, so a later positioned sibling cannot land on top. */}
             <div className="glass-chrome rim-t sticky bottom-0 z-10 -mx-6 flex flex-wrap gap-2 px-6 py-3 print:hidden">
-              <Button type="button" variant="ghost" onClick={goBack}>
-                {t('Back')}
-              </Button>
-              <Button
-                type="button"
-                onClick={handleRun}
-                disabled={status === 'loading'}
-              >
-                {status === 'loading' ? t('Running…') : t('Run report')}
-              </Button>
-              {/* Only once there is something to print. A blank form sent
-                  to a printer is pure waste, and the browser's own dialog
-                  gives no hint that the page is empty. */}
-              {assessment && (
-                <Button type="button" variant="outline" onClick={handlePrint}>
-                  <Printer aria-hidden="true" />
-                  {t('Print or save as PDF')}
-                </Button>
+              {step === 'form' ? (
+                <>
+                  <Button type="button" variant="ghost" onClick={goBack}>
+                    {t('Back')}
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleRun}
+                    disabled={status === 'loading'}
+                  >
+                    {status === 'loading' ? t('Running…') : t('Run report')}
+                  </Button>
+                  {/* A finished report survives a step back to the form, so
+                      there has to be a way forward to it that does not pay
+                      for it twice. It disappears the moment an input that
+                      feeds it changes, which is what makes the offer
+                      honest: whatever this returns to was computed from
+                      exactly what the form now says. */}
+                  {assessment && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setStep('report')}
+                    >
+                      {t('View the report')}
+                    </Button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setStep('form')}
+                  >
+                    <ArrowLeft aria-hidden="true" />
+                    {t('Change your answers')}
+                  </Button>
+                  <Button type="button" variant="outline" onClick={handlePrint}>
+                    <Printer aria-hidden="true" />
+                    {t('Print or save as PDF')}
+                  </Button>
+                </>
               )}
               <div className="flex-1" />
               <Button
