@@ -130,7 +130,7 @@ const UnresolvedGroups = ({
   <div className="flex flex-col gap-3">
     {groupByKind(items).map(([kind, group]) => (
       <div key={kind} className="flex flex-col gap-2">
-        <p className="text-sm font-medium">
+        <p data-print="subheading" className="text-sm font-medium">
           {kindHeading(kind, t)} ({group.length})
         </p>
         {group.map((item, index) => (
@@ -469,7 +469,15 @@ export const TaxReportScreen = () => {
     // defaults to `min-width: auto`, so one long unbreakable string inside
     // would otherwise push the whole column wider than the viewport
     // instead of wrapping.
-    <div className="mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-6 p-6">
+    <div
+      // The print stylesheet's hook for the document's text block. A data
+      // attribute rather than a class, because what print needs from this
+      // element - a measure and a page inset - has nothing to do with the
+      // screen utilities on it, and keying the two together means a Tailwind
+      // change silently restyles the paper.
+      data-print="document"
+      className="mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-6 p-6"
+    >
       <div className="flex min-w-0 flex-col gap-4">
         {!module ? (
           <>
@@ -617,7 +625,7 @@ export const TaxReportScreen = () => {
                       <li key={reference}>{reference}</li>
                     ))}
                   </ul>
-                  <p className="text-muted-foreground">
+                  <p data-print="notice" className="text-muted-foreground">
                     {t(disclaimer.noticeKey)}
                   </p>
                 </CardContent>
@@ -857,7 +865,15 @@ export const TaxReportScreen = () => {
                 )}
 
                 {/* 2. Totals, with `omitted` welded to `taxableGain` in the
-                    same paragraph - see the class doc comment above. */}
+                    same paragraph - see the class doc comment above.
+
+                    Under its own heading since the print stylesheet turned
+                    every Card into a bare block: without one the single
+                    most important section of the document - the figures
+                    that go on the return - arrived on paper with no label,
+                    sandwiched between the source directory and the
+                    thresholds. */}
+                <h3 className="text-sm font-semibold">{t('Result')}</h3>
                 <Card>
                   <CardContent className="flex flex-col gap-2">
                     <p>
@@ -1071,7 +1087,14 @@ export const TaxReportScreen = () => {
                                 shows an asset WITHOUT an amount and so
                                 never went through it. */}
                             {formatDate(line.timestamp)} ·{' '}
-                            {symbolOf(line.assetId)} ·{' '}
+                            {/* On screen CryptoAmount renders the asset's
+                                MARK, so the ticker beside it is the only
+                                thing naming the asset in letters. In print
+                                the mark is replaced by that same ticker,
+                                and the line read "ADA · 1.250 ADA". */}
+                            <span className="print:hidden">
+                              {symbolOf(line.assetId)} ·{' '}
+                            </span>
                             <CryptoAmount
                               value={line.amount}
                               assetId={line.assetId}

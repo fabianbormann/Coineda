@@ -482,6 +482,7 @@
     "Taxable income": "Taxable income",
     "This limit covers every private sale you made in the year, not only crypto.": "This limit covers every private sale you made in the year, not only crypto.",
     "The statutory 27.5% KESt on the taxable gain. It is a final tax, so it does not depend on your other income.": "The statutory 27.5% KESt on the taxable gain. It is a final tax, so it does not depend on your other income.",
-    "{{count}} other unresolved items are not disposals in this year": "{{count}} other unresolved items are not disposals in this year"
+    "{{count}} other unresolved items are not disposals in this year": "{{count}} other unresolved items are not disposals in this year",
+    "Result": "Result"
   }
 }

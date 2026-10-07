@@ -351,6 +351,65 @@ describe('the print stylesheet survives the build', () => {
     expect(css()).toContain('break-inside:avoid');
   });
 
+  /**
+   * The four defects a real export was measured against, each pinned to the
+   * rule that fixes it. Measured on the export that prompted them: the text
+   * block ran 209.9mm wide on a 210mm page, border pixels outnumbered text
+   * pixels 6.6 to 1, and with background graphics enabled the brand's conic
+   * gradient printed behind every figure.
+   */
+  it('gives the printed document a measure that survives the shell', () => {
+    const sheet = css();
+    // `main > *` carries `max-width:none!important` and AppShell renders the
+    // routed screen as a direct child of <main>, so this one has to be
+    // important too or the measure silently loses - invisible in any test
+    // that renders the screen without its shell.
+    expect(sheet).toMatch(
+      /\[data-print=["']?document["']?\]\{[^}]*max-width:165mm\s*!important/,
+    );
+    expect(sheet).toMatch(
+      /\[data-print=["']?document["']?\]\{[^}]*margin:0 auto\s*!important/,
+    );
+  });
+
+  it('neutralises the brand gradient, not only the page wash', () => {
+    // --lm-blob alone left --lm-rim standing, and every Card carries `rim`.
+    const printBlock = css().slice(css().indexOf('@media print'));
+    expect(printBlock).toMatch(/--lm-rim:\s*none/);
+    expect(printBlock).toMatch(/--lm-blob:\s*0/);
+    expect(printBlock).toMatch(/background-image:none\s*!important/);
+  });
+
+  it("sets the document in near-black, not the screen's muted grey", () => {
+    // In a tax report the "muted" text IS the content - every rationale,
+    // every consumed lot, every line of the method sheet - so a tone chosen
+    // to recede behind a UI made the whole document read as grey.
+    //
+    // Anchored on the rule that declares --lm-blob:0, which only the print
+    // palette does. Slicing from the first '@media print' instead landed in
+    // Lumen's own light palette - the built sheet has TWO print blocks -
+    // and the assertion then passed against a value it was never meant to
+    // read, including against the stylesheet it was written to reject.
+    const sheet = css();
+    const anchor = sheet.indexOf('--lm-blob:0');
+    expect(anchor).toBeGreaterThan(-1);
+    const rule = sheet.slice(
+      sheet.lastIndexOf('{', anchor),
+      sheet.indexOf('}', anchor),
+    );
+    const mute = /--lm-mute:\s*(#[0-9a-f]{6})\b/i.exec(rule)?.[1];
+    expect(mute, 'no plain --lm-mute hex in the print palette').toBeDefined();
+    expect(parseInt(mute!.slice(1, 3), 16)).toBeLessThanOrEqual(0x22);
+  });
+
+  it('turns the cards into sections rather than boxes', () => {
+    const printBlock = css().slice(css().indexOf('@media print'));
+    expect(printBlock).toMatch(
+      /\[data-slot=["']?card["']?\]\{[^}]*border:0\s*!important/,
+    );
+    expect(printBlock).toMatch(/break-inside:avoid/);
+  });
+
   it('generates a rule for every print variant the source actually uses', () => {
     // A `print:` variant that Tailwind never saw is a class in the markup
     // with no rule behind it: the controls would print and the document

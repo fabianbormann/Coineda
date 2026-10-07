@@ -242,21 +242,24 @@
     min-height: 100svh;
   }
 }
-
 /* ---------------------------------------------------------------------
    Print.
 
-   Everything in this app reads its colour through Lumen's `--lm-*` tokens
-   (see the mapping in :root above), so putting a light, opaque palette
-   there is what turns the whole UI into ink on paper - including the glass
-   surfaces, whose translucency has nothing to sit over once the coloured
-   wash is gone. Hunting individual utilities would have meant finding every
-   one of them, and missing one means a black rectangle on a printed tax
-   document.
+   This is a DOCUMENT stylesheet, not a recolouring of the screen. The
+   earlier version only neutralised Lumen's palette and trusted the rest of
+   the UI to come out as paper; measured against a real export it did not.
+   On a 210mm page the text block ran 209.9mm wide, every section printed
+   as a hairline box (border pixels outnumbered text pixels 6.6 to 1), and
+   the body was set in #333 while the brand's conic gradient printed behind
+   each card wherever background graphics were enabled.
+
+   So: Lumen's tokens are still repointed - that part was right, and
+   hunting individual utilities would mean missing one - but the rules
+   below then set the result as a document: one measure, near-black ink,
+   rules instead of boxes, and page breaks that do not strand a heading.
 
    `.dark` is overridden too: a print must not depend on which theme the
-   person happened to be using. A tax report printed from dark mode was
-   white text on a background the printer drops, i.e. a blank page.
+   person happened to be using.
    --------------------------------------------------------------------- */
 @media print {
   :root,
@@ -265,9 +268,15 @@
 
     --lm-bg: #ffffff;
     --lm-ink: #000000;
-    --lm-mute: #333333;
-    --lm-faint: rgb(0 0 0 / 0.06);
-    --lm-stroke: rgb(0 0 0 / 0.35);
+    /* Near-black, not the old #333. In a tax report the "muted" text IS
+       the content - every holding-period rationale, every consumed lot,
+       every line of the method sheet is secondary on screen and load
+       bearing on paper - so a tone chosen to recede behind a UI made the
+       document read as uniformly grey. Grey is kept only for the one
+       genuinely ancillary line, below. */
+    --lm-mute: #1a1a1a;
+    --lm-faint: rgb(0 0 0 / 0.18);
+    --lm-stroke: rgb(0 0 0 / 0.3);
     --lm-hl: transparent;
     /* The frosted tiers collapse to nothing: a frosted panel over white
        paper is just white paper, and leaving them translucent only risks
@@ -280,6 +289,22 @@
     --lm-shadow: transparent;
     /* The coloured wash behind the page is drawn at this opacity. */
     --lm-blob: 0;
+    /* The brand's conic gradient, which `rim` paints as a border and every
+       Card carries. Setting --lm-blob alone left this one standing: with
+       background graphics enabled the export came out with a pastel
+       rainbow behind every figure. Neutralised at the token, so any future
+       utility built on it is covered too. */
+    --lm-rim: none;
+    --lm-spec: none;
+    --lm-glow: none;
+    --lm-fill-glow: none;
+
+    /* Semantic colour survives, darkened. A reason printed in the screen's
+       red is thin on paper and vanishes through a photocopier, and these
+       three carry meaning a reader acts on. */
+    --destructive: #8c1111;
+    --gain: #0f5132;
+    --loss: #8c1111;
   }
 
   @page {
@@ -289,29 +314,137 @@
   html,
   body {
     background: #fff;
+    color: #000;
+    /* Paper, not a screen: a document set at the UI's 16px reads as
+       oversized and runs to twice the pages it needs. */
+    font-size: 10.5pt;
+    line-height: 1.5;
   }
 
   /* Blur and glow carry no information and render unpredictably - or
-     expensively - in a print engine. */
+     expensively - in a print engine. Background IMAGES go too: that is
+     what the rim gradient and the page wash both are, and killing them
+     here means a utility that reintroduces one cannot reach paper. */
   *,
   *::before,
   *::after {
     backdrop-filter: none !important;
     box-shadow: none !important;
     text-shadow: none !important;
-  }
-
-  /* A disposal line split across a page break is unreadable: the figures
-     land on one page and the sentence explaining them on the next. */
-  [data-slot='card'] {
-    border: 1px solid rgb(0 0 0 / 0.25);
-    break-inside: avoid;
+    background-image: none !important;
+    border-radius: 0 !important;
   }
 
   /* The screen caps itself for reading on a monitor; paper has its own
-     margin from @page and should use the rest. */
+     margin from @page. */
   main > * {
     max-width: none !important;
     padding: 0 !important;
+  }
+
+  /* The document's text block.
+     A measure and a centred block rather than padding, because @page's
+     margin is not reliably honoured: a real export came back with 0.0mm
+     side margins and the text running to both paper edges, which is what
+     "Margins: None" in the print dialog produces. A 165mm block centred in
+     the available width gives the SAME 22mm side margins whether the page
+     margin applied or not, and 165mm is also a sane measure - the full
+     width was 95 characters a line. */
+  [data-print='document'] {
+    /* !important, and not as a flourish: the rule above sets
+       `main > * { max-width: none !important }`, and AppShell renders the
+       routed screen as a DIRECT child of <main>, so this element matches
+       both. Without the flag the measure silently loses and the text runs
+       the full width again - which is invisible in any harness that
+       renders the screen without its shell. */
+    max-width: 165mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+  }
+
+  /* Sections, not boxes.
+     Each Card becomes a block opened by a hairline rule. The boxes were
+     the single biggest thing making the export look like a screenshot of
+     an app, and they cost a border on all four sides of every one of a
+     dozen sections. */
+  [data-slot='card'] {
+    border: 0 !important;
+    border-top: 0.5pt solid rgb(0 0 0 / 0.35) !important;
+    padding: 1.5mm 0 0 !important;
+    gap: 1mm !important;
+    background: none !important;
+    /* A disposal split across a page break is unreadable: the figures land
+       on one page and the sentence explaining them on the next. */
+    break-inside: avoid;
+  }
+
+  [data-slot='card-content'] {
+    padding: 0 !important;
+    gap: 0.8mm !important;
+  }
+
+  /* A heading stranded at the foot of a page is the other half of the same
+     problem - the recorded export ended a page with "Veräußerungen" and
+     nothing under it. */
+  h1,
+  h2,
+  h3,
+  [data-print='subheading'] {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  h2 {
+    font-size: 15pt;
+    margin-bottom: 1mm;
+  }
+
+  /* Section headings read as labels rather than as more prose, which is
+     what distinguishes a document's structure from its content. */
+  h3 {
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 3mm;
+  }
+
+  /* Figures line up in a column when they are tabular, which is most of
+     what this document is. */
+  [data-slot='crypto-amount'],
+  [data-testid='gain-loss'] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The screen's 4px gap sits between a figure and a LOGO; between a figure
+     and its ticker it reads as a double space. */
+  [data-slot='crypto-amount'] {
+    gap: 0.22em !important;
+  }
+
+  /* A logo is not a unit.
+     On screen the mark carries the asset and an sr-only span carries its
+     ticker to assistive tech; on paper the mark prints as an opaque glyph
+     and the figure loses its unit entirely - the export read "1.250" with
+     a small sun beside it where the holding is 1.250 ADA. So the mark goes
+     and the ticker, already in the markup, is promoted to visible. */
+  [data-slot='crypto-amount'] svg,
+  [data-slot='crypto-amount'] img {
+    display: none !important;
+  }
+
+  [data-slot='crypto-amount'] .sr-only {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    clip: auto !important;
+    clip-path: none !important;
+    white-space: normal !important;
+  }
+
+  /* The one line that really is ancillary. */
+  [data-print='notice'] {
+    color: #444;
   }
 }
