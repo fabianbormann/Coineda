@@ -70,6 +70,24 @@ const KINDS: Record<string, EventKind> = {
   sale: 'trade',
 };
 
+/**
+ * The `earn` subtypes that MOVE a holding rather than pay one.
+ *
+ * Kraken's `earn` row type is two different things and the parser read
+ * neither, because it mapped `type` and never looked at `subtype`. An
+ * allocation is Kraken shifting a balance between a user's own spot and
+ * earn wallets; a reward is yield. Measured on a real 198-row export: 53
+ * rewards and 8 allocation rows, and every one of the latter was reported
+ * as income for a movement that netted to exactly zero.
+ */
+const EARN_MOVEMENT_SUBTYPES = new Set([
+  'allocation',
+  'autoallocation',
+  'deallocation',
+  'autodeallocation',
+  'migration',
+]);
+
 const text = (row: CsvRow, column: string): string => {
   const key = Object.keys(row).find(
     (name) => name.trim().toLowerCase() === column,
@@ -124,10 +142,30 @@ export const parse = (input: string): ParseResult => {
   const note = (reason: string) =>
     skipped.set(reason, (skipped.get(reason) ?? 0) + 1);
 
+  /**
+   * Allocation legs, gathered by `refid` so each allocation becomes ONE
+   * event.
+   *
+   * The deliberate rule everywhere else in this parser is one event per
+   * row, and the comment above says why pairing a trade's rows would be
+   * guessing. This is not that. `isInternalTransfer` nets per asset WITHIN
+   * an event, so four allocation rows emitted separately each carry a
+   * single leg, never net to zero, and the outgoing ones become disposals
+   * of dust the user still holds. Grouping is what lets the ledger
+   * recognise the movement for what it is - and grouping too much is
+   * harmless here, because an allocation that does not net to zero is
+   * reported as the movement the data actually shows.
+   */
+  const movements = new Map<
+    string,
+    { timestamp: number; rawType: string; legs: Leg[] }
+  >();
+
   rows.forEach((row, index) => {
     const refid = text(row, 'refid');
     const txid = text(row, 'txid');
     const rawType = text(row, 'type').toLowerCase();
+    const subtype = text(row, 'subtype').toLowerCase();
     const code = text(row, 'asset');
     const amount = text(row, 'amount');
     const fee = text(row, 'fee');
@@ -212,6 +250,22 @@ export const parse = (input: string): ParseResult => {
       return;
     }
 
+    // An allocation's legs join their refid's group instead of becoming an
+    // event of their own.
+    if (
+      rawType === 'earn' &&
+      EARN_MOVEMENT_SUBTYPES.has(subtype) &&
+      refid !== ''
+    ) {
+      const group = movements.get(refid);
+      if (group) {
+        group.legs.push(...legs);
+      } else {
+        movements.set(refid, { timestamp: at, rawType: subtype, legs });
+      }
+      return;
+    }
+
     events.push({
       externalId,
       timestamp: at,
@@ -224,6 +278,21 @@ export const parse = (input: string): ParseResult => {
       note: refid === '' ? undefined : `Kraken ${rawType} ${refid}`,
     });
   });
+
+  for (const [refid, group] of movements) {
+    events.push({
+      // The bare refid, which cannot collide with the `refid#index` scheme
+      // the per-row path uses, so a re-import upserts onto the same event.
+      externalId: refid,
+      timestamp: group.timestamp,
+      // A movement between the user's own wallets, which is exactly what
+      // `isInternalTransfer` is looking for.
+      kind: 'transfer',
+      origin: 'derived',
+      legs: group.legs,
+      note: `Kraken earn ${group.rawType} ${refid}`,
+    });
+  }
 
   return {
     events,

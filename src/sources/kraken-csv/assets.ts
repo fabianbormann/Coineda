@@ -7,11 +7,20 @@ import { ASSET_DECIMALS } from '@/prices/scale';
  * Kraken's asset codes to Coineda asset ids.
  *
  * Kraken keeps a legacy naming where the major assets carry an X or Z
- * prefix - verified against its own live /0/public/Assets: `XXBT` is
- * bitcoin with altname XBT, `XETH` is ether, `ZEUR` is the euro, and the
- * bare `XBT` and `ETH` are NOT asset codes at all, only altnames. An
- * importer matching on "BTC" or "XBT" therefore recognises nothing in a
- * real ledger export.
+ * prefix - `XXBT` is bitcoin with altname XBT, `XETH` is ether, `ZEUR` is
+ * the euro - and that is what /0/public/Assets returns.
+ *
+ * The LEDGER EXPORT does not use it. This map held only the four prefixed
+ * codes, on exactly that API reading, and measured against a real 198-row
+ * export it recognised 22 rows: every one of them ADA, the one code the
+ * two namings agree on. The other 175 were skipped, among them 58 in ETH,
+ * 35 in EUR, 24 in BTC and 24 in EUR.HOLD - an account's entire euro and
+ * bitcoin history, including eleven withdrawals that read as disposals
+ * once the exchange side of them is missing.
+ *
+ * So both namings are accepted. The lookup is by exact code and never by
+ * prefix, which is what keeps `ETHW` (EthereumPoW, a different chain at a
+ * different price) and `ETH2` out of ether.
  *
  * Deliberately short, like the Bitpanda map it is modelled on. Kraken lists
  * 855 assets; a code this app cannot both scale and price is reported as
@@ -19,15 +28,21 @@ import { ASSET_DECIMALS } from '@/prices/scale';
  */
 export const KRAKEN_ASSETS: Record<string, string> = {
   XXBT: 'bitcoin:native',
+  XBT: 'bitcoin:native',
+  BTC: 'bitcoin:native',
   XETH: 'eth:native',
+  ETH: 'eth:native',
   ADA: 'cardano:lovelace',
   ZEUR: 'fiat:eur',
+  EUR: 'fiat:eur',
 };
 
 /**
  * Kraken suffixes a code when the holding sits in one of its earn or
  * staking wallets: `ADA.S` is staked ADA, `ETH2.S` was staked ether,
- * `XBT.M` is the opt-in rewards wallet.
+ * `XBT.M` is the opt-in rewards wallet, and `EUR.HOLD` is money on hold
+ * against a pending purchase - 24 rows of it in the measured export, all
+ * of them deposits and the purchases they paid for.
  *
  * The suffix names WHERE the asset is, not WHAT it is - which is why it is
  * stripped here and the ledger's `wallet` column becomes the leg's venue
@@ -37,7 +52,7 @@ export const KRAKEN_ASSETS: Record<string, string> = {
  * transfer the user made to themselves.
  */
 export const stripWalletSuffix = (code: string): string =>
-  code.replace(/\.(S|M|B|F|P)\d*$/i, '');
+  code.replace(/\.(HOLD|S|M|B|F|P)\d*$/i, '');
 
 export const assetIdForCode = (code: string): string | null =>
   KRAKEN_ASSETS[stripWalletSuffix(code.trim()).toUpperCase()] ?? null;
