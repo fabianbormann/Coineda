@@ -174,14 +174,55 @@ describe('encryption', () => {
     );
 
     // The plaintext is reachable only through `unseal`/`openCheckpoint`
-    // with the right secret - inflating the ciphertext region directly,
-    // without decrypting first, must fail rather than silently returning
-    // garbage that happens to look like something. Uses node:zlib's sync
-    // API directly (rather than DecompressionStream) because feeding
-    // genuinely invalid deflate data through Node's WHATWG-streams zlib
-    // adapter can surface as a double-emitted, unhandleable error rather
-    // than a clean promise rejection.
-    expect(() => inflateRawSync(ciphertext)).toThrow();
+    // with the right secret: inflating the ciphertext region directly,
+    // without decrypting first, must never hand back what was sealed.
+    //
+    // Asserting that it THROWS is a different and weaker claim, and it is
+    // false about one run in two hundred. Raw-deflate decoding of
+    // pseudorandom bytes succeeds by chance roughly 0.5% of the time -
+    // measured at 11 successes in 2000 real seals, and at 0.42-0.56%
+    // across random buffers from 64 bytes to 16KiB, so the rate is a
+    // property of the format rather than of this payload's size. The three
+    // header bits pick a block type, and a fixed-Huffman block (one case
+    // in four) can decode random bits all the way to an end-of-block
+    // symbol without hitting an invalid code.
+    //
+    // What it returns when that happens is garbage - the plaintext came
+    // back in 0 of those 2000 seals - so the property worth asserting is
+    // the one that is deterministic. Uses node:zlib's sync API directly
+    // (rather than DecompressionStream) because feeding genuinely invalid
+    // deflate data through Node's WHATWG-streams zlib adapter can surface
+    // as a double-emitted, unhandleable error rather than a clean promise
+    // rejection.
+    let inflatedDirectly: string | null = null;
+    try {
+      inflatedDirectly = inflateRawSync(ciphertext).toString('utf8');
+    } catch {
+      // The overwhelmingly common case: the bytes are not a deflate stream
+      // at all. Either way the assertion below is what has to hold.
+    }
+    expect(inflatedDirectly ?? '').not.toContain('super-secret-value');
+  });
+
+  it('still catches a body that is merely deflated plaintext', async () => {
+    // Guards the assertion above rather than the production code.
+    //
+    // That assertion was rewritten from "inflating throws" to "inflating
+    // never yields the plaintext" to remove a 0.5% flake, and an assertion
+    // that passes against a broken implementation would be a worse outcome
+    // than the flake it replaced. This pins its discriminating power: on a
+    // body that IS deflated plaintext - exactly what encryption being
+    // removed or bypassed would leave behind - inflating succeeds and the
+    // secret comes straight back out, so the assertion above fails.
+    const deflatedPlaintext = await rawDeflateRaw(
+      new TextEncoder().encode(
+        '{"sources":[{"config":{"projectId":"super-secret-value"}}]}',
+      ),
+    );
+
+    const recovered = inflateRawSync(deflatedPlaintext).toString('utf8');
+
+    expect(recovered).toContain('super-secret-value');
   });
 
   it('refuses a wrong secret', async () => {
