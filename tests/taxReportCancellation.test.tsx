@@ -50,6 +50,7 @@ const germanAssessment: TaxReport = {
   },
   thresholds: [],
   unresolved: [],
+  omittedDisposals: [],
   // Typed as the host's own return value rather than a jurisdiction's
   // TaxReport: this mock stands in for runTaxReport, and the screen
   // reads the method sheet off it. `vi.fn()` takes any argument, so

@@ -487,6 +487,7 @@
     "About {{app}}": "About {{app}}",
     "Coineda is open-source software for tracking crypto holdings and preparing a tax report. It runs entirely on this device: there is no server, no account, and no transmission of the data behind this report.": "Coineda is open-source software for tracking crypto holdings and preparing a tax report. It runs entirely on this device: there is no server, no account, and no transmission of the data behind this report.",
     "Source code and licence (GPLv3)": "Source code and licence (GPLv3)",
-    "Tax report": "Tax report"
+    "Tax report": "Tax report",
+    "{{count}} further acquisitions from {{from}} to {{to}} could not be priced. None of them is a disposal and none falls in {{year}}, so none affects the figures above. They are listed in full in the app.": "{{count}} further acquisitions from {{from}} to {{to}} could not be priced. None of them is a disposal and none falls in {{year}}, so none affects the figures above. They are listed in full in the app."
   }
 }

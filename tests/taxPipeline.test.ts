@@ -837,3 +837,59 @@ describe('two disposals out of one ledger event', () => {
     );
   });
 });
+
+describe('naming what could not be computed', () => {
+  it('hands back the disposals behind the omitted count, not just how many', async () => {
+    // A warning reading "2 disposals could not be computed" and nothing
+    // else leaves a reader to find those two among every other gap in the
+    // ledger - 65 of them in the report that prompted this.
+    await putEvents([
+      ledgerEvent({
+        id: 'naked-sale',
+        externalId: 'naked-sale',
+        timestamp: Date.UTC(2025, 2, 1),
+        txHash: 'abc123def456',
+        legs: [
+          {
+            assetId: 'fiat:eur',
+            amount: '100',
+            direction: 'out',
+            venue: 'wallet-a',
+            role: 'principal',
+          },
+        ],
+      }),
+    ]);
+
+    // A module that stamps the LEDGER event's id, as both shipped
+    // jurisdictions do. The host resolves the hash through that id and
+    // cannot do better: it has no way to know how a module forms its own
+    // ids, so one that mints fresh ones simply gets no hash - the same
+    // outcome as an exchange row that never had one.
+    const likeGermany: TaxModule = {
+      ...stubModule,
+      classify: (event) =>
+        event.legs.map((leg) => ({
+          sourceEventId: event.id,
+          kind: leg.direction === 'in' ? 'acquisition' : 'disposal',
+          assetId: leg.assetId,
+          amount: leg.amount,
+          timestamp: event.timestamp,
+          venue: leg.venue,
+        })) as TaxEvent[],
+    };
+
+    const report = await runTaxReport(likeGermany, {
+      year: 2025,
+      baseCurrency: 'eur',
+    });
+
+    expect(report.totals.omitted).toBe(report.omittedDisposals.length);
+    expect(report.omittedDisposals).toHaveLength(1);
+    const [item] = report.omittedDisposals;
+    expect(item.venue).toBe('wallet-a');
+    expect(item.amount).toBe('100');
+    // The hash is what makes the row actionable rather than merely true.
+    expect(item.txHash).toBe('abc123def456');
+  });
+});

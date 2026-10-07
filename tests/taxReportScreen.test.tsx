@@ -854,10 +854,17 @@ describe('reading the unresolved list', () => {
     gap('b', Date.UTC(2025, 3, 9)),
   ];
 
-  it('prints every unresolved item even while the screen filter hides some', async () => {
-    // The heading states a total. A sheet that states 65 and shows 1 - which
-    // is what the filter did to the printed document - is the thing that
-    // invites an estimate under §162 AO.
+  it('accounts on paper for every item the heading counts', async () => {
+    // The heading states a TOTAL, and the recorded report stated 65 while
+    // the printed list showed 1, because the screen's filter reached the
+    // page. Nothing may be silently absent from the sheet.
+    //
+    // Listed in full is not the same as accounted for, though. Of 65 items
+    // in that report, 60 were acquisitions from earlier years that could
+    // not be priced - no disposal, nothing inside the tax year, no bearing
+    // on any figure - and printing them ran to six pages that buried the
+    // two items which did matter. So the page lists what moved a figure
+    // and states an exact count and span for the rest.
     taxRegistry.push(
       withUnresolved([
         gap('in-year', Date.UTC(2025, 0, 1)),
@@ -870,16 +877,29 @@ describe('reading the unresolved list', () => {
     const { container } = renderScreen();
     await runReport('2025');
 
-    // The filter is ON by default, so the screen list is already reduced.
     const screenList = container.querySelector(
       '[data-testid="unresolved-screen"]',
     );
     const printList = container.querySelector(
       '[data-testid="unresolved-print"]',
     );
+
+    // The screen's filter is on by default and hides the two older ones.
     expect(screenList?.querySelectorAll('[data-slot="card"]')).toHaveLength(1);
-    expect(printList?.querySelectorAll('[data-slot="card"]')).toHaveLength(3);
     expect(screenList?.className).toContain('print:hidden');
+
+    // On paper: the in-year item in full, and the other two counted.
+    expect(printList?.querySelectorAll('[data-slot="card"]')).toHaveLength(1);
+    const summary = container.querySelector(
+      '[data-testid="unresolved-summary"]',
+    );
+    expect(summary?.textContent).toMatch(/\b2\b/);
+
+    // 1 listed + 2 counted = the 3 the heading claims. The arithmetic is
+    // the point: a page that lists fewer than it counts is the defect.
+    expect(
+      (printList?.querySelectorAll('[data-slot="card"]').length ?? 0) + 2,
+    ).toBe(3);
   });
 
   it('lists them in date order, not in the order the engine produced them', async () => {

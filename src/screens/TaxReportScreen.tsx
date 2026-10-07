@@ -444,6 +444,27 @@ export const TaxReportScreen = () => {
     (item) => new Date(item.timestamp).getUTCFullYear() === assessment?.year,
   ).length;
 
+  /**
+   * What the PRINTED list carries in full, and what it only counts.
+   *
+   * In full: everything inside the tax year, and every disposal whatever
+   * its year - those are the items that moved, or failed to move, a figure
+   * on this sheet. Counted: the rest, which is acquisitions from earlier
+   * years that could not be priced. The distinction is the host's own:
+   * `taxEventKind` is what `omitted` is already computed from.
+   */
+  const printedInFull = (assessment?.unresolved ?? []).filter(
+    (item) =>
+      new Date(item.timestamp).getUTCFullYear() === assessment?.year ||
+      item.taxEventKind === 'disposal',
+  );
+  const summarised = (assessment?.unresolved ?? []).filter(
+    (item) => !printedInFull.includes(item),
+  );
+  const summarisedCount = summarised.length;
+  const summarisedFrom = Math.min(...summarised.map((i) => i.timestamp));
+  const summarisedTo = Math.max(...summarised.map((i) => i.timestamp));
+
   const formatDate = (timestamp: number): string =>
     new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium' }).format(
       new Date(timestamp),
@@ -931,6 +952,42 @@ export const TaxReportScreen = () => {
                         could not be computed is what trained users to
                         ignore this warning - the recorded one-wallet report
                         showed 56 of them. */}
+                    {/* The ones behind that count, named.
+                        A warning that says "2 disposals could not be
+                        computed" and stops there leaves the reader to find
+                        those two among every other gap in the ledger - 65
+                        of them in the report that prompted this - and a
+                        warning nobody can act on is one they learn to
+                        ignore. Each row carries what it takes to find the
+                        transaction again: the date, the wallet, the asset
+                        and, where the ledger knows one, the hash. */}
+                    {assessment.omittedDisposals.length > 0 && (
+                      <ul
+                        data-testid="omitted-disposals"
+                        className="flex flex-col gap-1 text-sm"
+                      >
+                        {assessment.omittedDisposals.map((item, index) => (
+                          <li
+                            key={`${item.sourceEventId}-${item.assetId}-${index}`}
+                            className="text-destructive"
+                          >
+                            {formatDate(item.timestamp)} · {item.venue} ·{' '}
+                            <CryptoAmount
+                              value={item.amount}
+                              assetId={item.assetId}
+                            />
+                            {item.txHash !== undefined && (
+                              <>
+                                {' · '}
+                                <span className="break-all">{item.txHash}</span>
+                              </>
+                            )}
+                            {' — '}
+                            {t(item.reason.key, item.reason.params)}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                     {assessment.unresolved.length - assessment.totals.omitted >
                       0 && (
                       <p className="text-sm text-muted-foreground">
@@ -1283,10 +1340,34 @@ export const TaxReportScreen = () => {
                       className="hidden print:block"
                     >
                       <UnresolvedGroups
-                        items={assessment.unresolved}
+                        items={printedInFull}
                         t={t}
                         formatDate={formatDate}
                       />
+                      {/* What is left is counted, dated and described
+                          rather than listed.
+                          These are acquisitions from earlier years that
+                          carry no price - 60 of them in the report that
+                          prompted this, mostly NFTs and dust tokens with no
+                          market. None of them is a disposal and none falls
+                          in the tax year, so none bears on a single figure
+                          above; printed in full they ran to six pages and
+                          buried the two items that did. Nothing is hidden:
+                          the count is exact, the span is named, and the
+                          screen still lists every one. */}
+                      {summarisedCount > 0 && (
+                        <p data-testid="unresolved-summary" className="text-sm">
+                          {t(
+                            '{{count}} further acquisitions from {{from}} to {{to}} could not be priced. None of them is a disposal and none falls in {{year}}, so none affects the figures above. They are listed in full in the app.',
+                            {
+                              count: summarisedCount,
+                              from: formatDate(summarisedFrom),
+                              to: formatDate(summarisedTo),
+                              year: assessment.year,
+                            },
+                          )}
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}

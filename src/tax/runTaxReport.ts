@@ -276,7 +276,7 @@ export const runTaxReport = async (
   const disposalEventIds = new Set(
     foldDisposals(consideredEvents, ownedVenues).map((event) => event.id),
   );
-  const omitted = hostUnresolved.filter((item) => {
+  const isOmittedDisposal = (item: UnresolvedItem): boolean => {
     if (taxYearOf(item.timestamp) !== options.year) {
       return false;
     }
@@ -284,7 +284,20 @@ export const runTaxReport = async (
       return disposalEventIds.has(item.sourceEventId);
     }
     return item.taxEventKind === 'disposal';
-  }).length;
+  };
+
+  // The ledger event behind an item, where the id still matches one. Every
+  // shipped jurisdiction stamps a tax event with the ledger event's own id,
+  // so this resolves for them; a module that mints its own ids simply gets
+  // no hash, which is the same outcome as an exchange row that has none.
+  const eventById = new Map(allEvents.map((event) => [event.id, event]));
+  const withTxHash = (item: UnresolvedItem): UnresolvedItem => {
+    const txHash = eventById.get(item.sourceEventId)?.txHash;
+    return txHash === undefined ? item : { ...item, txHash };
+  };
+
+  const unresolved = hostUnresolved.map(withTxHash);
+  const omittedDisposals = unresolved.filter(isOmittedDisposal);
 
   // Joined on disposalEventId, never by position: `assess` is free to drop,
   // reorder or merge the lines it returns, and a positional join would
@@ -361,10 +374,11 @@ export const runTaxReport = async (
     ...assessment,
     lines,
     method,
-    unresolved: [...assessment.unresolved, ...hostUnresolved],
+    unresolved: [...assessment.unresolved, ...unresolved],
+    omittedDisposals,
     totals: {
       ...assessment.totals,
-      omitted,
+      omitted: omittedDisposals.length,
     },
   };
 };

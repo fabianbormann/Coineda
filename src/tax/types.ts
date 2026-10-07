@@ -98,6 +98,15 @@ export type UnresolvedItem = {
   venue: string;
   timestamp: number;
   /**
+   * The on-chain transaction this came from, where the ledger knows one.
+   *
+   * Carried so a reader can act on the item rather than only count it: a
+   * gap named by date and venue alone still has to be hunted for in an
+   * explorer, and the whole point of listing these is that someone can
+   * close them. Absent for exchange-internal activity, which has no hash.
+   */
+  txHash?: string;
+  /**
    * Why this could not be computed, as a key plus parameters.
    *
    * This used to be a raw sentence, on the reasoning that it names a
@@ -321,6 +330,16 @@ export type ReportMethod = {
 export type TaxReport = Omit<TaxAssessment, 'lines'> & {
   lines: ReportedDisposal[];
   method: ReportMethod;
+  /**
+   * The items behind `totals.omitted`, not just how many there were.
+   *
+   * A figure that says "2 disposals could not be computed" and nothing
+   * else leaves the reader to find those two among every other gap in the
+   * ledger - 65 of them in the report that prompted this - which is the
+   * difference between a warning someone can act on and one they learn to
+   * ignore. `totals.omitted === omittedDisposals.length` by construction.
+   */
+  omittedDisposals: UnresolvedItem[];
 };
 
 export type AssessInput = {
