@@ -359,7 +359,48 @@
        renders the screen without its shell. */
     max-width: 165mm !important;
     margin: 0 auto !important;
-    padding: 0 !important;
+    /* Vertical padding, where the horizontal inset comes from the measure
+       above. Same reason, measured the same way: with the page margin
+       defeated the first line sat 1.6mm from the paper edge. @page is the
+       only mechanism that can inset CONTINUATION pages, so this cannot
+       replace it - but it is what gives the first page, the one carrying
+       the letterhead, a top margin that no print dialog can take away. */
+    padding: 10mm 0 0 !important;
+  }
+
+  /* The letterhead. */
+  [data-print='mark'] {
+    height: 9mm;
+    width: auto;
+  }
+
+  [data-print='letterhead'] {
+    break-after: avoid;
+  }
+
+  /* The one piece of decoration on the sheet.
+     A gradient is a background image, and the print dialog's "background
+     graphics" box - off by default - drops those; `print-color-adjust`
+     asks for it anyway. Either way it carries no information, and the
+     blocks it separates are already separated by their own rules, so a
+     reader who never sees it loses nothing. */
+  [data-print='rule'] {
+    height: 2.5pt;
+    background-image: linear-gradient(
+      90deg,
+      var(--lm-g1),
+      var(--lm-g2),
+      var(--lm-g3)
+    ) !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  [data-print='colophon'] {
+    margin-top: 6mm;
+    font-size: 9pt;
+    color: #333;
+    break-inside: avoid;
   }
 
   /* Sections, not boxes.

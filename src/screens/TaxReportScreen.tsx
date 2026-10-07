@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import markBlack from '@/assets/logo/coineda-mark-black.svg';
 import { taxRegistry } from '@/tax/registry';
 import { runTaxReport } from '@/tax/runTaxReport';
 import { buildDisclaimer, type Disclaimer } from '@/tax/disclaimer';
@@ -538,6 +539,34 @@ export const TaxReportScreen = () => {
                 <ArrowLeft aria-hidden="true" />
                 {t('Choose a jurisdiction')}
               </Button>
+              {/* The letterhead. Print only, and above everything: a sheet
+                  that arrives at a tax office with no issuer reads as an
+                  anonymous printout, and the reader has no way to tell what
+                  produced the figures or where to check it. The mark is an
+                  SVG in the document flow, so it prints whether or not the
+                  dialog's "background graphics" box is ticked - unlike the
+                  gradient rule below it, which is decoration and is allowed
+                  to be absent. */}
+              {assessment && (
+                <div
+                  data-print="letterhead"
+                  className="hidden flex-col gap-2 print:flex"
+                >
+                  <div className="flex items-end justify-between gap-4">
+                    <span className="flex items-center gap-2">
+                      <img
+                        src={markBlack}
+                        alt=""
+                        aria-hidden="true"
+                        data-print="mark"
+                      />
+                      <span className="text-lg font-semibold">Coineda</span>
+                    </span>
+                    <span className="text-sm">{t('Tax report')}</span>
+                  </div>
+                  <div data-print="rule" aria-hidden="true" />
+                </div>
+              )}
               <h2 className="text-xl font-semibold">
                 {t(module.manifest.jurisdiction)}
               </h2>
@@ -1261,6 +1290,37 @@ export const TaxReportScreen = () => {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* The colophon. Print only, and last.
+                A reader at a tax office is being asked to accept figures
+                from software they have never heard of, and Rn. 29b of the
+                BMF letter this report cites makes the point that such a
+                report carries no authority of its own. So the sheet says
+                plainly what produced it, that the rules and the arithmetic
+                are open to inspection, and where to find them - written out
+                as a URL, because a hyperlink on paper is not one. */}
+            {assessment && (
+              <div
+                data-print="colophon"
+                className="hidden flex-col gap-1 print:flex"
+              >
+                <div data-print="rule" aria-hidden="true" />
+                <p>
+                  <span className="font-medium">
+                    {t('About {{app}}', { app: 'Coineda' })}:{' '}
+                  </span>
+                  {t(
+                    'Coineda is open-source software for tracking crypto holdings and preparing a tax report. It runs entirely on this device: there is no server, no account, and no transmission of the data behind this report.',
+                  )}
+                </p>
+                <p>
+                  {t('Source code and licence (GPLv3)')}:{' '}
+                  <span className="font-medium">
+                    github.com/fabianbormann/Coineda
+                  </span>
+                </p>
               </div>
             )}
 

@@ -1314,3 +1314,54 @@ describe('the taxpayer identity survives a slow or failed settings read', () => 
     expect(settings?.taxpayer?.taxNumber).toBe('12/345/67890');
   });
 });
+
+describe('what the sheet says about its own origin', () => {
+  it('prints a letterhead and a colophon, neither of them on screen', async () => {
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    const { container } = renderScreen();
+    await runReport('2025');
+
+    // A sheet that arrives at a tax office with no issuer reads as an
+    // anonymous printout, and Rn. 29b of the BMF letter this report cites
+    // makes the point that such a report carries no authority of its own -
+    // so it has to say what produced it and where that can be checked.
+    const letterhead = container.querySelector('[data-print="letterhead"]');
+    const colophon = container.querySelector('[data-print="colophon"]');
+    expect(letterhead?.className).toContain('print:flex');
+    expect(letterhead?.className).toContain('hidden');
+    expect(colophon?.className).toContain('print:flex');
+    expect(colophon?.className).toContain('hidden');
+  });
+
+  it('names the project, its licence and where to find the source', async () => {
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    const { container } = renderScreen();
+    await runReport('2025');
+
+    const colophon = container.querySelector('[data-print="colophon"]');
+    // Written out, not linked: a hyperlink on paper is not one.
+    expect(colophon?.textContent).toContain('github.com/fabianbormann/Coineda');
+    expect(colophon?.textContent).toMatch(/GPLv3/);
+    expect(colophon?.textContent).toMatch(/open-source|quelloffen/i);
+  });
+
+  it('carries the mark as document content, so it does not need background graphics', async () => {
+    // The gradient rule beside it is a background image and the print
+    // dialog drops those by default; the mark is an <img> in the flow and
+    // prints either way, which is why the issuer is identified by the mark
+    // and not by the gradient.
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    const { container } = renderScreen();
+    await runReport('2025');
+
+    const mark = container.querySelector('[data-print="mark"]');
+    expect(mark?.tagName).toBe('IMG');
+    expect(mark?.getAttribute('src')).toMatch(/coineda-mark/);
+  });
+});
