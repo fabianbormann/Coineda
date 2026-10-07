@@ -205,11 +205,21 @@
    the blur kept. Together that is ~92% coverage - enough that nothing
    behind is recognisable - while the remaining sliver of blurred wash
    keeps the bar tinted by the page it belongs to rather than flat. */
-@utility glass-chrome {
-  position: relative;
-  background:
+/* The chrome material itself, named once.
+   Two surfaces need it - the sticky report bar and the toast - and they
+   cannot share the utility: sonner paints its own `background` from
+   `--normal-bg` with a selector of equal specificity that is injected at
+   runtime, so a class would lose the cascade coin-flip. Sharing the VALUE
+   instead means a tune to one surface cannot leave the other behind. */
+:root {
+  --lm-chrome-bg:
     linear-gradient(var(--lm-glass-1), var(--lm-glass-1)),
     color-mix(in oklch, var(--lm-bg) 88%, transparent);
+}
+
+@utility glass-chrome {
+  position: relative;
+  background: var(--lm-chrome-bg);
   backdrop-filter: blur(28px) saturate(150%);
   -webkit-backdrop-filter: blur(28px) saturate(150%);
   box-shadow: var(--lm-glow);
