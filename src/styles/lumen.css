@@ -16,7 +16,19 @@
   --radius-none: 0;
   --radius-full: 0;
 
-  --color-base: var(--lm-bg);
+  /* `surface`, NOT `base`.
+     Tailwind v4 generates a `text-{name}` colour utility for every colour
+     the theme registers, and that generated utility replaces the built-in
+     font-size of the same name. Registered as `base`, this one compiled
+     `.text-base` to `color:var(--color-base)` - the page background - so
+     every field carrying shadcn's standard `text-base` painted typed text
+     in the exact colour of the surface behind it: 1.06:1 contrast in light
+     mode, 2.29:1 in dark, with the placeholder still perfectly legible
+     because it has an explicit class of its own.
+     `text-base` is one of the most-used utilities in the ecosystem and
+     arrives with every component copied from shadcn, so the name is not
+     one a palette can take. */
+  --color-surface: var(--lm-bg);
   --color-ink: var(--lm-ink);
   --color-mute: var(--lm-mute);
   --color-faint: var(--lm-faint);

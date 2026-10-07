@@ -358,6 +358,55 @@ describe('the print stylesheet survives the build', () => {
    * pixels 6.6 to 1, and with background graphics enabled the brand's conic
    * gradient printed behind every figure.
    */
+  it('keeps text-base a font size, not a colour', () => {
+    // Tailwind v4 generates a `text-{name}` COLOUR utility for every
+    // `--color-*` the theme registers, and the generated colour wins over
+    // the built-in font-size scale. Lumen registered a colour literally
+    // named `base`, so `.text-base` compiled to
+    // `color:var(--color-base)` - which is the PAGE BACKGROUND. Every
+    // field carrying shadcn's standard `text-base` therefore painted what
+    // a person typed in the exact colour of the surface behind it:
+    // measured at 1.06:1 contrast in light mode and 2.29:1 in dark, in
+    // every input in the app, while the placeholder (which has its own
+    // explicit class) stayed perfectly legible.
+    const sheet = css();
+    const rule = /\.text-base\{([^}]*)\}/.exec(sheet)?.[1];
+    expect(rule, 'no .text-base rule in the build').toBeDefined();
+    expect(rule).toContain('font-size');
+    expect(rule).not.toContain('color:');
+  });
+
+  it('registers no theme colour that shadows a font-size utility', () => {
+    // The generalisation of the bug above: any `--color-<size>` silently
+    // turns that size utility into a colour. Checked against the whole
+    // scale rather than against `base` alone, because the next collision
+    // would be just as invisible.
+    const lumen = fs.readFileSync(
+      path.join(import.meta.dirname, '..', 'src', 'styles', 'lumen.css'),
+      'utf8',
+    );
+    const sizes = [
+      'xs',
+      'sm',
+      'base',
+      'lg',
+      'xl',
+      '2xl',
+      '3xl',
+      '4xl',
+      '5xl',
+      '6xl',
+      '7xl',
+      '8xl',
+      '9xl',
+    ];
+    const declared = [...lumen.matchAll(/--color-([a-z0-9-]+)\s*:/g)].map(
+      (m) => m[1],
+    );
+    expect(declared.length).toBeGreaterThan(0);
+    expect(declared.filter((name) => sizes.includes(name))).toEqual([]);
+  });
+
   it('gives the printed document a measure that survives the shell', () => {
     const sheet = css();
     // `main > *` carries `max-width:none!important` and AppShell renders the
