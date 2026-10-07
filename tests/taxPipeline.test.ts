@@ -759,3 +759,81 @@ describe('the method sheet', () => {
     expect(report.method.matching).toBe('moving-average');
   });
 });
+
+describe('two disposals out of one ledger event', () => {
+  /**
+   * Germany's `legToTaxEvent` stamps EVERY leg of an event with
+   * `sourceEventId: event.id`, so one event disposing of two assets
+   * produces two disposals carrying the same `disposalEventId`. The file
+   * already knew this id is not unique - the unresolved list keys its rows
+   * on position for exactly that reason - and the provenance join keyed a
+   * Map on it anyway, so the second disposal silently overwrote the first
+   * and both lines printed one disposal's quantity, venue and lots under
+   * the other's figures.
+   */
+  const perLeg: TaxModule = {
+    ...stubModule,
+    classify: (event) =>
+      event.legs.map((leg) => ({
+        // The same id for every leg, exactly as the German module does.
+        sourceEventId: event.id,
+        kind: leg.direction === 'in' ? 'acquisition' : 'disposal',
+        assetId: leg.assetId,
+        amount: leg.amount,
+        timestamp: event.timestamp,
+        venue: leg.venue,
+      })) as TaxEvent[],
+  };
+
+  const leg = (assetId: string, amount: string, direction: 'in' | 'out') => ({
+    assetId,
+    amount,
+    direction,
+    venue: 'wallet-a',
+    role: 'principal' as const,
+  });
+
+  it('gives each line its own quantity and its own lots', async () => {
+    await putEvents([
+      ledgerEvent({
+        id: 'buy-ada',
+        externalId: 'buy-ada',
+        timestamp: Date.UTC(2024, 0, 1),
+        legs: [leg('cardano:lovelace', '1000000', 'in')],
+      }),
+      ledgerEvent({
+        id: 'buy-btc',
+        externalId: 'buy-btc',
+        timestamp: Date.UTC(2024, 0, 2),
+        legs: [leg('bitcoin:native', '100000000', 'in')],
+      }),
+      ledgerEvent({
+        id: 'one-event-two-assets',
+        externalId: 'one-event-two-assets',
+        timestamp: Date.UTC(2025, 0, 1),
+        legs: [
+          leg('cardano:lovelace', '1000000', 'out'),
+          leg('bitcoin:native', '100000000', 'out'),
+        ],
+      }),
+    ]);
+
+    const report = await runTaxReport(perLeg, {
+      year: 2025,
+      baseCurrency: 'eur',
+    });
+
+    expect(report.lines).toHaveLength(2);
+    const byAsset = Object.fromEntries(
+      report.lines.map((line) => [line.assetId, line]),
+    );
+    expect(byAsset['cardano:lovelace'].amount).toBe('1000000');
+    expect(byAsset['bitcoin:native'].amount).toBe('100000000');
+    expect(byAsset['cardano:lovelace'].consumed[0].acquisitionEventId).toBe(
+      'buy-ada',
+    );
+    expect(byAsset['bitcoin:native'].consumed[0].acquisitionEventId).toBe(
+      'buy-btc',
+    );
+  });
+});

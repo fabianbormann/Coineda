@@ -12,6 +12,7 @@ import { resolveValues } from './resolveValues';
 import { APP_VERSION } from '@/global/version';
 import type {
   LotMove,
+  MatchedDisposal,
   MatchingMethod,
   ReportedDisposal,
   ReportMethod,
@@ -290,18 +291,48 @@ export const runTaxReport = async (
   // silently attach one disposal's acquisition dates to another's figures -
   // a wrong holding period that reads as entirely plausible on paper, which
   // is the worst kind of wrong a tax document can be.
-  const byDisposalId = new Map(
-    yearMatched.map((disposal) => [disposal.disposalEventId, disposal]),
-  );
+  //
+  // A QUEUE per id, not one entry per id. `disposalEventId` is a tax
+  // event's `sourceEventId`, and that is not unique: a jurisdiction stamps
+  // every leg of a ledger event with the event's own id, so one event
+  // disposing of two assets yields two disposals sharing an id. Keyed into
+  // a Map the second overwrote the first, and both report lines printed one
+  // disposal's quantity, venue and lots beneath the other's figures - which
+  // is how a real report came to show "Anschaffungskosten: 240,12 EUR" above
+  // its own lot breakdown reading "0,15 EUR".
+  //
+  // Within one id the queue is consumed in order. Both shipped modules map
+  // `input.matched` one-to-one, so that order is the matcher's; a module
+  // that reorders its own lines within a single event would pair them
+  // differently, but every candidate then belongs to that same event rather
+  // than to an unrelated one, which is the failure this guards against.
+  const byDisposalId = new Map<string, MatchedDisposal[]>();
+  for (const disposal of yearMatched) {
+    const queue = byDisposalId.get(disposal.disposalEventId);
+    if (queue) {
+      queue.push(disposal);
+    } else {
+      byDisposalId.set(disposal.disposalEventId, [disposal]);
+    }
+  }
 
   const lines: ReportedDisposal[] = assessment.lines.map((line) => {
-    const disposal = byDisposalId.get(line.disposalEventId);
+    const queue = byDisposalId.get(line.disposalEventId);
+    // Narrowed by assetId first, because a module's line carries one and a
+    // mismatch there is a pairing this join can still rule out.
+    const index = queue?.findIndex(
+      (candidate) => candidate.assetId === line.assetId,
+    );
+    const disposal =
+      queue && index !== undefined && index >= 0
+        ? queue.splice(index, 1)[0]
+        : undefined;
     if (!disposal) {
       // No report at all, rather than one line that renders blanks where an
       // acquisition date belongs - the same call this function already
       // makes when a module throws while classifying.
       throw new Error(
-        `tax module "${module.manifest.id}" assessed a disposal it was not handed: ${line.disposalEventId}`,
+        `tax module "${module.manifest.id}" assessed a disposal it was not handed: ${line.disposalEventId} (${line.assetId})`,
       );
     }
     return {
