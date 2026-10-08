@@ -43,6 +43,7 @@ const readySeries: JourneySeries = {
   disposals: [],
   assets: ['cardano:lovelace'],
   finalValue: '20',
+  prices: { 'cardano:lovelace': '0.5' },
 };
 
 beforeEach(async () => {

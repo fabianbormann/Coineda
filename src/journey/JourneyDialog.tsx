@@ -28,15 +28,32 @@ type Status = 'loading' | 'ready' | 'error';
 const DEFAULT_CURRENCY = 'eur';
 const CANVAS_WIDTH = 960;
 const CANVAS_HEIGHT = 540;
-/** How long one loop of the live preview takes to sweep the whole series. */
-const PREVIEW_DURATION_MS = 6000;
-/** How long the exported clip runs - a single, non-looping sweep. */
-const EXPORT_DURATION_MS = 6000;
+/** How long the playhead takes to travel from the first event to today. */
+const SWEEP_MS = 7000;
+/** How long the settled pile and the closing figure stay on screen after
+ *  the sweep. Without this the clip ended on the frame the last coin
+ *  landed, and the total the whole thing builds up to was never seen. */
+const HOLD_MS = 2500;
+/** One full play, preview loop and exported clip alike. */
+const CLIP_MS = SWEEP_MS + HOLD_MS;
+
+/** Where in the clip `elapsed` falls: a 0..1 sweep, then held at 1. */
+const progressAt = (elapsedMs: number): number =>
+  Math.min(1, Math.max(0, elapsedMs / SWEEP_MS));
 
 const journeyFilename = (): string => {
   const date = new Date().toISOString().slice(0, 10);
   return `coineda-journey-${date}.webm`;
 };
+
+/** The frame's chrome, translated once per draw loop rather than per
+ *  frame. Passed in so render.ts never needs i18n to be testable. */
+const labelsOf = (t: (key: string) => string): JourneyLabels => ({
+  title: t('Your crypto journey'),
+  noDataLabel: t('No transactions to show yet'),
+  moreAssets: t('and {{count}} more assets'),
+  todayLabel: t('value today'),
+});
 
 /** A canvas with the non-standard (but universally implemented)
  *  `captureStream` method, which lib.dom.ts does not declare. */
@@ -49,17 +66,15 @@ type CapturableCanvas = HTMLCanvasElement & {
  * open, then lets the owner preview it live on a canvas and, on request,
  * record a fixed-length `.webm` clip of it.
  *
- * Two modes, picked before recording: 'relative' (the default) expresses
- * every value as a percentage of today's total and never draws an absolute
- * figure anywhere - see src/journey/render.ts's `scaleSeries`, which is
- * where that guarantee actually lives - so the owner can post it without
- * revealing their net worth. 'absolute' draws the real base-currency
- * values, for a clip kept private.
+ * Two modes, picked before recording: 'relative' (the default) names
+ * assets, dates and counts but never a quantity or a fiat figure - see
+ * src/journey/render.ts, where that guarantee actually lives - so the
+ * owner can post it without revealing their holdings. 'absolute' adds the
+ * quantities and the closing total, for a clip kept private.
  *
- * The series build does one historical price lookup per (asset, month)
- * pair and can therefore take a while on a real portfolio; the dialog
- * shows a pending state for it and, on failure, stays open with the
- * message shown rather than closing on the owner.
+ * The series build makes one spot-price request (for the closing total
+ * and the legend order) and no historical lookups; on failure the dialog
+ * stays open with the message shown rather than closing on the owner.
  */
 export const JourneyDialog = ({ open, onOpenChange }: Props) => {
   const { t, i18n } = useTranslation();
@@ -135,9 +150,9 @@ export const JourneyDialog = ({ open, onOpenChange }: Props) => {
     };
   }, [open, attempt]);
 
-  // The live preview loop: redraws every frame, looping progress 0..1 over
-  // PREVIEW_DURATION_MS, for as long as the dialog is ready, not
-  // recording, and has a canvas to draw on. Paused during `recording` so
+  // The live preview loop: redraws every frame, looping one whole clip
+  // (sweep, then hold) for as long as the dialog is ready, not recording,
+  // and has a canvas to draw on. Paused during `recording` so
   // the export's own single sweep (in handleRecord) is the only thing
   // drawing to the canvas while MediaRecorder is capturing it.
   useEffect(() => {
@@ -155,20 +170,14 @@ export const JourneyDialog = ({ open, onOpenChange }: Props) => {
       return;
     }
 
-    const labels: JourneyLabels = {
-      title: t('Your crypto journey'),
-      acquisitionPrefix: t('Bought'),
-      noDataLabel: t('Not enough priced history yet'),
-      moreAssets: t('and {{count}} more assets'),
-      todayLabel: t('value today'),
-    };
+    const labels = labelsOf(t);
 
     const startedAt = performance.now();
     const tick = (now: number) => {
-      const elapsed = (now - startedAt) % PREVIEW_DURATION_MS;
+      const elapsed = (now - startedAt) % CLIP_MS;
       renderJourneyFrame(ctx, series, {
         mode,
-        progress: elapsed / PREVIEW_DURATION_MS,
+        progress: progressAt(elapsed),
         width: CANVAS_WIDTH,
         height: CANVAS_HEIGHT,
         currency,
@@ -202,13 +211,7 @@ export const JourneyDialog = ({ open, onOpenChange }: Props) => {
       return;
     }
 
-    const labels: JourneyLabels = {
-      title: t('Your crypto journey'),
-      acquisitionPrefix: t('Bought'),
-      noDataLabel: t('Not enough priced history yet'),
-      moreAssets: t('and {{count}} more assets'),
-      todayLabel: t('value today'),
-    };
+    const labels = labelsOf(t);
 
     // captureStream() is obtained HERE, not inside recordVideo(), so a test
     // can stub it on the canvas and assert recordVideo was called with
@@ -218,24 +221,28 @@ export const JourneyDialog = ({ open, onOpenChange }: Props) => {
 
     try {
       const startedAt = performance.now();
+      // Keeps drawing through the hold, not only until progress reaches
+      // 1: a captured stream only carries frames that were actually
+      // painted, so a canvas left untouched for the last seconds would
+      // give the recorder nothing to encode for them.
       const drive = (now: number) => {
-        const progress = Math.min(1, (now - startedAt) / EXPORT_DURATION_MS);
+        const elapsed = now - startedAt;
         renderJourneyFrame(ctx, series, {
           mode,
-          progress,
+          progress: progressAt(elapsed),
           width: CANVAS_WIDTH,
           height: CANVAS_HEIGHT,
           currency,
           language: i18n.language,
           labels,
         });
-        if (progress < 1) {
+        if (elapsed < CLIP_MS) {
           exportFrame = requestAnimationFrame(drive);
         }
       };
       exportFrame = requestAnimationFrame(drive);
 
-      const blob = await recordVideo(stream, EXPORT_DURATION_MS);
+      const blob = await recordVideo(stream, CLIP_MS);
 
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
@@ -261,7 +268,7 @@ export const JourneyDialog = ({ open, onOpenChange }: Props) => {
           <DialogTitle>{t('Your crypto journey')}</DialogTitle>
           <DialogDescription>
             {t(
-              'A shareable look at your portfolio over time. Shareable mode never shows an absolute amount, so you can post it without revealing your balance.',
+              'Every purchase drops into the jar, every sale lifts back out, along a timeline of your history. Shareable mode never shows an amount, so you can post it without revealing your balance.',
             )}
           </DialogDescription>
         </DialogHeader>
@@ -273,9 +280,7 @@ export const JourneyDialog = ({ open, onOpenChange }: Props) => {
               aria-hidden="true"
             />
             <p className="text-sm text-muted-foreground">
-              {t(
-                'Building your journey… this can take a while because historical prices are looked up one at a time.',
-              )}
+              {t('Building your journey…')}
             </p>
           </div>
         )}

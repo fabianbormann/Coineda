@@ -47,13 +47,23 @@ export type JourneySeries = {
   /**
    * Today's total, in the base currency, for the CLOSING frame alone.
    *
-   * The animation itself never touches a price: holdings come straight out
-   * of the ledger, so the whole history plays offline, for any year, with no
-   * rate limit and no 365-day window. This one figure costs a single spot
-   * request, the same one the balance header makes. Null when it could not
-   * be priced, and the journey still plays without it.
+   * The animation itself never touches a historical price: holdings come
+   * straight out of the ledger, so the whole history plays offline, for
+   * any year, with no rate limit and no 365-day window. This one figure
+   * costs a single spot request, the same one the balance header makes.
+   * Null when it could not be priced, and the journey still plays without
+   * it.
    */
   finalValue: string | null;
+  /**
+   * Today's spot price per WHOLE unit of each asset in `assets`, in the
+   * base currency - the same single request as `finalValue`. The jar
+   * sizes each coin by what that purchase is worth today, which is the
+   * only measure that compares a Bitcoin buy with an ADA reward. Empty
+   * when the provider could not be reached, in which case every coin is
+   * the same size.
+   */
+  prices: Record<string, string>;
 };
 
 export type BuildJourneySeriesOptions = {
@@ -154,6 +164,7 @@ export const buildJourneySeries = async (
       disposals: [],
       assets: [],
       finalValue: null,
+      prices: {},
     };
   }
 
@@ -203,6 +214,24 @@ export const buildJourneySeries = async (
 
   const priced = totalValue(finalHoldings, prices);
   const finalValue = priced.missing.length === 0 ? priced.total : null;
+
+  // An asset the provider answered for but does not list has no value in
+  // the base currency, and a journey is a picture of value: a coin for a
+  // token nobody prices would be a coin for nothing, and it would crowd
+  // out the ones that count. Dropped from the story entirely - its lane,
+  // its coins and its ticks. The one exception is a provider that could
+  // not be reached at all, which prices NOTHING: that is an outage, not a
+  // verdict on any asset, and the journey plays in full without values.
+  // Only a crypto price counts as an answer: the base fiat is priced at 1
+  // locally, without asking anyone.
+  const answered = [...seen].some((assetId) => prices.has(assetId));
+  const isPriced = (assetId: string): boolean =>
+    !answered || prices.has(assetId);
+  for (const assetId of [...seen]) {
+    if (!isPriced(assetId)) {
+      seen.delete(assetId);
+    }
+  }
 
   const valueOfAsset = (assetId: string): number => {
     const holding = finalHoldings.find((h) => h.assetId === assetId);
@@ -261,7 +290,7 @@ export const buildJourneySeries = async (
     }
 
     for (const [assetId, change] of net) {
-      if (isZeroAmount(change)) {
+      if (isZeroAmount(change) || !isPriced(assetId)) {
         continue;
       }
       const marker = {
@@ -277,5 +306,16 @@ export const buildJourneySeries = async (
     }
   }
 
-  return { points, acquisitions, disposals, assets, finalValue };
+  return {
+    points,
+    acquisitions,
+    disposals,
+    assets,
+    finalValue,
+    prices: Object.fromEntries(
+      assets
+        .filter((assetId) => prices.has(assetId))
+        .map((assetId) => [assetId, prices.get(assetId) as string]),
+    ),
+  };
 };

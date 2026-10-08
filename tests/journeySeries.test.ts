@@ -79,6 +79,7 @@ describe('buildJourneySeries', () => {
       disposals: [],
       assets: [],
       finalValue: null,
+      prices: {},
     });
   });
 
@@ -158,6 +159,81 @@ describe('buildJourneySeries', () => {
     expect(series.finalValue).toBeNull();
     expect(series.points).toHaveLength(3);
     expect(series.assets).toEqual(['cardano:lovelace']);
+  });
+
+  it('leaves out an asset the provider has no price for', async () => {
+    // A journey is a picture of value. A token the provider answered for
+    // but does not list is worth nothing it can show, so it gets no coin,
+    // no tick and no line in the legend - and the assets that do count are
+    // not crowded out by it.
+    const unpriced = `cardano:${'0'.repeat(56)}414243`;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ cardano: { eur: 0.5 } }), {
+            status: 200,
+          }),
+      ),
+    );
+
+    const tokenReward = reward({
+      id: 'reward-2',
+      externalId: 'reward-2',
+      timestamp: Date.UTC(2025, 0, 20),
+      legs: [
+        {
+          assetId: unpriced,
+          amount: '7',
+          direction: 'in',
+          venue: 'wallet-a',
+          role: 'principal',
+        },
+      ],
+    });
+
+    const series = await buildJourneySeries([reward(), tokenReward], 'eur', {
+      now: Date.UTC(2025, 2, 15),
+    });
+
+    expect(series.assets).toEqual(['cardano:lovelace']);
+    expect(series.acquisitions.map((m) => m.assetId)).toEqual([
+      'cardano:lovelace',
+    ]);
+    expect(series.prices).toEqual({ 'cardano:lovelace': '0.5' });
+  });
+
+  it('keeps every asset when the provider is down, because that prices nothing', async () => {
+    const unpriced = `cardano:${'0'.repeat(56)}414243`;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch');
+      }),
+    );
+
+    const tokenReward = reward({
+      id: 'reward-2',
+      externalId: 'reward-2',
+      timestamp: Date.UTC(2025, 0, 20),
+      legs: [
+        {
+          assetId: unpriced,
+          amount: '7',
+          direction: 'in',
+          venue: 'wallet-a',
+          role: 'principal',
+        },
+      ],
+    });
+
+    const series = await buildJourneySeries([reward(), tokenReward], 'eur', {
+      now: Date.UTC(2025, 2, 15),
+    });
+
+    expect(series.assets).toHaveLength(2);
+    expect(series.acquisitions).toHaveLength(2);
+    expect(series.prices).toEqual({});
   });
 
   it('gives a lane to an asset that was sold in full', async () => {
