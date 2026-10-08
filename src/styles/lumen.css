@@ -222,3 +222,25 @@
     z-index: 1;
   }
 }
+
+/* A digit column settling into place - see src/components/money/RollingMoney.tsx.
+   An animation rather than a transition on purpose: a transition needs the
+   element to be painted at its start value first, which means a second frame
+   and a dance with rAF. An animation runs from mount. */
+@keyframes lm-roll {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(var(--lm-roll-to, 0));
+  }
+}
+
+@utility roll-strip {
+  display: block;
+  white-space: pre;
+  line-height: 1;
+  animation-name: lm-roll;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-fill-mode: forwards;
+}

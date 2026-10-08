@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent } from '@/components/ui/card';
-import { Money } from '@/components/money/Money';
+import { RollingMoney } from '@/components/money/RollingMoney';
 
 type Props = {
   /** The summed value of every priced holding, in the base currency. Always
@@ -67,7 +67,13 @@ export const BalanceHeader = ({
             <span className="text-muted-foreground text-xs tracking-widest uppercase">
               {t('Balance')}
             </span>
-            <Money
+            {/* Rolling, not plain: this screen starts at zero and prices
+                its holdings in an effect, so coming back from the tax
+                report shows 0 until they resolve. The counter does not
+                remove that window - the figure is unknown until the
+                prices land - but it turns the arrival into something that
+                reads as arriving rather than as a glitch. */}
+            <RollingMoney
               value={total}
               currency={currency}
               className="font-serif text-5xl leading-none md:text-6xl"
