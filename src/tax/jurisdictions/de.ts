@@ -84,8 +84,13 @@ const PRIVATE_SALE_SCOPE_NOTE =
   'This limit covers every private sale you made in the year, not only crypto.';
 const LIABILITY_NOTE =
   'Your marginal rate applied to the taxable gain. It does not include solidarity surcharge, church tax, or the effect on your overall progression.';
-const STAKING_INCOME_THRESHOLD_LABEL =
-  'Tax-free threshold for staking income (§22 Nr. 3 EStG)';
+/** Named for the provision, not for staking: every reward kind taxed as
+ *  income here counts against it, and so does any non-crypto §22 Nr. 3
+ *  income, which the scope note says. */
+const OTHER_INCOME_THRESHOLD_LABEL =
+  'Tax-free threshold for other income (§22 Nr. 3 EStG)';
+const OTHER_INCOME_SCOPE_NOTE =
+  'This limit covers all of your income under §22 Nr. 3 EStG in the year, not only crypto rewards.';
 
 const BUSINESS_INCOME_NOTE =
   'This reward may be gewerbliche Einkünfte rather than §22 Nr. 3 income. This classification is uncertain, so confirm it yourself before relying on it.';
@@ -405,11 +410,12 @@ const assess = (input: AssessInput): TaxAssessment => {
   const income = incomeExceeded ? incomeSum : '0';
 
   const incomeThreshold: ThresholdOutcome = {
-    label: STAKING_INCOME_THRESHOLD_LABEL,
+    label: OTHER_INCOME_THRESHOLD_LABEL,
     limit: incomeLimit,
     actual: incomeSum,
     exceeded: incomeExceeded,
     kind: 'freigrenze',
+    scopeNote: OTHER_INCOME_SCOPE_NOTE,
   };
 
   let estimatedLiability: string | undefined;

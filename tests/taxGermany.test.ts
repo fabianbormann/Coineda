@@ -708,11 +708,16 @@ describe('german threshold scope notes', () => {
       income: [],
     });
 
-    const [privateSale, staking] = report.thresholds;
+    const [privateSale, otherIncome] = report.thresholds;
     expect(privateSale.scopeNote).toBe(
       'This limit covers every private sale you made in the year, not only crypto.',
     );
-    expect(staking.scopeNote).toBeUndefined();
+    expect(otherIncome.label).toBe(
+      'Tax-free threshold for other income (§22 Nr. 3 EStG)',
+    );
+    expect(otherIncome.scopeNote).toBe(
+      'This limit covers all of your income under §22 Nr. 3 EStG in the year, not only crypto rewards.',
+    );
   });
 });
 
