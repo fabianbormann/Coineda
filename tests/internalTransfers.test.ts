@@ -833,6 +833,103 @@ describe('the coins that left but never arrived', () => {
     ).toEqual([['send:residual-out', '10000', 'bc1qa']]);
   });
 
+  it('decides the UTXO sender on its net, whatever order the ids sort in', async () => {
+    // The same send as above, with ids that sort the SENDER first. The
+    // sender's change output is an owned `in` leg, so a linker that took
+    // the first event with any `in` leg picked the sender as its own
+    // receiver and linked nothing - for roughly half of all real UUIDs.
+    await putEvents([
+      buyAt('bc1qa', '50000000'),
+      event({
+        id: 'aaa-send',
+        sourceId: 'bitcoin-a',
+        externalId: 'aaa-send',
+        txHash: HASH4,
+        timestamp: Date.UTC(2025, 1, 1),
+        legs: [leg('out', 'bc1qa', '50000000'), leg('in', 'bc1qa', '9990000')],
+      }),
+      event({
+        id: 'zzz-receive',
+        sourceId: 'bitcoin-b',
+        externalId: 'zzz-receive',
+        txHash: HASH4,
+        timestamp: Date.UTC(2025, 1, 1, 1),
+        legs: [leg('in', 'bc1qb', '40000000')],
+      }),
+    ]);
+
+    const report = await run();
+
+    expect(report.method.transferResiduals).toBe(1);
+    expect(
+      report.lines.map((line) => [
+        line.disposalEventId,
+        line.amount,
+        line.venue,
+      ]),
+    ).toEqual([['aaa-send:residual-out', '10000', 'bc1qa']]);
+    expect(report.unresolved).toEqual([]);
+  });
+
+  it('links a receipt split across two owned wallets in full', async () => {
+    // 0.4001 BTC left bc1qa net of change, and 0.2 BTC arrived at each of
+    // two owned wallets. Two links, one per receiver, carrying that
+    // receiver's own net; the only thing realised is the 10,000 sat fee.
+    const send = event({
+      id: 'send',
+      sourceId: 'bitcoin-a',
+      externalId: 'send',
+      txHash: HASH4,
+      timestamp: Date.UTC(2025, 1, 1),
+      legs: [leg('out', 'bc1qa', '50000000'), leg('in', 'bc1qa', '9990000')],
+    });
+    const receiveB = event({
+      id: 'receive-b',
+      sourceId: 'bitcoin-b',
+      externalId: 'receive-b',
+      txHash: HASH4,
+      timestamp: Date.UTC(2025, 1, 1, 1),
+      legs: [leg('in', 'bc1qb', '20000000')],
+    });
+    const receiveB2 = event({
+      id: 'receive-b2',
+      sourceId: 'bitcoin-b2',
+      externalId: 'receive-b2',
+      txHash: HASH4,
+      timestamp: Date.UTC(2025, 1, 1, 1),
+      legs: [leg('in', 'bc1qb2', '20000000')],
+    });
+
+    const all = [send, receiveB, receiveB2];
+    const links = linkInternalTransfers(all, ownedVenuesOf(all));
+    expect(
+      links
+        .map((link) => [
+          link.fromEventId,
+          link.fromVenue,
+          link.toEventId,
+          link.toVenue,
+          link.amount,
+        ])
+        .sort(),
+    ).toEqual([
+      ['send', 'bc1qa', 'receive-b', 'bc1qb', '20000000'],
+      ['send', 'bc1qa', 'receive-b2', 'bc1qb2', '20000000'],
+    ]);
+
+    await putEvents([buyAt('bc1qa', '50000000'), ...all]);
+    const report = await run();
+
+    expect(
+      report.lines.map((line) => [
+        line.disposalEventId,
+        line.amount,
+        line.venue,
+      ]),
+    ).toEqual([['send:residual-out', '10000', 'bc1qa']]);
+    expect(report.unresolved).toEqual([]);
+  });
+
   it('disposes of gas paid in another asset on the same transaction', async () => {
     // An ERC-20 shape: the linked asset arrives whole, the gas is a fee
     // leg in eth:native that has no link in this hash. It used to vanish

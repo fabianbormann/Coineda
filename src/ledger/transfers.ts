@@ -53,10 +53,18 @@ export type TransferLink = {
   timestamp: number;
 };
 
-const ownedPrincipals = (event: LedgerEvent, ownedVenues: Set<string>) =>
-  event.legs.filter(
+/** An event's owned principal legs netted per asset (see
+ *  `netPrincipalLegs`): at most one leg per asset, pointing the way the
+ *  event moved that asset on balance. UTXO change is already subtracted. */
+const netOwnedPrincipals = (
+  event: LedgerEvent,
+  ownedVenues: Set<string>,
+): Leg[] =>
+  netPrincipalLegs(event, ownedVenues).legs.filter(
     (leg) => leg.role === 'principal' && ownedVenues.has(leg.venue),
   );
+
+type Side = { event: LedgerEvent; leg: Leg };
 
 export const linkInternalTransfers = (
   events: LedgerEvent[],
@@ -85,61 +93,67 @@ export const linkInternalTransfers = (
       continue;
     }
 
+    const netted = group.map((event) => ({
+      event,
+      legs: netOwnedPrincipals(event, ownedVenues),
+    }));
+
     // Per asset, because one transaction can move more than one.
     const assets = new Set(
-      group.flatMap((event) =>
-        ownedPrincipals(event, ownedVenues).map((leg) => leg.assetId),
-      ),
+      netted.flatMap(({ legs }) => legs.map((leg) => leg.assetId)),
     );
 
     for (const assetId of assets) {
-      const sent = group.find((event) =>
-        ownedPrincipals(event, ownedVenues).some(
-          (leg) => leg.assetId === assetId && leg.direction === 'out',
-        ),
-      );
-      const received = group.find((event) =>
-        ownedPrincipals(event, ownedVenues).some(
-          (leg) => leg.assetId === assetId && leg.direction === 'in',
-        ),
-      );
-
-      // Both sides must exist, and they must be DIFFERENT events. One event
-      // holding both directions is the single-event case, which
-      // `isInternalTransfer` already decides - and decides more strictly,
-      // on the net, because a UTXO change output makes "has both" true for
-      // an ordinary outbound payment.
-      if (
-        sent === undefined ||
-        received === undefined ||
-        sent.id === received.id
-      ) {
-        continue;
+      // Sender and receiver are decided on each event's NET for the asset,
+      // never on whether it has a leg pointing some way. A UTXO sender's
+      // change output is an owned `in` leg, so "has an in leg" used to pick
+      // the sender as its own receiver whenever its id sorted first - and
+      // the guard against pairing an event with itself then linked
+      // nothing, leaving roughly half of real wallet-to-wallet sends as a
+      // disposal and an acquisition at market. An event that nets to zero
+      // for the asset (a self-send, which `isInternalTransfer` decides) is
+      // neither side, so an event can never be paired with itself.
+      const senders: Side[] = [];
+      const receivers: Side[] = [];
+      for (const { event, legs } of netted) {
+        const leg = legs.find((one) => one.assetId === assetId);
+        if (leg === undefined) {
+          continue;
+        }
+        if (leg.direction === 'out') {
+          senders.push({ event, leg });
+        } else {
+          receivers.push({ event, leg });
+        }
       }
 
-      const arriving = ownedPrincipals(received, ownedVenues).find(
-        (leg) => leg.assetId === assetId && leg.direction === 'in',
-      );
-      const leaving = ownedPrincipals(sent, ownedVenues).find(
-        (leg) => leg.assetId === assetId && leg.direction === 'out',
-      );
-      if (arriving === undefined || leaving === undefined) {
+      // Exactly one sender. Several events netting out on one hash is
+      // ambiguous - which of them fed which receipt is not something a
+      // hash can say - so nothing is linked rather than guessed.
+      if (senders.length !== 1 || receivers.length === 0) {
         continue;
       }
+      const [sender] = senders;
 
-      links.push({
-        assetId,
-        fromEventId: sent.id,
-        fromVenue: leaving.venue,
-        toEventId: received.id,
-        toVenue: arriving.venue,
-        amount: arriving.amount,
-        txHash,
-        // The arrival's time: the destination holds it from then, and
-        // ordering the move before the receipt would let a disposal at the
-        // destination match a lot that had not landed yet.
-        timestamp: received.timestamp,
-      });
+      // One link per receiver, each carrying what THAT receiver netted: a
+      // receipt split across two owned wallets moves both halves, rather
+      // than one half moving and the other being realised as a disposal at
+      // the sender and an acquisition at market.
+      for (const receiver of receivers) {
+        links.push({
+          assetId,
+          fromEventId: sender.event.id,
+          fromVenue: sender.leg.venue,
+          toEventId: receiver.event.id,
+          toVenue: receiver.leg.venue,
+          amount: receiver.leg.amount,
+          txHash,
+          // The arrival's time: the destination holds it from then, and
+          // ordering the move before the receipt would let a disposal at
+          // the destination match a lot that had not landed yet.
+          timestamp: receiver.event.timestamp,
+        });
+      }
     }
   }
 
