@@ -285,9 +285,11 @@ export const resolveValues = async (
       // The event is still valued and returned; only the deduction is
       // missing. No `taxEventKind`, because a fee is not a disposal missing
       // from the gain figure, and no resolution, because recording a
-      // purchase cannot price a fee.
+      // purchase cannot price a fee. `subject` tells the reader it is the
+      // deduction that is missing, not a second failed disposal.
       unpriced.push({
         kind: 'needs-price',
+        subject: 'cost',
         sourceEventId: taxEvent.sourceEventId,
         assetId: cost.assetId,
         amount: cost.amount,

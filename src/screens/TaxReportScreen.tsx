@@ -156,6 +156,11 @@ const UnresolvedGroups = ({
                 <CryptoAmount value={item.amount} assetId={item.assetId} />
               </p>
               <p className="text-destructive" role="alert">
+                {/* A cost the host could not price: the event itself was
+                    computed, only the deduction is missing, and without
+                    this the row reads as a second failed disposal of the
+                    same coins. */}
+                {item.subject === 'cost' && <>{t('Fee, not deducted')} · </>}
                 {t('Could not be computed: {{detail}}', {
                   detail: t(item.reason.key, item.reason.params),
                 })}

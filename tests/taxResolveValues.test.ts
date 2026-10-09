@@ -384,6 +384,13 @@ describe('transaction costs', () => {
           amount: '1000000',
           costs: [{ assetId: 'cardano:deadbeef.NoSuchToken', amount: '7' }],
         }),
+        // The fee coins' own disposal, which a crypto fee always produces
+        // as well and which cannot be priced either.
+        event({
+          sourceEventId: 'swap-1',
+          assetId: 'cardano:deadbeef.NoSuchToken',
+          amount: '7',
+        }),
       ],
       'eur',
     );
@@ -394,9 +401,15 @@ describe('transaction costs', () => {
     expect(valued[0].value).toBe('2');
     expect(valued[0].costs?.[0].value).toBeUndefined();
 
-    expect(unpriced).toHaveLength(1);
-    expect(unpriced[0]).toMatchObject({
+    // Same asset, same amount, same event - told apart by `subject`, so a
+    // reader does not see the one gap as two failed disposals.
+    expect(unpriced).toHaveLength(2);
+    const ownDisposal = unpriced.find((item) => item.subject === undefined);
+    expect(ownDisposal?.taxEventKind).toBe('disposal');
+    const costEntry = unpriced.find((item) => item.subject === 'cost');
+    expect(costEntry).toMatchObject({
       kind: 'needs-price',
+      subject: 'cost',
       sourceEventId: 'swap-1',
       assetId: 'cardano:deadbeef.NoSuchToken',
       amount: '7',
@@ -408,6 +421,6 @@ describe('transaction costs', () => {
     });
     // Not a disposal missing from the gain figure, so it must not be
     // counted as one by runTaxReport's `omitted` rule.
-    expect(unpriced[0].taxEventKind).toBeUndefined();
+    expect(costEntry?.taxEventKind).toBeUndefined();
   });
 });

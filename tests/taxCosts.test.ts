@@ -192,6 +192,14 @@ describe('trade fees reach the gain', () => {
       'disposal',
       undefined,
     ]);
+    // The cost entry says it is a fee that was not deducted; the fee
+    // coins' own disposal does not.
+    const costEntry = unpriced.find((item) => item.taxEventKind === undefined);
+    const ownDisposal = unpriced.find(
+      (item) => item.taxEventKind === 'disposal',
+    );
+    expect(costEntry?.subject).toBe('cost');
+    expect(ownDisposal?.subject).toBeUndefined();
     expect(report.totals.omitted).toBe(1);
   });
 

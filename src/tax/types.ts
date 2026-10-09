@@ -176,6 +176,13 @@ export type UnresolvedItem = {
    * which is the whole point of that kind.
    */
   taxEventKind?: TaxEventKind;
+  /**
+   * Set when the gap is a COST the host could not price rather than the
+   * event's own principal. The event itself was computed; only the
+   * deduction is missing. Rendered as its own wording so the row is not
+   * mistaken for a second failed disposal of the same asset and amount.
+   */
+  subject?: 'cost';
   resolutions: Resolution[];
 };
 
