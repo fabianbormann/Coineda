@@ -4,8 +4,9 @@ import {
   subtractAmounts,
   sumAmounts,
 } from './amount';
-import { netPrincipalLegs } from './balances';
+import { isInternalTransfer, netPrincipalLegs } from './balances';
 import type { LedgerEvent, Leg, LegDirection } from './types';
+import type { LotMove } from '@/tax/types';
 
 /**
  * Transfers between the user's OWN venues, recognised across sources.
@@ -158,6 +159,90 @@ export const linkInternalTransfers = (
   }
 
   return links;
+};
+
+/**
+ * The lot moves an internal transfer makes INSIDE one event.
+ *
+ * `isInternalTransfer` drops an event whose owned principal legs net to
+ * zero per asset, and for a UTXO self-send that is the whole story: every
+ * leg sits at one venue, so nothing changes partition. A grouped exchange
+ * transfer is the other shape - Binance `Spot` -> `USDⓈ-M Futures`, Kraken
+ * `spot / main` -> `earn / staking` - one event, two owned venues. Dropping
+ * it without a move leaves the lots behind in the source partition, and a
+ * jurisdiction that partitions FIFO by venue then reports every later
+ * disposal at the destination as having no acquisition on record.
+ *
+ * Per asset, each venue's principal net (in minus out) decides its side: a
+ * negative net is where the coins left, a positive net is where they
+ * arrived, and a venue that nets to zero (every leg of a self-send) moves
+ * nothing. One move per destination venue, carrying that venue's net - for
+ * a destination with only `in` legs, the sum of them. With the usual single
+ * source that is the whole rule; were several venues to net out at once,
+ * destinations are filled from the sources in leg order, so the total moved
+ * is still exactly what arrived.
+ */
+export const intraEventLotMoves = (
+  events: LedgerEvent[],
+  ownedVenues: Set<string>,
+): LotMove[] => {
+  const moves: LotMove[] = [];
+  for (const event of events) {
+    if (!isInternalTransfer(event, ownedVenues)) {
+      continue;
+    }
+    const principals = event.legs.filter((leg) => leg.role === 'principal');
+    const assets = [...new Set(principals.map((leg) => leg.assetId))];
+    for (const assetId of assets) {
+      // Insertion-ordered, so sources and destinations follow leg order.
+      const netByVenue = new Map<string, string>();
+      for (const leg of principals) {
+        if (leg.assetId !== assetId) {
+          continue;
+        }
+        const current = netByVenue.get(leg.venue) ?? '0';
+        netByVenue.set(
+          leg.venue,
+          leg.direction === 'in'
+            ? addAmounts(current, leg.amount)
+            : subtractAmounts(current, leg.amount),
+        );
+      }
+      const sources = [...netByVenue]
+        .filter(([, net]) => compareAmounts(net, '0') < 0)
+        .map(([venue, net]) => ({
+          venue,
+          left: subtractAmounts('0', net),
+        }));
+      const destinations = [...netByVenue].filter(
+        ([, net]) => compareAmounts(net, '0') > 0,
+      );
+      for (const [toVenue, arrived] of destinations) {
+        let owed = arrived;
+        for (const source of sources) {
+          if (compareAmounts(owed, '0') <= 0) {
+            break;
+          }
+          if (compareAmounts(source.left, '0') <= 0) {
+            continue;
+          }
+          const amount =
+            compareAmounts(source.left, owed) < 0 ? source.left : owed;
+          source.left = subtractAmounts(source.left, amount);
+          owed = subtractAmounts(owed, amount);
+          moves.push({
+            sourceEventId: event.id,
+            assetId,
+            amount,
+            timestamp: event.timestamp,
+            fromVenue: source.venue,
+            toVenue,
+          });
+        }
+      }
+    }
+  }
+  return moves;
 };
 
 /** Every event id that is one side of a linked transfer. */

@@ -7,6 +7,7 @@ import {
 } from '@/ledger/balances';
 import type { LedgerEvent } from '@/ledger/types';
 import {
+  intraEventLotMoves,
   linkInternalTransfers,
   linkedEventIds,
   residualTransferEvents,
@@ -214,14 +215,20 @@ export const runTaxReport = async (
    * transfer to oneself neither realises a gain nor restarts a holding
    * period.
    */
-  const lotMoves: LotMove[] = transferLinks.map((link) => ({
-    sourceEventId: link.fromEventId,
-    assetId: link.assetId,
-    amount: link.amount,
-    timestamp: link.timestamp,
-    fromVenue: link.fromVenue,
-    toVenue: link.toVenue,
-  }));
+  const lotMoves: LotMove[] = [
+    ...transferLinks.map((link) => ({
+      sourceEventId: link.fromEventId,
+      assetId: link.assetId,
+      amount: link.amount,
+      timestamp: link.timestamp,
+      fromVenue: link.fromVenue,
+      toVenue: link.toVenue,
+    })),
+    // The single-event shape is dropped above too, and a grouped exchange
+    // transfer between two owned venues (Spot -> Futures, spot -> earn)
+    // must carry its lots across just the same.
+    ...intraEventLotMoves(allEvents, ownedVenues),
+  ];
 
   const taxEvents: TaxEvent[] = [];
   const hostUnresolved: UnresolvedItem[] = [];

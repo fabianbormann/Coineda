@@ -354,6 +354,62 @@ describe('a real Kraken export', () => {
   });
 });
 
+describe('a Kraken move from spot to staking', () => {
+  it('lets a sale from the staking wallet find the lot bought on spot', async () => {
+    // The spot-to-staking pair is one event between two owned venues and
+    // is dropped as internal. Its lot move is what carries the spot lot
+    // into the `earn / staking` partition; without it the sale below had
+    // no acquisition on record.
+    const text = [
+      '"txid","refid","time","type","subtype","aclass","asset","wallet","amount","fee","balance"',
+      '"LEUR01-AAAAA-AAAAAA","TADA01-BBBBB-BBBBBB","2025-01-10 09:00:00.0000","trade","","currency","ZEUR","spot / main","-100.0000","0.0000","0.0000"',
+      '"LADA01-CCCCC-CCCCCC","TADA01-BBBBB-BBBBBB","2025-01-10 09:00:00.0000","trade","","currency","ADA","spot / main","100.000000","0.000000","100.000000"',
+      '"LSTK01-DDDDD-DDDDDD","RSTK02-EEEEE-EEEEEE","2025-02-01 00:00:00.0000","transfer","spottostaking","currency","ADA","spot / main","-100.000000","0.000000","0.000000"',
+      '"LSTK02-FFFFF-FFFFFF","RSTK02-EEEEE-EEEEEE","2025-02-01 00:00:00.0000","transfer","spottostaking","currency","ADA.S","earn / staking","100.000000","0.000000","100.000000"',
+    ].join('\n');
+    const { events } = krakenCsv.parse(text);
+    const imported: LedgerEvent[] = events.map((derived, index) => ({
+      ...derived,
+      id: `kraken-stake-${index}`,
+      sourceId: 'kraken',
+    }));
+    const buy = imported.find((row) => row.kind === 'trade');
+    expect(buy).toBeDefined();
+
+    await putEvents([
+      ...imported,
+      event({
+        id: 'sell',
+        sourceId: 'authored',
+        externalId: 'sell',
+        origin: 'authored',
+        timestamp: Date.UTC(2025, 5, 1),
+        legs: [
+          leg({
+            assetId: ADA,
+            amount: ada(100),
+            direction: 'out',
+            venue: 'earn / staking',
+          }),
+          leg({
+            assetId: EUR,
+            amount: '150',
+            direction: 'in',
+            venue: 'earn / staking',
+          }),
+        ],
+      }),
+    ]);
+
+    const report = await runGermany(2025);
+
+    const sell = report.lines.find((line) => line.disposalEventId === 'sell');
+    expect(sell?.costBasis).toBe('100');
+    expect(sell?.consumed[0].acquisitionEventId).toBe(buy?.id);
+    expect(report.totals.omitted).toBe(0);
+  });
+});
+
 describe('a Kraken dollar pair', () => {
   it('values a dollar buy and its dollar fee at the ECB rate of the day', async () => {
     // One trade, two rows on one refid: 1000 USD (plus a 2.50 USD fee) for

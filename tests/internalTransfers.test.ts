@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import {
+  intraEventLotMoves,
   linkInternalTransfers,
   linkedEventIds,
   residualTransferEvents,
@@ -1255,5 +1256,69 @@ describe('the coins that left but never arrived', () => {
         role: 'principal',
       },
     ]);
+  });
+});
+
+describe('a transfer between owned venues inside ONE event', () => {
+  // A grouped exchange transfer (Binance Spot -> USDⓈ-M Futures, Kraken
+  // spot / main -> earn / staking) is one event whose legs net to zero
+  // across two owned venues. It is dropped as internal, and its lots must
+  // still follow the coins to the destination partition.
+  it('moves the lots from the out venue to the in venue', () => {
+    const move = event({
+      id: 'grouped',
+      legs: [leg('out', 'Spot', '500'), leg('in', 'USDⓈ-M Futures', '500')],
+    });
+    expect(intraEventLotMoves([move], ownedVenuesOf([move]))).toEqual([
+      {
+        sourceEventId: 'grouped',
+        assetId: BTC,
+        amount: '500',
+        timestamp: move.timestamp,
+        fromVenue: 'Spot',
+        toVenue: 'USDⓈ-M Futures',
+      },
+    ]);
+  });
+
+  it('moves nothing for a UTXO self-send whose legs share one venue', () => {
+    const selfSend = event({
+      id: 'self',
+      legs: [leg('out', 'bc1qwallet', '700'), leg('in', 'bc1qwallet', '700')],
+    });
+    expect(intraEventLotMoves([selfSend], ownedVenuesOf([selfSend]))).toEqual(
+      [],
+    );
+  });
+
+  it('moves to each destination venue its own summed amount', () => {
+    const split = event({
+      id: 'split',
+      legs: [
+        leg('out', 'Spot', '500'),
+        leg('in', 'earn', '200'),
+        leg('in', 'earn', '100'),
+        leg('in', 'futures', '200'),
+      ],
+    });
+    const moves = intraEventLotMoves([split], ownedVenuesOf([split]));
+    expect(
+      moves.map(({ fromVenue, toVenue, amount }) => ({
+        fromVenue,
+        toVenue,
+        amount,
+      })),
+    ).toEqual([
+      { fromVenue: 'Spot', toVenue: 'earn', amount: '300' },
+      { fromVenue: 'Spot', toVenue: 'futures', amount: '200' },
+    ]);
+  });
+
+  it('moves nothing for an event that is not an internal transfer', () => {
+    const lossy = event({
+      id: 'lossy',
+      legs: [leg('out', 'Spot', '500'), leg('in', 'futures', '400')],
+    });
+    expect(intraEventLotMoves([lossy], ownedVenuesOf([lossy]))).toEqual([]);
   });
 });

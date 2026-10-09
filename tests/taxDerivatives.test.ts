@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import { openLedger, putEvents } from '@/ledger/db';
 import { runTaxReport } from '@/tax/runTaxReport';
 import germanTax from '@/tax/jurisdictions/de';
+import binanceCsv from '@/sources/binance-csv';
 import type { DerivativeKind, LedgerEvent, Leg } from '@/ledger/types';
 import { flatRange } from './priceRangeStub';
 
@@ -179,5 +180,40 @@ describe('derivatives end to end', () => {
     const item = report.unresolved.find((one) => one.kind === 'needs-price');
     expect(item?.taxEventKind).toBe('capital-gain');
     expect(report.totals.omitted).toBe(0);
+  });
+});
+
+describe('a futures account funded from Spot', () => {
+  it('carries the Spot lots to the futures wallet, so its losses find them', async () => {
+    // The grouped wallet transfer is one event between two owned venues.
+    // It is dropped as internal; without a lot move the USDT it carried
+    // stayed in the Spot partition and both settlements below reported
+    // "No acquisition is on record".
+    const futures = 'USDⓈ-M Futures';
+    const op = 'Transfer Between Main and Futures Wallet';
+    const { events } = binanceCsv.parse(
+      [
+        'User_ID,UTC_Time,Account,Operation,Coin,Change,Remark',
+        '1,2025-01-10 10:00:00,Spot,Transaction Spend,EUR,-1000,',
+        '1,2025-01-10 10:00:00,Spot,Transaction Buy,USDT,1000,',
+        `1,2025-02-10 10:00:00,Spot,${op},USDT,-500,`,
+        `1,2025-02-10 10:00:00,${futures},${op},USDT,500,`,
+        `1,2025-03-10 10:00:00,${futures},Realized Profit and Loss,USDT,-100,`,
+        `1,2025-03-10 11:00:00,${futures},Commission,USDT,-1,`,
+      ].join('\n'),
+    );
+    await putEvents(
+      events.map((derived, index) => ({
+        ...derived,
+        id: `binance-${index}`,
+        sourceId: 'binance',
+      })),
+    );
+
+    const report = await runGermany();
+
+    expect(report.capitalResult?.losses).toBe('101');
+    expect(report.totals.omitted).toBe(0);
+    expect(report.unresolved).toEqual([]);
   });
 });
