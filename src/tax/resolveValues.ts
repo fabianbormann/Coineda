@@ -35,6 +35,8 @@ export const PRICE_REASON_KEYS = [
 const utcDay = (timestamp: number): string =>
   new Date(timestamp).toISOString().slice(0, 10);
 
+const BASE_SOURCE = 'base currency';
+
 const pairKey = (assetId: string, date: string): string => `${assetId}|${date}`;
 
 /**
@@ -79,7 +81,7 @@ const describeFailure = (error: unknown, date: string): TaxReason => {
   };
 };
 
-type DayResult = { price: string } | { reason: TaxReason };
+type DayResult = { price: string; source: string } | { reason: TaxReason };
 
 /**
  * Resolves every (asset, day) pair once: cache first, then one batched
@@ -102,7 +104,10 @@ const lookUp = async (
   for (const [key, { assetId, date }] of pairs) {
     const cached = await getCachedPrice({ assetId, currency, date });
     if (cached !== null) {
-      results.set(key, { price: cached });
+      results.set(key, {
+        price: cached.price,
+        source: cached.source ?? 'cache (source not recorded)',
+      });
       continue;
     }
     // A fiat asset has no CoinGecko id and needs none: fetchHistory prices
@@ -137,11 +142,11 @@ const lookUp = async (
   // free tier refuses anything older than 365 days, and an acquisition
   // three years before its disposal is exactly the figure a cost basis
   // needs.
-  const { prices: fetched, failures } = await fetchHistory(
-    missing,
-    currency,
-    apiKey,
-  );
+  const {
+    prices: fetched,
+    sources,
+    failures,
+  } = await fetchHistory(missing, currency, apiKey);
 
   // Still matches the CoinGecko path: with a key, no day is refused locally.
   const cutoff = apiKey ? Number.NEGATIVE_INFINITY : freeTierCutoff();
@@ -151,8 +156,9 @@ const lookUp = async (
       const key = pairKey(assetId, date);
       const price = fetched.get(key);
       if (price !== undefined) {
-        await putCachedPrice({ assetId, currency, date }, price);
-        results.set(key, { price });
+        const source = sources.get(key) ?? 'CoinGecko';
+        await putCachedPrice({ assetId, currency, date }, price, source);
+        results.set(key, { price, source });
         continue;
       }
       if (failure !== null) {
@@ -246,21 +252,24 @@ export const resolveValues = async (
     assetId: string,
     amount: string,
     timestamp: number,
-  ): { value: string } | { reason: TaxReason } => {
+  ): { value: string; source: string } | { reason: TaxReason } => {
     // Nothing is worth nothing on any day: a hard fork's zero cost basis
     // must not need a price source.
     if (isZeroAmount(amount)) {
-      return { value: '0' };
+      return { value: '0', source: BASE_SOURCE };
     }
     if (assetId === baseFiatAssetId) {
-      return { value: normaliseAmount(amount) };
+      return { value: normaliseAmount(amount), source: BASE_SOURCE };
     }
     const result = results.get(pairKey(assetId, utcDay(timestamp)));
     if (result && 'price' in result) {
       // Through valueOf, never a bare multiplication: the price is quoted
       // per WHOLE unit and the amount is in the asset's base unit, so the
       // per-asset scale has to be applied here. See src/prices/scale.ts.
-      return { value: valueOf(amount, result.price, assetId) };
+      return {
+        value: valueOf(amount, result.price, assetId),
+        source: result.source,
+      };
     }
     return {
       reason: result?.reason ?? {
@@ -298,8 +307,13 @@ export const resolveValues = async (
       continue;
     }
 
+    const priceSource =
+      taxEvent.consideration === undefined
+        ? own.source
+        : `consideration · ${own.source}`;
+
     if (taxEvent.costs === undefined) {
-      valued.push({ ...taxEvent, value: own.value });
+      valued.push({ ...taxEvent, value: own.value, priceSource });
       continue;
     }
 
@@ -327,7 +341,7 @@ export const resolveValues = async (
       return cost;
     });
 
-    valued.push({ ...taxEvent, value: own.value, costs });
+    valued.push({ ...taxEvent, value: own.value, priceSource, costs });
   }
 
   return { valued, unpriced };

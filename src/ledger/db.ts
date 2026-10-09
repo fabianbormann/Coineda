@@ -32,7 +32,10 @@ interface LedgerSchema extends DBSchema {
   /** Cached spot prices, keyed on `${assetId}|${currency}|${date}` so a base
    *  currency switch can never return the previous currency's number under
    *  the new label. See src/prices/priceStore.ts. */
-  prices: { key: string; value: { key: string; price: string } };
+  prices: {
+    key: string;
+    value: { key: string; price: string; source?: string };
+  };
   /** Freeform app settings (language, base currency, onboarded flag, ...),
    *  keyed by name. See src/settings/settingsStore.ts. */
   settings: { key: string; value: { key: string; value: unknown } };

@@ -329,6 +329,9 @@ export const runTaxReport = async (
         // `valued` only ever holds events resolveValues gave a value to;
         // the fallback is for the type, not for a case that occurs.
         value: event.value ?? '0',
+        ...(event.priceSource === undefined
+          ? {}
+          : { priceSource: event.priceSource }),
         ...(event.note === undefined ? {} : { note: event.note }),
         ...(rewardKind === undefined ? {} : { rewardKind }),
       };
@@ -356,6 +359,9 @@ export const runTaxReport = async (
         timestamp: event.timestamp,
         venue: event.venue,
         value: event.value ?? '0',
+        ...(event.priceSource === undefined
+          ? {}
+          : { priceSource: event.priceSource }),
         kind:
           event.kind === 'capital-gain' ? ('gain' as const) : ('loss' as const),
         deducted: event.deductible !== false,
@@ -468,6 +474,22 @@ export const runTaxReport = async (
     }
   }
 
+  // The matcher's disposals carry no TaxEvent, so who priced each one is
+  // looked up from the valued disposal events by the same id and asset the
+  // join above narrows by. First wins; a shared id with a shared asset is
+  // the same ledger event valued the same way.
+  const priceSourceByDisposal = new Map<string, string>();
+  for (const event of valued) {
+    const key = `${event.sourceEventId}|${event.assetId}`;
+    if (
+      event.kind === 'disposal' &&
+      event.priceSource !== undefined &&
+      !priceSourceByDisposal.has(key)
+    ) {
+      priceSourceByDisposal.set(key, event.priceSource);
+    }
+  }
+
   const lines: ReportedDisposal[] = assessment.lines.map((line) => {
     const queue = byDisposalId.get(line.disposalEventId);
     // Narrowed by assetId first, because a module's line carries one and a
@@ -487,8 +509,12 @@ export const runTaxReport = async (
         `tax module "${module.manifest.id}" assessed a disposal it was not handed: ${line.disposalEventId} (${line.assetId})`,
       );
     }
+    const priceSource = priceSourceByDisposal.get(
+      `${line.disposalEventId}|${line.assetId}`,
+    );
     const reported: ReportedDisposal = {
       ...line,
+      ...(priceSource === undefined ? {} : { priceSource }),
       amount: disposal.amount,
       venue: disposal.venue,
       consumed: disposal.consumed,

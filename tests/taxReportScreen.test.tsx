@@ -364,6 +364,10 @@ describe('running a report', () => {
     );
     expect(screen.getAllByText(/fees deducted/i)).not.toHaveLength(0);
     expect(screen.getAllByText(/sale value/i)).not.toHaveLength(0);
+    // Who priced the figure is printed on the row, here the fiat paid.
+    expect(
+      screen.getAllByText(/priced by consideration · base currency/i),
+    ).not.toHaveLength(0);
   });
 
   it('labels a transfer fee disposal and states the count on the method sheet', async () => {

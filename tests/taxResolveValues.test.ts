@@ -591,3 +591,94 @@ describe('consideration', () => {
     });
   });
 });
+
+describe('price provenance', () => {
+  it('labels base fiat as the base currency', async () => {
+    const { valued } = await resolveValues(
+      [event({ assetId: 'fiat:eur', amount: '12' })],
+      'eur',
+    );
+    expect(valued[0].priceSource).toBe('base currency');
+  });
+
+  it('labels a CoinGecko-priced event with CoinGecko', async () => {
+    vi.stubGlobal(
+      'fetch',
+      rangeStub(() => 0.35),
+    );
+    const { valued } = await resolveValues(
+      [event({ amount: '10000000' })],
+      'eur',
+    );
+    expect(valued[0].priceSource).toBe('CoinGecko');
+  });
+
+  it('prefixes a fiat consideration with consideration', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (String(url).includes('frankfurter')) {
+          return new Response(
+            JSON.stringify({
+              base: 'USD',
+              rates: { '2026-09-15': { EUR: 0.85 } },
+            }),
+            { status: 200 },
+          );
+        }
+        throw new Error(`nobody but the ECB may be asked: ${url}`);
+      }),
+    );
+    const { valued } = await resolveValues(
+      [
+        event({
+          amount: '1000000',
+          consideration: { assetId: 'fiat:usd', amount: '100' },
+        }),
+      ],
+      'eur',
+    );
+    expect(valued[0].priceSource).toBe('consideration · ECB');
+  });
+
+  it('labels a base-currency consideration', async () => {
+    const { valued } = await resolveValues(
+      [
+        event({
+          kind: 'acquisition',
+          amount: '1000000',
+          consideration: { assetId: 'fiat:eur', amount: '500' },
+        }),
+      ],
+      'eur',
+    );
+    expect(valued[0].priceSource).toBe('consideration · base currency');
+  });
+
+  it('reads a cache row with no source as not recorded', async () => {
+    const db = await openLedger();
+    await db.put('prices', {
+      key: 'cardano:lovelace|eur|2026-09-15',
+      price: '0.4',
+    });
+    const { valued } = await resolveValues(
+      [event({ amount: '10000000' })],
+      'eur',
+    );
+    expect(valued[0].priceSource).toBe('cache (source not recorded)');
+  });
+
+  it('reads the source off a cache row that has one', async () => {
+    const db = await openLedger();
+    await db.put('prices', {
+      key: 'cardano:lovelace|eur|2026-09-15',
+      price: '0.4',
+      source: 'ECB',
+    });
+    const { valued } = await resolveValues(
+      [event({ amount: '10000000' })],
+      'eur',
+    );
+    expect(valued[0].priceSource).toBe('ECB');
+  });
+});

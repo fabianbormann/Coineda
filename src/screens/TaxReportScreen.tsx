@@ -1576,6 +1576,12 @@ export const TaxReportScreen = () => {
                                     ({t('not deducted')})
                                   </span>
                                 )}
+                                {row.priceSource !== undefined && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {' '}
+                                    · {t('priced by')} {row.priceSource}
+                                  </span>
+                                )}
                               </p>
                               {row.note !== undefined && (
                                 <p className="text-muted-foreground">
@@ -1748,6 +1754,12 @@ export const TaxReportScreen = () => {
                               value={Number(line.taxable)}
                               currency={baseCurrency}
                             />
+                            {line.priceSource !== undefined && (
+                              <span className="text-xs text-muted-foreground">
+                                {' '}
+                                · {t('priced by')} {line.priceSource}
+                              </span>
+                            )}
                           </p>
                           <p className="text-muted-foreground">
                             {t(line.reason.key, line.reason.params)}
@@ -1852,6 +1864,12 @@ export const TaxReportScreen = () => {
                               value={Number(row.value)}
                               currency={baseCurrency}
                             />
+                            {row.priceSource !== undefined && (
+                              <span className="text-xs text-muted-foreground">
+                                {' '}
+                                · {t('priced by')} {row.priceSource}
+                              </span>
+                            )}
                           </p>
                           {row.note !== undefined && (
                             <p className="text-muted-foreground">

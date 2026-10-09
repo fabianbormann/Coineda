@@ -17,18 +17,32 @@ export type { PriceKey };
 const cacheKey = ({ assetId, currency, date }: PriceKey): string =>
   `${assetId}|${currency}|${date}`;
 
-export const getCachedPrice = async (key: PriceKey): Promise<string | null> => {
+/** A cached price and, when it was recorded, the source that priced it. A
+ *  row written before sources were recorded has none. */
+export const getCachedPrice = async (
+  key: PriceKey,
+): Promise<{ price: string; source?: string } | null> => {
   const db = await openLedger();
   const row = await db.get('prices', cacheKey(key));
-  return row?.price ?? null;
+  if (row === undefined) {
+    return null;
+  }
+  return row.source === undefined
+    ? { price: row.price }
+    : { price: row.price, source: row.source };
 };
 
 export const putCachedPrice = async (
   key: PriceKey,
   price: string,
+  source?: string,
 ): Promise<void> => {
   const db = await openLedger();
-  await db.put('prices', { key: cacheKey(key), price });
+  await db.put('prices', {
+    key: cacheKey(key),
+    price,
+    ...(source === undefined ? {} : { source }),
+  });
 };
 
 /** Today's calendar day in UTC, as YYYY-MM-DD - matches PriceKey.date. */
@@ -76,7 +90,7 @@ export const resolveSpotPrices = async (
     }
     const cached = await getCachedPrice({ assetId, currency, date });
     if (cached !== null) {
-      result.set(assetId, cached);
+      result.set(assetId, cached.price);
     } else if (isFiatAsset(assetId)) {
       fiatMisses.push(assetId);
     } else {
@@ -93,7 +107,7 @@ export const resolveSpotPrices = async (
       );
       const rate = rates.get(date);
       if (rate !== undefined) {
-        await putCachedPrice({ assetId, currency, date }, rate);
+        await putCachedPrice({ assetId, currency, date }, rate, 'ECB');
         result.set(assetId, rate);
       }
     } catch {
@@ -115,7 +129,7 @@ export const resolveSpotPrices = async (
   }
 
   for (const [assetId, price] of fetched) {
-    await putCachedPrice({ assetId, currency, date }, price);
+    await putCachedPrice({ assetId, currency, date }, price, 'CoinGecko');
     result.set(assetId, price);
   }
 

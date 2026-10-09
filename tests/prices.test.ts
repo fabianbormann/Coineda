@@ -42,6 +42,29 @@ describe('the price cache', () => {
     ).toBeNull();
   });
 
+  it('stores the source beside the price and returns it', async () => {
+    const key = {
+      assetId: 'cardano:lovelace',
+      currency: 'eur',
+      date: '2026-01-01',
+    };
+    await putCachedPrice(key, '0.42', 'CoinGecko');
+    expect(await getCachedPrice(key)).toEqual({
+      price: '0.42',
+      source: 'CoinGecko',
+    });
+  });
+
+  it('returns a row written without a source with no source', async () => {
+    const key = {
+      assetId: 'cardano:lovelace',
+      currency: 'eur',
+      date: '2026-01-02',
+    };
+    await putCachedPrice(key, '0.5');
+    expect(await getCachedPrice(key)).toEqual({ price: '0.5' });
+  });
+
   it('does not call the provider for a price it already has', async () => {
     const today = new Date().toISOString().slice(0, 10);
     await putCachedPrice(

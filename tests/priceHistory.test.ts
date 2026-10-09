@@ -216,13 +216,14 @@ describe('combining them', () => {
       }),
     );
 
-    const { prices, failures } = await fetchHistory(
+    const { prices, failures, sources } = await fetchHistory(
       new Map([[ADA, ['2021-06-01']]]),
       'eur',
     );
     expect(failures.size).toBe(0);
     // 1.74 USD at 0.818 EUR/USD.
     expect(prices.get(`${ADA}|2021-06-01`)).toBe('1.42332');
+    expect(sources.get(`${ADA}|2021-06-01`)).toBe('DefiLlama · ECB');
   });
 
   it('refuses to price when the rate is missing, rather than quoting dollars', async () => {
@@ -284,12 +285,13 @@ describe('combining them', () => {
       }),
     );
 
-    const { prices } = await fetchHistory(
+    const { prices, sources } = await fetchHistory(
       new Map([[ADA, ['2026-09-15']]]),
       'eur',
     );
     expect(asked.some((url) => url.includes('coingecko.com'))).toBe(true);
     expect(prices.get(`${ADA}|2026-09-15`)).toBe('0.5');
+    expect(sources.get(`${ADA}|2026-09-15`)).toBe('CoinGecko');
   });
 });
 
@@ -378,12 +380,13 @@ describe('fiat assets in the history', () => {
       }),
     );
 
-    const { prices, failures } = await fetchHistory(
+    const { prices, failures, sources } = await fetchHistory(
       new Map([['fiat:usd', ['2021-06-01']]]),
       'eur',
     );
     expect(failures.size).toBe(0);
     expect(prices.get('fiat:usd|2021-06-01')).toBe('0.818');
+    expect(sources.get('fiat:usd|2021-06-01')).toBe('ECB');
   });
 
   it('leaves a fiat currency the ECB does not publish unpriced, as a gap not a failure', async () => {

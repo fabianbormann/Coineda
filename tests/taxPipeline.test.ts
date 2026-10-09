@@ -963,6 +963,7 @@ describe('income on the report', () => {
       timestamp: Date.UTC(2025, 1, 1),
       venue: 'stake1',
       value: '3',
+      priceSource: 'base currency',
       note: 'Test note key',
     });
   });
@@ -1123,6 +1124,7 @@ describe('capital events on the report', () => {
         timestamp: Date.UTC(2025, 3, 1),
         venue: 'futures',
         value: '40',
+        priceSource: 'base currency',
         kind: 'gain',
         deducted: true,
         derivativeKind: 'pnl',

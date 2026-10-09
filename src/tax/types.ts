@@ -61,6 +61,9 @@ export type TaxEvent = {
   venue: string;
   /** Base-currency value as a decimal string, filled by the host. */
   value?: string;
+  /** Who priced `value`: set by the host alongside it. Never empty on a
+   *  valued event. */
+  priceSource?: string;
   /**
    * Costs the jurisdiction attributes to this event. Only a jurisdiction
    * knows which leg a fee belongs to (Germany: a sell's or swap's
@@ -409,6 +412,8 @@ export type TaxAssessment = {
 export type ReportedDisposal = AssessedDisposal & {
   /** From the matcher, see MatchedDisposal.costs. */
   costs: string;
+  /** Who priced the disposal, from its valued tax event. */
+  priceSource?: string;
   /** How much of the asset left, in its own units. */
   amount: string;
   /** Which wallet or exchange it left from. */
@@ -491,6 +496,7 @@ export type ReportedIncome = {
   timestamp: number;
   venue: string;
   value: string;
+  priceSource?: string;
   note?: string;
   /** From the ledger event, when the host can find it. */
   rewardKind?: RewardKind;
@@ -504,6 +510,7 @@ export type ReportedCapital = {
   timestamp: number;
   venue: string;
   value: string;
+  priceSource?: string;
   kind: 'gain' | 'loss';
   /** False for a loss the jurisdiction records but does not deduct. */
   deducted: boolean;

@@ -25,9 +25,13 @@ export { pairKey };
  * Every failure is reported per asset, never swallowed: a provider outage
  * has to read as "could not be computed", not as "this is worth nothing".
  */
+export type PriceSource = 'DefiLlama · ECB' | 'ECB' | 'CoinGecko';
+
 export type HistoryResult = {
   /** Keyed `assetId|YYYY-MM-DD`, in the requested currency. */
   prices: Map<string, string>;
+  /** Which source priced each entry of `prices`, under the same keys. */
+  sources: Map<string, PriceSource>;
   /** Per asset, the error from the LAST source that was tried for it, so a
    *  caller can explain why a day is missing. Absent when a source simply
    *  had no data, which is a different thing from a source that failed. */
@@ -51,10 +55,11 @@ export const fetchHistory = async (
   signal?: AbortSignal,
 ): Promise<HistoryResult> => {
   const prices = new Map<string, string>();
+  const sources = new Map<string, PriceSource>();
   const failures = new Map<string, unknown>();
 
   if (wanted.size === 0) {
-    return { prices, failures };
+    return { prices, sources, failures };
   }
 
   // Fiat assets first and separately: a `fiat:usd` consideration is priced
@@ -74,6 +79,7 @@ export const fetchHistory = async (
         const rate = rates.get(date);
         if (rate !== undefined) {
           prices.set(pairKey(assetId, date), rate);
+          sources.set(pairKey(assetId, date), 'ECB');
         }
       }
     } catch (error) {
@@ -81,7 +87,7 @@ export const fetchHistory = async (
     }
   }
   if (crypto.size === 0) {
-    return { prices, failures };
+    return { prices, sources, failures };
   }
 
   const everyDay = [...new Set([...crypto.values()].flat())];
@@ -112,6 +118,7 @@ export const fetchHistory = async (
       const rate = rates.get(date);
       if (quote !== undefined && rate !== undefined) {
         prices.set(key, inCurrency(quote, rate));
+        sources.set(key, 'DefiLlama · ECB');
       }
     }
   }
@@ -135,6 +142,7 @@ export const fetchHistory = async (
       );
       for (const [date, price] of fetched) {
         prices.set(pairKey(assetId, date), price);
+        sources.set(pairKey(assetId, date), 'CoinGecko');
       }
       // Deliberately NOT recording `primaryFailed` here when the fallback
       // merely came back short. CoinGecko declines a day older than its
@@ -148,5 +156,5 @@ export const fetchHistory = async (
     }
   }
 
-  return { prices, failures };
+  return { prices, sources, failures };
 };
