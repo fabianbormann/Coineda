@@ -1,4 +1,4 @@
-import type { Leg } from '@/ledger/types';
+import type { Leg, RewardKind } from '@/ledger/types';
 import type { DerivedEvent, FetchPage, ProbeResult } from '@/sources/types';
 import type { CardanoProvider } from './provider';
 import {
@@ -207,6 +207,9 @@ export const fetchRewardEvents = async (
       // data rather than only as prose in `note` - a jurisdiction that taxes
       // a pool operator's leader rewards as business income needs to branch
       // on it, and branching on a sentence is not a contract.
+      rewardKind: (reward.type === 'leader'
+        ? 'leader'
+        : 'staking') as RewardKind,
       raw: reward,
       legs: [
         {

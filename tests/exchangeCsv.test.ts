@@ -112,6 +112,36 @@ describe('Binance', () => {
     expect(skipped.join(' ')).toMatch(/DOGE/);
   });
 
+  it('names the kind of every reward', () => {
+    const { events } = binanceCsv.parse(BINANCE);
+    const rewards = events.filter((event) => event.kind === 'reward');
+    expect(rewards.length).toBeGreaterThan(0);
+    expect(rewards.every((event) => event.rewardKind !== undefined)).toBe(true);
+    expect(rewards.find((e) => e.note?.includes('staking'))?.rewardKind).toBe(
+      'staking',
+    );
+    const header = 'User_ID,UTC_Time,Account,Operation,Coin,Change,Remark';
+    const inline = binanceCsv.parse(
+      [
+        header,
+        '1,2024-07-01 00:00:00,Spot,Distribution,ADA,1.0,',
+        '1,2024-07-02 00:00:00,Earn,Simple Earn Flexible Interest,ADA,1.0,',
+        '1,2024-07-03 00:00:00,Spot,Commission,ADA,1.0,',
+      ].join('\n'),
+    );
+    expect(inline.events.map((e) => [e.kind, e.rewardKind])).toEqual([
+      ['reward', 'airdrop'],
+      ['reward', 'lending'],
+      ['reward', 'other'],
+    ]);
+    // Only rewards carry one.
+    expect(
+      events
+        .filter((event) => event.kind !== 'reward')
+        .every((event) => event.rewardKind === undefined),
+    ).toBe(true);
+  });
+
   it('folds to what the file actually says', () => {
     const { events } = binanceCsv.parse(BINANCE);
     const held = foldHoldings(ledger(events), ownedVenuesOf(ledger(events)));
@@ -154,6 +184,38 @@ describe('Coinbase', () => {
     });
     const bought = events.find((event) => event.externalId === 'abc-1');
     expect(bought?.legs[0]).toMatchObject({ direction: 'in' });
+  });
+
+  it('names the kind of every reward', () => {
+    const { events } = coinbaseCsv.parse(COINBASE);
+    const rewards = events.filter((event) => event.kind === 'reward');
+    expect(rewards.length).toBeGreaterThan(0);
+    expect(rewards.every((event) => event.rewardKind !== undefined)).toBe(true);
+    expect(rewards.find((e) => e.externalId === 'abc-3')?.rewardKind).toBe(
+      'staking',
+    );
+    const header =
+      'ID,Timestamp,Transaction Type,Asset,Quantity Transacted,Price Currency,Price at Transaction,Subtotal,Total (inclusive of fees and/or spread),Fees and/or Spread,Notes';
+    const inline = coinbaseCsv.parse(
+      [
+        'preamble',
+        '',
+        header,
+        'r-1,2024-07-01T00:00:00Z,Rewards Income,ADA,1.0,EUR,0.4,0.4,0.4,0,',
+        'r-2,2024-07-02T00:00:00Z,Inflation Reward,ADA,1.0,EUR,0.4,0.4,0.4,0,',
+        'r-3,2024-07-03T00:00:00Z,Learning Reward,ADA,1.0,EUR,0.4,0.4,0.4,0,',
+      ].join('\n'),
+    );
+    expect(inline.events.map((e) => [e.kind, e.rewardKind])).toEqual([
+      ['reward', 'lending'],
+      ['reward', 'staking'],
+      ['reward', 'airdrop'],
+    ]);
+    expect(
+      events
+        .filter((event) => event.kind !== 'reward')
+        .every((event) => event.rewardKind === undefined),
+    ).toBe(true);
   });
 
   it('emits the counter-currency from the same row', () => {

@@ -2,7 +2,7 @@ import Big from 'big.js';
 import { readCsv, type CsvRow } from '@/sources/csv/readCsv';
 import type { ParseResult } from '@/sources/csv/types';
 import type { DerivedEvent } from '@/sources/types';
-import type { EventKind, Leg } from '@/ledger/types';
+import type { EventKind, Leg, RewardKind } from '@/ledger/types';
 import { assetIdForCode, baseUnits } from './assets';
 
 /**
@@ -61,6 +61,16 @@ export const sniff = (text: string): boolean => {
  *
  * A type absent from here is SKIPPED and reported, never guessed at.
  */
+/** What each reward-bearing row type is. `earn` and `reward` are Kraken's
+ *  staking programmes (bonded, flexible, liquid); `dividend` is paid on
+ *  tokenised products and the parser knows no more than that. */
+const REWARD_KINDS: Record<string, RewardKind> = {
+  staking: 'staking',
+  reward: 'staking',
+  earn: 'staking',
+  dividend: 'other',
+};
+
 const KINDS: Record<string, EventKind> = {
   deposit: 'transfer',
   withdrawal: 'transfer',
@@ -324,6 +334,7 @@ export const parse = (input: string): ParseResult => {
       kind,
       origin: 'derived',
       legs,
+      ...(kind === 'reward' ? { rewardKind: REWARD_KINDS[rawType] } : {}),
       // Provenance only, never parsed: the refid is what ties the two rows
       // of one trade together in Kraken's own export, which is what a
       // person needs to follow a figure back to their statement.

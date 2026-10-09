@@ -3,7 +3,7 @@ import { readCsvRows } from '@/sources/csv/readCsv';
 import { makeSkipLog, toBaseUnits } from '@/sources/csv/ledgerShape';
 import type { ParseResult } from '@/sources/csv/types';
 import type { DerivedEvent } from '@/sources/types';
-import type { EventKind, Leg } from '@/ledger/types';
+import type { EventKind, Leg, RewardKind } from '@/ledger/types';
 
 /**
  * Coinbase's "Transaction history" export.
@@ -38,7 +38,10 @@ const COINBASE_ASSETS: Record<string, string> = {
 
 /** Which way the asset moved, per Coinbase transaction type. `null` means
  *  recognised but not a movement of its own. */
-const DIRECTIONS: Record<string, { kind: EventKind; incoming: boolean }> = {
+const DIRECTIONS: Record<
+  string,
+  { kind: EventKind; incoming: boolean; rewardKind?: RewardKind }
+> = {
   buy: { kind: 'trade', incoming: true },
   'advanced trade buy': { kind: 'trade', incoming: true },
   sell: { kind: 'trade', incoming: false },
@@ -47,10 +50,10 @@ const DIRECTIONS: Record<string, { kind: EventKind; incoming: boolean }> = {
   receive: { kind: 'transfer', incoming: true },
   deposit: { kind: 'fiat-in', incoming: true },
   withdrawal: { kind: 'fiat-out', incoming: false },
-  'rewards income': { kind: 'reward', incoming: true },
-  'staking income': { kind: 'reward', incoming: true },
-  'inflation reward': { kind: 'reward', incoming: true },
-  'learning reward': { kind: 'reward', incoming: true },
+  'rewards income': { kind: 'reward', incoming: true, rewardKind: 'lending' },
+  'staking income': { kind: 'reward', incoming: true, rewardKind: 'staking' },
+  'inflation reward': { kind: 'reward', incoming: true, rewardKind: 'staking' },
+  'learning reward': { kind: 'reward', incoming: true, rewardKind: 'airdrop' },
 };
 
 const norm = (name: string): string => name.trim().toLowerCase();
@@ -211,6 +214,7 @@ export const parse = (input: string): ParseResult => {
       kind: movement.kind,
       origin: 'derived',
       legs,
+      ...(movement.rewardKind ? { rewardKind: movement.rewardKind } : {}),
       note: `Coinbase ${type}`,
     });
   });

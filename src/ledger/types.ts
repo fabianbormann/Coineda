@@ -16,6 +16,26 @@ export type Leg = {
 export type EventKind =
   'trade' | 'transfer' | 'reward' | 'fee' | 'fiat-in' | 'fiat-out';
 
+/**
+ * What a `reward` event is, as the source knows it.
+ *
+ * Typed, because a tax rule branches on it: staking and lending are §22
+ * Nr. 3 income in Germany, a pool operator's leader reward may be business
+ * income, an airdrop and a hard fork each have their own treatment. Before
+ * this field, Germany recognised staking by a regular expression over the
+ * prose `note` and every other reward fell through as "unclassified".
+ */
+export type RewardKind =
+  | 'staking'
+  | 'leader'
+  | 'lending'
+  | 'liquidity'
+  | 'mining'
+  | 'masternode'
+  | 'airdrop'
+  | 'fork'
+  | 'other';
+
 export type LedgerEvent = {
   id: string;
   /** The configured source that produced this. */
@@ -27,6 +47,10 @@ export type LedgerEvent = {
   timestamp: number;
   kind: EventKind;
   legs: Leg[];
+  /** On `kind: 'reward'` events: what kind of reward, set by the source.
+   *  Absent on rows written before the field existed, which the
+   *  jurisdictions still read through their legacy heuristics. */
+  rewardKind?: RewardKind;
   /** 'derived' rows are discarded and refetched on a re-sync; 'authored'
    *  rows are the user's own and travel in the checkpoint. */
   origin: 'derived' | 'authored';

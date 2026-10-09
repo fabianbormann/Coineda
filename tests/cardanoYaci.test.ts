@@ -140,6 +140,26 @@ describe('cardano-yaci', () => {
     ).resolves.toBeUndefined();
   });
 
+  it('names a member reward a staking reward', async () => {
+    stubFetch(withRewardsForTrackedAccount(await loadFixtures()));
+    const rewards = [];
+    let cursor: string | null = null;
+    do {
+      const page: Awaited<ReturnType<typeof cardanoYaci.fetchEvents>> =
+        await cardanoYaci.fetchEvents(config, cursor);
+      rewards.push(...page.events.filter((e) => e.kind === 'reward'));
+      cursor = page.cursor;
+    } while (cursor !== null);
+    expect(rewards.length).toBeGreaterThan(0);
+    for (const event of rewards) {
+      const type = (event.raw as { type: string }).type;
+      expect(event.rewardKind).toBe(type === 'leader' ? 'leader' : 'staking');
+    }
+    // The recorded rewards are member rewards; the leader branch is the
+    // one-line ternary in the translator, not reachable from these fixtures.
+    expect(rewards.some((e) => e.rewardKind === 'staking')).toBe(true);
+  });
+
   it('declares every kind the shared translator can emit', () => {
     // Stated as a property of the manifest as well, because the drain
     // above only covers the kinds THESE fixtures happen to contain.

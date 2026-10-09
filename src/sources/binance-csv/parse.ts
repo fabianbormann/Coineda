@@ -3,7 +3,7 @@ import { readCsv, type CsvRow } from '@/sources/csv/readCsv';
 import { makeSkipLog, toBaseUnits } from '@/sources/csv/ledgerShape';
 import type { ParseResult } from '@/sources/csv/types';
 import type { DerivedEvent } from '@/sources/types';
-import type { EventKind, Leg } from '@/ledger/types';
+import type { EventKind, Leg, RewardKind } from '@/ledger/types';
 
 /**
  * Binance's "Transaction History" export.
@@ -62,6 +62,14 @@ const KINDS: Record<string, EventKind> = {
 
 /** Fee rows are their own operation on Binance, and are charged as a fee
  *  leg rather than a disposal of their own. */
+/** What each reward operation is. */
+const REWARD_KINDS: Record<string, RewardKind> = {
+  'staking rewards': 'staking',
+  'simple earn flexible interest': 'lending',
+  distribution: 'airdrop',
+  commission: 'other',
+};
+
 const FEE_OPERATIONS = new Set(['fee', 'transaction fee', 'trading fee']);
 
 const cell = (row: CsvRow, column: string): string => {
@@ -201,6 +209,7 @@ export const parse = (input: string): ParseResult => {
       kind,
       origin: 'derived',
       legs,
+      ...(kind === 'reward' ? { rewardKind: REWARD_KINDS[operation] } : {}),
       note: `Binance ${operation}`,
     });
   });

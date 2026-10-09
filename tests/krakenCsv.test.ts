@@ -548,6 +548,8 @@ describe('what Kraken calls "earn"', () => {
     expect(events).toHaveLength(1);
     expect(events[0].kind).toBe('transfer');
     expect(events[0].legs).toHaveLength(4);
+    // A movement between the user's own wallets is not a reward of any kind.
+    expect(events[0].rewardKind).toBeUndefined();
   });
 
   it('nets an auto-allocation to nothing once the ledger folds it', async () => {
@@ -594,6 +596,33 @@ describe('what Kraken calls "earn"', () => {
 
     expect(events).toHaveLength(2);
     expect(events.map((e) => e.kind)).toEqual(['reward', 'reward']);
+  });
+
+  it('names the kind of every reward row', () => {
+    // This describe's `row` fixes the type to `earn`; these rows vary it.
+    const typed = (
+      txid: string,
+      refid: string,
+      type: string,
+      asset: string,
+      wallet: string,
+      amount: string,
+    ) =>
+      `"${txid}","${refid}","2025-10-01 13:43:14","${type}","","currency","${asset}","${wallet}","${amount}","0.0000","0.0000"`;
+    const text = [
+      header,
+      typed('L7', 'R-ST', 'staking', 'ADA.S', 'earn / staking', '1.000000'),
+      typed('L8', 'R-RW', 'reward', 'XETH', 'earn / liquid', '0.000001'),
+      typed('L9', 'R-DV', 'dividend', 'XXBT', 'spot / main', '0.00000100'),
+      row('L10', 'R-EA', 'reward', 'XETH', 'earn / liquid', '0.000001'),
+    ].join('\n');
+    const { events } = krakenCsv.parse(text);
+    expect(events.map((e) => [e.kind, e.rewardKind])).toEqual([
+      ['reward', 'staking'],
+      ['reward', 'staking'],
+      ['reward', 'other'],
+      ['reward', 'staking'],
+    ]);
   });
 });
 
