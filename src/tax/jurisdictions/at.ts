@@ -172,12 +172,21 @@ const classifyTrade = (event: LedgerEvent): TaxEvent[] => {
   // legToTaxEvent already drops the fiat leg itself - paying or receiving
   // euros is not a disposal of crypto - which leaves exactly the crypto
   // side of the trade.
+  //
+  // The consideration belongs to the principal crypto leg alone. A crypto
+  // fee leg is its own disposal of the fee coins, valued at market: giving
+  // it the trade's consideration would value a 0.0001 BTC fee at the whole
+  // 500 EUR paid, a phantom gain of the full trade value on every trade.
+  // Austria does not model `costs`, so the fee is only that disposal.
   const consideration = fiatConsiderationOf(event);
-  return event.legs
+  const principals = event.legs.filter((leg) => leg.role === 'principal');
+  const fees = event.legs.filter((leg) => leg.role === 'fee');
+  const taxEvents = principals
     .flatMap((leg) => legToTaxEvent(event, leg))
     .map((taxEvent) =>
       consideration === undefined ? taxEvent : { ...taxEvent, consideration },
     );
+  return [...taxEvents, ...fees.flatMap((leg) => legToTaxEvent(event, leg))];
 };
 
 /**

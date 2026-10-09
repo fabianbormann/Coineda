@@ -311,6 +311,41 @@ describe('german classification', () => {
     });
   });
 
+  it('carries both the consideration and the fee costs on a euro buy with a euro fee', () => {
+    const events = germanTax.classify(
+      trade([
+        {
+          assetId: 'fiat:eur',
+          amount: '500',
+          direction: 'out',
+          venue: 'kraken',
+          role: 'principal',
+        },
+        {
+          assetId: 'bitcoin:native',
+          amount: '1000000',
+          direction: 'in',
+          venue: 'kraken',
+          role: 'principal',
+        },
+        {
+          assetId: 'fiat:eur',
+          amount: '1.3',
+          direction: 'out',
+          venue: 'kraken',
+          role: 'fee',
+        },
+      ]),
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0].kind).toBe('acquisition');
+    expect(events[0].consideration).toEqual({
+      assetId: 'fiat:eur',
+      amount: '500',
+    });
+    expect(events[0].costs).toEqual([{ assetId: 'fiat:eur', amount: '1.3' }]);
+  });
+
   it('values a swap at market: no consideration', () => {
     const events = germanTax.classify(
       trade([

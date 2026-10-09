@@ -178,6 +178,86 @@ describe('austrian classification', () => {
       amount: sale.legs.find((leg) => leg.assetId === 'fiat:eur')?.amount,
     });
   });
+
+  it('attaches the consideration to a buy, never to its crypto fee disposal', () => {
+    const events = austrianTax.classify({
+      ...purchase,
+      legs: [
+        {
+          assetId: 'fiat:eur',
+          amount: '500',
+          direction: 'out',
+          venue: 'wallet-a',
+          role: 'principal',
+        },
+        {
+          assetId: 'bitcoin:native',
+          amount: '0.01',
+          direction: 'in',
+          venue: 'wallet-a',
+          role: 'principal',
+        },
+        {
+          assetId: 'bitcoin:native',
+          amount: '0.0001',
+          direction: 'out',
+          venue: 'wallet-a',
+          role: 'fee',
+        },
+      ],
+    });
+    expect(events).toHaveLength(2);
+    const acquisition = events.find((e) => e.kind === 'acquisition');
+    const feeDisposal = events.find((e) => e.kind === 'disposal');
+    expect(acquisition?.consideration).toEqual({
+      assetId: 'fiat:eur',
+      amount: '500',
+    });
+    expect(feeDisposal?.amount).toBe('0.0001');
+    expect(feeDisposal?.consideration).toBeUndefined();
+  });
+
+  it('attaches the consideration to a sale, never to its crypto fee disposal', () => {
+    const events = austrianTax.classify({
+      ...sale,
+      legs: [
+        ...sale.legs,
+        {
+          assetId: 'bitcoin:native',
+          amount: '0.0001',
+          direction: 'out',
+          venue: 'wallet-a',
+          role: 'fee',
+        },
+      ],
+    });
+    expect(events).toHaveLength(2);
+    const disposal = events.find((e) => e.amount === '1');
+    const feeDisposal = events.find((e) => e.amount === '0.0001');
+    expect(disposal?.consideration).toEqual({
+      assetId: 'fiat:eur',
+      amount: '50000',
+    });
+    expect(feeDisposal?.kind).toBe('disposal');
+    expect(feeDisposal?.consideration).toBeUndefined();
+  });
+
+  it('carries no consideration on any event of a swap', () => {
+    const events = austrianTax.classify({
+      ...swap,
+      legs: [
+        ...swap.legs,
+        {
+          assetId: 'cardano:lovelace',
+          amount: '1',
+          direction: 'out',
+          venue: 'wallet-a',
+          role: 'fee',
+        },
+      ],
+    });
+    expect(events.every((e) => e.consideration === undefined)).toBe(true);
+  });
 });
 
 describe('austrian assessment', () => {
