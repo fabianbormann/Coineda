@@ -318,6 +318,21 @@ describe('austrian assessment', () => {
   it('refuses a year before the regime existed', () => {
     expect(austrianTax.manifest.supportedYears.from).toBe(2022);
   });
+
+  it('versions the figure-changing rules of 9 October as a minor release', () => {
+    // Valuing sales at the fiat received, zero-cost forks and leaving
+    // rewards unclassified all change figures: a minor bump, not a patch,
+    // dated and checked on the day they were changed and reviewed.
+    const { manifest } = austrianTax;
+    expect(manifest.rulesVersion).toBe('1.1.0');
+    expect(manifest.rulesCheckedOn).toBe('2026-10-09');
+    expect(manifest.changelog[0]).toEqual({
+      version: '1.1.0',
+      date: '2026-10-09',
+      summary:
+        'Sales valued at the fiat actually received; hard forks acquired at zero; airdrop, other, mining, masternode and liquidity rewards left unclassified until rules exist.',
+    });
+  });
 });
 
 describe('austrian rationales', () => {

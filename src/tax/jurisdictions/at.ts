@@ -305,14 +305,15 @@ const austrianTax: TaxModule = {
     id: 'at',
     jurisdiction: 'Austria',
     contributor: 'Fabian Bormann',
-    rulesCheckedOn: '2026-10-10',
-    rulesVersion: '1.0.1',
+    // The day the rules below were changed and reviewed.
+    rulesCheckedOn: '2026-10-09',
+    rulesVersion: '1.1.0',
     changelog: [
       {
-        version: '1.0.1',
-        date: '2026-10-10',
+        version: '1.1.0',
+        date: '2026-10-09',
         summary:
-          'Sales valued at the fiat actually received; hard forks acquired at zero.',
+          'Sales valued at the fiat actually received; hard forks acquired at zero; airdrop, other, mining, masternode and liquidity rewards left unclassified until rules exist.',
       },
       {
         version: '1.0.0',
