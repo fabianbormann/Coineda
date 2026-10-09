@@ -30,7 +30,7 @@ yarn-error.log*
 
 .vscode/
 
-docs/
+docs/superpowers/
 
 # Local Claude Code settings (machine-specific permission grants)
 .claude/settings.local.json
