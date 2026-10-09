@@ -338,13 +338,9 @@ describe('a real Kraken export', () => {
     expect(sell?.consumed[0].acquisitionEventId).toBe(buy?.id);
     expect(sell?.consumed[0].costBasis).toBe('248.1435');
 
-    // Named rather than waved through. The rest of the sell, which that
-    // withdrawal already consumed, has no lot; and the fixture's
-    // spot-to-staking transfer is two per-row events, so its outgoing ADA
-    // row reads as a disposal with no acquisition.
-    const transferOut = imported.find(
-      (row) => row.externalId === 'LSTKNG-A1B2C-D3E4F5',
-    );
+    // Named rather than waved through: the rest of the sell, which the
+    // fixture's withdrawal already consumed, has no lot. The spot-to-staking
+    // move is one event now and nets to nothing.
     expect(
       report.unresolved.map((item) => [
         item.kind,
@@ -352,9 +348,6 @@ describe('a real Kraken export', () => {
         item.assetId,
         item.amount,
       ]),
-    ).toEqual([
-      ['needs-cost-basis', 'sell', BTC, '505000'],
-      ['needs-cost-basis', transferOut?.id, ADA, '500000000'],
-    ]);
+    ).toEqual([['needs-cost-basis', 'sell', BTC, '505000']]);
   });
 });

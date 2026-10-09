@@ -1,4 +1,9 @@
-import { getSources, putSource, putEventsIfSourceExists } from '@/ledger/db';
+import {
+  deleteEventsByIdentity,
+  getSources,
+  putSource,
+  putEventsIfSourceExists,
+} from '@/ledger/db';
 import type { LedgerEvent, SourceRecord } from '@/ledger/types';
 import { detectFileModule } from './registry';
 import { looksLikeZip, readZip } from './readZip';
@@ -9,6 +14,8 @@ export type ImportOutcome = {
   source: SourceRecord;
   inserted: number;
   updated: number;
+  /** Per-row events of an earlier parser version removed before writing. */
+  superseded: number;
   skipped: string[];
 };
 
@@ -102,7 +109,7 @@ export const importFile = async (
     );
   }
 
-  const { events, skipped } = module.parse(text);
+  const { events, skipped, supersedes = [] } = module.parse(text);
 
   const existing = (await getSources()).find(
     (candidate) => candidate.moduleId === module.manifest.id,
@@ -119,6 +126,14 @@ export const importFile = async (
   // deleted source's rows; here the source is deliberately being created.
   await putSource({ ...source, lastSyncedAt: now, lastError: undefined });
 
+  // Before the write, not after: the grouped event and the per-row events
+  // it replaces share a source but not an identity, so an upsert alone
+  // would keep both and count the trade twice.
+  const superseded =
+    supersedes.length === 0
+      ? 0
+      : await deleteEventsByIdentity(source.id, supersedes);
+
   const rows: LedgerEvent[] = events.map((event) => ({
     ...event,
     id: crypto.randomUUID(),
@@ -127,5 +142,5 @@ export const importFile = async (
 
   const { inserted, updated } = await putEventsIfSourceExists(source.id, rows);
 
-  return { module, source, inserted, updated, skipped };
+  return { module, source, inserted, updated, superseded, skipped };
 };

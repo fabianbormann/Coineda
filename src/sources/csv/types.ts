@@ -46,6 +46,14 @@ export type ParseResult = {
   /** One human-readable sentence per skipped row, already deduplicated by
    *  the parser where a reason repeats across hundreds of rows. */
   skipped: string[];
+  /**
+   * External ids of per-row events an earlier version of this parser
+   * emitted for rows that are now folded into a grouped event. The host
+   * deletes them from the source before writing, so a re-import converges
+   * instead of keeping both shapes. Absent or empty for a parser whose
+   * event identities never changed.
+   */
+  supersedes?: string[];
 };
 
 export type FileSourceModule = {

@@ -280,6 +280,31 @@ export const deleteDerivedEvents = async (
   return removed;
 };
 
+/**
+ * Removes the rows a source once wrote under these external ids - the
+ * per-row shape an earlier parser emitted for what is now one grouped
+ * event - so a re-import converges instead of keeping both. An id with no
+ * row is ignored. Returns how many rows were removed.
+ */
+export const deleteEventsByIdentity = async (
+  sourceId: string,
+  externalIds: string[],
+): Promise<number> => {
+  const db = await openLedger();
+  const tx = db.transaction('events', 'readwrite');
+  const index = tx.store.index('identity');
+  let removed = 0;
+  for (const externalId of externalIds) {
+    const row = await index.get([sourceId, externalId]);
+    if (row) {
+      await tx.store.delete(row.id);
+      removed += 1;
+    }
+  }
+  await tx.done;
+  return removed;
+};
+
 export const putSource = async (source: SourceRecord): Promise<void> => {
   await (await openLedger()).put('sources', source);
 };

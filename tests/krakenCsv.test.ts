@@ -14,7 +14,7 @@ import { readCsv, readCsvRows } from '@/sources/csv/readCsv';
 import { detectFileModule } from '@/sources/csv/registry';
 import { foldHoldings, ownedVenuesOf } from '@/ledger/balances';
 import { importFile, UnknownFileFormatError } from '@/sources/csv/importFile';
-import { getAllEvents, getSources, openLedger } from '@/ledger/db';
+import { getAllEvents, getSources, openLedger, putEvents } from '@/ledger/db';
 import { syncSource } from '@/sync/syncSource';
 import type { LedgerEvent } from '@/ledger/types';
 
@@ -181,12 +181,13 @@ describe('detecting the format', () => {
 describe('parsing the ledger', () => {
   const parsed = () => krakenCsv.parse(LEDGER);
 
-  it('emits one event per readable row, and one per trade', () => {
+  it('emits one event per readable row, and one per trade or transfer', () => {
     // Nine rows: two are skipped (an asset with no id, a type with no
-    // mapping), leaving seven - and the two rows of the one trade share a
-    // refid and become one event, leaving six.
+    // mapping), leaving seven. The two rows of the one trade share a refid
+    // and become one event, as do the two rows of the spot-to-staking
+    // transfer, leaving five.
     const { events } = parsed();
-    expect(events).toHaveLength(6);
+    expect(events).toHaveLength(5);
   });
 
   it('groups the rows of a trade by refid, with the fee on the quote row', () => {
@@ -301,6 +302,60 @@ describe('parsing the ledger', () => {
     expect(skipped.join(' ')).toMatch(/mysterytype/);
     expect(skipped).toHaveLength(2);
   });
+
+  it('groups the two rows of a transfer between its own wallets by refid', () => {
+    // Spot to staking is one movement in Kraken's books, written as a
+    // debit row and a credit row. Apart, the debit is a disposal with no
+    // acquisition; together, the per-asset net is zero at venues the user
+    // owns, which is exactly what the ledger recognises as internal.
+    const { events } = parsed();
+    const move = events.find(
+      (event) => event.externalId === 'RSTK01-AAAAA-BBBBB',
+    );
+    expect(move?.kind).toBe('transfer');
+    expect(move?.note).toBe('Kraken transfer RSTK01-AAAAA-BBBBB');
+    expect(move?.legs).toEqual([
+      {
+        assetId: 'cardano:lovelace',
+        amount: '500000000',
+        direction: 'out',
+        venue: 'spot / main',
+        role: 'principal',
+      },
+      {
+        assetId: 'cardano:lovelace',
+        amount: '500000000',
+        direction: 'in',
+        venue: 'earn / staking',
+        role: 'principal',
+      },
+    ]);
+  });
+
+  it('names the per-row ids an earlier parser emitted for the rows it now groups', () => {
+    // So the importer can remove them: a re-import of the same file onto a
+    // source written before trades and transfers were grouped would
+    // otherwise keep both shapes and count the trade twice.
+    const { supersedes } = parsed();
+    expect(supersedes).toEqual([
+      'LTFMCX-ODMAV-SJB2PO',
+      'LPCNTQ-7NAFX-UAHD2X',
+      'LSTKNG-A1B2C-D3E4F5',
+      'LSTKNG-F6G7H-I8J9K0',
+    ]);
+  });
+
+  it('keeps a transfer row with no refid as an event of its own', () => {
+    const text = [
+      '"txid","refid","time","type","subtype","aclass","asset","wallet","amount","fee","balance"',
+      '"L1","","2025-01-16 11:00:00","transfer","spottostaking","currency","ADA","spot / main","-5.000000","0.000000","0.000000"',
+      '"L2","","2025-01-16 11:00:00","transfer","spottostaking","currency","ADA.S","earn / staking","5.000000","0.000000","5.000000"',
+    ].join('\n');
+    const { events, supersedes } = krakenCsv.parse(text);
+    expect(events).toHaveLength(2);
+    expect(events.map((event) => event.externalId)).toEqual(['L1', 'L2']);
+    expect(supersedes ?? []).toEqual([]);
+  });
 });
 
 describe('importing into the ledger', () => {
@@ -314,7 +369,7 @@ describe('importing into the ledger', () => {
   it('creates a source and writes what the file held', async () => {
     const outcome = await importFile(LEDGER);
     expect(outcome.module.manifest.id).toBe('kraken-csv');
-    expect(outcome.inserted).toBe(6);
+    expect(outcome.inserted).toBe(5);
     expect(outcome.updated).toBe(0);
 
     const sources = await getSources();
@@ -331,11 +386,11 @@ describe('importing into the ledger', () => {
     const again = await importFile(LEDGER);
 
     expect(again.inserted).toBe(0);
-    expect(again.updated).toBe(6);
+    expect(again.updated).toBe(5);
     expect(await getSources()).toHaveLength(1);
 
     const events = await getAllEvents();
-    expect(events).toHaveLength(6);
+    expect(events).toHaveLength(5);
   });
 
   it('refuses a file it does not recognise, naming nothing it cannot read', async () => {
@@ -357,7 +412,67 @@ describe('importing into the ledger', () => {
     const after = (await getSources()).find((row) => row.id === source.id);
     expect(after?.lastError).toBeUndefined();
     // And it did not delete what the import wrote.
-    expect(await getAllEvents()).toHaveLength(6);
+    expect(await getAllEvents()).toHaveLength(5);
+  });
+
+  it('removes the per-row events an earlier import wrote for a grouped trade', async () => {
+    // A user who imported before trades and transfers were grouped has
+    // per-row events keyed by txid. The parser names them; the importer
+    // removes them before writing the grouped event under its refid, so the
+    // trade is counted once and not twice.
+    const first = await importFile(LEDGER);
+    expect(first.superseded).toBe(0);
+
+    await putEvents([
+      {
+        id: 'old-eur-row',
+        sourceId: first.source.id,
+        externalId: 'LTFMCX-ODMAV-SJB2PO',
+        timestamp: Date.UTC(2024, 2, 11, 9, 5),
+        kind: 'trade',
+        origin: 'derived',
+        legs: [
+          {
+            assetId: 'fiat:eur',
+            amount: '500',
+            direction: 'out',
+            venue: 'spot / main',
+            role: 'principal',
+          },
+          {
+            assetId: 'fiat:eur',
+            amount: '1.3',
+            direction: 'out',
+            venue: 'spot / main',
+            role: 'fee',
+          },
+        ],
+      },
+      {
+        id: 'old-ada-row',
+        sourceId: first.source.id,
+        externalId: 'LSTKNG-A1B2C-D3E4F5',
+        timestamp: Date.UTC(2024, 6, 1),
+        kind: 'transfer',
+        origin: 'derived',
+        legs: [
+          {
+            assetId: 'cardano:lovelace',
+            amount: '500000000',
+            direction: 'out',
+            venue: 'spot / main',
+            role: 'principal',
+          },
+        ],
+      },
+    ]);
+    expect(await getAllEvents()).toHaveLength(7);
+
+    const again = await importFile(LEDGER);
+    expect(again.superseded).toBe(2);
+    expect(again.updated).toBe(5);
+    expect(again.inserted).toBe(0);
+    expect(await getAllEvents()).toHaveLength(5);
   });
 });
 

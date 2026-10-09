@@ -55,8 +55,9 @@ export const sniff = (text: string): boolean => {
  * the same asset, which the host nets per asset.
  *
  * `transfer` is Kraken moving an asset between a user's own wallets, spot
- * to staking and back. Both legs sit at venues the user owns, so the fold
- * nets them to zero and no disposal is invented.
+ * to staking and back, written as a debit row and a credit row sharing a
+ * refid. They are grouped into one event, so both legs sit at venues the
+ * user owns and the fold nets them to zero: no disposal is invented.
  *
  * A type absent from here is SKIPPED and reported, never guessed at.
  */
@@ -147,30 +148,62 @@ export const parse = (input: string): ParseResult => {
     skipped.set(reason, (skipped.get(reason) ?? 0) + 1);
 
   /**
-   * Allocation legs, gathered by `refid` so each allocation becomes ONE
-   * event.
+   * Rows that are ONE movement in Kraken's own books, gathered by `refid`
+   * into one event: the two rows of a trade (fee on the quote row), the
+   * debit and credit rows of a transfer between the user's own wallets,
+   * and the legs of an earn allocation.
    *
-   * Outside trades and allocations the rule in this parser is one event
-   * per row. `isInternalTransfer` nets per asset WITHIN
-   * an event, so four allocation rows emitted separately each carry a
-   * single leg, never net to zero, and the outgoing ones become disposals
-   * of dust the user still holds. Grouping is what lets the ledger
-   * recognise the movement for what it is - and grouping too much is
-   * harmless here, because an allocation that does not net to zero is
-   * reported as the movement the data actually shows.
+   * Emitted row by row, each carried a single leg: a trade's euro row had no
+   * crypto leg to carry its fee, and a transfer's debit row was a disposal
+   * of coins the user still holds. `isInternalTransfer` nets per asset
+   * WITHIN an event, so grouping is what lets the ledger see the movement
+   * for what it is - and grouping too much is harmless, because a group
+   * that does not net to zero is reported as the movement the data shows.
+   *
+   * The event is pushed where the refid's first row sits, so the output
+   * keeps the export's order, and filled in as later rows arrive. Fees are
+   * appended after every principal, whichever row each came from.
    */
-  const movements = new Map<
-    string,
-    { timestamp: number; rawType: string; legs: Leg[] }
-  >();
+  const groups = new Map<string, { event: DerivedEvent; fees: Leg[] }>();
 
-  /**
-   * A trade's legs, gathered by `refid` so each trade becomes ONE event -
-   * see `KINDS` for why. The event is pushed where the refid's first row
-   * sits, so the output keeps the export's order, and filled in as later
-   * rows of the same refid arrive.
-   */
-  const trades = new Map<string, { event: DerivedEvent; fees: Leg[] }>();
+  /** Per-row ids an earlier version of this parser emitted for rows that
+   *  now join a group, so the importer can remove them. Earn allocations
+   *  were grouped from the start and name nothing. */
+  const supersedes: string[] = [];
+
+  const joinGroup = (
+    refid: string,
+    kind: EventKind,
+    note: string,
+    at: number,
+    legs: Leg[],
+    supersededRowId: string,
+  ): void => {
+    if (supersededRowId !== '') {
+      supersedes.push(supersededRowId);
+    }
+    const principals = legs.filter((leg) => leg.role !== 'fee');
+    const fees = legs.filter((leg) => leg.role === 'fee');
+    const group = groups.get(refid);
+    if (group) {
+      group.event.legs.push(...principals);
+      group.fees.push(...fees);
+      group.event.timestamp = Math.min(group.event.timestamp, at);
+      return;
+    }
+    const grouped: DerivedEvent = {
+      // The bare refid, which cannot collide with the per-row `txid`
+      // scheme, so a re-import upserts onto the same event.
+      externalId: refid,
+      timestamp: at,
+      kind,
+      origin: 'derived',
+      legs: principals,
+      note,
+    };
+    groups.set(refid, { event: grouped, fees });
+    events.push(grouped);
+  };
 
   rows.forEach((row, index) => {
     const refid = text(row, 'refid');
@@ -268,39 +301,20 @@ export const parse = (input: string): ParseResult => {
       EARN_MOVEMENT_SUBTYPES.has(subtype) &&
       refid !== ''
     ) {
-      const group = movements.get(refid);
-      if (group) {
-        group.legs.push(...legs);
-      } else {
-        movements.set(refid, { timestamp: at, rawType: subtype, legs });
-      }
+      joinGroup(
+        refid,
+        'transfer',
+        `Kraken earn ${subtype} ${refid}`,
+        at,
+        legs,
+        '',
+      );
       return;
     }
 
-    // A trade's legs join their refid's group: principals first, then the
-    // fees, whichever row each came from.
-    if (rawType === 'trade' && refid !== '') {
-      const principals = legs.filter((leg) => leg.role !== 'fee');
-      const fees = legs.filter((leg) => leg.role === 'fee');
-      const group = trades.get(refid);
-      if (group) {
-        group.event.legs.push(...principals);
-        group.fees.push(...fees);
-        group.event.timestamp = Math.min(group.event.timestamp, at);
-      } else {
-        const grouped: DerivedEvent = {
-          // The bare refid, which cannot collide with the per-row `txid`
-          // scheme, so a re-import upserts onto the same event.
-          externalId: refid,
-          timestamp: at,
-          kind,
-          origin: 'derived',
-          legs: principals,
-          note: `Kraken trade ${refid}`,
-        };
-        trades.set(refid, { event: grouped, fees });
-        events.push(grouped);
-      }
+    // A trade's rows, or a transfer's, join their refid's group too.
+    if ((rawType === 'trade' || rawType === 'transfer') && refid !== '') {
+      joinGroup(refid, kind, `Kraken ${rawType} ${refid}`, at, legs, txid);
       return;
     }
 
@@ -317,23 +331,8 @@ export const parse = (input: string): ParseResult => {
     });
   });
 
-  for (const { event, fees } of trades.values()) {
+  for (const { event, fees } of groups.values()) {
     event.legs.push(...fees);
-  }
-
-  for (const [refid, group] of movements) {
-    events.push({
-      // The bare refid, which cannot collide with the `refid#index` scheme
-      // the per-row path uses, so a re-import upserts onto the same event.
-      externalId: refid,
-      timestamp: group.timestamp,
-      // A movement between the user's own wallets, which is exactly what
-      // `isInternalTransfer` is looking for.
-      kind: 'transfer',
-      origin: 'derived',
-      legs: group.legs,
-      note: `Kraken earn ${group.rawType} ${refid}`,
-    });
   }
 
   return {
@@ -341,5 +340,6 @@ export const parse = (input: string): ParseResult => {
     skipped: [...skipped.entries()].map(([reason, count]) =>
       count === 1 ? `Skipped ${reason}` : `Skipped ${count} ${reason}`,
     ),
+    supersedes,
   };
 };
