@@ -539,10 +539,8 @@ const assess = (input: AssessInput): TaxAssessment => {
         remaining: subtractAmounts(declaredCapital, carryForwardUsed),
       };
     }
-    const excess = subtractAmounts(
-      subtractAmounts(net, carryForwardUsed),
-      allowance,
-    );
+    const netAfterCarry = subtractAmounts(net, carryForwardUsed);
+    const excess = subtractAmounts(netAfterCarry, allowance);
     const taxable = compareAmounts(excess, '0') > 0 ? excess : '0';
     capital = {
       gains,
@@ -561,8 +559,11 @@ const assess = (input: AssessInput): TaxAssessment => {
     thresholds.push({
       label: SAVER_ALLOWANCE_LABEL,
       limit: allowance,
-      actual: compareAmounts(net, '0') > 0 ? net : '0',
-      exceeded: compareAmounts(net, allowance) > 0,
+      // The post-carry figure, so this card agrees with the derivatives
+      // card: a carry that takes the net under the allowance leaves it
+      // unexceeded.
+      actual: compareAmounts(netAfterCarry, '0') > 0 ? netAfterCarry : '0',
+      exceeded: compareAmounts(netAfterCarry, allowance) > 0,
       kind: 'freibetrag',
       scopeNote: SAVER_ALLOWANCE_SCOPE_NOTE,
     });

@@ -1279,6 +1279,16 @@ describe('german loss carry-forward', () => {
     });
   });
 
+  it('reports the saver threshold on the post-carry figure', () => {
+    const saver = (carry?: string) =>
+      runCapital(
+        [capitalEvent('capital-gain', '1500')],
+        carry === undefined ? {} : { capital: carry },
+      ).thresholds.find((threshold) => threshold.kind === 'freibetrag');
+    expect(saver('600')).toMatchObject({ actual: '900', exceeded: false });
+    expect(saver()).toMatchObject({ actual: '1500', exceeded: true });
+  });
+
   it('uses no §20 carry-forward against a net loss', () => {
     const report = runCapital([capitalEvent('capital-loss', '100')], {
       capital: '600',
