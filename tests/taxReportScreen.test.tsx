@@ -469,12 +469,33 @@ describe('the rule-set version', () => {
       await screen.findByRole('button', { name: /run report/i }),
     );
 
-    expect(await screen.findAllByText(/rule set de 1\.4\.0/i)).not.toHaveLength(
-      0,
+    // The jurisdiction's name, not the module id: "de" means nothing to a
+    // reader at the Finanzamt. The disclaimer prints at once, the method
+    // sheet only once the run is over - so wait for both.
+    await waitFor(() =>
+      expect(screen.getAllByText(/rule set germany 1\.4\.0/i)).toHaveLength(2),
     );
     expect(
-      screen.getByText(/rule set de 1\.4\.0, checked on/i),
+      screen.getByText(/rule set germany 1\.4\.0, checked on/i),
     ).toBeInTheDocument();
+    expect(screen.queryByText(/rule set de\b/i)).toBeNull();
+  });
+
+  it('names the jurisdiction in German on a German sheet', async () => {
+    vi.stubGlobal('fetch', flatRange(1));
+    taxRegistry.push(germanTax);
+    await i18n.changeLanguage('de');
+    try {
+      renderScreen();
+      await userEvent.click(
+        await screen.findByRole('button', { name: /deutschland/i }),
+      );
+      expect(
+        await screen.findByText(/regelwerk deutschland 1\.4\.0, geprüft am/i),
+      ).toBeInTheDocument();
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });
 

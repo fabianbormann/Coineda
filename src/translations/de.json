@@ -300,8 +300,6 @@
     "Choose a jurisdiction": "Wähle ein Steuerland",
     "No tax jurisdictions are available yet.": "Es sind noch keine Steuerländer verfügbar.",
     "Written by {{contributor}}": "Erstellt von {{contributor}}",
-    "Rule set {{id}} {{version}}, checked on {{date}}": "Regelwerk {{id}} {{version}}, geprüft am {{date}}",
-    "Rule set": "Regelwerk",
     "These rules have not been checked in {{months}} months. Verify them yourself before relying on this report.": "Diese Regeln wurden seit {{months}} Monaten nicht mehr geprüft. Prüfe sie selbst, bevor du dich auf diesen Report verlässt.",
     "Your personal tax rate (optional)": "Dein persönlicher Steuersatz (optional)",
     "A percentage, e.g. 42. Used only to estimate what you would owe - leave it empty to skip that figure.": "Ein Prozentsatz, z. B. 42. Wird nur verwendet, um deine Steuerschuld zu schätzen - lass das Feld leer, um diese Zahl zu überspringen.",
@@ -542,6 +540,8 @@
     "Loss carry-forward as stated by the Finanzamt: {{declared}} · {{used}} used this year · {{remaining}} remaining": "Verlustvortrag laut Bescheid: {{declared}} · davon verrechnet {{used}} · verbleibend {{remaining}}",
     "The Finanzamt adds the remaining carry-forward to this itself.": "Das Finanzamt rechnet den verbleibenden Verlustvortrag selbst hinzu.",
     "Remaining loss carry-forward under §23 EStG as at 31 Dec {{prevYear}} (Verlustfeststellungsbescheid)": "Verbleibender Verlustvortrag nach §23 EStG zum 31.12.{{prevYear}} (laut Verlustfeststellungsbescheid)",
-    "Remaining loss carry-forward under §20 EStG as at 31 Dec {{prevYear}}, excluding losses from selling shares (§20 Abs. 6 S. 4)": "Verbleibender Verlustvortrag nach §20 EStG zum 31.12.{{prevYear}}, ohne Aktienverluste (§20 Abs. 6 S. 4)"
+    "Remaining loss carry-forward under §20 EStG as at 31 Dec {{prevYear}}, excluding losses from selling shares (§20 Abs. 6 S. 4)": "Verbleibender Verlustvortrag nach §20 EStG zum 31.12.{{prevYear}}, ohne Aktienverluste (§20 Abs. 6 S. 4)",
+    "Rule set {{jurisdiction}} {{version}}, checked on {{date}}": "Regelwerk {{jurisdiction}} {{version}}, geprüft am {{date}}",
+    "Rule set {{jurisdiction}} {{version}}": "Regelwerk {{jurisdiction}} {{version}}"
   }
 }

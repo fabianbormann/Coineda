@@ -790,13 +790,16 @@ export const TaxReportScreen = () => {
                       contributor: disclaimer.contributor,
                     })}
                     {' · '}
-                    {t('Rule set {{id}} {{version}}, checked on {{date}}', {
-                      id: module.manifest.id,
-                      version: disclaimer.rulesVersion,
-                      date: new Intl.DateTimeFormat(i18n.language, {
-                        dateStyle: 'medium',
-                      }).format(Date.parse(disclaimer.rulesCheckedOn)),
-                    })}
+                    {t(
+                      'Rule set {{jurisdiction}} {{version}}, checked on {{date}}',
+                      {
+                        jurisdiction: t(module.manifest.jurisdiction),
+                        version: disclaimer.rulesVersion,
+                        date: new Intl.DateTimeFormat(i18n.language, {
+                          dateStyle: 'medium',
+                        }).format(Date.parse(disclaimer.rulesCheckedOn)),
+                      },
+                    )}
                   </p>
                   {disclaimer.stale && (
                     <p className="flex items-center gap-2 text-destructive">
@@ -1068,8 +1071,10 @@ export const TaxReportScreen = () => {
                         </span>
                         Coineda {assessment.method.appVersion}
                         {' · '}
-                        {t('Rule set')} {module.manifest.id}{' '}
-                        {assessment.method.rulesVersion}
+                        {t('Rule set {{jurisdiction}} {{version}}', {
+                          jurisdiction: t(module.manifest.jurisdiction),
+                          version: assessment.method.rulesVersion,
+                        })}
                       </p>
                       <p className="text-muted-foreground">
                         {t(
