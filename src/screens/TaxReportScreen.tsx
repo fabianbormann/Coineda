@@ -11,6 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import markBlack from '@/assets/logo/coineda-mark-black.svg';
 import { taxRegistry } from '@/tax/registry';
 import { runTaxReport } from '@/tax/runTaxReport';
+import { REWARD_KIND_LABELS } from '@/tax/rewardKinds';
 import { buildDisclaimer, type Disclaimer } from '@/tax/disclaimer';
 import { getSettings, putSettings } from '@/settings/settingsStore';
 import { getAllEvents, getSources } from '@/ledger/db';
@@ -1400,6 +1401,9 @@ export const TaxReportScreen = () => {
                       <Card key={row.sourceEventId}>
                         <CardContent className="flex flex-col gap-1 text-sm">
                           <p className="font-medium">
+                            {row.rewardKind !== undefined && (
+                              <>{t(REWARD_KIND_LABELS[row.rewardKind])} · </>
+                            )}
                             {formatDate(row.timestamp)} ·{' '}
                             <span className="print:hidden">
                               {symbolOf(row.assetId)} ·{' '}

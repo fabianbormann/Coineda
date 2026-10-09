@@ -500,6 +500,15 @@
     "Tax report": "Tax report",
     "{{count}} further acquisitions from {{from}} to {{to}} could not be priced. None of them is a disposal and none falls in {{year}}, so none affects the figures above. They are listed in full in the app.": "{{count}} further acquisitions from {{from}} to {{to}} could not be priced. None of them is a disposal and none falls in {{year}}, so none affects the figures above. They are listed in full in the app.",
     "View the report": "View the report",
-    "Change your answers": "Change your answers"
+    "Change your answers": "Change your answers",
+    "Staking reward": "Staking reward",
+    "Pool operator reward": "Pool operator reward",
+    "Lending interest": "Lending interest",
+    "Liquidity reward": "Liquidity reward",
+    "Mining reward": "Mining reward",
+    "Masternode reward": "Masternode reward",
+    "Airdrop": "Airdrop",
+    "Hard fork": "Hard fork",
+    "Other reward": "Other reward"
   }
 }

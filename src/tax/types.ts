@@ -1,4 +1,4 @@
-import type { EventKind, LedgerEvent } from '@/ledger/types';
+import type { EventKind, LedgerEvent, RewardKind } from '@/ledger/types';
 
 export type TaxEventKind = 'acquisition' | 'disposal' | 'income';
 
@@ -417,6 +417,8 @@ export type ReportedIncome = {
   venue: string;
   value: string;
   note?: string;
+  /** From the ledger event, when the host can find it. */
+  rewardKind?: RewardKind;
 };
 
 /**

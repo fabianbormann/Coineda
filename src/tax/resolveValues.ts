@@ -9,7 +9,7 @@ import { fetchHistory } from '@/prices/history';
 import { valueOf } from '@/prices/scale';
 import { getSettings } from '@/settings/settingsStore';
 import { isFiatAsset } from '@/ledger/balances';
-import { normaliseAmount } from '@/ledger/amount';
+import { isZeroAmount, normaliseAmount } from '@/ledger/amount';
 import type { TaxCost, TaxEvent, TaxReason, UnresolvedItem } from '@/tax/types';
 
 /**
@@ -209,8 +209,8 @@ export const resolveValues = async (
   // applies, because reporting a euro figure as unpriced would silently
   // drop it from a total.
   const pairs = new Map<string, { assetId: string; date: string }>();
-  const need = (assetId: string, timestamp: number): void => {
-    if (assetId === baseFiatAssetId) {
+  const need = (assetId: string, amount: string, timestamp: number): void => {
+    if (assetId === baseFiatAssetId || isZeroAmount(amount)) {
       return;
     }
     const date = utcDay(timestamp);
@@ -228,9 +228,10 @@ export const resolveValues = async (
     };
 
   for (const taxEvent of events) {
-    need(basisOf(taxEvent).assetId, taxEvent.timestamp);
+    const basis = basisOf(taxEvent);
+    need(basis.assetId, basis.amount, taxEvent.timestamp);
     for (const cost of taxEvent.costs ?? []) {
-      need(cost.assetId, taxEvent.timestamp);
+      need(cost.assetId, cost.amount, taxEvent.timestamp);
     }
   }
 
@@ -246,6 +247,11 @@ export const resolveValues = async (
     amount: string,
     timestamp: number,
   ): { value: string } | { reason: TaxReason } => {
+    // Nothing is worth nothing on any day: a hard fork's zero cost basis
+    // must not need a price source.
+    if (isZeroAmount(amount)) {
+      return { value: '0' };
+    }
     if (assetId === baseFiatAssetId) {
       return { value: normaliseAmount(amount) };
     }

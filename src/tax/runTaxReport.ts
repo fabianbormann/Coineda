@@ -285,21 +285,32 @@ export const runTaxReport = async (
       event.kind === 'income' && taxYearOf(event.timestamp) === options.year,
   );
 
+  // The ledger event behind an item, where the id still matches one. Every
+  // shipped jurisdiction stamps a tax event with the ledger event's own id,
+  // so this resolves for them; a module that mints its own ids simply gets
+  // no hash, which is the same outcome as an exchange row that has none.
+  const eventById = new Map(
+    [...allEvents, ...residuals].map((event) => [event.id, event]),
+  );
   // Sorted here rather than left to insertion order, which came from the
   // order sources happened to sync in: a document's rows must not reorder
   // between two runs of the same data.
   const income: ReportedIncome[] = yearIncome
-    .map((event) => ({
-      sourceEventId: event.sourceEventId,
-      assetId: event.assetId,
-      amount: event.amount,
-      timestamp: event.timestamp,
-      venue: event.venue,
-      // `valued` only ever holds events resolveValues gave a value to;
-      // the fallback is for the type, not for a case that occurs.
-      value: event.value ?? '0',
-      ...(event.note === undefined ? {} : { note: event.note }),
-    }))
+    .map((event) => {
+      const rewardKind = eventById.get(event.sourceEventId)?.rewardKind;
+      return {
+        sourceEventId: event.sourceEventId,
+        assetId: event.assetId,
+        amount: event.amount,
+        timestamp: event.timestamp,
+        venue: event.venue,
+        // `valued` only ever holds events resolveValues gave a value to;
+        // the fallback is for the type, not for a case that occurs.
+        value: event.value ?? '0',
+        ...(event.note === undefined ? {} : { note: event.note }),
+        ...(rewardKind === undefined ? {} : { rewardKind }),
+      };
+    })
     .sort(
       (a, b) =>
         a.timestamp - b.timestamp ||
@@ -351,13 +362,6 @@ export const runTaxReport = async (
     return item.taxEventKind === 'disposal';
   };
 
-  // The ledger event behind an item, where the id still matches one. Every
-  // shipped jurisdiction stamps a tax event with the ledger event's own id,
-  // so this resolves for them; a module that mints its own ids simply gets
-  // no hash, which is the same outcome as an exchange row that has none.
-  const eventById = new Map(
-    [...allEvents, ...residuals].map((event) => [event.id, event]),
-  );
   const withTxHash = (item: UnresolvedItem): UnresolvedItem => {
     const txHash = eventById.get(item.sourceEventId)?.txHash;
     return txHash === undefined ? item : { ...item, txHash };

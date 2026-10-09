@@ -500,6 +500,15 @@
     "Tax report": "Steuerreport",
     "{{count}} further acquisitions from {{from}} to {{to}} could not be priced. None of them is a disposal and none falls in {{year}}, so none affects the figures above. They are listed in full in the app.": "{{count}} weitere Anschaffungen aus dem Zeitraum {{from}} bis {{to}} konnten nicht bewertet werden. Keine davon ist eine Veräußerung und keine fällt in {{year}}, keine wirkt sich also auf die obigen Zahlen aus. In der App sind sie vollständig aufgeführt.",
     "View the report": "Zum Report",
-    "Change your answers": "Eingaben ändern"
+    "Change your answers": "Eingaben ändern",
+    "Staking reward": "Staking-Belohnung",
+    "Pool operator reward": "Pool-Betreiber-Belohnung",
+    "Lending interest": "Lending-Zinsen",
+    "Liquidity reward": "Liquiditäts-Belohnung",
+    "Mining reward": "Mining-Belohnung",
+    "Masternode reward": "Masternode-Belohnung",
+    "Airdrop": "Airdrop",
+    "Hard fork": "Hard Fork",
+    "Other reward": "Sonstige Belohnung"
   }
 }

@@ -326,6 +326,31 @@ describe('resolveValues', () => {
   });
 });
 
+describe('a zero amount', () => {
+  it('is valued as zero without asking anybody', async () => {
+    const fetchMock = rangeStub(() => 2);
+    vi.stubGlobal('fetch', fetchMock);
+    const { valued, unpriced } = await resolveValues(
+      [
+        event({
+          kind: 'acquisition',
+          amount: '1000000',
+          consideration: { assetId: 'cardano:lovelace', amount: '0' },
+        }),
+        event({
+          kind: 'acquisition',
+          assetId: 'cardano:deadbeef.NoSuchToken',
+          amount: '0',
+        }),
+      ],
+      'eur',
+    );
+    expect(valued.map((e) => e.value)).toEqual(['0', '0']);
+    expect(unpriced).toHaveLength(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
 describe('transaction costs', () => {
   it('values a cost in the base currency without a lookup', async () => {
     const fetchMock = rangeStub(() => 2);

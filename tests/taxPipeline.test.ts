@@ -932,6 +932,7 @@ describe('income on the report', () => {
         id: 'r-early',
         externalId: 'r-early',
         kind: 'reward',
+        rewardKind: 'lending',
         timestamp: Date.UTC(2025, 1, 1),
         legs: [rewardLeg('fiat:eur', '3')],
       }),
@@ -962,6 +963,71 @@ describe('income on the report', () => {
       value: '3',
       note: 'Test note key',
     });
+  });
+
+  it('names the kind the ledger event carried, when the module keeps the event id', async () => {
+    await putEvents([
+      ledgerEvent({
+        id: 'r-kind',
+        externalId: 'r-kind',
+        kind: 'reward',
+        rewardKind: 'lending',
+        timestamp: Date.UTC(2025, 1, 1),
+        legs: [rewardLeg('fiat:eur', '3')],
+      }),
+      ledgerEvent({
+        id: 'r-plain',
+        externalId: 'r-plain',
+        kind: 'reward',
+        timestamp: Date.UTC(2025, 2, 1),
+        legs: [rewardLeg('fiat:eur', '4')],
+      }),
+    ]);
+    // Every shipped jurisdiction stamps the tax event with the ledger
+    // event's own id, which is what the host looks the kind up by.
+    const keepingIds: TaxModule = {
+      ...incomeModule,
+      classify: (event) =>
+        incomeModule
+          .classify(event)
+          .map((taxEvent) => ({ ...taxEvent, sourceEventId: event.id })),
+    };
+
+    const report = await runTaxReport(keepingIds, {
+      year: 2025,
+      baseCurrency: 'eur',
+    });
+
+    expect(report.income[0].rewardKind).toBe('lending');
+    expect(report.income[1]).not.toHaveProperty('rewardKind');
+  });
+
+  it('gives a row without a kind when the module minted its own event id', async () => {
+    await putEvents([
+      ledgerEvent({
+        id: 'r-minted',
+        externalId: 'r-minted',
+        kind: 'reward',
+        rewardKind: 'staking',
+        timestamp: Date.UTC(2025, 1, 1),
+        legs: [rewardLeg('fiat:eur', '3')],
+      }),
+    ]);
+    const minting: TaxModule = {
+      ...incomeModule,
+      classify: (event) =>
+        incomeModule
+          .classify(event)
+          .map((taxEvent) => ({ ...taxEvent, sourceEventId: 'minted:1' })),
+    };
+
+    const report = await runTaxReport(minting, {
+      year: 2025,
+      baseCurrency: 'eur',
+    });
+
+    expect(report.income).toHaveLength(1);
+    expect(report.income[0]).not.toHaveProperty('rewardKind');
   });
 
   it('leaves an unpriced income event out of the rows and in the unresolved list', async () => {
