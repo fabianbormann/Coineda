@@ -1179,3 +1179,120 @@ describe('german derivatives', () => {
     expect(events[0].note).toBeUndefined();
   });
 });
+
+describe('german loss carry-forward', () => {
+  const run = (
+    gain: string,
+    carryForward?: { privateSales?: string; capital?: string },
+  ) =>
+    germanTax.assess({
+      year: 2024,
+      matched: [disposal({ heldDays: 10, gain })],
+      income: [],
+      capital: [],
+      carryForward,
+    });
+
+  const capitalEvent = (
+    kind: 'capital-gain' | 'capital-loss',
+    value: string,
+  ): TaxEvent => ({
+    sourceEventId: `c-${kind}-${value}`,
+    kind,
+    assetId: 'fiat:eur',
+    amount: value,
+    timestamp: Date.UTC(2024, 5, 1),
+    venue: 'ex',
+    value,
+  });
+  const runCapital = (events: TaxEvent[], carryForward: { capital?: string }) =>
+    germanTax.assess({
+      year: 2024,
+      matched: [],
+      income: [],
+      capital: events,
+      carryForward,
+    });
+
+  it('reduces a taxable gain by the declared loss', () => {
+    const report = run('2000', { privateSales: '500' });
+    expect(report.totals.taxableGain).toBe('1500');
+    expect(report.carryForward?.privateSales).toEqual({
+      declared: '500',
+      used: '500',
+      remaining: '0',
+    });
+  });
+
+  it('uses no more than the gain and keeps the rest', () => {
+    const report = run('2000', { privateSales: '5000' });
+    expect(report.totals.taxableGain).toBe('0');
+    expect(report.carryForward?.privateSales).toEqual({
+      declared: '5000',
+      used: '2000',
+      remaining: '3000',
+    });
+  });
+
+  it('tests the Freigrenze before the carry-forward', () => {
+    const report = run('800', { privateSales: '500' });
+    expect(report.totals.taxableGain).toBe('0');
+    expect(report.carryForward?.privateSales).toEqual({
+      declared: '500',
+      used: '0',
+      remaining: '500',
+    });
+  });
+
+  it('uses nothing in a loss year', () => {
+    const report = run('-400', { privateSales: '500' });
+    expect(report.totals.loss).toBe('400');
+    expect(report.carryForward?.privateSales).toEqual({
+      declared: '500',
+      used: '0',
+      remaining: '500',
+    });
+  });
+
+  it('is unchanged without a carry-forward', () => {
+    const report = run('2000');
+    expect(report.carryForward).toBeUndefined();
+    expect(report.totals.taxableGain).toBe('2000');
+  });
+
+  it('treats a declared zero as no carry-forward', () => {
+    const report = run('2000', { privateSales: '0' });
+    expect(report.carryForward).toBeUndefined();
+    expect(report.totals.taxableGain).toBe('2000');
+  });
+
+  it('applies a §20 carry-forward before the allowance', () => {
+    const report = runCapital([capitalEvent('capital-gain', '1500')], {
+      capital: '600',
+    });
+    expect(report.capital?.carryForwardUsed).toBe('600');
+    expect(report.capital?.taxable).toBe('0');
+    expect(report.carryForward?.capital).toEqual({
+      declared: '600',
+      used: '600',
+      remaining: '0',
+    });
+  });
+
+  it('uses no §20 carry-forward against a net loss', () => {
+    const report = runCapital([capitalEvent('capital-loss', '100')], {
+      capital: '600',
+    });
+    expect(report.capital?.carryForwardUsed).toBe('0');
+    expect(report.carryForward?.capital).toEqual({
+      declared: '600',
+      used: '0',
+      remaining: '600',
+    });
+  });
+
+  it('advertises support in the manifest, for Germany only', () => {
+    expect(germanTax.manifest.supportsCarryForward).toBe(true);
+    expect(austrianTax.manifest.supportsCarryForward).toBeUndefined();
+  });
+});

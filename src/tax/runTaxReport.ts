@@ -19,6 +19,7 @@ import { APP_VERSION } from '@/global/version';
 import type {
   LotMove,
   MatchedDisposal,
+  CarryForward,
   MatchingMethod,
   ReportedDisposal,
   ReportedCapital,
@@ -37,6 +38,8 @@ export type RunTaxReportOptions = {
   matching?: MatchingMethod;
   /** Optional personal rate as a decimal string percentage, e.g. '42'. */
   rate?: string;
+  /** Losses carried into `year`, as declared by the user. */
+  carryForward?: CarryForward;
 };
 
 /**
@@ -381,6 +384,7 @@ export const runTaxReport = async (
     income: yearIncome,
     capital: yearCapital,
     rate: options.rate,
+    carryForward: options.carryForward,
   });
 
   // `omitted` is typed as "disposals that stayed unresolved" and is

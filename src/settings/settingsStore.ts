@@ -1,4 +1,5 @@
 import { openLedger } from '@/ledger/db';
+import type { CarryForward } from '@/tax/types';
 
 /**
  * Freeform app settings backed by the 'settings' store (schema version 3).
@@ -37,6 +38,13 @@ export type Settings = {
      *  Bundesland and no validation here could be right for all of them. */
     taxNumber?: string;
   };
+  /**
+   * Losses carried into a tax year, keyed by that year ("2025"). Entered by
+   * the user from their Verlustfeststellungsbescheid, in the base currency;
+   * only the Finanzamt knows the figure. Not normalised. putSettings merges
+   * at the top level, so a write replaces this whole record.
+   */
+  lossCarryForward?: Record<string, CarryForward>;
 };
 
 /**

@@ -1723,6 +1723,7 @@ describe('the derivatives section', () => {
               net: '300',
               allowance: '1000',
               taxable: '0',
+              carryForwardUsed: '0',
               loss: '0',
               note: 'Test capital note',
             },
@@ -1834,5 +1835,117 @@ describe('the derivatives section', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+});
+
+describe('the loss carry-forward inputs', () => {
+  const thisYear = new Date().getUTCFullYear();
+
+  const openGermany = async () => {
+    taxRegistry.push(germanTax);
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /germany/i }),
+    );
+  };
+
+  const leg = (
+    assetId: string,
+    amount: string,
+    direction: 'in' | 'out',
+  ): LedgerEvent['legs'][number] => ({
+    assetId,
+    amount,
+    direction,
+    venue: 'wallet-a',
+    role: 'principal',
+  });
+
+  it('renders for Germany and not for a module without support', async () => {
+    await openGermany();
+    expect(await screen.findByLabelText(/under §23 EStG/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/under §20 EStG/i)).toBeInTheDocument();
+  });
+
+  it('does not render for a module that ignores it', async () => {
+    taxRegistry.push(makeModule());
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /testland/i }),
+    );
+    await screen.findByLabelText(/tax year/i);
+    expect(screen.queryByLabelText(/under §23 EStG/i)).toBeNull();
+  });
+
+  it('persists the figure by year and shows a blank for another year', async () => {
+    await openGermany();
+    const input = await screen.findByLabelText(/under §23 EStG/i);
+    await userEvent.type(input, '500');
+    await userEvent.tab();
+    await waitFor(async () => {
+      const settings = await getSettings();
+      expect(settings?.lossCarryForward?.[String(thisYear)]?.privateSales).toBe(
+        '500',
+      );
+    });
+
+    const yearInput = screen.getByLabelText(/tax year/i);
+    await userEvent.clear(yearInput);
+    await userEvent.type(yearInput, String(thisYear - 1));
+    expect(screen.getByLabelText(/under §23 EStG/i)).toHaveValue('');
+
+    await userEvent.clear(yearInput);
+    await userEvent.type(yearInput, String(thisYear));
+    expect(screen.getByLabelText(/under §23 EStG/i)).toHaveValue('500');
+  });
+
+  it('blocks the run on a European-formatted amount', async () => {
+    await openGermany();
+    const input = await screen.findByLabelText(/under §23 EStG/i);
+    await userEvent.type(input, '1.000,50');
+    await userEvent.click(
+      await screen.findByRole('button', { name: /run report/i }),
+    );
+    expect(await screen.findByText(/enter an amount like/i)).toBeVisible();
+    expect(screen.queryByText(/running your tax report/i)).toBeNull();
+  });
+
+  it('prints the carry-forward line after a run', async () => {
+    vi.stubGlobal('fetch', flatRange(1));
+    await putEvents([
+      ledgerEvent({
+        id: 'buy',
+        externalId: 'buy',
+        kind: 'trade',
+        timestamp: Date.UTC(thisYear, 0, 2),
+        legs: [
+          leg('fiat:eur', '1000', 'out'),
+          leg('cardano:lovelace', '1000000000', 'in'),
+        ],
+      }),
+      ledgerEvent({
+        id: 'sell',
+        externalId: 'sell',
+        kind: 'trade',
+        timestamp: Date.UTC(thisYear, 0, 3),
+        legs: [
+          leg('cardano:lovelace', '1000000000', 'out'),
+          leg('fiat:eur', '3000', 'in'),
+        ],
+      }),
+    ]);
+    await openGermany();
+    await userEvent.type(
+      await screen.findByLabelText(/under §23 EStG/i),
+      '500',
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /run report/i }),
+    );
+
+    const line = await screen.findByTestId('carry-forward-private');
+    expect(line).toHaveTextContent(/used/i);
+    expect(line).toHaveTextContent(/€0\.00 remaining/);
+    expect(screen.getAllByText(/1,500\.00/).length).toBeGreaterThan(0);
   });
 });

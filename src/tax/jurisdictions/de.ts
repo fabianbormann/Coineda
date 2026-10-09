@@ -16,6 +16,7 @@ import type {
   AssessedDisposal,
   AssessInput,
   CapitalResult,
+  CarryForwardOutcome,
   MatchedDisposal,
   TaxAssessment,
   TaxEvent,
@@ -444,7 +445,27 @@ const assess = (input: AssessInput): TaxAssessment => {
 
   const gainLimit = input.year >= 2024 ? '1000' : '600';
   const gainExceeded = compareAmounts(rawTaxableGain, gainLimit) >= 0;
-  const taxableGain = gainExceeded ? rawTaxableGain : '0';
+  let taxableGain = gainExceeded ? rawTaxableGain : '0';
+
+  const declaredPrivate = input.carryForward?.privateSales;
+  let privateOutcome: CarryForwardOutcome | undefined;
+  if (declaredPrivate !== undefined && !isZeroAmount(declaredPrivate)) {
+    // §23 Abs. 3 S. 8 EStG, nach Maßgabe des §10d: the carried loss reduces
+    // the Einkünfte AFTER the Freigrenze has been tested on the year's own
+    // Gesamtgewinn (S. 5). Testing after the deduction would exempt gains
+    // the law taxes and consume carry-forward the law preserves.
+    const used = gainExceeded
+      ? compareAmounts(declaredPrivate, rawTaxableGain) < 0
+        ? declaredPrivate
+        : rawTaxableGain
+      : '0';
+    taxableGain = subtractAmounts(taxableGain, used);
+    privateOutcome = {
+      declared: declaredPrivate,
+      used,
+      remaining: subtractAmounts(declaredPrivate, used),
+    };
+  }
 
   // A negative year is NOT the same thing as a year under the Freigrenze,
   // even though the old code gave both the same taxableGain of '0'. One
@@ -482,6 +503,7 @@ const assess = (input: AssessInput): TaxAssessment => {
 
   const thresholds = [gainThreshold, incomeThreshold];
   let capital: CapitalResult | undefined;
+  let capitalOutcome: CarryForwardOutcome | undefined;
   if (input.capital.length > 0) {
     const gains = sumAmounts(
       input.capital
@@ -503,7 +525,24 @@ const assess = (input: AssessInput): TaxAssessment => {
     );
     const net = subtractAmounts(gains, losses);
     const allowance = input.year >= 2023 ? '1000' : '801';
-    const excess = subtractAmounts(net, allowance);
+    // A §20 carry-forward reduces a positive net before the allowance.
+    const declaredCapital = input.carryForward?.capital;
+    let carryForwardUsed = '0';
+    if (declaredCapital !== undefined && !isZeroAmount(declaredCapital)) {
+      if (compareAmounts(net, '0') > 0) {
+        carryForwardUsed =
+          compareAmounts(declaredCapital, net) < 0 ? declaredCapital : net;
+      }
+      capitalOutcome = {
+        declared: declaredCapital,
+        used: carryForwardUsed,
+        remaining: subtractAmounts(declaredCapital, carryForwardUsed),
+      };
+    }
+    const excess = subtractAmounts(
+      subtractAmounts(net, carryForwardUsed),
+      allowance,
+    );
     const taxable = compareAmounts(excess, '0') > 0 ? excess : '0';
     capital = {
       gains,
@@ -512,6 +551,7 @@ const assess = (input: AssessInput): TaxAssessment => {
       net,
       allowance,
       taxable,
+      carryForwardUsed,
       loss: compareAmounts(net, '0') < 0 ? negateAmount(net) : '0',
       estimatedTax: normaliseAmount(
         new Big(taxable).times(ABGELTUNGSTEUER_PERCENT).div(100).toString(),
@@ -568,6 +608,18 @@ const assess = (input: AssessInput): TaxAssessment => {
     },
     thresholds,
     ...(capital === undefined ? {} : { capital }),
+    ...(privateOutcome === undefined && capitalOutcome === undefined
+      ? {}
+      : {
+          carryForward: {
+            ...(privateOutcome === undefined
+              ? {}
+              : { privateSales: privateOutcome }),
+            ...(capitalOutcome === undefined
+              ? {}
+              : { capital: capitalOutcome }),
+          },
+        }),
     estimatedLiability,
     liabilityNote,
     unresolved: [],
@@ -605,6 +657,7 @@ const germanTax: TaxModule = {
       'BMF 06.03.2025 (IV C 1 - S 2256/00042/064/043)',
     ],
     supportedYears: { from: 2020 },
+    supportsCarryForward: true,
   },
   // 'reward' is deliberately absent: classifyReward's airdrop branch
   // returns [] because the tax treatment is genuinely unresolved, not

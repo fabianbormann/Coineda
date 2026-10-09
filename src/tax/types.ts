@@ -301,6 +301,21 @@ export type ThresholdOutcome = {
  * computed it. Optional on an assessment: only a module that classifies
  * capital events returns one.
  */
+/**
+ * A loss carried INTO the year, as the Finanzamt stated it (user-entered
+ * decimal strings in the base currency). Per pot: §23 private sales and §20
+ * capital income are separate pots and never offset each other.
+ */
+export type CarryForward = { privateSales?: string; capital?: string };
+
+/** What happened to one declared carry-forward. `used <= gain`,
+ *  `remaining = declared - used`. */
+export type CarryForwardOutcome = {
+  declared: string;
+  used: string;
+  remaining: string;
+};
+
 export type CapitalResult = {
   gains: string;
   /** Deducted losses only. */
@@ -312,6 +327,9 @@ export type CapitalResult = {
   /** The allowance applied (Sparer-Pauschbetrag for Germany). */
   allowance: string;
   taxable: string;
+  /** Declared carry-forward applied to a positive net before the allowance;
+   *  '0' when none. */
+  carryForwardUsed: string;
   /** Positive carry-forward loss, or '0'. */
   loss: string;
   estimatedTax?: string;
@@ -322,6 +340,11 @@ export type CapitalResult = {
 export type TaxAssessment = {
   year: number;
   capital?: CapitalResult;
+  /** Present only when a non-zero carry-forward was declared. */
+  carryForward?: {
+    privateSales?: CarryForwardOutcome;
+    capital?: CarryForwardOutcome;
+  };
   lines: AssessedDisposal[];
   totals: {
     taxableGain: string;
@@ -520,9 +543,13 @@ export type AssessInput = {
   capital: TaxEvent[];
   /** Optional personal rate as a decimal string percentage, e.g. '42'. */
   rate?: string;
+  /** Losses carried into the year, as declared by the user. */
+  carryForward?: CarryForward;
 };
 
 export type TaxManifest = {
+  /** The module applies a declared loss carry-forward. */
+  supportsCarryForward?: boolean;
   /** Stable, lowercase: 'de', 'at'. */
   id: string;
   /** Translation key for the country name. */

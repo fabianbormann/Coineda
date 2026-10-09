@@ -32,6 +32,7 @@ import { CryptoAmount } from '@/components/money/CryptoAmount';
 import { GainLoss } from '@/components/money/GainLoss';
 import { formatFiat } from '@/components/money/format';
 import type {
+  CarryForward,
   TaxManifest,
   TaxModule,
   TaxReport,
@@ -68,7 +69,11 @@ type RunRequest = {
    * provider on THIS run rather than the next one.
    */
   apiKey?: string;
+  carryForward?: CarryForward;
 };
+
+/** Decimal point only: `1.000,50` must be rejected, not silently misread. */
+const CARRY_AMOUNT = /^\d+(\.\d+)?$/;
 
 const DEFAULT_CURRENCY = 'eur';
 
@@ -235,7 +240,8 @@ export const TaxReportScreen = () => {
   // - calling Date.now() directly during render is an impure read that
   // react-hooks/purity correctly rejects.
   const [disclaimer, setDisclaimer] = useState<Disclaimer | null>(null);
-  const [year, setYear] = useState(String(new Date().getUTCFullYear()));
+  const [initialYear] = useState(String(new Date().getUTCFullYear()));
+  const [year, setYear] = useState(initialYear);
   const [rate, setRate] = useState('');
   const [yearError, setYearError] = useState(false);
   const [baseCurrency, setBaseCurrency] = useState(DEFAULT_CURRENCY);
@@ -260,6 +266,16 @@ export const TaxReportScreen = () => {
   // putSettings replaces the taxpayer object wholesale rather than merging
   // into it. This is the same guard `loadedApiKey` exists for one field up.
   const [taxpayerLoaded, setTaxpayerLoaded] = useState(false);
+  // Losses carried INTO the chosen year, as the Finanzamt stated them. The
+  // whole stored record is kept so a blur writes back the other years
+  // untouched, and the inputs are re-seeded from it whenever the year
+  // changes - a 2024 run must never read 2025's figure.
+  const [lossRecord, setLossRecord] = useState<Record<string, CarryForward>>(
+    {},
+  );
+  const [carryPrivate, setCarryPrivate] = useState('');
+  const [carryCapital, setCarryCapital] = useState('');
+  const [carryError, setCarryError] = useState(false);
   // Built alongside the report, not on mount: it describes the ledger the
   // figures were computed from, so it has to be read at the same moment
   // they were - a source added after a run would otherwise appear on a
@@ -289,11 +305,16 @@ export const TaxReportScreen = () => {
       setTaxpayerName(settings?.taxpayer?.name ?? '');
       setTaxNumber(settings?.taxpayer?.taxNumber ?? '');
       setTaxpayerLoaded(true);
+      const record = settings?.lossCarryForward ?? {};
+      setLossRecord(record);
+      const stored = record[initialYear];
+      setCarryPrivate(stored?.privateSales ?? '');
+      setCarryCapital(stored?.capital ?? '');
     });
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialYear]);
 
   /**
    * Discards a finished report, because an input that feeds it changed.
@@ -320,6 +341,34 @@ export const TaxReportScreen = () => {
     void putSettings({
       taxpayer: { name: taxpayerName, taxNumber },
     });
+  };
+
+  /** Seeds the two inputs from the stored figure for `nextYear`. */
+  const loadCarryFor = (nextYear: string) => {
+    const stored = lossRecord[nextYear];
+    setCarryPrivate(stored?.privateSales ?? '');
+    setCarryCapital(stored?.capital ?? '');
+    setCarryError(false);
+  };
+
+  /** Written on blur, keyed by the year carried into. */
+  const persistCarry = () => {
+    if (!taxpayerLoaded || !/^\d+$/.test(year.trim())) {
+      return;
+    }
+    const key = year.trim();
+    const privateSales = carryPrivate.trim() || undefined;
+    const capital = carryCapital.trim() || undefined;
+    if (
+      lossRecord[key] === undefined &&
+      privateSales === undefined &&
+      capital === undefined
+    ) {
+      return;
+    }
+    const next = { ...lossRecord, [key]: { privateSales, capital } };
+    setLossRecord(next);
+    void putSettings({ lossCarryForward: next });
   };
 
   const chooseModule = (next: TaxModule) => {
@@ -350,6 +399,25 @@ export const TaxReportScreen = () => {
       return;
     }
     setYearError(false);
+    let carryForward: CarryForward | undefined;
+    if (module.manifest.supportsCarryForward) {
+      const privateSales = carryPrivate.trim();
+      const capital = carryCapital.trim();
+      if (
+        (privateSales !== '' && !CARRY_AMOUNT.test(privateSales)) ||
+        (capital !== '' && !CARRY_AMOUNT.test(capital))
+      ) {
+        setCarryError(true);
+        return;
+      }
+      if (privateSales !== '' || capital !== '') {
+        carryForward = {
+          ...(privateSales === '' ? {} : { privateSales }),
+          ...(capital === '' ? {} : { capital }),
+        };
+      }
+    }
+    setCarryError(false);
     setStatus('loading');
     setError(null);
     setAssessment(null);
@@ -362,6 +430,7 @@ export const TaxReportScreen = () => {
       baseCurrency,
       rate: rate.trim() === '' ? undefined : rate.trim(),
       apiKey: trimmedKey === loadedApiKey ? undefined : trimmedKey,
+      carryForward,
     });
   };
 
@@ -399,6 +468,7 @@ export const TaxReportScreen = () => {
           year: request.year,
           baseCurrency: request.baseCurrency,
           rate: request.rate,
+          carryForward: request.carryForward,
         });
         if (cancelled) {
           return;
@@ -750,6 +820,7 @@ export const TaxReportScreen = () => {
                       aria-invalid={yearError || undefined}
                       onChange={(event) => {
                         setYear(event.target.value);
+                        loadCarryFor(event.target.value.trim());
                         invalidateReport();
                       }}
                       disabled={status === 'loading'}
@@ -805,6 +876,60 @@ export const TaxReportScreen = () => {
                       )}
                     </p>
                   </div>
+                  {module?.manifest.supportsCarryForward && (
+                    <>
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="tax-report-carry-private">
+                          {t(
+                            'Loss carried into {{year}} under §23 EStG (as stated by the Finanzamt)',
+                            { year },
+                          )}
+                        </Label>
+                        <Input
+                          id="tax-report-carry-private"
+                          inputMode="decimal"
+                          value={carryPrivate}
+                          aria-invalid={carryError || undefined}
+                          onChange={(event) => {
+                            setCarryPrivate(event.target.value);
+                            invalidateReport();
+                          }}
+                          onBlur={persistCarry}
+                          disabled={status === 'loading'}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="tax-report-carry-capital">
+                          {t(
+                            'Loss carried into {{year}} under §20 EStG (as stated by the Finanzamt)',
+                            { year },
+                          )}
+                        </Label>
+                        <Input
+                          id="tax-report-carry-capital"
+                          inputMode="decimal"
+                          value={carryCapital}
+                          aria-invalid={carryError || undefined}
+                          onChange={(event) => {
+                            setCarryCapital(event.target.value);
+                            invalidateReport();
+                          }}
+                          onBlur={persistCarry}
+                          disabled={status === 'loading'}
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          {t(
+                            'From your Verlustfeststellungsbescheid. Only the Finanzamt knows this figure; stored only on this device.',
+                          )}
+                        </p>
+                      </div>
+                      {carryError && (
+                        <p className="text-sm text-destructive" role="alert">
+                          {t('Enter an amount like 1234.56')}
+                        </p>
+                      )}
+                    </>
+                  )}
                   <div className="flex flex-col gap-2">
                     <Label htmlFor="tax-report-taxpayer-name">
                       {t('Your name')}
@@ -1016,6 +1141,34 @@ export const TaxReportScreen = () => {
                         </span>
                       )}
                     </p>
+                    {assessment.carryForward?.privateSales && (
+                      <p data-testid="carry-forward-private">
+                        {t(
+                          'Loss carried forward: {{declared}} declared · {{used}} used · {{remaining}} remaining',
+                          {
+                            declared: formatFiat(
+                              Number(
+                                assessment.carryForward.privateSales.declared,
+                              ),
+                              i18n.language,
+                              baseCurrency,
+                            ),
+                            used: formatFiat(
+                              Number(assessment.carryForward.privateSales.used),
+                              i18n.language,
+                              baseCurrency,
+                            ),
+                            remaining: formatFiat(
+                              Number(
+                                assessment.carryForward.privateSales.remaining,
+                              ),
+                              i18n.language,
+                              baseCurrency,
+                            ),
+                          },
+                        )}
+                      </p>
+                    )}
                     {/* The remaining unresolved items, counted and named
                         separately rather than folded into the disposal
                         count above: an unpriced acquisition or native-token
@@ -1202,6 +1355,34 @@ export const TaxReportScreen = () => {
                               )}
                               currency={baseCurrency}
                             />
+                          </p>
+                        )}
+                        {assessment.carryForward?.capital && (
+                          <p data-testid="carry-forward-capital">
+                            {t(
+                              'Loss carried forward: {{declared}} declared · {{used}} used · {{remaining}} remaining',
+                              {
+                                declared: formatFiat(
+                                  Number(
+                                    assessment.carryForward.capital.declared,
+                                  ),
+                                  i18n.language,
+                                  baseCurrency,
+                                ),
+                                used: formatFiat(
+                                  Number(assessment.carryForward.capital.used),
+                                  i18n.language,
+                                  baseCurrency,
+                                ),
+                                remaining: formatFiat(
+                                  Number(
+                                    assessment.carryForward.capital.remaining,
+                                  ),
+                                  i18n.language,
+                                  baseCurrency,
+                                ),
+                              },
+                            )}
                           </p>
                         )}
                         {!isZeroAmount(assessment.capitalResult.loss) && (
