@@ -8,7 +8,7 @@ import {
 import { isFiatAsset } from '@/ledger/balances';
 import { fiatConsiderationOf } from '@/tax/consideration';
 import { rewardKindOf } from '@/tax/rewardKinds';
-import type { Leg, LedgerEvent } from '@/ledger/types';
+import type { Leg, LedgerEvent, RewardKind } from '@/ledger/types';
 import type {
   AssessedDisposal,
   AssessInput,
@@ -88,6 +88,15 @@ const legToTaxEvent = (event: LedgerEvent, leg: Leg): TaxEvent[] => {
   ];
 };
 
+/** The reward kinds Austria classifies today: income at receipt plus an
+ *  acquisition, and a fork as a zero-cost acquisition. */
+const AUSTRIAN_RULED_KINDS: ReadonlySet<RewardKind> = new Set<RewardKind>([
+  'staking',
+  'leader',
+  'lending',
+  'fork',
+]);
+
 const classifyReward = (event: LedgerEvent): TaxEvent[] => {
   const leg = event.legs.find(
     (one) => one.role === 'principal' && one.direction === 'in',
@@ -96,8 +105,12 @@ const classifyReward = (event: LedgerEvent): TaxEvent[] => {
     return [];
   }
   const kind = rewardKindOf(event);
-  if (kind === undefined) {
-    // Unresolved rather than guessed, same as Germany.
+  if (kind === undefined || !AUSTRIAN_RULED_KINDS.has(kind)) {
+    // Unresolved rather than guessed, same as Germany. That includes the
+    // kinds this module has no rule for yet (airdrop, other, mining,
+    // masternode, liquidity): they await the Austria contributor's rules
+    // and must keep surfacing as unclassified until then, never be taxed
+    // as income by default.
     return [];
   }
 

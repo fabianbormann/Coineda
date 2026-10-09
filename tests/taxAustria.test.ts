@@ -413,6 +413,25 @@ describe('austrian reward kinds', () => {
     ).toEqual(['acquisition', 'income']);
   });
 
+  it.each(['staking', 'leader'] as const)(
+    'treats %s as income plus acquisition',
+    (kind) => {
+      expect(
+        austrianTax
+          .classify(reward(kind))
+          .map((e) => e.kind)
+          .sort(),
+      ).toEqual(['acquisition', 'income']);
+    },
+  );
+
+  it.each(['airdrop', 'other', 'mining', 'masternode', 'liquidity'] as const)(
+    'leaves %s unclassified until Austria has a rule for it',
+    (kind) => {
+      expect(austrianTax.classify(reward(kind))).toEqual([]);
+    },
+  );
+
   it('returns nothing for an unnamed reward', () => {
     expect(austrianTax.classify(reward())).toEqual([]);
   });
