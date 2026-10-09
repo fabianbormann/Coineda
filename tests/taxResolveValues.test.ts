@@ -325,3 +325,89 @@ describe('resolveValues', () => {
     expect(JSON.stringify(unpriced[0].reason)).not.toContain('cg-secret');
   });
 });
+
+describe('transaction costs', () => {
+  it('values a cost in the base currency without a lookup', async () => {
+    const fetchMock = rangeStub(() => 2);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { valued, unpriced } = await resolveValues(
+      [
+        event({
+          assetId: 'fiat:eur',
+          amount: '100',
+          costs: [{ assetId: 'fiat:eur', amount: '1.5' }],
+        }),
+      ],
+      'eur',
+    );
+
+    expect(valued[0].value).toBe('100');
+    expect(valued[0].costs).toEqual([
+      { assetId: 'fiat:eur', amount: '1.5', value: '1.5' },
+    ]);
+    expect(unpriced).toHaveLength(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("values a cost paid in the event's own asset at that day's price", async () => {
+    vi.stubGlobal(
+      'fetch',
+      rangeStub(() => 2),
+    );
+
+    const { valued, unpriced } = await resolveValues(
+      [
+        event({
+          amount: '1000000',
+          costs: [{ assetId: 'cardano:lovelace', amount: '500000' }],
+        }),
+      ],
+      'eur',
+    );
+
+    expect(valued[0].value).toBe('2');
+    expect(valued[0].costs?.[0].value).toBe('1');
+    expect(unpriced).toHaveLength(0);
+  });
+
+  it('lists a cost it cannot price instead of deducting zero', async () => {
+    vi.stubGlobal(
+      'fetch',
+      rangeStub(() => 2),
+    );
+
+    const { valued, unpriced } = await resolveValues(
+      [
+        event({
+          sourceEventId: 'swap-1',
+          amount: '1000000',
+          costs: [{ assetId: 'cardano:deadbeef.NoSuchToken', amount: '7' }],
+        }),
+      ],
+      'eur',
+    );
+
+    // The event itself is valued and returned: the fee's price is the
+    // gap, not the trade's.
+    expect(valued).toHaveLength(1);
+    expect(valued[0].value).toBe('2');
+    expect(valued[0].costs?.[0].value).toBeUndefined();
+
+    expect(unpriced).toHaveLength(1);
+    expect(unpriced[0]).toMatchObject({
+      kind: 'needs-price',
+      sourceEventId: 'swap-1',
+      assetId: 'cardano:deadbeef.NoSuchToken',
+      amount: '7',
+      resolutions: [],
+      reason: {
+        key: 'No price source is configured for {{asset}}.',
+        params: { asset: 'cardano:deadbeef.NoSuchToken' },
+      },
+    });
+    // Not a disposal missing from the gain figure, so it must not be
+    // counted as one by runTaxReport's `omitted` rule.
+    expect(unpriced[0].taxEventKind).toBeUndefined();
+  });
+});

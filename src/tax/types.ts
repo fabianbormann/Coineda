@@ -2,6 +2,28 @@ import type { EventKind, LedgerEvent } from '@/ledger/types';
 
 export type TaxEventKind = 'acquisition' | 'disposal' | 'income';
 
+/**
+ * A transaction cost attributable to a tax event, in the asset it was paid
+ * in: an exchange's trading fee, the network fee of a swap.
+ *
+ * §23 Abs. 3 Satz 1 EStG: the gain is proceeds less acquisition cost less
+ * Werbungskosten. The host values a cost the same way it values the event
+ * itself (`value`, base currency, UTC day), and the matcher then raises an
+ * acquisition's cost basis or lowers a disposal's proceeds by it.
+ *
+ * An unvalued cost is NOT deducted. The host lists it as unpriced and the
+ * matcher skips it, so a fee that could not be priced never silently
+ * becomes a fee of zero - the same rule `match` applies to an acquisition
+ * with no value.
+ */
+export type TaxCost = {
+  assetId: string;
+  /** Decimal string. Never a JS number. */
+  amount: string;
+  /** Base-currency value as a decimal string, filled by the host. */
+  value?: string;
+};
+
 export type TaxEvent = {
   /** The ledger event this came from, so a report links back to its cause. */
   sourceEventId: string;
@@ -14,6 +36,13 @@ export type TaxEvent = {
   venue: string;
   /** Base-currency value as a decimal string, filled by the host. */
   value?: string;
+  /**
+   * Costs the jurisdiction attributes to this event. Only a jurisdiction
+   * knows which leg a fee belongs to (Germany: a sell's or swap's
+   * disposal, a buy's acquisition), so `classify` fills this; the host
+   * only values it.
+   */
+  costs?: TaxCost[];
   /** Why the module emitted this, for the audit trail. Display only. */
   note?: string;
 };

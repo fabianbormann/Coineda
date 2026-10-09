@@ -9,7 +9,7 @@ import { fetchHistory } from '@/prices/history';
 import { valueOf } from '@/prices/scale';
 import { getSettings } from '@/settings/settingsStore';
 import { normaliseAmount } from '@/ledger/amount';
-import type { TaxEvent, TaxReason, UnresolvedItem } from '@/tax/types';
+import type { TaxCost, TaxEvent, TaxReason, UnresolvedItem } from '@/tax/types';
 
 /**
  * The reason keys this module can emit.
@@ -89,44 +89,24 @@ type DayResult = { price: string } | { reason: TaxReason };
  * applies: reporting a euro balance as unpriced would silently drop it
  * from a total.
  *
- * Every other (assetId, day) pair is deduplicated first and resolved once
+ * Every other (assetId, day) pair - the event's own asset and the asset each of its costs was paid in - is deduplicated first and resolved once
  * - cache, then provider - since a historical price for a past day never
  * changes. A failure on one pair is caught and recorded rather than
  * aborting the run, so one unpriceable asset cannot cost a user their
  * whole report.
  */
-export const resolveValues = async (
-  events: TaxEvent[],
+/**
+ * Resolves every (asset, day) pair once: cache first, then one batched
+ * provider request for whatever is missing. Extracted so the valuation
+ * loop above can value an event's costs through the same table as the
+ * event itself.
+ */
+const lookUp = async (
+  pairs: Map<string, { assetId: string; date: string }>,
   currency: string,
-): Promise<{ valued: TaxEvent[]; unpriced: UnresolvedItem[] }> => {
-  const baseFiatAssetId = `fiat:${currency}`;
-  const valued: TaxEvent[] = [];
-  const pending: TaxEvent[] = [];
-
-  for (const taxEvent of events) {
-    if (taxEvent.assetId === baseFiatAssetId) {
-      valued.push({ ...taxEvent, value: normaliseAmount(taxEvent.amount) });
-    } else {
-      pending.push(taxEvent);
-    }
-  }
-
-  const unpriced: UnresolvedItem[] = [];
-  if (pending.length === 0) {
-    return { valued, unpriced };
-  }
-
+): Promise<Map<string, DayResult>> => {
   const settings = await getSettings();
   const apiKey = settings?.coingeckoApiKey;
-
-  const pairs = new Map<string, { assetId: string; date: string }>();
-  for (const taxEvent of pending) {
-    const date = utcDay(taxEvent.timestamp);
-    const key = pairKey(taxEvent.assetId, date);
-    if (!pairs.has(key)) {
-      pairs.set(key, { assetId: taxEvent.assetId, date });
-    }
-  }
 
   const results = new Map<string, DayResult>();
 
@@ -207,35 +187,118 @@ export const resolveValues = async (
     }
   }
 
-  for (const taxEvent of pending) {
-    const date = utcDay(taxEvent.timestamp);
-    const result = results.get(pairKey(taxEvent.assetId, date));
+  return results;
+};
 
+export const resolveValues = async (
+  events: TaxEvent[],
+  currency: string,
+): Promise<{ valued: TaxEvent[]; unpriced: UnresolvedItem[] }> => {
+  const baseFiatAssetId = `fiat:${currency}`;
+
+  // Every (asset, day) pair the run needs, deduplicated: each event's own
+  // asset and the asset each of its costs was paid in. Base fiat is 1 by
+  // definition and is never requested - the same rule resolveSpotPrices
+  // applies, because reporting a euro figure as unpriced would silently
+  // drop it from a total.
+  const pairs = new Map<string, { assetId: string; date: string }>();
+  const need = (assetId: string, timestamp: number): void => {
+    if (assetId === baseFiatAssetId) {
+      return;
+    }
+    const date = utcDay(timestamp);
+    const key = pairKey(assetId, date);
+    if (!pairs.has(key)) {
+      pairs.set(key, { assetId, date });
+    }
+  };
+  for (const taxEvent of events) {
+    need(taxEvent.assetId, taxEvent.timestamp);
+    for (const cost of taxEvent.costs ?? []) {
+      need(cost.assetId, taxEvent.timestamp);
+    }
+  }
+
+  const results =
+    pairs.size === 0
+      ? new Map<string, DayResult>()
+      : await lookUp(pairs, currency);
+
+  /** The base-currency value of `amount` of `assetId` on the event's day,
+   *  or the reason there is none. */
+  const valueAt = (
+    assetId: string,
+    amount: string,
+    timestamp: number,
+  ): { value: string } | { reason: TaxReason } => {
+    if (assetId === baseFiatAssetId) {
+      return { value: normaliseAmount(amount) };
+    }
+    const result = results.get(pairKey(assetId, utcDay(timestamp)));
     if (result && 'price' in result) {
       // Through valueOf, never a bare multiplication: the price is quoted
       // per WHOLE unit and the amount is in the asset's base unit, so the
       // per-asset scale has to be applied here. See src/prices/scale.ts.
-      const value = valueOf(taxEvent.amount, result.price, taxEvent.assetId);
-      valued.push({ ...taxEvent, value });
+      return { value: valueOf(amount, result.price, assetId) };
+    }
+    return {
+      reason: result?.reason ?? {
+        key: PRICE_REASON_KEYS[1],
+        params: { asset: assetId },
+      },
+    };
+  };
+
+  const valued: TaxEvent[] = [];
+  const unpriced: UnresolvedItem[] = [];
+
+  for (const taxEvent of events) {
+    const own = valueAt(taxEvent.assetId, taxEvent.amount, taxEvent.timestamp);
+    if ('reason' in own) {
+      unpriced.push({
+        kind: 'needs-price',
+        // An unpriced acquisition is not a disposal missing from the gain
+        // figure, and `omitted` must be able to tell them apart.
+        taxEventKind: taxEvent.kind,
+        sourceEventId: taxEvent.sourceEventId,
+        assetId: taxEvent.assetId,
+        amount: taxEvent.amount,
+        venue: taxEvent.venue,
+        timestamp: taxEvent.timestamp,
+        reason: own.reason,
+        resolutions: [{ kind: 'record-purchase', marketPriceAt: undefined }],
+      });
       continue;
     }
 
-    unpriced.push({
-      kind: 'needs-price',
-      // An unpriced acquisition is not a disposal missing from the gain
-      // figure, and `omitted` must be able to tell them apart.
-      taxEventKind: taxEvent.kind,
-      sourceEventId: taxEvent.sourceEventId,
-      assetId: taxEvent.assetId,
-      amount: taxEvent.amount,
-      venue: taxEvent.venue,
-      timestamp: taxEvent.timestamp,
-      reason: result?.reason ?? {
-        key: PRICE_REASON_KEYS[1],
-        params: { asset: taxEvent.assetId },
-      },
-      resolutions: [{ kind: 'record-purchase', marketPriceAt: undefined }],
+    if (taxEvent.costs === undefined) {
+      valued.push({ ...taxEvent, value: own.value });
+      continue;
+    }
+
+    const costs: TaxCost[] = taxEvent.costs.map((cost) => {
+      const priced = valueAt(cost.assetId, cost.amount, taxEvent.timestamp);
+      if ('value' in priced) {
+        return { ...cost, value: priced.value };
+      }
+      // The event is still valued and returned; only the deduction is
+      // missing. No `taxEventKind`, because a fee is not a disposal missing
+      // from the gain figure, and no resolution, because recording a
+      // purchase cannot price a fee.
+      unpriced.push({
+        kind: 'needs-price',
+        sourceEventId: taxEvent.sourceEventId,
+        assetId: cost.assetId,
+        amount: cost.amount,
+        venue: taxEvent.venue,
+        timestamp: taxEvent.timestamp,
+        reason: priced.reason,
+        resolutions: [],
+      });
+      return cost;
     });
+
+    valued.push({ ...taxEvent, value: own.value, costs });
   }
 
   return { valued, unpriced };
