@@ -81,24 +81,9 @@ const describeFailure = (error: unknown, date: string): TaxReason => {
 type DayResult = { price: string } | { reason: TaxReason };
 
 /**
- * Values each event in the base currency, at the price its asset had on
- * the UTC calendar day the event happened - not today's price.
- *
- * `fiat:{currency}` is resolved to exactly 1 before the cache or the
- * provider are even consulted, the same rule resolveSpotPrices already
- * applies: reporting a euro balance as unpriced would silently drop it
- * from a total.
- *
- * Every other (assetId, day) pair - the event's own asset and the asset each of its costs was paid in - is deduplicated first and resolved once
- * - cache, then provider - since a historical price for a past day never
- * changes. A failure on one pair is caught and recorded rather than
- * aborting the run, so one unpriceable asset cannot cost a user their
- * whole report.
- */
-/**
  * Resolves every (asset, day) pair once: cache first, then one batched
  * provider request for whatever is missing. Extracted so the valuation
- * loop above can value an event's costs through the same table as the
+ * loop below can value an event's costs through the same table as the
  * event itself.
  */
 const lookUp = async (
@@ -190,6 +175,22 @@ const lookUp = async (
   return results;
 };
 
+/**
+ * Values each event in the base currency, at the price its asset had on
+ * the UTC calendar day the event happened - not today's price.
+ *
+ * `fiat:{currency}` is resolved to exactly 1 before the cache or the
+ * provider are even consulted, the same rule resolveSpotPrices already
+ * applies: reporting a euro balance as unpriced would silently drop it
+ * from a total.
+ *
+ * Every other (assetId, day) pair - the event's own asset and the asset
+ * each of its costs was paid in - is deduplicated first and resolved once
+ * - cache, then provider - since a historical price for a past day never
+ * changes. A failure on one pair is caught and recorded rather than
+ * aborting the run, so one unpriceable asset cannot cost a user their
+ * whole report.
+ */
 export const resolveValues = async (
   events: TaxEvent[],
   currency: string,
