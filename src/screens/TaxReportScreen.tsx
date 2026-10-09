@@ -1239,6 +1239,18 @@ export const TaxReportScreen = () => {
                               value={Number(line.proceeds)}
                               currency={baseCurrency}
                             />{' '}
+                            {/* Only when something came off: a line that
+                                says "Fees: 0,00 EUR" under every disposal
+                                buries the ones where a fee mattered. */}
+                            {!isZeroAmount(line.costs) && (
+                              <>
+                                · {t('of which fees deducted')}:{' '}
+                                <Money
+                                  value={Number(line.costs)}
+                                  currency={baseCurrency}
+                                />{' '}
+                              </>
+                            )}
                             · {t('Cost basis')}:{' '}
                             <Money
                               value={Number(line.costBasis)}

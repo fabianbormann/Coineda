@@ -281,6 +281,79 @@ describe('running a report', () => {
     // Nothing from a (nonexistent) assessment leaks through.
     expect(screen.queryByText(/taxable gain/i)).not.toBeInTheDocument();
   });
+
+  it('prints the fees deducted from a disposal', async () => {
+    vi.stubGlobal('fetch', flatRange(1));
+    taxRegistry.push(germanTax);
+    await putEvents([
+      ledgerEvent({
+        id: 'buy',
+        externalId: 'buy',
+        kind: 'trade',
+        timestamp: Date.UTC(new Date().getUTCFullYear(), 0, 2),
+        legs: [
+          {
+            assetId: 'fiat:eur',
+            amount: '100',
+            direction: 'out',
+            venue: 'wallet-a',
+            role: 'principal',
+          },
+          {
+            assetId: 'cardano:lovelace',
+            amount: '100000000',
+            direction: 'in',
+            venue: 'wallet-a',
+            role: 'principal',
+          },
+        ],
+      }),
+      ledgerEvent({
+        id: 'sell',
+        externalId: 'sell',
+        kind: 'trade',
+        timestamp: Date.UTC(new Date().getUTCFullYear(), 0, 3),
+        legs: [
+          {
+            assetId: 'cardano:lovelace',
+            amount: '100000000',
+            direction: 'out',
+            venue: 'wallet-a',
+            role: 'principal',
+          },
+          {
+            assetId: 'fiat:eur',
+            amount: '100',
+            direction: 'in',
+            venue: 'wallet-a',
+            role: 'principal',
+          },
+          {
+            assetId: 'fiat:eur',
+            amount: '7',
+            direction: 'out',
+            venue: 'wallet-a',
+            role: 'fee',
+          },
+        ],
+      }),
+    ]);
+    vi.stubGlobal('fetch', flatRange(1));
+
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /germany/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /run report/i }),
+    );
+
+    // Rendered twice, once for the screen and once in the print copy, so
+    // "all", not "by".
+    expect(
+      await screen.findAllByText(/of which fees deducted/i),
+    ).not.toHaveLength(0);
+  });
 });
 
 describe('the unresolved list', () => {

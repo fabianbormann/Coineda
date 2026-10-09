@@ -138,6 +138,56 @@ const legToTaxEvent = (event: LedgerEvent, leg: Leg): TaxEvent[] => {
   ];
 };
 
+/**
+ * A trade's fee legs are Werbungskosten of that trade (§23 Abs. 3 Satz 1
+ * EStG), so they ride on the trade's own tax event as `costs`: on a sell
+ * or a swap, the crypto disposal (Veräußerungskosten); on a buy, where
+ * there is no crypto disposal, the acquisition (Anschaffungsnebenkosten).
+ *
+ * A fee paid in crypto ALSO leaves the holdings, so it keeps the
+ * standalone disposal `legToTaxEvent` always gave it - the two are not a
+ * double count. The fee coins' disposal realises whatever gain THEY had
+ * since purchase; the cost attachment deducts the fee's value from the
+ * trade. Netted: gain on trade - fee value + (fee value - fee coins' cost
+ * basis) = gain on trade - what the fee coins originally cost, which is
+ * what actually happened. A fiat fee has no holding to dispose of and
+ * previously vanished here entirely: `legToTaxEvent` returns [] for fiat,
+ * so a Kraken EUR trading fee never reduced anything.
+ *
+ * Only `trade`. A fee on a transfer to a third party is gas on a gift or a
+ * payment, not a selling cost, and stays the plain disposal it was.
+ */
+const classifyTrade = (event: LedgerEvent): TaxEvent[] => {
+  const principals = event.legs.filter((leg) => leg.role === 'principal');
+  const fees = event.legs.filter((leg) => leg.role === 'fee');
+
+  const taxEvents = principals.flatMap((leg) => legToTaxEvent(event, leg));
+  const feeDisposals = fees.flatMap((leg) => legToTaxEvent(event, leg));
+
+  if (fees.length === 0) {
+    return [...taxEvents, ...feeDisposals];
+  }
+
+  const carrier =
+    taxEvents.find((taxEvent) => taxEvent.kind === 'disposal') ??
+    taxEvents.find((taxEvent) => taxEvent.kind === 'acquisition');
+  if (carrier === undefined) {
+    // Fiat for fiat: nothing crypto to attach a cost to.
+    return [...taxEvents, ...feeDisposals];
+  }
+
+  const costs = fees.map((leg) => ({
+    assetId: leg.assetId,
+    amount: leg.amount,
+  }));
+  return [
+    ...taxEvents.map((taxEvent) =>
+      taxEvent === carrier ? { ...taxEvent, costs } : taxEvent,
+    ),
+    ...feeDisposals,
+  ];
+};
+
 const classifyReward = (event: LedgerEvent): TaxEvent[] => {
   const leg = event.legs[0];
   if (!leg) {
@@ -190,6 +240,7 @@ const classifyReward = (event: LedgerEvent): TaxEvent[] => {
 const classify = (event: LedgerEvent): TaxEvent[] => {
   switch (event.kind) {
     case 'trade':
+      return classifyTrade(event);
     case 'transfer':
     case 'fiat-in':
     case 'fiat-out':
@@ -408,6 +459,7 @@ const germanTax: TaxModule = {
       'Lots are matched per wallet or exchange, not pooled across the portfolio.',
     references: [
       '§23 Abs. 1 Nr. 2 EStG',
+      '§23 Abs. 3 Satz 1 EStG',
       '§23 Abs. 3 Satz 5 EStG',
       // The loss carry-forward this module now reports through
       // `totals.loss` rather than folding into a tax-free zero.

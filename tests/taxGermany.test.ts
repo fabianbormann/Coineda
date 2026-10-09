@@ -139,6 +139,150 @@ describe('german classification', () => {
     expect(germanTax.partitionBy(event)).toBe('wallet-q');
     expect(germanTax.defaultMatching).toBe('fifo');
   });
+  const trade = (
+    legs: LedgerEvent['legs'],
+    kind: LedgerEvent['kind'] = 'trade',
+  ): LedgerEvent => ({
+    id: 't',
+    sourceId: 's1',
+    externalId: 'x',
+    timestamp: Date.UTC(2024, 5, 1),
+    kind,
+    origin: 'derived',
+    legs,
+  });
+
+  it('attaches a fiat fee on a sell to the disposal, and emits no disposal of the fee', () => {
+    const events = germanTax.classify(
+      trade([
+        {
+          assetId: 'cardano:lovelace',
+          amount: '100',
+          direction: 'out',
+          venue: 'kraken',
+          role: 'principal',
+        },
+        {
+          assetId: 'fiat:eur',
+          amount: '50',
+          direction: 'in',
+          venue: 'kraken',
+          role: 'principal',
+        },
+        {
+          assetId: 'fiat:eur',
+          amount: '1',
+          direction: 'out',
+          venue: 'kraken',
+          role: 'fee',
+        },
+      ]),
+    );
+
+    expect(events).toHaveLength(1);
+    expect(events[0].kind).toBe('disposal');
+    expect(events[0].costs).toEqual([{ assetId: 'fiat:eur', amount: '1' }]);
+  });
+
+  it('attaches a fiat fee on a buy to the acquisition', () => {
+    const events = germanTax.classify(
+      trade([
+        {
+          assetId: 'fiat:eur',
+          amount: '50',
+          direction: 'out',
+          venue: 'kraken',
+          role: 'principal',
+        },
+        {
+          assetId: 'cardano:lovelace',
+          amount: '100',
+          direction: 'in',
+          venue: 'kraken',
+          role: 'principal',
+        },
+        {
+          assetId: 'fiat:eur',
+          amount: '2',
+          direction: 'out',
+          venue: 'kraken',
+          role: 'fee',
+        },
+      ]),
+    );
+
+    expect(events).toHaveLength(1);
+    expect(events[0].kind).toBe('acquisition');
+    expect(events[0].costs).toEqual([{ assetId: 'fiat:eur', amount: '2' }]);
+  });
+
+  it('attaches a crypto fee on a swap to the disposal AND disposes of the fee coins', () => {
+    const events = germanTax.classify(
+      trade([
+        {
+          assetId: 'cardano:lovelace',
+          amount: '100',
+          direction: 'out',
+          venue: 'wallet-a',
+          role: 'principal',
+        },
+        {
+          assetId: 'bitcoin:native',
+          amount: '1',
+          direction: 'in',
+          venue: 'wallet-a',
+          role: 'principal',
+        },
+        {
+          assetId: 'cardano:lovelace',
+          amount: '1',
+          direction: 'out',
+          venue: 'wallet-a',
+          role: 'fee',
+        },
+      ]),
+    );
+
+    const disposals = events.filter((e) => e.kind === 'disposal');
+    const acquisition = events.find((e) => e.kind === 'acquisition');
+    expect(disposals.map((e) => e.amount).sort()).toEqual(['1', '100']);
+    expect(disposals.find((e) => e.amount === '100')?.costs).toEqual([
+      { assetId: 'cardano:lovelace', amount: '1' },
+    ]);
+    // The fee coins' own disposal carries no costs, and neither does the
+    // acquisition: the fee is deducted exactly once.
+    expect(disposals.find((e) => e.amount === '1')?.costs).toBeUndefined();
+    expect(acquisition?.costs).toBeUndefined();
+  });
+
+  it('leaves a fee on a transfer as a plain disposal with nothing attached', () => {
+    // REVIEW FOCUS 1. A send to a third party is not a sale, so there is
+    // nothing to deduct the gas from. The fee coins still left.
+    const events = germanTax.classify(
+      trade(
+        [
+          {
+            assetId: 'eth:native',
+            amount: '1000',
+            direction: 'out',
+            venue: 'wallet-e',
+            role: 'principal',
+          },
+          {
+            assetId: 'eth:native',
+            amount: '21',
+            direction: 'out',
+            venue: 'wallet-e',
+            role: 'fee',
+          },
+        ],
+        'transfer',
+      ),
+    );
+
+    expect(events.map((e) => e.kind)).toEqual(['disposal', 'disposal']);
+    expect(events.every((e) => e.costs === undefined)).toBe(true);
+  });
 });
 
 describe('german holding period', () => {
