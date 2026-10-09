@@ -598,6 +598,21 @@ describe('what Kraken calls "earn"', () => {
     expect(events.map((e) => e.kind)).toEqual(['reward', 'reward']);
   });
 
+  it('names no reward kind for an allocation with an empty refid', () => {
+    // With no refid the allocation cannot join a group and is emitted on
+    // its own. It moves a holding rather than paying one, so it must not
+    // be typed as staking income.
+    const { events } = krakenCsv.parse(
+      [
+        header,
+        row('L11', '', 'allocation', 'XETH', 'earn / liquid', '0.000001'),
+      ].join('\n'),
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0].kind).toBe('reward');
+    expect(events[0].rewardKind).toBeUndefined();
+  });
+
   it('names the kind of every reward row', () => {
     // This describe's `row` fixes the type to `earn`; these rows vary it.
     const typed = (

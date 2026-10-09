@@ -334,7 +334,12 @@ export const parse = (input: string): ParseResult => {
       kind,
       origin: 'derived',
       legs,
-      ...(kind === 'reward' ? { rewardKind: REWARD_KINDS[rawType] } : {}),
+      // An earn allocation that reaches here (no refid to group on) moves a
+      // holding rather than paying one, so it is not typed as a reward.
+      ...(kind === 'reward' &&
+      !(rawType === 'earn' && EARN_MOVEMENT_SUBTYPES.has(subtype))
+        ? { rewardKind: REWARD_KINDS[rawType] }
+        : {}),
       // Provenance only, never parsed: the refid is what ties the two rows
       // of one trade together in Kraken's own export, which is what a
       // person needs to follow a figure back to their statement.
