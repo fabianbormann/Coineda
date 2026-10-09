@@ -206,6 +206,11 @@ describe('running a report', () => {
       'p',
     );
     expect(taxableGainLine).toHaveTextContent(/200\.00/);
+    // No fee came off this disposal, so the line keeps its one figure and
+    // names no deduction.
+    expect(screen.getAllByText(/proceeds/i)).not.toHaveLength(0);
+    expect(screen.queryByText(/fees deducted/i)).toBeNull();
+    expect(screen.queryByText(/sale value/i)).toBeNull();
   });
 
   it('shows "N disposals could not be computed" right next to the total when omitted > 0', async () => {
@@ -349,10 +354,14 @@ describe('running a report', () => {
     );
 
     // Rendered twice, once for the screen and once in the print copy, so
-    // "all", not "by".
-    expect(
-      await screen.findAllByText(/of which fees deducted/i),
-    ).not.toHaveLength(0);
+    // "all", not "by". Three figures, gross first: "Proceeds: 93 - of which
+    // fees: 7" told a reader the 7 was part of the 93, when the 93 is
+    // already net of it.
+    expect(await screen.findAllByText(/proceeds after fees/i)).not.toHaveLength(
+      0,
+    );
+    expect(screen.getAllByText(/fees deducted/i)).not.toHaveLength(0);
+    expect(screen.getAllByText(/sale value/i)).not.toHaveLength(0);
   });
 });
 

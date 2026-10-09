@@ -18,7 +18,12 @@ import {
   buildSourceDirectory,
   type SourceDirectoryEntry,
 } from '@/tax/sourceDirectory';
-import { compareAmounts, isZeroAmount, subtractAmounts } from '@/ledger/amount';
+import {
+  addAmounts,
+  compareAmounts,
+  isZeroAmount,
+  subtractAmounts,
+} from '@/ledger/amount';
 import { Money } from '@/components/money/Money';
 import { symbolOf } from '@/components/money/asset';
 import { CryptoAmount } from '@/components/money/CryptoAmount';
@@ -1234,19 +1239,38 @@ export const TaxReportScreen = () => {
                             · {line.venue}
                           </p>
                           <p>
-                            {t('Proceeds')}:{' '}
-                            <Money
-                              value={Number(line.proceeds)}
-                              currency={baseCurrency}
-                            />{' '}
                             {/* Only when something came off: a line that
                                 says "Fees: 0,00 EUR" under every disposal
-                                buries the ones where a fee mattered. */}
-                            {!isZeroAmount(line.costs) && (
+                                buries the ones where a fee mattered. When
+                                it did, gross, fee and net are printed in
+                                that order, because `proceeds` is already
+                                net and "Proceeds: X, of which fees: Y"
+                                read as though Y were inside X. */}
+                            {isZeroAmount(line.costs) ? (
                               <>
-                                · {t('of which fees deducted')}:{' '}
+                                {t('Proceeds')}:{' '}
+                                <Money
+                                  value={Number(line.proceeds)}
+                                  currency={baseCurrency}
+                                />{' '}
+                              </>
+                            ) : (
+                              <>
+                                {t('Sale value')}:{' '}
+                                <Money
+                                  value={Number(
+                                    addAmounts(line.proceeds, line.costs),
+                                  )}
+                                  currency={baseCurrency}
+                                />{' '}
+                                · {t('Fees deducted')}:{' '}
                                 <Money
                                   value={Number(line.costs)}
+                                  currency={baseCurrency}
+                                />{' '}
+                                · {t('Proceeds after fees')}:{' '}
+                                <Money
+                                  value={Number(line.proceeds)}
                                   currency={baseCurrency}
                                 />{' '}
                               </>
