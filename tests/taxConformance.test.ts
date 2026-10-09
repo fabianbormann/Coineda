@@ -2,7 +2,11 @@ import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { taxRegistry } from '@/tax/registry';
-import { HOST_REASON_KEYS, RESIDUAL_ORIGIN_KEY } from '@/tax/runTaxReport';
+import {
+  HOST_REASON_KEYS,
+  PAID_ORIGIN_KEY,
+  RESIDUAL_ORIGIN_KEY,
+} from '@/tax/runTaxReport';
 import { PRICE_REASON_KEYS } from '@/tax/resolveValues';
 import type { LedgerEvent } from '@/ledger/types';
 import type { MatchedDisposal } from '@/tax/types';
@@ -372,11 +376,13 @@ describe('host reason keys', () => {
   // and they land in the same printed document as a jurisdiction's. They
   // are exported as constants precisely so this gate does not have to
   // provoke each one through a real report to find it.
-  it.each([...HOST_REASON_KEYS, RESIDUAL_ORIGIN_KEY, ...PRICE_REASON_KEYS])(
-    'keys %s in both locales',
-    (key) => {
-      expect(en[key], `missing from en.json: ${key}`).toBeDefined();
-      expect(de[key], `missing from de.json: ${key}`).toBeDefined();
-    },
-  );
+  it.each([
+    ...HOST_REASON_KEYS,
+    RESIDUAL_ORIGIN_KEY,
+    PAID_ORIGIN_KEY,
+    ...PRICE_REASON_KEYS,
+  ])('keys %s in both locales', (key) => {
+    expect(en[key], `missing from en.json: ${key}`).toBeDefined();
+    expect(de[key], `missing from de.json: ${key}`).toBeDefined();
+  });
 });

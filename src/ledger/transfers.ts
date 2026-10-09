@@ -200,10 +200,23 @@ const sumLegs = (
  * `in` leg. Nothing here deducts anything: a network fee on a move to
  * oneself is not a selling cost (owner's decision, 2026-10-09).
  *
- * Per asset, per linked event: residualOut = netOut + explicitFees −
- * arrivedByLink, residualIn = netIn − arrivedByLink. `netPrincipalLegs`
- * supplies the net so UTXO change is already subtracted. Only positive
- * residuals are emitted; an event with none produces nothing.
+ * On the `out` side, the coins that left are split in two, because the
+ * data can tell them apart and a report must not call a payment a fee:
+ *
+ * - FEE, under `${id}:residual-out`: every explicit `role: 'fee'` leg of an
+ *   asset, plus, for an asset that HAS a link from this event, the
+ *   shortfall netOut − carriedByLink (the fee a UTXO chain hides in inputs
+ *   minus change).
+ * - PAID, under `${id}:residual-paid-out`: the principal net out of an
+ *   asset with NO link from this event - coins sent to somebody else in a
+ *   transaction that also moved coins between the user's own venues. An
+ *   unlinked asset's fee legs still go to the fee event; only its
+ *   principal net is a payment.
+ *
+ * On the `in` side, residualIn = netIn − carriedByLink, under
+ * `${id}:residual-in`. `netPrincipalLegs` supplies the net so UTXO change
+ * is already subtracted. Only positive residuals are emitted; an event with
+ * none produces nothing.
  */
 export const residualTransferEvents = (
   events: LedgerEvent[],
@@ -231,6 +244,22 @@ export const residualTransferEvents = (
   }
 
   const residuals: LedgerEvent[] = [];
+  const emit = (original: LedgerEvent, suffix: string, legs: Leg[]) => {
+    if (legs.length === 0) {
+      return;
+    }
+    residuals.push({
+      id: `${original.id}:${suffix}`,
+      sourceId: original.sourceId,
+      externalId: `${original.externalId}:${suffix}`,
+      timestamp: original.timestamp,
+      kind: 'transfer',
+      origin: 'derived',
+      legs,
+      ...(original.txHash === undefined ? {} : { txHash: original.txHash }),
+    });
+  };
+
   for (const [key, perAsset] of carried) {
     const [eventId, direction] = key.split('|') as [string, LegDirection];
     const original = byId.get(eventId);
@@ -240,46 +269,53 @@ export const residualTransferEvents = (
     const netted = netPrincipalLegs(original, ownedVenues);
     const assets = [...new Set(original.legs.map((leg) => leg.assetId))];
 
-    const legs: Leg[] = [];
-    for (const assetId of assets) {
-      const net = sumLegs(netted.legs, assetId, direction, 'principal');
-      const fees =
-        direction === 'out'
-          ? sumLegs(original.legs, assetId, 'out', 'fee')
-          : '0';
-      const residual = subtractAmounts(
-        addAmounts(net, fees),
-        perAsset.get(assetId) ?? '0',
-      );
-      if (compareAmounts(residual, '0') <= 0) {
-        continue;
+    const legFor = (assetId: string, amount: string): Leg[] => {
+      if (compareAmounts(amount, '0') <= 0) {
+        return [];
       }
       const venue =
         original.legs.find(
           (leg) => leg.assetId === assetId && leg.direction === direction,
         )?.venue ?? original.legs[0].venue;
-      legs.push({
-        assetId,
-        amount: residual,
-        direction,
-        venue,
-        role: 'principal',
-      });
-    }
-    if (legs.length === 0) {
+      return [{ assetId, amount, direction, venue, role: 'principal' }];
+    };
+
+    if (direction === 'in') {
+      emit(
+        original,
+        'residual-in',
+        assets.flatMap((assetId) =>
+          legFor(
+            assetId,
+            subtractAmounts(
+              sumLegs(netted.legs, assetId, 'in', 'principal'),
+              perAsset.get(assetId) ?? '0',
+            ),
+          ),
+        ),
+      );
       continue;
     }
 
-    residuals.push({
-      id: `${original.id}:residual-${direction}`,
-      sourceId: original.sourceId,
-      externalId: `${original.externalId}:residual-${direction}`,
-      timestamp: original.timestamp,
-      kind: 'transfer',
-      origin: 'derived',
-      legs,
-      ...(original.txHash === undefined ? {} : { txHash: original.txHash }),
-    });
+    const feeLegs: Leg[] = [];
+    const paidLegs: Leg[] = [];
+    for (const assetId of assets) {
+      const net = sumLegs(netted.legs, assetId, 'out', 'principal');
+      const fees = sumLegs(original.legs, assetId, 'out', 'fee');
+      const linked = perAsset.get(assetId);
+      if (linked === undefined) {
+        // Nothing of this asset went to the user's own venues: its
+        // principal net was paid to somebody else, its fee legs are fees.
+        feeLegs.push(...legFor(assetId, fees));
+        paidLegs.push(...legFor(assetId, net));
+      } else {
+        feeLegs.push(
+          ...legFor(assetId, subtractAmounts(addAmounts(net, fees), linked)),
+        );
+      }
+    }
+    emit(original, 'residual-out', feeLegs);
+    emit(original, 'residual-paid-out', paidLegs);
   }
 
   return residuals;

@@ -468,6 +468,7 @@
     "{{count}} network fee on a transfer between your own wallets was treated as a disposal of the fee coins and not deducted._one": "{{count}} network fee on a transfer between your own wallets was treated as a disposal of the fee coins and not deducted.",
     "{{count}} network fee on a transfer between your own wallets was treated as a disposal of the fee coins and not deducted._other": "{{count}} network fees on transfers between your own wallets were treated as disposals of the fee coins and not deducted.",
     "Network fee on a transfer between your own wallets, disposed of at market value and not deducted.": "Network fee on a transfer between your own wallets, disposed of at market value and not deducted.",
+    "Sent to someone else in a transaction that also moved coins between your own wallets.": "Sent to someone else in a transaction that also moved coins between your own wallets.",
     "Acquired {{date}}": "Acquired {{date}}",
     "cost": "cost",
     "held {{days}} days": "held {{days}} days",

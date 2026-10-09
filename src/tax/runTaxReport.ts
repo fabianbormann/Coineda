@@ -71,6 +71,18 @@ export const HOST_REASON_KEYS = [
 export const RESIDUAL_ORIGIN_KEY =
   'Network fee on a transfer between your own wallets, disposed of at market value and not deducted.';
 
+/**
+ * What a report line says when it is coins paid to somebody else in a
+ * transaction that also moved coins between the user's own venues (the
+ * `:residual-paid-out` events of residualTransferEvents). A payment, not a
+ * fee, so it must not be labelled or counted as one.
+ */
+export const PAID_ORIGIN_KEY =
+  'Sent to someone else in a transaction that also moved coins between your own wallets.';
+
+const FEE_RESIDUAL_SUFFIX = ':residual-out';
+const PAID_RESIDUAL_SUFFIX = ':residual-paid-out';
+
 /** A ledger event the module's `classify` produced nothing for. Recorded
  *  so a new `EventKind` the module has not been taught about cannot vanish
  *  from a report silently - it shows up as something to resolve instead.
@@ -384,7 +396,17 @@ export const runTaxReport = async (
     }
   }
 
-  const residualIds = new Set(residuals.map((event) => event.id));
+  // The label each residual disposal carries, by the event it came from:
+  // a network fee, or coins paid to somebody else in the same transaction.
+  // A residual `in` event is an acquisition and never becomes a line.
+  const originKeyById = new Map<string, string>();
+  for (const event of residuals) {
+    if (event.id.endsWith(FEE_RESIDUAL_SUFFIX)) {
+      originKeyById.set(event.id, RESIDUAL_ORIGIN_KEY);
+    } else if (event.id.endsWith(PAID_RESIDUAL_SUFFIX)) {
+      originKeyById.set(event.id, PAID_ORIGIN_KEY);
+    }
+  }
 
   const lines: ReportedDisposal[] = assessment.lines.map((line) => {
     const queue = byDisposalId.get(line.disposalEventId);
@@ -412,16 +434,15 @@ export const runTaxReport = async (
       consumed: disposal.consumed,
       costs: disposal.costs,
     };
-    if (!residualIds.has(line.disposalEventId)) {
+    const originKey = originKeyById.get(line.disposalEventId);
+    if (originKey === undefined) {
       return reported;
     }
     const txHash = eventById.get(line.disposalEventId)?.txHash;
     return {
       ...reported,
       origin:
-        txHash === undefined
-          ? { key: RESIDUAL_ORIGIN_KEY }
-          : { key: RESIDUAL_ORIGIN_KEY, txHash },
+        txHash === undefined ? { key: originKey } : { key: originKey, txHash },
     };
   });
 
@@ -437,10 +458,11 @@ export const runTaxReport = async (
     appVersion: APP_VERSION,
     eventsConsidered: survivors.length,
     internalTransfersNetted: allEvents.length - survivors.length,
-    // Only the disposals: the sentence this count feeds describes fee
-    // coins treated as disposals, and a residual `in` event is not one.
+    // Only the fees: the sentence this count feeds describes network fee
+    // coins treated as disposals. A residual `in` event is no disposal, and
+    // a `:residual-paid-out` event is a payment, not a fee.
     transferResiduals: residuals.filter((event) =>
-      event.legs.some((leg) => leg.direction === 'out'),
+      event.id.endsWith(FEE_RESIDUAL_SUFFIX),
     ).length,
   };
 

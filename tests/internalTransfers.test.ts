@@ -8,7 +8,11 @@ import {
 import { match } from '@/tax/matching';
 import { ownedVenuesOf } from '@/ledger/balances';
 import { openLedger, putEvents } from '@/ledger/db';
-import { RESIDUAL_ORIGIN_KEY, runTaxReport } from '@/tax/runTaxReport';
+import {
+  PAID_ORIGIN_KEY,
+  RESIDUAL_ORIGIN_KEY,
+  runTaxReport,
+} from '@/tax/runTaxReport';
 import germanTax from '@/tax/jurisdictions/de';
 import type { LedgerEvent } from '@/ledger/types';
 import type { LotMove, TaxEvent } from '@/tax/types';
@@ -989,7 +993,8 @@ describe('the coins that left but never arrived', () => {
     // Spec case (d). One hash: bitpanda sends BTC to the user's own wallet
     // (linked) AND ADA to somebody else (no receiving event). The ADA left
     // the user's control exactly like a payment, so it is a disposal at the
-    // sender - carried in the same residual event as the BTC network fee.
+    // sender - but a PAYMENT, under its own residual event and label, never
+    // the network fee the BTC residual is.
     await putEvents([
       buyAt('bitpanda', '50000000'),
       {
@@ -1048,13 +1053,32 @@ describe('the coins that left but never arrived', () => {
 
     expect(
       report.lines
-        .filter((line) => line.disposalEventId === 'withdraw:residual-out')
-        .map((line) => [line.assetId, line.amount, line.venue])
+        .filter((line) => line.disposalEventId.startsWith('withdraw:'))
+        .map((line) => [
+          line.disposalEventId,
+          line.assetId,
+          line.amount,
+          line.venue,
+          line.origin,
+        ])
         .sort(),
     ).toEqual([
-      [BTC, '5000', 'bitpanda'],
-      ['cardano:lovelace', '1000000', 'bitpanda'],
+      [
+        'withdraw:residual-out',
+        BTC,
+        '5000',
+        'bitpanda',
+        { key: RESIDUAL_ORIGIN_KEY, txHash: HASH4 },
+      ],
+      [
+        'withdraw:residual-paid-out',
+        'cardano:lovelace',
+        '1000000',
+        'bitpanda',
+        { key: PAID_ORIGIN_KEY, txHash: HASH4 },
+      ],
     ]);
+    // One network fee; the payment is not counted as one.
     expect(report.method.transferResiduals).toBe(1);
     expect(report.unresolved).toEqual([]);
   });
@@ -1099,6 +1123,75 @@ describe('the coins that left but never arrived', () => {
     const report = await run();
 
     expect(report.method.transferResiduals).toBe(1);
+  });
+
+  it('splits an unlinked asset into its fee and the coins it paid away', () => {
+    // Pure, on the helper. The sender's BTC is linked to its own wallet;
+    // its ADA went to somebody else AND paid an ADA fee. The ADA fee is a
+    // fee, like any explicit fee leg; the ADA principal is a payment.
+    const ADA = 'cardano:lovelace';
+    const sender: LedgerEvent = event({
+      id: 'sender',
+      externalId: 'sender',
+      txHash: HASH4,
+      legs: [
+        leg('out', 'wallet-a', '1000'),
+        {
+          assetId: ADA,
+          amount: '700',
+          direction: 'out',
+          venue: 'wallet-a',
+          role: 'principal',
+        },
+        {
+          assetId: ADA,
+          amount: '3',
+          direction: 'out',
+          venue: 'wallet-a',
+          role: 'fee',
+        },
+      ],
+    });
+    const receiver: LedgerEvent = event({
+      id: 'receiver',
+      externalId: 'receiver',
+      txHash: HASH4,
+      legs: [leg('in', 'wallet-b', '1000')],
+    });
+    const owned = ownedVenuesOf([sender, receiver]);
+    const links = linkInternalTransfers([sender, receiver], owned);
+    const residuals = residualTransferEvents([sender, receiver], links, owned);
+
+    expect(
+      residuals.map((row) => [row.id, row.externalId, row.legs]).sort(),
+    ).toEqual([
+      [
+        'sender:residual-out',
+        'sender:residual-out',
+        [
+          {
+            assetId: ADA,
+            amount: '3',
+            direction: 'out',
+            venue: 'wallet-a',
+            role: 'principal',
+          },
+        ],
+      ],
+      [
+        'sender:residual-paid-out',
+        'sender:residual-paid-out',
+        [
+          {
+            assetId: ADA,
+            amount: '700',
+            direction: 'out',
+            venue: 'wallet-a',
+            role: 'principal',
+          },
+        ],
+      ],
+    ]);
   });
 
   it('keeps the residuals of two events in one hash apart, under ids that cannot collide', () => {
