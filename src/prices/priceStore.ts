@@ -4,8 +4,10 @@ import { openLedger } from '@/ledger/db';
 // inside ./scale's valueOf - from ever producing exponential form, even
 // though nothing in this file sets them directly.
 import { addAmounts } from '@/ledger/amount';
+import { isFiatAsset } from '@/ledger/balances';
 import type { Holding } from '@/ledger/balances';
 import { fetchSpotPrices } from './coingecko';
+import { fetchRates } from './ecb';
 import { valueOf } from './scale';
 import type { PriceKey } from './types';
 
@@ -50,11 +52,11 @@ const todayUtc = (): string => new Date().toISOString().slice(0, 10);
  * priced at exactly 1 by definition and resolved directly, before cache or
  * provider are even consulted - a euro balance held at an exchange is worth
  * one euro, and reporting it in `missing` would silently exclude it from the
- * total. This does NOT extend to a different fiat asset under this base
- * currency (`fiat:usd` under a eur base): that needs an FX rate this
- * milestone does not have, so it is left to fall through to `missing`
- * exactly like any other unpriced asset - the honest answer rather than a
- * fabricated rate.
+ * total. A different fiat asset under this base currency (`fiat:usd` under a
+ * eur base) is priced at the ECB's reference rate for today - carried back
+ * over a weekend the way fetchRates does - and never asked of the crypto
+ * provider. If the ECB cannot be reached it falls through to `missing` like
+ * any other unpriced asset: the honest answer rather than a fabricated par.
  */
 export const resolveSpotPrices = async (
   assetIds: string[],
@@ -65,6 +67,8 @@ export const resolveSpotPrices = async (
   const misses: string[] = [];
   const baseFiatAssetId = `fiat:${currency}`;
 
+  const fiatMisses: string[] = [];
+
   for (const assetId of assetIds) {
     if (assetId === baseFiatAssetId) {
       result.set(assetId, '1');
@@ -73,8 +77,27 @@ export const resolveSpotPrices = async (
     const cached = await getCachedPrice({ assetId, currency, date });
     if (cached !== null) {
       result.set(assetId, cached);
+    } else if (isFiatAsset(assetId)) {
+      fiatMisses.push(assetId);
     } else {
       misses.push(assetId);
+    }
+  }
+
+  for (const assetId of fiatMisses) {
+    try {
+      const rates = await fetchRates(
+        [date],
+        assetId.slice('fiat:'.length),
+        currency,
+      );
+      const rate = rates.get(date);
+      if (rate !== undefined) {
+        await putCachedPrice({ assetId, currency, date }, rate);
+        result.set(assetId, rate);
+      }
+    } catch {
+      // Same rule as the provider outage below: never throw into the UI.
     }
   }
 

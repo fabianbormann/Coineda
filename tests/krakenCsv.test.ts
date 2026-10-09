@@ -621,6 +621,21 @@ describe('the asset codes a real export actually uses', () => {
     expect(assetIdForCode('ZEUR')).toBe('fiat:eur');
   });
 
+  it('maps the fiat currencies the ECB publishes and Kraken trades', () => {
+    // A dollar pair used to be skipped row by row, leaving a crypto-only
+    // event valued at market: the dollars actually paid never reached the
+    // report, and the ECB conversion for non-euro fiat was unreachable.
+    expect(assetIdForCode('ZUSD')).toBe('fiat:usd');
+    expect(assetIdForCode('USD')).toBe('fiat:usd');
+    expect(assetIdForCode('ZGBP')).toBe('fiat:gbp');
+    expect(assetIdForCode('CHF')).toBe('fiat:chf');
+    expect(assetIdForCode('ZCAD')).toBe('fiat:cad');
+    expect(assetIdForCode('ZAUD')).toBe('fiat:aud');
+    expect(assetIdForCode('ZJPY')).toBe('fiat:jpy');
+    // Kept as a decimal with its cents, like the euro.
+    expect(baseUnits('-1000.0050', 'fiat:usd')).toBe('-1000.005');
+  });
+
   it('does not let ETHW fall into ether', () => {
     // EthereumPoW is a different chain with a different price. An alias
     // added by prefix rather than by exact code would merge the two

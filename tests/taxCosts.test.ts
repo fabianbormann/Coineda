@@ -351,3 +351,73 @@ describe('a real Kraken export', () => {
     ).toEqual([['needs-cost-basis', 'sell', BTC, '505000']]);
   });
 });
+
+describe('a Kraken dollar pair', () => {
+  it('values a dollar buy and its dollar fee at the ECB rate of the day', async () => {
+    // One trade, two rows on one refid: 1000 USD (plus a 2.50 USD fee) for
+    // 0.02 BTC. The dollars actually paid are the consideration, and both
+    // they and the fee reach the euro cost basis at the ECB's reference
+    // rate for the buy day - never the market price of the bitcoin.
+    const coingecko = flatRange(60000);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        const asked = String(url);
+        if (asked.includes('frankfurter')) {
+          if (asked.includes('base=USD')) {
+            return new Response(
+              JSON.stringify({
+                base: 'USD',
+                rates: { '2024-03-11': { EUR: 0.9 } },
+              }),
+              { status: 200 },
+            );
+          }
+          return new Response(JSON.stringify({ rates: {} }), { status: 200 });
+        }
+        return coingecko(url, init);
+      }),
+    );
+    const text = [
+      '"txid","refid","time","type","subtype","aclass","asset","wallet","amount","fee","balance"',
+      '"LUSD1-AAAAA-AAAAAA","TUSD1-BBBBB-BBBBBB","2024-03-11 09:05:00.0000","trade","","currency","ZUSD","spot / main","-1000.0000","2.5000","0.0000"',
+      '"LBTC1-CCCCC-CCCCCC","TUSD1-BBBBB-BBBBBB","2024-03-11 09:05:00.0000","trade","","currency","XXBT","spot / main","0.0200000000","0.0000000000","0.0200000000"',
+    ].join('\n');
+    const { events } = krakenCsv.parse(text);
+    const imported: LedgerEvent[] = events.map((derived, index) => ({
+      ...derived,
+      id: `kraken-usd-${index}`,
+      sourceId: 'kraken',
+    }));
+    expect(imported).toHaveLength(1);
+    const wallet = imported[0].legs.find((row) => row.assetId === BTC)?.venue;
+    expect(wallet).toBeDefined();
+
+    await putEvents([
+      ...imported,
+      event({
+        id: 'sell',
+        sourceId: 'authored',
+        externalId: 'sell',
+        origin: 'authored',
+        timestamp: Date.UTC(2025, 2, 12),
+        legs: [
+          leg({
+            assetId: BTC,
+            amount: '2000000',
+            direction: 'out',
+            venue: wallet,
+          }),
+          leg({ assetId: EUR, amount: '1200', direction: 'in', venue: wallet }),
+        ],
+      }),
+    ]);
+
+    const report = await runGermany(2025);
+
+    const sell = report.lines.find((line) => line.disposalEventId === 'sell');
+    // (1000 + 2.5) USD x 0.9 EUR/USD.
+    expect(sell?.costBasis).toBe('902.25');
+    expect(report.unresolved).toEqual([]);
+  });
+});

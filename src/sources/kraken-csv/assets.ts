@@ -35,6 +35,22 @@ export const KRAKEN_ASSETS: Record<string, string> = {
   ADA: 'cardano:lovelace',
   ZEUR: 'fiat:eur',
   EUR: 'fiat:eur',
+  // The other fiat currencies Kraken trades against that the ECB also
+  // publishes a reference rate for, so a dollar or pound pair is valued at
+  // what was actually paid, converted at that day's rate, rather than
+  // being skipped row by row and leaving a crypto-only event valued at
+  // market. Stored as decimals like the euro (see baseUnits).
+  ZUSD: 'fiat:usd',
+  USD: 'fiat:usd',
+  ZGBP: 'fiat:gbp',
+  GBP: 'fiat:gbp',
+  CHF: 'fiat:chf',
+  ZCAD: 'fiat:cad',
+  CAD: 'fiat:cad',
+  ZAUD: 'fiat:aud',
+  AUD: 'fiat:aud',
+  ZJPY: 'fiat:jpy',
+  JPY: 'fiat:jpy',
 };
 
 /**

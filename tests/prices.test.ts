@@ -85,13 +85,45 @@ describe('the price cache', () => {
     expect(missing).toEqual([]);
   });
 
-  it('does not price a different fiat asset at 1 under a different base currency', async () => {
-    // fiat:usd under a eur base needs an FX rate this milestone does not
-    // have - it must fall through to missing, not be fabricated as par.
+  it('prices a different fiat asset at the ECB reference rate, not at 1', async () => {
+    // A dollar balance under a eur base is worth what the ECB says a dollar
+    // bought today - never fabricated as par, and never a question for a
+    // crypto price provider.
+    const fetchMock = vi.fn(async (url: string) => {
+      expect(String(url)).toContain('frankfurter');
+      expect(String(url)).toContain('base=USD');
+      expect(String(url)).toContain('symbols=EUR');
+      const today = new Date().toISOString().slice(0, 10);
+      return new Response(
+        JSON.stringify({ base: 'USD', rates: { [today]: { EUR: 0.9 } } }),
+        { status: 200 },
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const prices = await resolveSpotPrices(['fiat:usd'], 'eur');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(prices.get('fiat:usd')).toBe('0.9');
+    const { total, missing } = totalValue(
+      [{ assetId: 'fiat:usd', amount: '100' }],
+      prices,
+    );
+    expect(missing).toEqual([]);
+    expect(total).toBe('90');
+  });
+
+  it('leaves a different fiat asset missing when the ECB cannot be reached', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('offline');
+      }),
+    );
+
     const prices = await resolveSpotPrices(['fiat:usd'], 'eur');
 
     expect(prices.has('fiat:usd')).toBe(false);
-
     const { missing } = totalValue(
       [{ assetId: 'fiat:usd', amount: '100' }],
       prices,
