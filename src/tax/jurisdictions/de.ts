@@ -98,9 +98,9 @@ const OTHER_INCOME_SCOPE_NOTE =
  *  says. */
 const SAVER_ALLOWANCE_LABEL = "Saver's allowance (§20 Abs. 9 EStG)";
 const SAVER_ALLOWANCE_SCOPE_NOTE =
-  'This allowance covers all of your capital income in the year, not only derivatives, and only what is not already used elsewhere.';
+  'This allowance covers all of your capital income in the year, not only derivatives, and only what is not already used elsewhere. Spouses assessed jointly have twice the amount.';
 const CAPITAL_NOTE =
-  'Capital income from Termingeschäfte under §20 Abs. 2 S. 1 Nr. 3 EStG. The estimate is the flat 25 % Abgeltungsteuer on the taxable amount, without Solidaritätszuschlag, Kirchensteuer or the Günstigerprüfung. Losses offset only other capital income (§20 Abs. 6 EStG).';
+  'Capital income from Termingeschäfte under §20 Abs. 2 S. 1 Nr. 3 EStG. The estimate is the flat 25 % Abgeltungsteuer on the taxable amount, without Solidaritätszuschlag, Kirchensteuer or the Günstigerprüfung. Losses offset only other capital income (§20 Abs. 6 EStG). A foreign exchange withholds no Kapitalertragsteuer, so this income is declared in Anlage KAP.';
 const ABGELTUNGSTEUER_PERCENT = '25';
 /** On every capital event from a margin position: the §20 reading is the
  *  one applied, and it is contested. Keyed on the typed `product`. */

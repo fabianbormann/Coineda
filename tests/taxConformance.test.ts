@@ -8,6 +8,7 @@ import {
   RESIDUAL_ORIGIN_KEY,
 } from '@/tax/runTaxReport';
 import { REWARD_KIND_LABELS } from '@/tax/rewardKinds';
+import { DERIVATIVE_KIND_LABELS } from '@/tax/derivativeKinds';
 import { PRICE_REASON_KEYS } from '@/tax/resolveValues';
 import type { LedgerEvent } from '@/ledger/types';
 import type { MatchedDisposal, TaxEvent } from '@/tax/types';
@@ -497,6 +498,7 @@ describe('host reason keys', () => {
     PAID_ORIGIN_KEY,
     ...PRICE_REASON_KEYS,
     ...Object.values(REWARD_KIND_LABELS),
+    ...Object.values(DERIVATIVE_KIND_LABELS),
   ])('keys %s in both locales', (key) => {
     expect(en[key], `missing from en.json: ${key}`).toBeDefined();
     expect(de[key], `missing from de.json: ${key}`).toBeDefined();

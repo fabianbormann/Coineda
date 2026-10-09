@@ -1822,6 +1822,8 @@ describe('the derivatives section', () => {
       const lines = await screen.findByTestId('capital-lines');
       expect(lines).toHaveTextContent(/· Profit/);
       expect(lines).toHaveTextContent(/· Loss/);
+      // Each row names what the settlement was.
+      expect(lines).toHaveTextContent(/· Realised P&L/);
       // The fee's caveat and its undeducted state, from the tax event.
       expect(within(lines).getByText('Test row note')).toBeInTheDocument();
       expect(within(lines).getByText(/\(not deducted\)/i)).toBeInTheDocument();

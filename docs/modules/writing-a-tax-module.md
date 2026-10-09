@@ -140,15 +140,21 @@ zero-Freigrenze is not.
 ## Derivative settlements and the `capital` block
 
 Margin and futures settlements arrive as `derivative` ledger events
-(`event.derivative.kind` is `pnl`, `funding`, `rollover` or `commission`),
-each with a principal leg in the settlement asset and/or fee legs. A module
-that has a rule for them lists `'derivative'` in `handles` and classifies
-the legs as `capital-gain` / `capital-loss` tax events. A settlement paid in
-crypto also moves holdings, so emit an `acquisition` or `disposal` beside it
-to keep the lots right. The matcher skips the capital kinds; they reach
-`assess` as `input.capital`, and you return a `capital` result (gains,
-losses, net, allowance, taxable, loss, optional estimated tax, a note key)
-only when `input.capital` is non-empty. The block is optional: a module with
+(`event.derivative.kind` is `pnl`, `funding`, `rollover` or `commission`,
+and `event.derivative.product`, when the source knows it, is `margin` or
+`futures`), each with a principal leg in the settlement asset and/or fee
+legs. A module that has a rule for them lists `'derivative'` in `handles`
+and classifies the legs as `capital-gain` / `capital-loss` tax events. A
+settlement paid in crypto also moves holdings, so emit an `acquisition` or
+`disposal` beside it to keep the lots right. Where your rules differ by
+product or kind, branch on those typed fields and never on `event.note`,
+which is provenance prose and may change with any source. A loss your
+jurisdiction records but does not deduct carries `deductible: false`; keep it
+out of `losses` and report it as `notDeducted` so the report still shows it.
+The matcher skips the capital kinds; they reach `assess` as `input.capital`,
+and you return a `capital` result (gains, deducted losses, notDeducted, net,
+allowance, taxable, loss, optional estimated tax, a note key) only when
+`input.capital` is non-empty. The block is optional: a module with
 no rule leaves `'derivative'` out of `handles`, and the host then lists those
 events as unclassified rather than guessing. Germany taxes them under §20
 EStG with the Sparer-Pauschbetrag; Austria does not handle them yet.

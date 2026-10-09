@@ -12,6 +12,7 @@ import markBlack from '@/assets/logo/coineda-mark-black.svg';
 import { taxRegistry } from '@/tax/registry';
 import { runTaxReport } from '@/tax/runTaxReport';
 import { REWARD_KIND_LABELS } from '@/tax/rewardKinds';
+import { DERIVATIVE_KIND_LABELS } from '@/tax/derivativeKinds';
 import { buildDisclaimer, type Disclaimer } from '@/tax/disclaimer';
 import { getSettings, putSettings } from '@/settings/settingsStore';
 import { getAllEvents, getSources } from '@/ledger/db';
@@ -1256,6 +1257,17 @@ export const TaxReportScreen = () => {
                                   assetId={row.assetId}
                                 />{' '}
                                 · {t(row.kind === 'gain' ? 'Profit' : 'Loss')}
+                                {row.derivativeKind !== undefined && (
+                                  <>
+                                    {' '}
+                                    ·{' '}
+                                    {t(
+                                      DERIVATIVE_KIND_LABELS[
+                                        row.derivativeKind
+                                      ],
+                                    )}
+                                  </>
+                                )}
                                 {row.instrument !== undefined && (
                                   <> · {row.instrument}</>
                                 )}

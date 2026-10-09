@@ -49,6 +49,11 @@ export const BINANCE_ASSETS: Record<string, string> = {
  * names across its products, and an operation absent from here is skipped
  * and reported rather than guessed at - guessing turns a margin interest
  * charge into a disposal.
+ *
+ * The futures operation and coin names (`BNFCR`, `BUSD`, "Transfer Between
+ * Spot Account and UM Futures Account") are unverified against a real
+ * export; a row whose operation or coin is absent here is skipped with a
+ * note rather than guessed.
  */
 const KINDS: Record<string, EventKind> = {
   deposit: 'transfer',

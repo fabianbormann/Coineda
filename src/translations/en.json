@@ -290,8 +290,8 @@
     "Tax-free threshold for other income (§22 Nr. 3 EStG)": "Tax-free threshold for other income (§22 Nr. 3 EStG)",
     "This limit covers all of your income under §22 Nr. 3 EStG in the year, not only crypto rewards.": "This limit covers all of your income under §22 Nr. 3 EStG in the year, not only crypto rewards.",
     "Saver's allowance (§20 Abs. 9 EStG)": "Saver's allowance (§20 Abs. 9 EStG)",
-    "This allowance covers all of your capital income in the year, not only derivatives, and only what is not already used elsewhere.": "This allowance covers all of your capital income in the year, not only derivatives, and only what is not already used elsewhere.",
-    "Capital income from Termingeschäfte under §20 Abs. 2 S. 1 Nr. 3 EStG. The estimate is the flat 25 % Abgeltungsteuer on the taxable amount, without Solidaritätszuschlag, Kirchensteuer or the Günstigerprüfung. Losses offset only other capital income (§20 Abs. 6 EStG).": "Capital income from Termingeschäfte under §20 Abs. 2 S. 1 Nr. 3 EStG. The estimate is the flat 25 % Abgeltungsteuer on the taxable amount, without Solidaritätszuschlag, Kirchensteuer or the Günstigerprüfung. Losses offset only other capital income (§20 Abs. 6 EStG).",
+    "This allowance covers all of your capital income in the year, not only derivatives, and only what is not already used elsewhere. Spouses assessed jointly have twice the amount.": "This allowance covers all of your capital income in the year, not only derivatives, and only what is not already used elsewhere. Spouses assessed jointly have twice the amount.",
+    "Capital income from Termingeschäfte under §20 Abs. 2 S. 1 Nr. 3 EStG. The estimate is the flat 25 % Abgeltungsteuer on the taxable amount, without Solidaritätszuschlag, Kirchensteuer or the Günstigerprüfung. Losses offset only other capital income (§20 Abs. 6 EStG). A foreign exchange withholds no Kapitalertragsteuer, so this income is declared in Anlage KAP.": "Capital income from Termingeschäfte under §20 Abs. 2 S. 1 Nr. 3 EStG. The estimate is the flat 25 % Abgeltungsteuer on the taxable amount, without Solidaritätszuschlag, Kirchensteuer or the Günstigerprüfung. Losses offset only other capital income (§20 Abs. 6 EStG). A foreign exchange withholds no Kapitalertragsteuer, so this income is declared in Anlage KAP.",
     "This reward may be gewerbliche Einkünfte rather than §22 Nr. 3 income. This classification is uncertain, so confirm it yourself before relying on it.": "This reward may be gewerbliche Einkünfte rather than §22 Nr. 3 income. This classification is uncertain, so confirm it yourself before relying on it.",
     "Treated as received for a counter-performance (§22 Nr. 3 income at the value on receipt). An airdrop received for nothing may not be income at receipt; see BMF 06.03.2025 on airdrops and confirm which applies.": "Treated as received for a counter-performance (§22 Nr. 3 income at the value on receipt). An airdrop received for nothing may not be income at receipt; see BMF 06.03.2025 on airdrops and confirm which applies.",
     "The source did not say what kind of reward this was, so it is treated as §22 Nr. 3 income at the value on receipt.": "The source did not say what kind of reward this was, so it is treated as §22 Nr. 3 income at the value on receipt.",
@@ -528,6 +528,10 @@
     "Masternode reward": "Masternode reward",
     "Airdrop": "Airdrop",
     "Hard fork": "Hard fork",
-    "Other reward": "Other reward"
+    "Other reward": "Other reward",
+    "Realised P&L": "Realised P&L",
+    "Funding": "Funding",
+    "Rollover fee": "Rollover fee",
+    "Commission": "Commission"
   }
 }
