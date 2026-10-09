@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TriangleAlertIcon, Loader2Icon } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -255,6 +255,13 @@ export const TaxReportScreen = () => {
   const [disclaimer, setDisclaimer] = useState<Disclaimer | null>(null);
   const [initialYear] = useState(String(new Date().getUTCFullYear()));
   const [year, setYear] = useState(initialYear);
+  // The year as of the last render, for the settings read below: it may
+  // land after the user has already changed the year, and must then seed
+  // the carry inputs for the year showing, not the one mounted with.
+  const yearRef = useRef(initialYear);
+  useEffect(() => {
+    yearRef.current = year.trim();
+  }, [year]);
   const [rate, setRate] = useState('');
   const [yearError, setYearError] = useState(false);
   const [baseCurrency, setBaseCurrency] = useState(DEFAULT_CURRENCY);
@@ -320,14 +327,14 @@ export const TaxReportScreen = () => {
       setTaxpayerLoaded(true);
       const record = settings?.lossCarryForward ?? {};
       setLossRecord(record);
-      const stored = record[initialYear];
+      const stored = record[yearRef.current];
       setCarryPrivate(stored?.privateSales ?? '');
       setCarryCapital(stored?.capital ?? '');
     });
     return () => {
       active = false;
     };
-  }, [initialYear]);
+  }, []);
 
   /**
    * Discards a finished report, because an input that feeds it changed.

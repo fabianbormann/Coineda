@@ -2018,6 +2018,39 @@ describe('the loss carry-forward inputs', () => {
     expect(screen.getByLabelText(/under §23 EStG/i)).toHaveValue('500');
   });
 
+  it('seeds the inputs for the year showing when a slow settings read lands', async () => {
+    await putSettings({
+      lossCarryForward: { [String(thisYear - 1)]: { privateSales: '700' } },
+    });
+    const stored = await getSettings();
+    let release: (value: Settings | null) => void = () => {};
+    const held = new Promise<Settings | null>((resolve) => {
+      release = resolve;
+    });
+    const spy = vi
+      .spyOn(settingsStore, 'getSettings')
+      .mockReturnValueOnce(held);
+
+    try {
+      await openGermany();
+      // The year changes while the read is still out...
+      const yearInput = await screen.findByLabelText(/tax year/i);
+      await userEvent.clear(yearInput);
+      await userEvent.type(yearInput, String(thisYear - 1));
+      expect(screen.getByLabelText(/under §23 EStG/i)).toHaveValue('');
+
+      // ...so the read must seed the year now showing, not the one the
+      // screen mounted with.
+      release(stored);
+    } finally {
+      spy.mockRestore();
+    }
+
+    await waitFor(() =>
+      expect(screen.getByLabelText(/under §23 EStG/i)).toHaveValue('700'),
+    );
+  });
+
   it('blocks the run on a European-formatted amount', async () => {
     await openGermany();
     const input = await screen.findByLabelText(/under §23 EStG/i);
