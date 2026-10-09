@@ -98,6 +98,12 @@ matching, read that fact from `partition`, never from a consumed lot's
 *disposal's own* timestamp as `acquiredAt` with `heldDays: 0`, because an
 averaged pool has no acquisition date of its own.
 
+`ConsumedLot.heldDays` is for display. A holding-period rule that turns on
+a calendar date must compare `acquiredAt` and the disposal's `timestamp`
+as dates, in UTC — Germany's `heldMoreThanOneYear` in `de.ts` is the
+reference, including the 29 February case. A day count silently moves a
+leap-year anniversary across the boundary.
+
 ## Freigrenze vs. Freibetrag — pick the right one
 
 `ThresholdOutcome.kind` is `'freigrenze' | 'freibetrag'`, and conflating the

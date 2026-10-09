@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import germanTax from '@/tax/jurisdictions/de';
+import germanTax, { heldMoreThanOneYear } from '@/tax/jurisdictions/de';
 import type { LedgerEvent } from '@/ledger/types';
 import type { MatchedDisposal, TaxEvent } from '@/tax/types';
 import { subtractAmounts } from '@/ledger/amount';
@@ -144,7 +144,7 @@ describe('german holding period', () => {
   it('exempts a lot held more than one year', () => {
     const report = germanTax.assess({
       year: 2024,
-      matched: [disposal({ heldDays: 366, gain: '5000' })],
+      matched: [disposal({ heldDays: 367, gain: '5000' })],
       income: [],
     });
     expect(report.totals.exemptGain).toBe('5000');
@@ -506,5 +506,81 @@ describe('what the estimated liability leaves out', () => {
 
     expect(report.estimatedLiability).toBeUndefined();
     expect(report.liabilityNote).toBeUndefined();
+  });
+});
+
+describe('german holding period runs by calendar date', () => {
+  // Gain 5000 so the 2024 Freigrenze of 1000 is comfortably exceeded and
+  // the taxable total reads the holding-period decision alone.
+  const disposalOn = (
+    acquiredAt: number,
+    disposedAt: number,
+  ): MatchedDisposal => ({
+    disposalEventId: 'd-cal',
+    assetId: 'cardano:lovelace',
+    venue: 'wallet-a',
+    partition: 'wallet-a',
+    amount: '10',
+    proceeds: '6000',
+    costBasis: '1000',
+    gain: '5000',
+    timestamp: disposedAt,
+    consumed: [
+      {
+        acquisitionEventId: 'a-cal',
+        amount: '10',
+        costBasis: '1000',
+        acquiredAt,
+        heldDays: Math.floor((disposedAt - acquiredAt) / 86_400_000),
+      },
+    ],
+  });
+
+  const taxableGainOf = (acquiredAt: number, disposedAt: number): string =>
+    germanTax.assess({
+      year: new Date(disposedAt).getUTCFullYear(),
+      matched: [disposalOn(acquiredAt, disposedAt)],
+      income: [],
+    }).totals.taxableGain;
+
+  it('taxes a sale on the anniversary even when a leap day made it 366 days', () => {
+    // 1 March 2023 to 1 March 2024 spans 29 February 2024: 366 days, and
+    // still the anniversary. §188 Abs. 2 BGB ends the period WITH that
+    // day, so the sale is inside it. A day count of 366 > 365 exempted it.
+    expect(taxableGainOf(Date.UTC(2023, 2, 1), Date.UTC(2024, 2, 1))).toBe(
+      '5000',
+    );
+  });
+
+  it('exempts the day after the anniversary', () => {
+    expect(taxableGainOf(Date.UTC(2023, 2, 1), Date.UTC(2024, 2, 2))).toBe('0');
+  });
+
+  it('ends a period that began on 29 February with 28 February', () => {
+    // §188 Abs. 3 BGB: the following year has no 29 February, so the
+    // period ends with the last day of that month.
+    expect(taxableGainOf(Date.UTC(2024, 1, 29), Date.UTC(2025, 1, 28))).toBe(
+      '5000',
+    );
+    expect(taxableGainOf(Date.UTC(2024, 1, 29), Date.UTC(2025, 2, 1))).toBe(
+      '0',
+    );
+  });
+
+  it('decides by calendar day, not by elapsed hours', () => {
+    const lateEvening = Date.UTC(2024, 5, 1, 23, 59);
+    // 00:01 on the anniversary: 364.99 days elapsed, still the anniversary.
+    expect(taxableGainOf(lateEvening, Date.UTC(2025, 5, 1, 0, 1))).toBe('5000');
+    // Midnight the day after: exempt, however few hours over a year.
+    expect(taxableGainOf(lateEvening, Date.UTC(2025, 5, 2, 0, 0))).toBe('0');
+  });
+
+  it('exposes the decision so the boundary can be read directly', () => {
+    expect(
+      heldMoreThanOneYear(Date.UTC(2023, 2, 1), Date.UTC(2024, 2, 1)),
+    ).toBe(false);
+    expect(
+      heldMoreThanOneYear(Date.UTC(2023, 2, 1), Date.UTC(2024, 2, 2)),
+    ).toBe(true);
   });
 });

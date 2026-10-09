@@ -33,10 +33,46 @@ import type {
  * confident-looking number.
  */
 
-/** Strictly more than one year is exempt - the anniversary itself is still
- *  taxable. REVIEW FOCUS 1: an inclusive (>=) comparison here makes a
- *  taxable gain disappear. */
-const ONE_YEAR_DAYS = 365;
+/**
+ * §23 Abs. 1 Nr. 2 EStG exempts a holding period of MORE than one year.
+ *
+ * The period runs by calendar date, not by counting days (§187 Abs. 1,
+ * §188 Abs. 2 and 3 BGB): the day of acquisition is not counted, and the
+ * period ends with the day of the following year bearing the same date -
+ * or, when that month has no such day (29 February), with its last day.
+ * The anniversary itself is therefore still inside the period, and only a
+ * disposal on a LATER calendar day is exempt.
+ *
+ * A day count cannot express this. This used to compare `heldDays > 365`:
+ * 1 March 2023 to 1 March 2024 spans a 29 February, reads as 366 days, and
+ * was exempted - a taxable gain made to disappear by a leap day, which is
+ * exactly the failure the old "REVIEW FOCUS 1" comment warned about from
+ * the other direction. Decided in UTC, the same calendar the tax year
+ * itself is decided in (see taxYearOf).
+ */
+export const heldMoreThanOneYear = (
+  acquiredAt: number,
+  disposedAt: number,
+): boolean => {
+  const acquired = new Date(acquiredAt);
+  const year = acquired.getUTCFullYear() + 1;
+  const month = acquired.getUTCMonth();
+  const candidate = Date.UTC(year, month, acquired.getUTCDate());
+  // Date.UTC rolls 29 February over into 1 March in a common year; §188
+  // Abs. 3 BGB ends the period on the last day of the month instead, which
+  // is day 0 of the month after.
+  const anniversary =
+    new Date(candidate).getUTCMonth() === month
+      ? candidate
+      : Date.UTC(year, month + 1, 0);
+  const disposed = new Date(disposedAt);
+  const disposalDay = Date.UTC(
+    disposed.getUTCFullYear(),
+    disposed.getUTCMonth(),
+    disposed.getUTCDate(),
+  );
+  return disposalDay > anniversary;
+};
 
 const PRIVATE_SALE_THRESHOLD_LABEL =
   'Tax-free threshold for private sales (§23 EStG)';
@@ -237,8 +273,8 @@ const assessDisposal = (disposal: MatchedDisposal): AssessedDisposal => {
 
     const lotGain = subtractAmounts(lotProceeds, lot.costBasis);
 
-    // Strictly greater than one year, never >=: Review Focus 1.
-    if (lot.heldDays > ONE_YEAR_DAYS) {
+    // By calendar date, never by heldDays: see heldMoreThanOneYear.
+    if (heldMoreThanOneYear(lot.acquiredAt, disposal.timestamp)) {
       exempt = addAmounts(exempt, lotGain);
     } else {
       taxable = addAmounts(taxable, lotGain);
@@ -367,7 +403,7 @@ const germanTax: TaxModule = {
     id: 'de',
     jurisdiction: 'Germany',
     contributor: 'Fabian Bormann',
-    rulesCheckedOn: '2026-10-01',
+    rulesCheckedOn: '2026-10-09',
     partitionLabel:
       'Lots are matched per wallet or exchange, not pooled across the portfolio.',
     references: [
@@ -376,6 +412,7 @@ const germanTax: TaxModule = {
       // The loss carry-forward this module now reports through
       // `totals.loss` rather than folding into a tax-free zero.
       '§23 Abs. 3 Satz 7-8 EStG',
+      '§187 Abs. 1, §188 Abs. 2-3 BGB',
       '§22 Nr. 3 EStG',
       // Re-issued 2025-03-06, replacing the 10.05.2022 letter this cited
       // for three years while `rulesCheckedOn` claimed a current review -
