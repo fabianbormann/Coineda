@@ -21,6 +21,19 @@ const locale = (name: string): Record<string, string> =>
     ),
   ).translation;
 
+/** Numeric per segment, so 1.10.0 is above 1.9.0: negative, zero or
+ *  positive as `a` is below, equal to or above `b`. */
+const compareVersions = (a: string, b: string): number => {
+  const left = a.split('.').map(Number);
+  const right = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if (left[i] !== right[i]) {
+      return left[i] - right[i];
+    }
+  }
+  return 0;
+};
+
 /** The versioning gate as a predicate, so it can be shown to fail on a bad
  *  manifest as well as pass on the real ones. */
 const versionProblems = (
@@ -39,9 +52,24 @@ const versionProblems = (
       problems.push(`bad date ${entry.date}`);
     }
   }
+  const semver = /^\d+\.\d+\.\d+$/;
+  for (const entry of changelog) {
+    if (!semver.test(entry.version)) {
+      problems.push(`bad version ${entry.version}`);
+    }
+  }
   for (let i = 1; i < changelog.length; i++) {
     if (changelog[i].date > changelog[i - 1].date) {
       problems.push('changelog is not newest first');
+    }
+    const newer = changelog[i - 1].version;
+    const older = changelog[i].version;
+    if (
+      semver.test(newer) &&
+      semver.test(older) &&
+      compareVersions(newer, older) <= 0
+    ) {
+      problems.push('versions do not strictly decrease');
     }
   }
   if (manifest.rulesCheckedOn < changelog[0].date) {
@@ -566,5 +594,70 @@ describe('the rule-set versioning gate', () => {
     expect(
       versionProblems({ ...good, rulesCheckedOn: '2026-10-05' }),
     ).not.toEqual([]);
+  });
+
+  it('rejects a date that is not ISO', () => {
+    expect(
+      versionProblems({
+        ...good,
+        changelog: [
+          good.changelog[0],
+          { version: '1.0.0', date: '10/10/2026', summary: 'a' },
+        ],
+      }),
+    ).toContain('bad date 10/10/2026');
+  });
+
+  it('rejects a version that is not MAJOR.MINOR.PATCH', () => {
+    expect(
+      versionProblems({
+        ...good,
+        rulesVersion: 'v1.1',
+        changelog: [
+          { version: 'v1.1', date: '2026-10-10', summary: 'b' },
+          good.changelog[1],
+        ],
+      }),
+    ).toContain('bad version v1.1');
+  });
+
+  it('rejects a duplicated version', () => {
+    expect(
+      versionProblems({
+        ...good,
+        changelog: [
+          good.changelog[0],
+          { version: '1.1.0', date: '2026-10-01', summary: 'a' },
+        ],
+      }),
+    ).toContain('versions do not strictly decrease');
+  });
+
+  it('rejects versions out of order on the same date', () => {
+    // Same day, so the date check alone cannot see it.
+    expect(
+      versionProblems({
+        rulesVersion: '1.0.0',
+        rulesCheckedOn: '2026-10-10',
+        changelog: [
+          { version: '1.0.0', date: '2026-10-10', summary: 'b' },
+          { version: '1.1.0', date: '2026-10-10', summary: 'a' },
+        ],
+      }),
+    ).toContain('versions do not strictly decrease');
+  });
+
+  it('compares versions numerically per segment', () => {
+    // As strings, '1.10.0' sorts below '1.9.0'.
+    expect(
+      versionProblems({
+        rulesVersion: '1.10.0',
+        rulesCheckedOn: '2026-10-10',
+        changelog: [
+          { version: '1.10.0', date: '2026-10-10', summary: 'b' },
+          { version: '1.9.0', date: '2026-10-01', summary: 'a' },
+        ],
+      }),
+    ).toEqual([]);
   });
 });

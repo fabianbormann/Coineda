@@ -297,11 +297,6 @@ export type ThresholdOutcome = {
 };
 
 /**
- * The year's derivative (Kapitalvermögen) result as a jurisdiction
- * computed it. Optional on an assessment: only a module that classifies
- * capital events returns one.
- */
-/**
  * A loss carried INTO the year, as the Finanzamt stated it (user-entered
  * decimal strings in the base currency).
  *
@@ -326,6 +321,11 @@ export type CarryForwardOutcome = {
   remaining: string;
 };
 
+/**
+ * The year's derivative (Kapitalvermögen) result as a jurisdiction
+ * computed it. Optional on an assessment: only a module that classifies
+ * capital events returns one.
+ */
 export type CapitalResult = {
   gains: string;
   /** Deducted losses only. */

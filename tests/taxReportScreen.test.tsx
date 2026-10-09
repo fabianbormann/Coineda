@@ -2072,6 +2072,25 @@ describe('the loss carry-forward inputs', () => {
     );
   });
 
+  it('does not persist an invalid amount on blur, and says why', async () => {
+    await putSettings({
+      lossCarryForward: { [String(thisYear)]: { privateSales: '500' } },
+    });
+    await openGermany();
+    const input = await screen.findByLabelText(/under §23 EStG/i);
+    await waitFor(() => expect(input).toHaveValue('500'));
+    await userEvent.clear(input);
+    await userEvent.type(input, '1.000,50');
+    await userEvent.tab();
+
+    expect(await screen.findByText(/enter an amount like/i)).toBeVisible();
+    expect(input).toHaveValue('1.000,50');
+    const settings = await getSettings();
+    expect(settings?.lossCarryForward?.[String(thisYear)]?.privateSales).toBe(
+      '500',
+    );
+  });
+
   it('blocks the run on a European-formatted amount', async () => {
     await openGermany();
     const input = await screen.findByLabelText(/under §23 EStG/i);

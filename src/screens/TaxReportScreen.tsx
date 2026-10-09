@@ -377,7 +377,10 @@ export const TaxReportScreen = () => {
     setCarryError(false);
   };
 
-  /** Written on blur, keyed by the year carried into. */
+  /** Written on blur, keyed by the year carried into. Validated with the
+   *  same rule as the run: an invalid figure is never stored, so it cannot
+   *  come back as the seeded value next time; the field keeps showing it,
+   *  with the error, until it is corrected. */
   const persistCarry = () => {
     if (!taxpayerLoaded || !CARRY_YEAR.test(year.trim())) {
       return;
@@ -385,6 +388,14 @@ export const TaxReportScreen = () => {
     const key = year.trim();
     const privateSales = carryPrivate.trim() || undefined;
     const capital = carryCapital.trim() || undefined;
+    if (
+      (privateSales !== undefined && !CARRY_AMOUNT.test(privateSales)) ||
+      (capital !== undefined && !CARRY_AMOUNT.test(capital))
+    ) {
+      setCarryError(true);
+      return;
+    }
+    setCarryError(false);
     if (
       lossRecord[key] === undefined &&
       privateSales === undefined &&

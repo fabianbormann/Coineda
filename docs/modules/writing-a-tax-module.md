@@ -159,6 +159,35 @@ no rule leaves `'derivative'` out of `handles`, and the host then lists those
 events as unclassified rather than guessing. Germany taxes them under §20
 EStG with the Sparer-Pauschbetrag; Austria does not handle them yet.
 
+## Loss carry-forward: `supportsCarryForward` and `input.carryForward`
+
+A loss carried into the year is a figure only the tax office knows (in
+Germany, the remaining amount in the Verlustfeststellungsbescheid as at 31
+December of the previous year), so the user enters it and the host passes
+it to `assess` as `input.carryForward`: `{ privateSales?, capital? }`,
+decimal strings in the base currency. The host shows the inputs only when
+your manifest sets `supportsCarryForward: true`; leave it unset and
+`carryForward` never arrives. The contract, if you set it:
+
+- **Per pot, never across Einkunftsarten.** `privateSales` offsets only
+  private-sale gains and `capital` only capital income; one never reduces
+  the other, and neither touches other income such as staking. `capital`
+  is the general capital-income pot only - a separately ring-fenced pot
+  (Germany's share-loss pot, §20 Abs. 6 S. 4 EStG) offsets only its own
+  kind of gain and must never be applied here.
+- **The Freigrenze first.** A Freigrenze is tested on the year's own gain,
+  and only then is the carry deducted from a gain that exceeded it (§23
+  Abs. 3 S. 5 and S. 8 EStG). Deducting first would exempt gains the law
+  taxes and consume carry-forward the law preserves. A year under the
+  Freigrenze, or a loss year, uses none of it.
+- **Report what happened.** For each non-zero pot return
+  `carryForward.<pot>` as `{ declared, used, remaining }`, with
+  `used <= gain` and `remaining = declared - used`; a declared `'0'` is no
+  carry-forward. For the capital pot also set `capital.carryForwardUsed`
+  (deducted from a positive net before the allowance, `'0'` otherwise) and
+  report the allowance threshold on the net AFTER it, so the threshold card
+  and the derivatives card agree.
+
 ## Unresolved items are how you decline to guess
 
 `UnresolvedItem.kind` is `'needs-cost-basis' | 'needs-price' | 'unclassified'`.
@@ -188,9 +217,10 @@ instead of trusting it.
 rule set, printed on every report, and a newest-first list of
 `{ version, date, summary }` entries. Whenever a rule changes, bump the
 version and add an entry; the conformance gate enforces that
-`rulesVersion` equals `changelog[0].version`, dates are ISO and not
-increasing down the list, and `rulesCheckedOn` is not older than the newest
-entry.
+`rulesVersion` equals `changelog[0].version`, every version is
+`MAJOR.MINOR.PATCH`, versions strictly decrease down the list (no
+duplicates), dates are ISO `YYYY-MM-DD` and not increasing down the list,
+and `rulesCheckedOn` is not older than the newest entry.
 
 ## Golden fixtures, and proving each one load-bearing
 
