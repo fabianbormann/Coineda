@@ -1391,6 +1391,49 @@ export const TaxReportScreen = () => {
                             ['Gains', assessment.capitalResult.gains],
                             ['Losses', assessment.capitalResult.losses],
                             ['Net result', assessment.capitalResult.net],
+                          ] as const
+                        ).map(([label, figure]) => (
+                          <p key={label}>
+                            <span className="font-medium">{t(label)}: </span>
+                            <Money
+                              value={Number(figure)}
+                              currency={baseCurrency}
+                            />
+                          </p>
+                        ))}
+                        {/* The carry sits where it is subtracted - after the
+                            net, before the allowance - so the card reads as
+                            the arithmetic it is, top to bottom. */}
+                        {assessment.carryForward?.capital && (
+                          <p data-testid="carry-forward-capital">
+                            {t(
+                              'Loss carry-forward as stated by the Finanzamt: {{declared}} · {{used}} used this year · {{remaining}} remaining',
+                              {
+                                declared: formatFiat(
+                                  Number(
+                                    assessment.carryForward.capital.declared,
+                                  ),
+                                  i18n.language,
+                                  baseCurrency,
+                                ),
+                                used: formatFiat(
+                                  Number(assessment.carryForward.capital.used),
+                                  i18n.language,
+                                  baseCurrency,
+                                ),
+                                remaining: formatFiat(
+                                  Number(
+                                    assessment.carryForward.capital.remaining,
+                                  ),
+                                  i18n.language,
+                                  baseCurrency,
+                                ),
+                              },
+                            )}
+                          </p>
+                        )}
+                        {(
+                          [
                             [
                               'Allowance applied',
                               assessment.capitalResult.allowance,
@@ -1424,34 +1467,6 @@ export const TaxReportScreen = () => {
                               )}
                               currency={baseCurrency}
                             />
-                          </p>
-                        )}
-                        {assessment.carryForward?.capital && (
-                          <p data-testid="carry-forward-capital">
-                            {t(
-                              'Loss carry-forward as stated by the Finanzamt: {{declared}} · {{used}} used this year · {{remaining}} remaining',
-                              {
-                                declared: formatFiat(
-                                  Number(
-                                    assessment.carryForward.capital.declared,
-                                  ),
-                                  i18n.language,
-                                  baseCurrency,
-                                ),
-                                used: formatFiat(
-                                  Number(assessment.carryForward.capital.used),
-                                  i18n.language,
-                                  baseCurrency,
-                                ),
-                                remaining: formatFiat(
-                                  Number(
-                                    assessment.carryForward.capital.remaining,
-                                  ),
-                                  i18n.language,
-                                  baseCurrency,
-                                ),
-                              },
-                            )}
                           </p>
                         )}
                         {!isZeroAmount(assessment.capitalResult.loss) && (

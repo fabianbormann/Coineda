@@ -1771,9 +1771,9 @@ describe('the derivatives section', () => {
     );
   });
 
-  it('notes under the taxable line that the Finanzamt applies a §20 carry-forward', async () => {
+  const capitalCarryModule = (): TaxModule => {
     const base = capitalModule(true);
-    taxRegistry.push({
+    return {
       ...base,
       assess: (input) => {
         const result = base.assess(input);
@@ -1791,7 +1791,35 @@ describe('the derivatives section', () => {
           },
         };
       },
-    });
+    };
+  };
+
+  it('prints the §20 carry-forward line between the net result and the allowance', async () => {
+    taxRegistry.push(capitalCarryModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+
+    const section = await screen.findByTestId('capital');
+    const line = within(section).getByTestId('carry-forward-capital');
+    expect(line).toHaveTextContent(/as stated by the Finanzamt/);
+    expect(line).toHaveTextContent(/€600\.00 used this year/);
+    expect(line).toHaveTextContent(/€0\.00 remaining/);
+    // Read top to bottom: net, minus the carry, then the allowance.
+    const net = within(section).getByText(/^net result/i);
+    const allowance = within(section).getByText(/^allowance applied/i);
+    expect(
+      net.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      line.compareDocumentPosition(allowance) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('notes under the taxable line that the Finanzamt applies a §20 carry-forward', async () => {
+    taxRegistry.push(capitalCarryModule());
     await putEvents([acquisitionEvent, disposalEvent]);
 
     renderScreen();
