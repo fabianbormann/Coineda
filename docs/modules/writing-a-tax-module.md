@@ -137,6 +137,22 @@ If your jurisdiction has neither (Austria has none at all —
 structure with a limit of zero; an empty array is honest, a disguised
 zero-Freigrenze is not.
 
+## Derivative settlements and the `capital` block
+
+Margin and futures settlements arrive as `derivative` ledger events
+(`event.derivative.kind` is `pnl`, `funding`, `rollover` or `commission`),
+each with a principal leg in the settlement asset and/or fee legs. A module
+that has a rule for them lists `'derivative'` in `handles` and classifies
+the legs as `capital-gain` / `capital-loss` tax events. A settlement paid in
+crypto also moves holdings, so emit an `acquisition` or `disposal` beside it
+to keep the lots right. The matcher skips the capital kinds; they reach
+`assess` as `input.capital`, and you return a `capital` result (gains,
+losses, net, allowance, taxable, loss, optional estimated tax, a note key)
+only when `input.capital` is non-empty. The block is optional: a module with
+no rule leaves `'derivative'` out of `handles`, and the host then lists those
+events as unclassified rather than guessing. Germany taxes them under §20
+EStG with the Sparer-Pauschbetrag; Austria does not handle them yet.
+
 ## Unresolved items are how you decline to guess
 
 `UnresolvedItem.kind` is `'needs-cost-basis' | 'needs-price' | 'unclassified'`.

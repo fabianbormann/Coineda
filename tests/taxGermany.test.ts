@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import germanTax, { heldMoreThanOneYear } from '@/tax/jurisdictions/de';
+import austrianTax from '@/tax/jurisdictions/at';
 import type { LedgerEvent, RewardKind } from '@/ledger/types';
 import type { MatchedDisposal, TaxEvent } from '@/tax/types';
 import { subtractAmounts } from '@/ledger/amount';
@@ -964,5 +965,164 @@ describe('german reward kinds', () => {
       ]),
     );
     expect(events.find((e) => e.kind === 'income')?.amount).toBe('100');
+  });
+});
+
+describe('german derivatives', () => {
+  const derivative = (
+    legs: {
+      asset: string;
+      direction: 'in' | 'out';
+      role?: 'principal' | 'fee';
+    }[],
+  ): LedgerEvent => ({
+    id: 'dv',
+    sourceId: 's1',
+    externalId: 'dv',
+    timestamp: Date.UTC(2024, 5, 1),
+    kind: 'derivative',
+    derivative: { kind: 'pnl' },
+    origin: 'derived',
+    legs: legs.map((one) => ({
+      assetId: one.asset,
+      amount: '5',
+      direction: one.direction,
+      venue: 'ex',
+      role: one.role ?? 'principal',
+    })),
+  });
+  const kinds = (event: LedgerEvent) =>
+    germanTax.classify(event).map((one) => one.kind);
+
+  it('classifies fiat settlements as capital events only', () => {
+    expect(kinds(derivative([{ asset: 'fiat:eur', direction: 'in' }]))).toEqual(
+      ['capital-gain'],
+    );
+    expect(
+      kinds(derivative([{ asset: 'fiat:eur', direction: 'out' }])),
+    ).toEqual(['capital-loss']);
+    expect(
+      kinds(derivative([{ asset: 'fiat:eur', direction: 'out', role: 'fee' }])),
+    ).toEqual(['capital-loss']);
+  });
+
+  it('adds an acquisition or disposal for crypto settlements', () => {
+    const btc = 'bitcoin:native';
+    const gain = germanTax.classify(
+      derivative([{ asset: btc, direction: 'in' }]),
+    );
+    expect(gain.map((one) => one.kind)).toEqual([
+      'capital-gain',
+      'acquisition',
+    ]);
+    expect(gain[0].amount).toBe(gain[1].amount);
+    expect(kinds(derivative([{ asset: btc, direction: 'out' }]))).toEqual([
+      'capital-loss',
+      'disposal',
+    ]);
+    expect(
+      kinds(derivative([{ asset: btc, direction: 'out', role: 'fee' }])),
+    ).toEqual(['capital-loss', 'disposal']);
+  });
+
+  it('is handled by Germany and not by Austria', () => {
+    expect(germanTax.handles).toContain('derivative');
+    expect(austrianTax.handles).not.toContain('derivative');
+    expect(
+      austrianTax.classify(
+        derivative([{ asset: 'fiat:eur', direction: 'in' }]),
+      ),
+    ).toEqual([]);
+  });
+
+  const capitalEvent = (
+    kind: 'capital-gain' | 'capital-loss',
+    value: string,
+  ): TaxEvent => ({
+    sourceEventId: `c-${kind}-${value}`,
+    kind,
+    assetId: 'fiat:eur',
+    amount: value,
+    timestamp: Date.UTC(2024, 5, 1),
+    venue: 'ex',
+    value,
+  });
+  const assessCapital = (year: number, events: TaxEvent[]) =>
+    germanTax.assess({
+      year,
+      matched: [],
+      income: [],
+      capital: events,
+    });
+
+  it('nets gains and losses inside the allowance', () => {
+    const result = assessCapital(2024, [
+      capitalEvent('capital-gain', '500'),
+      capitalEvent('capital-loss', '200'),
+      capitalEvent('capital-loss', '5'),
+    ]);
+    expect(result.capital).toMatchObject({
+      gains: '500',
+      losses: '205',
+      net: '295',
+      allowance: '1000',
+      taxable: '0',
+      loss: '0',
+      estimatedTax: '0',
+    });
+    expect(result.thresholds).toHaveLength(3);
+    expect(result.thresholds[2]).toMatchObject({
+      label: "Saver's allowance (§20 Abs. 9 EStG)",
+      kind: 'freibetrag',
+    });
+    expect(result.thresholds[2].scopeNote).toBeDefined();
+    expect(result.thresholds[0].label).toMatch(/§23/);
+    expect(result.thresholds[1].label).toMatch(/§22/);
+  });
+
+  it('taxes only the excess over the allowance at 25 percent', () => {
+    expect(
+      assessCapital(2024, [capitalEvent('capital-gain', '3000')]).capital,
+    ).toMatchObject({ taxable: '2000', estimatedTax: '500' });
+    expect(
+      assessCapital(2022, [capitalEvent('capital-gain', '3000')]).capital,
+    ).toMatchObject({ allowance: '801', taxable: '2199' });
+  });
+
+  it('owes nothing at exactly the allowance', () => {
+    const result = assessCapital(2024, [capitalEvent('capital-gain', '1000')]);
+    expect(result.capital?.taxable).toBe('0');
+    expect(result.thresholds[2].exceeded).toBe(false);
+  });
+
+  it('carries a net loss forward', () => {
+    const result = assessCapital(2024, [
+      capitalEvent('capital-loss', '700'),
+      capitalEvent('capital-gain', '100'),
+    ]);
+    expect(result.capital).toMatchObject({
+      net: '-600',
+      loss: '600',
+      taxable: '0',
+    });
+  });
+
+  it('adds nothing without capital input and never changes §23 totals', () => {
+    const matched = [disposal({ heldDays: 10, gain: '1500' })];
+    const base = germanTax.assess({
+      year: 2024,
+      matched,
+      income: [],
+      capital: [],
+    });
+    const withCapital = germanTax.assess({
+      year: 2024,
+      matched,
+      income: [],
+      capital: [capitalEvent('capital-loss', '700')],
+    });
+    expect(base.capital).toBeUndefined();
+    expect(base.thresholds).toHaveLength(2);
+    expect(withCapital.totals).toEqual(base.totals);
   });
 });

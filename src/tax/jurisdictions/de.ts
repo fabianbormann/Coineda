@@ -15,6 +15,7 @@ import type { Leg, LedgerEvent, RewardKind } from '@/ledger/types';
 import type {
   AssessedDisposal,
   AssessInput,
+  CapitalResult,
   MatchedDisposal,
   TaxAssessment,
   TaxEvent,
@@ -91,6 +92,16 @@ const OTHER_INCOME_THRESHOLD_LABEL =
   'Tax-free threshold for other income (§22 Nr. 3 EStG)';
 const OTHER_INCOME_SCOPE_NOTE =
   'This limit covers all of your income under §22 Nr. 3 EStG in the year, not only crypto rewards.';
+
+/** §20 Abs. 9 EStG Sparer-Pauschbetrag: a Freibetrag, so only the excess is
+ *  taxed. It is shared with all other capital income, which the scope note
+ *  says. */
+const SAVER_ALLOWANCE_LABEL = "Saver's allowance (§20 Abs. 9 EStG)";
+const SAVER_ALLOWANCE_SCOPE_NOTE =
+  'This allowance covers all of your capital income in the year, not only derivatives, and only what is not already used elsewhere.';
+const CAPITAL_NOTE =
+  'Capital income from Termingeschäfte under §20 Abs. 2 S. 1 Nr. 3 EStG. The estimate is the flat 25 % Abgeltungsteuer on the taxable amount, without Solidaritätszuschlag, Kirchensteuer or the Günstigerprüfung. Losses offset only other capital income (§20 Abs. 6 EStG).';
+const ABGELTUNGSTEUER_PERCENT = '25';
 
 const BUSINESS_INCOME_NOTE =
   'This reward may be gewerbliche Einkünfte rather than §22 Nr. 3 income. This classification is uncertain, so confirm it yourself before relying on it.';
@@ -244,6 +255,34 @@ const classifyReward = (event: LedgerEvent): TaxEvent[] => {
 };
 
 /**
+ * A derivative settlement is §20 Abs. 2 S. 1 Nr. 3 capital income, not a §23
+ * private sale: each settlement leg becomes a capital gain (received) or
+ * capital loss (paid, or a fee). A settlement in crypto ALSO moves holdings,
+ * so it additionally acquires (profit received) or disposes of (loss or fee
+ * paid) those coins, which keeps the lot ledger and later §23 sales right.
+ * Fiat settlements have no holding and stay capital events only.
+ */
+const classifyDerivative = (event: LedgerEvent): TaxEvent[] =>
+  event.legs.flatMap((leg) => {
+    const isGain = leg.role === 'principal' && leg.direction === 'in';
+    const capital: TaxEvent = {
+      sourceEventId: event.id,
+      kind: isGain ? 'capital-gain' : 'capital-loss',
+      assetId: leg.assetId,
+      amount: leg.amount,
+      timestamp: event.timestamp,
+      venue: leg.venue,
+    };
+    if (isFiatAsset(leg.assetId)) {
+      return [capital];
+    }
+    return [
+      capital,
+      { ...capital, kind: isGain ? 'acquisition' : 'disposal' } as TaxEvent,
+    ];
+  });
+
+/**
  * Pure and synchronous - no Date.now(), no Math.random(), no locale
  * formatting. The conformance gate (Task 6) runs this twice on the same
  * input and compares, so any hidden impurity would be caught, but the real
@@ -260,6 +299,8 @@ const classify = (event: LedgerEvent): TaxEvent[] => {
       return event.legs.flatMap((leg) => legToTaxEvent(event, leg));
     case 'reward':
       return classifyReward(event);
+    case 'derivative':
+      return classifyDerivative(event);
     default:
       // 'fee' is not addressed by this task's confirmed rules, so a
       // standalone fee event is left unclassified rather than guessed at.
@@ -418,6 +459,45 @@ const assess = (input: AssessInput): TaxAssessment => {
     scopeNote: OTHER_INCOME_SCOPE_NOTE,
   };
 
+  const thresholds = [gainThreshold, incomeThreshold];
+  let capital: CapitalResult | undefined;
+  if (input.capital.length > 0) {
+    const gains = sumAmounts(
+      input.capital
+        .filter((event) => event.kind === 'capital-gain')
+        .map((event) => event.value ?? '0'),
+    );
+    const losses = sumAmounts(
+      input.capital
+        .filter((event) => event.kind === 'capital-loss')
+        .map((event) => event.value ?? '0'),
+    );
+    const net = subtractAmounts(gains, losses);
+    const allowance = input.year >= 2023 ? '1000' : '801';
+    const excess = subtractAmounts(net, allowance);
+    const taxable = compareAmounts(excess, '0') > 0 ? excess : '0';
+    capital = {
+      gains,
+      losses,
+      net,
+      allowance,
+      taxable,
+      loss: compareAmounts(net, '0') < 0 ? negateAmount(net) : '0',
+      estimatedTax: normaliseAmount(
+        new Big(taxable).times(ABGELTUNGSTEUER_PERCENT).div(100).toString(),
+      ),
+      note: CAPITAL_NOTE,
+    };
+    thresholds.push({
+      label: SAVER_ALLOWANCE_LABEL,
+      limit: allowance,
+      actual: compareAmounts(net, '0') > 0 ? net : '0',
+      exceeded: compareAmounts(net, allowance) > 0,
+      kind: 'freibetrag',
+      scopeNote: SAVER_ALLOWANCE_SCOPE_NOTE,
+    });
+  }
+
   let estimatedLiability: string | undefined;
   let liabilityNote: string | undefined;
   if (input.rate !== undefined) {
@@ -456,7 +536,8 @@ const assess = (input: AssessInput): TaxAssessment => {
       computedFrom: input.matched.length,
       omitted: 0,
     },
-    thresholds: [gainThreshold, incomeThreshold],
+    thresholds,
+    ...(capital === undefined ? {} : { capital }),
     estimatedLiability,
     liabilityNote,
     unresolved: [],
@@ -468,7 +549,7 @@ const germanTax: TaxModule = {
     id: 'de',
     jurisdiction: 'Germany',
     contributor: 'Fabian Bormann',
-    rulesCheckedOn: '2026-10-09',
+    rulesCheckedOn: '2026-10-10',
     partitionLabel:
       'Lots are matched per wallet or exchange, not pooled across the portfolio.',
     references: [
@@ -480,6 +561,7 @@ const germanTax: TaxModule = {
       '§23 Abs. 3 Satz 7-8 EStG',
       '§187 Abs. 1, §188 Abs. 2-3 BGB',
       '§22 Nr. 3 EStG',
+      '§20 Abs. 2 S. 1 Nr. 3, Abs. 6, Abs. 9 EStG',
       // Re-issued 2025-03-06, replacing the 10.05.2022 letter this cited
       // for three years while `rulesCheckedOn` claimed a current review -
       // a contradiction the disclaimer surface exists to prevent, since
@@ -500,7 +582,7 @@ const germanTax: TaxModule = {
   // surfacing as `unclassified` rather than vanish. 'fee' is absent for the
   // same reason the classify switch's default case returns [] for it -
   // this task's confirmed rules do not address it.
-  handles: ['trade', 'transfer', 'fiat-in', 'fiat-out'],
+  handles: ['trade', 'transfer', 'fiat-in', 'fiat-out', 'derivative'],
   defaultMatching: 'fifo',
   // German FIFO is per wallet, not pooled across the whole portfolio.
   partitionBy: (event) => event.venue,

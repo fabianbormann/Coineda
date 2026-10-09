@@ -10,7 +10,7 @@ import {
 import { REWARD_KIND_LABELS } from '@/tax/rewardKinds';
 import { PRICE_REASON_KEYS } from '@/tax/resolveValues';
 import type { LedgerEvent } from '@/ledger/types';
-import type { MatchedDisposal } from '@/tax/types';
+import type { MatchedDisposal, TaxEvent } from '@/tax/types';
 
 const locale = (name: string): Record<string, string> =>
   JSON.parse(
@@ -126,7 +126,36 @@ const sampleEvents: LedgerEvent[] = [
       },
     ],
   },
+  {
+    // A derivative settlement, so a module that taxes one reaches its
+    // capital threshold, scope note and capital note below.
+    id: 'e6',
+    sourceId: 's1',
+    externalId: 'x6',
+    timestamp: Date.UTC(2024, 10, 1),
+    kind: 'derivative',
+    origin: 'derived',
+    derivative: { kind: 'pnl' },
+    legs: [
+      {
+        assetId: 'fiat:eur',
+        amount: '10',
+        direction: 'in',
+        venue: 'ex',
+        role: 'principal',
+      },
+    ],
+  },
 ];
+
+/** The sample events' capital events, valued, for assess to consume. */
+const capitalOf = (module: {
+  classify: (event: LedgerEvent) => TaxEvent[];
+}): TaxEvent[] =>
+  sampleEvents
+    .flatMap((event) => module.classify(event))
+    .filter((e) => e.kind === 'capital-gain' || e.kind === 'capital-loss')
+    .map((e) => ({ ...e, value: e.amount }));
 
 /**
  * Disposals shaped to reach a DIFFERENT outcome branch in every
@@ -263,9 +292,12 @@ describe.each(taxRegistry.map((m) => [m.manifest.id, m] as const))(
             year: 2024,
             matched: [matched],
             income: [],
-            capital: [],
+            capital: capitalOf(module),
             rate,
           });
+          if (assessed.capital !== undefined) {
+            keys.add(assessed.capital.note);
+          }
           for (const threshold of assessed.thresholds) {
             if (threshold.scopeNote !== undefined) {
               keys.add(threshold.scopeNote);

@@ -9,7 +9,7 @@ describe('buildDisclaimer', () => {
       Date.UTC(2026, 9, 1),
     );
     expect(disclaimer.contributor).toBe('Fabian Bormann');
-    expect(disclaimer.rulesCheckedOn).toBe('2026-10-09');
+    expect(disclaimer.rulesCheckedOn).toBe('2026-10-10');
     expect(disclaimer.references).toContain('§23 Abs. 1 Nr. 2 EStG');
   });
 
