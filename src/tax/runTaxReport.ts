@@ -267,7 +267,14 @@ export const runTaxReport = async (
     .sort(
       (a, b) =>
         a.timestamp - b.timestamp ||
-        a.sourceEventId.localeCompare(b.sourceEventId),
+        // A plain comparison, not localeCompare: without a locale that
+        // depends on the machine, and the same ledger must print the same
+        // order everywhere.
+        (a.sourceEventId < b.sourceEventId
+          ? -1
+          : a.sourceEventId > b.sourceEventId
+            ? 1
+            : 0),
     );
 
   const assessment = module.assess({

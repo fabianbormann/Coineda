@@ -111,12 +111,13 @@ module decides what they are. If your law deducts them from a sale or adds
 them to a purchase, attach them to that tax event as `costs: TaxCost[]`
 (asset and amount, no value): the host prices each cost on the event's
 day, the matcher raises an acquisition's cost basis or lowers a disposal's
-proceeds by the valued costs, and the report prints what came off. A cost
-the host cannot price is listed as unpriced and **not** deducted — never
-treated as zero. Germany's `classifyTrade` in `de.ts` is the reference:
-a fee on a sell or swap goes on the disposal, on a buy on the acquisition,
-and a fee paid in crypto additionally keeps its own disposal because the
-coins really left.
+proceeds by the valued costs, and the report prints what came off a
+disposal; a buy's fee is inside the lot's cost basis the report prints per
+lot. A cost the host cannot price is listed as unpriced and **not**
+deducted — never treated as zero. Germany's `classifyTrade` in `de.ts` is
+the reference: a fee on a sell or swap goes on the disposal, on a buy on
+the acquisition, and a fee paid in crypto additionally keeps its own
+disposal because the coins really left.
 
 ## Freigrenze vs. Freibetrag — pick the right one
 

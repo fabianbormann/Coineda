@@ -7,7 +7,7 @@ import { openLedger, putEvents } from '@/ledger/db';
 import { runTaxReport } from '@/tax/runTaxReport';
 import germanTax from '@/tax/jurisdictions/de';
 import type { LedgerEvent, Leg } from '@/ledger/types';
-import { flatRange } from './priceRangeStub';
+import { flatRange, rangeStub } from './priceRangeStub';
 
 /**
  * Trade fees end to end: the German module attaches them, the host values
@@ -124,6 +124,12 @@ describe('trade fees reach the gain', () => {
   });
 
   it('deducts a crypto fee on a swap once, and disposes of the fee coins', async () => {
+    // ADA at 1 EUR before 2025 and 2 EUR from then on, so the identity
+    // below is proved at a price that moved, not only at a flat one.
+    vi.stubGlobal(
+      'fetch',
+      rangeStub((isoDate) => (isoDate < '2025-01-01' ? 1 : 2)),
+    );
     await putEvents([
       oldBuy,
       event({
@@ -139,22 +145,28 @@ describe('trade fees reach the gain', () => {
 
     const report = await runGermany(2025);
 
+    // The lot is 1000 ADA at a cost of 1000. The swap disposes of 100 ADA
+    // worth 200 and pays a 1-ADA fee worth 2: its proceeds are 200 - 2.
+    // The fee coins are a disposal of their own, worth 2, from the same
+    // lot at a cost of 1. Total gain 98 + 1 = 99 = (200 - 100) - 1, the
+    // fee coins' original cost - so the fee is deducted exactly once.
     const byAmount = new Map(report.lines.map((line) => [line.amount, line]));
     const swap = byAmount.get(ada(100));
     const fee = byAmount.get(ada(1));
-    expect(swap?.proceeds).toBe('99');
-    expect(swap?.costs).toBe('1');
-    expect(fee?.proceeds).toBe('1');
+    expect(swap?.proceeds).toBe('198');
+    expect(swap?.costBasis).toBe('100');
+    expect(swap?.gain).toBe('98');
+    expect(swap?.costs).toBe('2');
+    expect(fee?.proceeds).toBe('2');
+    expect(fee?.costBasis).toBe('1');
+    expect(fee?.gain).toBe('1');
     expect(fee?.costs).toBe('0');
-    // 101 ADA left the 1000-ADA lot: the swap's 100 and the fee's 1.
-    expect(report.lines.map((line) => line.costBasis).sort()).toEqual([
-      '1',
-      '100',
-    ]);
+    expect(report.lines).toHaveLength(2);
   });
 
   it('lists a fee it cannot price and computes the trade without it', async () => {
-    // REVIEW FOCUS 2.
+    // An unpriced fee must be listed as a gap, never deducted as zero, and
+    // must not stop the trade itself from being computed.
     await putEvents([
       oldBuy,
       event({
@@ -204,7 +216,8 @@ describe('trade fees reach the gain', () => {
   });
 
   it('does not deduct gas on a transfer to a third party', async () => {
-    // REVIEW FOCUS 1, end to end.
+    // Gas on a send to someone else is not a cost of any sale: the fee
+    // coins are disposed of, but nothing is deducted. End to end.
     await putEvents([
       oldBuy,
       event({

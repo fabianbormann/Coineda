@@ -325,6 +325,8 @@ const matchFifo = (
     // apportioned, so a partially covered disposal carries its share of
     // the fee along with its share of the sale.
     const costs = costsOf(event);
+    // A fee larger than the sale leaves `netValue` negative: that is a
+    // loss on this disposal, and it prints as one.
     const netValue = subtractAmounts(event.value, costs);
     const fullyMatched = compareAmounts(amountMatched, event.amount) === 0;
     const proceeds = fullyMatched
@@ -441,6 +443,8 @@ const matchMovingAverage = (
     pool.cost = subtractAmounts(pool.cost, costBasis);
 
     const costs = costsOf(event);
+    // A fee larger than the sale leaves `netValue` negative: that is a
+    // loss on this disposal, and it prints as one.
     const netValue = subtractAmounts(event.value, costs);
     const fullyMatched = compareAmounts(disposedAmount, event.amount) === 0;
     const proceeds = fullyMatched

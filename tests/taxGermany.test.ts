@@ -256,7 +256,8 @@ describe('german classification', () => {
   });
 
   it('leaves a fee on a transfer as a plain disposal with nothing attached', () => {
-    // REVIEW FOCUS 1. A send to a third party is not a sale, so there is
+    // Guards that gas is never attached as a cost to a transfer. A send to
+    // a third party is not a sale, so there is
     // nothing to deduct the gas from. The fee coins still left.
     const events = germanTax.classify(
       trade(

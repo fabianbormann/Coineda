@@ -61,6 +61,26 @@ const sampleEvents: LedgerEvent[] = [
       },
     ],
   },
+  {
+    // A pool LEADER reward, so a module that attaches a note to one (as
+    // Germany does) has that note reach the key-coverage check below.
+    id: 'e3',
+    sourceId: 's1',
+    externalId: 'x3',
+    timestamp: Date.UTC(2024, 7, 1),
+    kind: 'reward',
+    origin: 'derived',
+    raw: { type: 'leader' },
+    legs: [
+      {
+        assetId: 'cardano:lovelace',
+        amount: '7',
+        direction: 'in',
+        venue: 'stake1',
+        role: 'principal',
+      },
+    ],
+  },
 ];
 
 /**
@@ -167,6 +187,19 @@ describe.each(taxRegistry.map((m) => [m.manifest.id, m] as const))(
       for (const key of keys) {
         expect(en[key], `missing from en.json: ${key}`).toBeDefined();
         expect(de[key], `missing from de.json: ${key}`).toBeDefined();
+      }
+
+      // A tax event's `note` is printed on the income row through `t()`,
+      // so it is a key too, and an untranslated one prints in English on
+      // a German report.
+      const notes = sampleEvents
+        .flatMap((event) => module.classify(event))
+        .flatMap((taxEvent) =>
+          taxEvent.note === undefined ? [] : [taxEvent.note],
+        );
+      for (const note of notes) {
+        expect(en[note], `missing from en.json: ${note}`).toBeDefined();
+        expect(de[note], `missing from de.json: ${note}`).toBeDefined();
       }
     });
 

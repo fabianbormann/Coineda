@@ -633,7 +633,8 @@ describe('transaction costs', () => {
   });
 
   it('apportions costs to the matched part of a partial disposal', () => {
-    // REVIEW FOCUS 3. Only 6 of the 10 sold have a lot. Both the proceeds
+    // Guards that costs are apportioned like proceeds on a shortfall.
+    // Only 6 of the 10 sold have a lot. Both the proceeds
     // and the costs follow the 6, so the matched line is internally
     // consistent and the shortfall of 4 reports as before.
     const { matched, shortfalls } = match(

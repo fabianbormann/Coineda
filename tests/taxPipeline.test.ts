@@ -965,7 +965,8 @@ describe('income on the report', () => {
   });
 
   it('leaves an unpriced income event out of the rows and in the unresolved list', async () => {
-    // REVIEW FOCUS 5.
+    // An income event with no price is a gap to list, never a row valued
+    // at zero that quietly lowers the income total.
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => new Response('', { status: 404 })),
@@ -986,6 +987,7 @@ describe('income on the report', () => {
     });
 
     expect(report.income).toEqual([]);
+    expect(report.totals.income).toBe('0');
     const gap = report.unresolved.find(
       (item) => item.sourceEventId === 'r-unpriced:0',
     );
