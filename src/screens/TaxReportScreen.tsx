@@ -922,7 +922,7 @@ export const TaxReportScreen = () => {
                       {assessment.method.transferResiduals > 0 && (
                         <p className="text-muted-foreground">
                           {t(
-                            '{{count}} network fees on transfers between your own wallets were treated as disposals of the fee coins and not deducted.',
+                            '{{count}} network fee on a transfer between your own wallets was treated as a disposal of the fee coins and not deducted.',
                             { count: assessment.method.transferResiduals },
                           )}
                         </p>

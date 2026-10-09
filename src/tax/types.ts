@@ -392,7 +392,9 @@ export type ReportMethod = {
    *  classification rather than reported as sales. */
   internalTransfersNetted: number;
   /** Network fees on transfers between the user's own venues, each
-   *  treated as a disposal of the fee coins and not deducted. */
+   *  treated as a disposal of the fee coins and not deducted: the residual
+   *  events whose legs go OUT. A residual acquisition (more arrived than a
+   *  link carried) is not one of those and is not counted here. */
   transferResiduals: number;
 };
 

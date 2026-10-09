@@ -437,7 +437,11 @@ export const runTaxReport = async (
     appVersion: APP_VERSION,
     eventsConsidered: survivors.length,
     internalTransfersNetted: allEvents.length - survivors.length,
-    transferResiduals: residuals.length,
+    // Only the disposals: the sentence this count feeds describes fee
+    // coins treated as disposals, and a residual `in` event is not one.
+    transferResiduals: residuals.filter((event) =>
+      event.legs.some((leg) => leg.direction === 'out'),
+    ).length,
   };
 
   return {

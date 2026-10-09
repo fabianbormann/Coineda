@@ -985,6 +985,122 @@ describe('the coins that left but never arrived', () => {
     ]);
   });
 
+  it('disposes of a second asset the linked sender paid to a third party in the same transaction', async () => {
+    // Spec case (d). One hash: bitpanda sends BTC to the user's own wallet
+    // (linked) AND ADA to somebody else (no receiving event). The ADA left
+    // the user's control exactly like a payment, so it is a disposal at the
+    // sender - carried in the same residual event as the BTC network fee.
+    await putEvents([
+      buyAt('bitpanda', '50000000'),
+      {
+        id: 'buy-ada',
+        sourceId: 'src',
+        externalId: 'buy-ada',
+        timestamp: Date.UTC(2025, 0, 10),
+        kind: 'trade',
+        origin: 'derived',
+        legs: [
+          {
+            assetId: 'cardano:lovelace',
+            amount: '1000000',
+            direction: 'in',
+            venue: 'bitpanda',
+            role: 'principal',
+          },
+          {
+            assetId: 'fiat:eur',
+            amount: '1',
+            direction: 'out',
+            venue: 'bitpanda',
+            role: 'principal',
+          },
+        ],
+      },
+      event({
+        id: 'withdraw',
+        sourceId: 'bitpanda',
+        externalId: 'withdraw',
+        txHash: HASH4,
+        timestamp: Date.UTC(2025, 1, 1),
+        legs: [
+          leg('out', 'bitpanda', '49995000'),
+          leg('out', 'bitpanda', '5000', 'fee'),
+          {
+            assetId: 'cardano:lovelace',
+            amount: '1000000',
+            direction: 'out',
+            venue: 'bitpanda',
+            role: 'principal',
+          },
+        ],
+      }),
+      event({
+        id: 'arrive',
+        sourceId: 'bitcoin',
+        externalId: 'arrive',
+        txHash: HASH4,
+        timestamp: Date.UTC(2025, 1, 1, 1),
+        legs: [leg('in', 'bc1qwallet', '49995000')],
+      }),
+    ]);
+
+    const report = await run();
+
+    expect(
+      report.lines
+        .filter((line) => line.disposalEventId === 'withdraw:residual-out')
+        .map((line) => [line.assetId, line.amount, line.venue])
+        .sort(),
+    ).toEqual([
+      [BTC, '5000', 'bitpanda'],
+      ['cardano:lovelace', '1000000', 'bitpanda'],
+    ]);
+    expect(report.method.transferResiduals).toBe(1);
+    expect(report.unresolved).toEqual([]);
+  });
+
+  it('counts only the residuals that are disposals on the method sheet', async () => {
+    // A linked receipt that also brought in an asset nothing in the hash
+    // sent: that comes back as a residual ACQUISITION, which the method
+    // sheet's sentence - about fee coins treated as disposals - does not
+    // describe and must not count.
+    await putEvents([
+      buyAt('bitpanda', '50000000'),
+      event({
+        id: 'withdraw',
+        sourceId: 'bitpanda',
+        externalId: 'withdraw',
+        txHash: HASH4,
+        timestamp: Date.UTC(2025, 1, 1),
+        legs: [
+          leg('out', 'bitpanda', '49995000'),
+          leg('out', 'bitpanda', '5000', 'fee'),
+        ],
+      }),
+      event({
+        id: 'arrive',
+        sourceId: 'bitcoin',
+        externalId: 'arrive',
+        txHash: HASH4,
+        timestamp: Date.UTC(2025, 1, 1, 1),
+        legs: [
+          leg('in', 'bc1qwallet', '49995000'),
+          {
+            assetId: 'cardano:lovelace',
+            amount: '1000000',
+            direction: 'in',
+            venue: 'bc1qwallet',
+            role: 'principal',
+          },
+        ],
+      }),
+    ]);
+
+    const report = await run();
+
+    expect(report.method.transferResiduals).toBe(1);
+  });
+
   it('keeps the residuals of two events in one hash apart, under ids that cannot collide', () => {
     // Pure, on the helper. One hash in which wallet A sends BTC to wallet B
     // and receives a token from it: A is the sender of one link and the

@@ -128,7 +128,10 @@ export const importFile = async (
 
   // Before the write, not after: the grouped event and the per-row events
   // it replaces share a source but not an identity, so an upsert alone
-  // would keep both and count the trade twice.
+  // would keep both and count the trade twice. The delete and the write are
+  // not one transaction: a failure between them leaves the superseded rows
+  // gone until the next import of the same file, which re-creates the
+  // grouped events, so the window is self-healing.
   const superseded =
     supersedes.length === 0
       ? 0
