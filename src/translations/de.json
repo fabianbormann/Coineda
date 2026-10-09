@@ -538,6 +538,9 @@
     "Realised P&L": "Realisiertes Ergebnis",
     "Funding": "Funding",
     "Rollover fee": "Rollover-Gebühr",
-    "Commission": "Kommission"
+    "Commission": "Kommission",
+    "Gain to declare (before loss carry-forward)": "Zu erklärender Gewinn (vor Verlustvortrag)",
+    "Taxable gain after carry-forward (estimate)": "Steuerpflichtiger Gewinn nach Verlustvortrag (Schätzung)",
+    "The Finanzamt applies the carry-forward it has recorded; declare the gain before it.": "Das Finanzamt rechnet den festgestellten Verlustvortrag selbst an; erkläre den Gewinn davor."
   }
 }

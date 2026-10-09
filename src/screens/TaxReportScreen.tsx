@@ -75,6 +75,11 @@ type RunRequest = {
 /** Decimal point only: `1.000,50` must be rejected, not silently misread. */
 const CARRY_AMOUNT = /^\d+(\.\d+)?$/;
 
+/** Printed under a figure a carry-forward has reduced: the return takes the
+ *  figure before it. Shared by the Result and derivatives cards. */
+const CARRY_APPLIED_BY_FINANZAMT =
+  'The Finanzamt applies the carry-forward it has recorded; declare the gain before it.';
+
 const DEFAULT_CURRENCY = 'eur';
 
 /** Translated wrapper text per UnresolvedItem.kind, so the raw `reason`
@@ -1127,8 +1132,34 @@ export const TaxReportScreen = () => {
                 <h3 className="text-sm font-semibold">{t('Result')}</h3>
                 <Card>
                   <CardContent className="flex flex-col gap-2">
+                    {/* With a carry-forward the return still takes the
+                        year's own gain - the Finanzamt deducts the carry it
+                        has recorded itself - so that figure comes first and
+                        the reduced one is labelled as the estimate it is.
+                        `thresholds[0]` is the §23 Freigrenze test, whose
+                        `actual` is the year's gain before any carry. */}
+                    {assessment.carryForward?.privateSales &&
+                      assessment.thresholds[0] && (
+                        <p data-testid="gain-before-carry">
+                          <span className="font-medium">
+                            {t('Gain to declare (before loss carry-forward)')}
+                            :{' '}
+                          </span>
+                          <Money
+                            value={Number(assessment.thresholds[0].actual)}
+                            currency={baseCurrency}
+                          />
+                        </p>
+                      )}
                     <p>
-                      <span className="font-medium">{t('Taxable gain')}: </span>
+                      <span className="font-medium">
+                        {t(
+                          assessment.carryForward?.privateSales
+                            ? 'Taxable gain after carry-forward (estimate)'
+                            : 'Taxable gain',
+                        )}
+                        :{' '}
+                      </span>
                       <Money
                         value={Number(assessment.totals.taxableGain)}
                         currency={baseCurrency}
@@ -1146,6 +1177,11 @@ export const TaxReportScreen = () => {
                         </span>
                       )}
                     </p>
+                    {assessment.carryForward?.privateSales && (
+                      <p className="text-sm text-muted-foreground">
+                        {t(CARRY_APPLIED_BY_FINANZAMT)}
+                      </p>
+                    )}
                     {assessment.carryForward?.privateSales && (
                       <p data-testid="carry-forward-private">
                         {t(
@@ -1347,6 +1383,11 @@ export const TaxReportScreen = () => {
                             />
                           </p>
                         ))}
+                        {assessment.capitalResult.carryForwardUsed !== '0' && (
+                          <p className="text-muted-foreground">
+                            {t(CARRY_APPLIED_BY_FINANZAMT)}
+                          </p>
+                        )}
                         {!isZeroAmount(
                           assessment.capitalResult.notDeducted,
                         ) && (

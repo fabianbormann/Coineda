@@ -1771,6 +1771,53 @@ describe('the derivatives section', () => {
     );
   });
 
+  it('notes under the taxable line that the Finanzamt applies a §20 carry-forward', async () => {
+    const base = capitalModule(true);
+    taxRegistry.push({
+      ...base,
+      assess: (input) => {
+        const result = base.assess(input);
+        return {
+          ...result,
+          capital: {
+            ...result.capital!,
+            gains: '1500',
+            losses: '0',
+            net: '1500',
+            carryForwardUsed: '600',
+          },
+          carryForward: {
+            capital: { declared: '600', used: '600', remaining: '0' },
+          },
+        };
+      },
+    });
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+
+    const section = await screen.findByTestId('capital');
+    expect(
+      within(section).getByText(
+        /the finanzamt applies the carry-forward it has recorded; declare the gain before it\./i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('prints no carry-forward note in the derivatives card without one', async () => {
+    taxRegistry.push(capitalModule(true));
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+
+    const section = await screen.findByTestId('capital');
+    expect(
+      within(section).queryByText(/declare the gain before it/i),
+    ).toBeNull();
+  });
+
   it('renders no such section when the assessment has no capital', async () => {
     taxRegistry.push(capitalModule(false));
     await putEvents([acquisitionEvent, disposalEvent]);
@@ -1970,5 +2017,33 @@ describe('the loss carry-forward inputs', () => {
     expect(line).toHaveTextContent(/used/i);
     expect(line).toHaveTextContent(/€0\.00 remaining/);
     expect(screen.getAllByText(/1,500\.00/).length).toBeGreaterThan(0);
+
+    // The return takes the year's own gain; the reduced figure is labelled
+    // as the estimate it is, with the reason underneath.
+    const before = screen.getByTestId('gain-before-carry');
+    expect(before).toHaveTextContent(
+      /gain to declare \(before loss carry-forward\)/i,
+    );
+    expect(before).toHaveTextContent(/2,000\.00/);
+    expect(
+      screen.getByText(/taxable gain after carry-forward \(estimate\)/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /the finanzamt applies the carry-forward it has recorded; declare the gain before it\./i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('leaves the Result card unchanged without a carry-forward', async () => {
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+    renderScreen();
+    await runReport('2025');
+
+    expect(screen.getByText(/^taxable gain/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('gain-before-carry')).toBeNull();
+    expect(screen.queryByText(/after carry-forward/i)).toBeNull();
+    expect(screen.queryByText(/declare the gain before it/i)).toBeNull();
   });
 });
