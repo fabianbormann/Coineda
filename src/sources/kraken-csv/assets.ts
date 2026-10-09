@@ -1,7 +1,7 @@
 import Big from 'big.js';
 import { normaliseAmount } from '@/ledger/amount';
 import { isFiatAsset } from '@/ledger/balances';
-import { ASSET_DECIMALS } from '@/prices/scale';
+import { ASSET_DECIMALS, USDC_ASSET_ID, USDT_ASSET_ID } from '@/prices/scale';
 
 /**
  * Kraken's asset codes to Coineda asset ids.
@@ -33,6 +33,8 @@ export const KRAKEN_ASSETS: Record<string, string> = {
   XETH: 'eth:native',
   ETH: 'eth:native',
   ADA: 'cardano:lovelace',
+  USDT: USDT_ASSET_ID,
+  USDC: USDC_ASSET_ID,
   ZEUR: 'fiat:eur',
   EUR: 'fiat:eur',
   // The other fiat currencies Kraken trades against that the ECB also

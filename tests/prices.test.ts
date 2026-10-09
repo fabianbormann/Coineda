@@ -15,6 +15,18 @@ beforeEach(async () => {
   vi.unstubAllGlobals();
 });
 
+describe('stablecoin price ids', () => {
+  it('maps USDT and USDC to CoinGecko ids, and so to DefiLlama coins', async () => {
+    const { COINGECKO_IDS } = await import('@/prices/coingecko');
+    const { defillamaCoin } = await import('@/prices/defillama');
+    const usdt = 'eth:0xdac17f958d2ee523a2206206994597c13d831ec7';
+    const usdc = 'eth:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48';
+    expect(COINGECKO_IDS[usdt]).toBe('tether');
+    expect(COINGECKO_IDS[usdc]).toBe('usd-coin');
+    expect(defillamaCoin(usdt)).toBe('coingecko:tether');
+  });
+});
+
 describe('the price cache', () => {
   it('keys on currency, so switching base currency does not reuse the old number', async () => {
     await putCachedPrice(

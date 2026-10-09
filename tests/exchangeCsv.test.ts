@@ -4,7 +4,7 @@ import path from 'node:path';
 import Big from 'big.js';
 import binanceCsv from '@/sources/binance-csv';
 import coinbaseCsv from '@/sources/coinbase-csv';
-import { parseBinanceTime } from '@/sources/binance-csv/parse';
+import { BINANCE_ASSETS, parseBinanceTime } from '@/sources/binance-csv/parse';
 import { findHeaderRow } from '@/sources/coinbase-csv/parse';
 import { readCsvRows } from '@/sources/csv/readCsv';
 import { detectFileModule } from '@/sources/csv/registry';
@@ -293,18 +293,16 @@ describe('Coinbase', () => {
 
 describe('Binance futures rows', () => {
   const header = 'User_ID,UTC_Time,Account,Operation,Coin,Change,Remark';
-  // BTC stands in for the settlement asset: the asset table has no USDT,
-  // and the parser skips an asset it cannot scale.
   const csvOf = (...lines: string[]): string => [header, ...lines].join('\n');
   const futures = 'USDⓈ-M Futures';
 
   it('maps realized pnl, funding and futures commission', () => {
     const { events } = binanceCsv.parse(
       csvOf(
-        `1,2025-03-10 10:00:00,${futures},Realized Profit and Loss,BTC,12.5,`,
-        `1,2025-03-10 11:00:00,${futures},Funding Fee,BTC,-0.3,`,
-        `1,2025-03-10 12:00:00,${futures},Funding Fee,BTC,0.2,`,
-        `1,2025-03-10 13:00:00,${futures},Commission,BTC,-0.05,`,
+        `1,2025-03-10 10:00:00,${futures},Realized Profit and Loss,USDT,12.5,`,
+        `1,2025-03-10 11:00:00,${futures},Funding Fee,USDT,-0.3,`,
+        `1,2025-03-10 12:00:00,${futures},Funding Fee,USDT,0.2,`,
+        `1,2025-03-10 13:00:00,${futures},Commission,USDT,-0.05,`,
       ),
     );
     expect(events.map((e) => e.kind)).toEqual([
@@ -343,8 +341,8 @@ describe('Binance futures rows', () => {
     const at = '2025-03-10 10:00:00';
     const { events } = binanceCsv.parse(
       csvOf(
-        `1,${at},Spot,Transfer Between Main and Futures Wallet,BTC,-100,`,
-        `1,${at},${futures},Transfer Between Main and Futures Wallet,BTC,100,`,
+        `1,${at},Spot,Transfer Between Main and Futures Wallet,USDT,-100,`,
+        `1,${at},${futures},Transfer Between Main and Futures Wallet,USDT,100,`,
       ),
     );
     expect(events).toHaveLength(1);
@@ -358,11 +356,28 @@ describe('Binance futures rows', () => {
   it('keeps a lone wallet-transfer row as a per-row transfer', () => {
     const { events } = binanceCsv.parse(
       csvOf(
-        `1,2025-03-10 10:00:00,Spot,Transfer Between Main and Futures Wallet,BTC,-100,`,
+        `1,2025-03-10 10:00:00,Spot,Transfer Between Main and Futures Wallet,USDT,-100,`,
       ),
     );
     expect(events).toHaveLength(1);
     expect(events[0].kind).toBe('transfer');
     expect(events[0].legs).toHaveLength(1);
+  });
+});
+
+describe('Binance stablecoins', () => {
+  it('maps USDT and USDC to their ERC-20 ids and scales by 6 decimals', () => {
+    expect(BINANCE_ASSETS['USDT']).toBe(
+      'eth:0xdac17f958d2ee523a2206206994597c13d831ec7',
+    );
+    expect(BINANCE_ASSETS['USDC']).toBe(
+      'eth:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
+    );
+    const { events } = binanceCsv.parse(
+      'User_ID,UTC_Time,Account,Operation,Coin,Change,Remark\n' +
+        '1,2025-03-10 10:00:00,USDⓈ-M Futures,Realized Profit and Loss,USDT,12.5,',
+    );
+    expect(events[0].legs[0].assetId).toBe(BINANCE_ASSETS['USDT']);
+    expect(events[0].legs[0].amount).toBe('12500000');
   });
 });

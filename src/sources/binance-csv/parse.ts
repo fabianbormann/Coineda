@@ -1,6 +1,7 @@
 import Big from 'big.js';
 import { readCsv, type CsvRow } from '@/sources/csv/readCsv';
 import { makeSkipLog, toBaseUnits } from '@/sources/csv/ledgerShape';
+import { USDC_ASSET_ID, USDT_ASSET_ID } from '@/prices/scale';
 import type { ParseResult } from '@/sources/csv/types';
 import type { DerivedEvent } from '@/sources/types';
 import type {
@@ -32,11 +33,13 @@ import type {
  */
 const REQUIRED = ['utc_time', 'operation', 'coin', 'change'] as const;
 
-const BINANCE_ASSETS: Record<string, string> = {
+export const BINANCE_ASSETS: Record<string, string> = {
   BTC: 'bitcoin:native',
   ETH: 'eth:native',
   ADA: 'cardano:lovelace',
   EUR: 'fiat:eur',
+  USDT: USDT_ASSET_ID,
+  USDC: USDC_ASSET_ID,
 };
 
 /**

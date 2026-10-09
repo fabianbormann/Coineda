@@ -57,6 +57,9 @@ import { normaliseAmount } from '@/ledger/amount';
 export const NIGHT_ASSET_ID =
   'cardano:0691b2fecca1ac4f53cb6dfb00b7013e561d1f34403b957cbb5af1fa4e49474854';
 
+export const USDT_ASSET_ID = 'eth:0xdac17f958d2ee523a2206206994597c13d831ec7';
+export const USDC_ASSET_ID = 'eth:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48';
+
 export const ASSET_DECIMALS: Record<string, number> = {
   'cardano:lovelace': 6,
   'bitcoin:native': 8,
@@ -65,6 +68,10 @@ export const ASSET_DECIMALS: Record<string, number> = {
   // detail_platforms for the Cardano platform. Bitpanda reports it in whole
   // NIGHT, so `baseUnits` scales by this on the way in.
   [NIGHT_ASSET_ID]: 6,
+  // USDT and USDC as ERC-20 tokens, both 6 decimals, so an exchange export's
+  // `12.5` matches an on-chain holding of the same token.
+  [USDT_ASSET_ID]: 6,
+  [USDC_ASSET_ID]: 6,
 };
 
 export const decimalsOf = (assetId: string): number =>
