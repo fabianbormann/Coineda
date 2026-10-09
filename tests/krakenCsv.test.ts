@@ -181,11 +181,48 @@ describe('detecting the format', () => {
 describe('parsing the ledger', () => {
   const parsed = () => krakenCsv.parse(LEDGER);
 
-  it('emits one event per readable row', () => {
+  it('emits one event per readable row, and one per trade', () => {
     // Nine rows: two are skipped (an asset with no id, a type with no
-    // mapping), leaving seven.
+    // mapping), leaving seven - and the two rows of the one trade share a
+    // refid and become one event, leaving six.
     const { events } = parsed();
-    expect(events).toHaveLength(7);
+    expect(events).toHaveLength(6);
+  });
+
+  it('groups the rows of a trade by refid, with the fee on the quote row', () => {
+    // Kraken charges the fee on the quote-currency row. Emitted alone, that
+    // row is a euro-only event with no crypto leg to carry the cost, and
+    // the fee never reaches the gain.
+    const { events } = parsed();
+    const trade = events.find(
+      (event) => event.externalId === 'TY5BOV-TMAVF-E6SKCH',
+    );
+    expect(trade?.kind).toBe('trade');
+    expect(trade?.timestamp).toBe(Date.UTC(2024, 2, 11, 9, 5));
+    expect(trade?.note).toBe('Kraken trade TY5BOV-TMAVF-E6SKCH');
+    expect(trade?.legs).toEqual([
+      {
+        assetId: 'fiat:eur',
+        amount: '500',
+        direction: 'out',
+        venue: 'spot / main',
+        role: 'principal',
+      },
+      {
+        assetId: 'bitcoin:native',
+        amount: '1000000',
+        direction: 'in',
+        venue: 'spot / main',
+        role: 'principal',
+      },
+      {
+        assetId: 'fiat:eur',
+        amount: '1.3',
+        direction: 'out',
+        venue: 'spot / main',
+        role: 'fee',
+      },
+    ]);
   });
 
   it('charges the fee as its own leg', () => {
@@ -214,16 +251,15 @@ describe('parsing the ledger', () => {
 
   it('reads Kraken’s sign as the direction', () => {
     const { events } = parsed();
-    const spent = events.find((event) => event.externalId.startsWith('LTFMCX'));
-    expect(spent?.legs[0]).toMatchObject({
+    const trade = events.find(
+      (event) => event.externalId === 'TY5BOV-TMAVF-E6SKCH',
+    );
+    expect(trade?.legs[0]).toMatchObject({
       assetId: 'fiat:eur',
       amount: '500',
       direction: 'out',
     });
-    const received = events.find((event) =>
-      event.externalId.startsWith('LPCNTQ'),
-    );
-    expect(received?.legs[0]).toMatchObject({
+    expect(trade?.legs[1]).toMatchObject({
       assetId: 'bitcoin:native',
       amount: '1000000',
       direction: 'in',
@@ -247,8 +283,8 @@ describe('parsing the ledger', () => {
 
   it('gives every event an id that survives a re-import', () => {
     // A longer export re-imported must converge rather than duplicate, and
-    // events upsert on (sourceId, externalId). refid alone would have one
-    // side of a trade overwrite the other: both rows share it.
+    // events upsert on (sourceId, externalId). A trade's rows are one
+    // event keyed by the bare refid; every other row by its txid.
     const { events } = parsed();
     const ids = events.map((event) => event.externalId);
     expect(new Set(ids).size).toBe(ids.length);
@@ -278,7 +314,7 @@ describe('importing into the ledger', () => {
   it('creates a source and writes what the file held', async () => {
     const outcome = await importFile(LEDGER);
     expect(outcome.module.manifest.id).toBe('kraken-csv');
-    expect(outcome.inserted).toBe(7);
+    expect(outcome.inserted).toBe(6);
     expect(outcome.updated).toBe(0);
 
     const sources = await getSources();
@@ -295,11 +331,11 @@ describe('importing into the ledger', () => {
     const again = await importFile(LEDGER);
 
     expect(again.inserted).toBe(0);
-    expect(again.updated).toBe(7);
+    expect(again.updated).toBe(6);
     expect(await getSources()).toHaveLength(1);
 
     const events = await getAllEvents();
-    expect(events).toHaveLength(7);
+    expect(events).toHaveLength(6);
   });
 
   it('refuses a file it does not recognise, naming nothing it cannot read', async () => {
@@ -321,7 +357,7 @@ describe('importing into the ledger', () => {
     const after = (await getSources()).find((row) => row.id === source.id);
     expect(after?.lastError).toBeUndefined();
     // And it did not delete what the import wrote.
-    expect(await getAllEvents()).toHaveLength(7);
+    expect(await getAllEvents()).toHaveLength(6);
   });
 });
 

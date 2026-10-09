@@ -45,10 +45,14 @@ export const sniff = (text: string): boolean => {
  * Which ledger row types become which kind of event.
  *
  * `trade` covers both sides of a trade - Kraken writes one row per asset,
- * sharing a `refid` - and each row is emitted as its own event rather than
- * being paired up. Pairing would be guessing: the two rows of a trade are
- * already two legs the ledger folds correctly, and a `refid` can group more
- * than two rows (a trade settled across several fills).
+ * sharing a `refid` - and the rows of one refid are GROUPED into a single
+ * event. Kraken charges the fee on the quote-currency row by default, so a
+ * buy's euro row carries `-500 EUR` and a `1.3 EUR` fee while the bitcoin
+ * row carries none. Emitted alone, that euro row is an event with no crypto
+ * leg for a jurisdiction to attach the fee to, and the fee never reaches
+ * the gain. The fee belongs to the trade, so the trade is one event. A
+ * refid settled across several fills simply contributes several legs of
+ * the same asset, which the host nets per asset.
  *
  * `transfer` is Kraken moving an asset between a user's own wallets, spot
  * to staking and back. Both legs sit at venues the user owns, so the fold
@@ -146,9 +150,8 @@ export const parse = (input: string): ParseResult => {
    * Allocation legs, gathered by `refid` so each allocation becomes ONE
    * event.
    *
-   * The deliberate rule everywhere else in this parser is one event per
-   * row, and the comment above says why pairing a trade's rows would be
-   * guessing. This is not that. `isInternalTransfer` nets per asset WITHIN
+   * Outside trades and allocations the rule in this parser is one event
+   * per row. `isInternalTransfer` nets per asset WITHIN
    * an event, so four allocation rows emitted separately each carry a
    * single leg, never net to zero, and the outgoing ones become disposals
    * of dust the user still holds. Grouping is what lets the ledger
@@ -160,6 +163,14 @@ export const parse = (input: string): ParseResult => {
     string,
     { timestamp: number; rawType: string; legs: Leg[] }
   >();
+
+  /**
+   * A trade's legs, gathered by `refid` so each trade becomes ONE event -
+   * see `KINDS` for why. The event is pushed where the refid's first row
+   * sits, so the output keeps the export's order, and filled in as later
+   * rows of the same refid arrive.
+   */
+  const trades = new Map<string, { event: DerivedEvent; fees: Leg[] }>();
 
   rows.forEach((row, index) => {
     const refid = text(row, 'refid');
@@ -174,8 +185,8 @@ export const parse = (input: string): ParseResult => {
     // An id Kraken gave, preferred over a row number: a re-import of a
     // longer export must converge on the same events rather than duplicate
     // them, and events upsert on (sourceId, externalId). `txid` is unique
-    // per ledger row; `refid` groups a trade's rows, so it alone would have
-    // one side of a trade overwrite the other.
+    // per ledger row; a grouped trade or allocation is keyed by its bare
+    // refid instead, below.
     const externalId = txid !== '' ? txid : `${refid}#${index}`;
 
     if (rawType === '') {
@@ -266,6 +277,33 @@ export const parse = (input: string): ParseResult => {
       return;
     }
 
+    // A trade's legs join their refid's group: principals first, then the
+    // fees, whichever row each came from.
+    if (rawType === 'trade' && refid !== '') {
+      const principals = legs.filter((leg) => leg.role !== 'fee');
+      const fees = legs.filter((leg) => leg.role === 'fee');
+      const group = trades.get(refid);
+      if (group) {
+        group.event.legs.push(...principals);
+        group.fees.push(...fees);
+        group.event.timestamp = Math.min(group.event.timestamp, at);
+      } else {
+        const grouped: DerivedEvent = {
+          // The bare refid, which cannot collide with the per-row `txid`
+          // scheme, so a re-import upserts onto the same event.
+          externalId: refid,
+          timestamp: at,
+          kind,
+          origin: 'derived',
+          legs: principals,
+          note: `Kraken trade ${refid}`,
+        };
+        trades.set(refid, { event: grouped, fees });
+        events.push(grouped);
+      }
+      return;
+    }
+
     events.push({
       externalId,
       timestamp: at,
@@ -278,6 +316,10 @@ export const parse = (input: string): ParseResult => {
       note: refid === '' ? undefined : `Kraken ${rawType} ${refid}`,
     });
   });
+
+  for (const { event, fees } of trades.values()) {
+    event.legs.push(...fees);
+  }
 
   for (const [refid, group] of movements) {
     events.push({

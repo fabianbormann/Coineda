@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import krakenCsv from '@/sources/kraken-csv';
 import { openLedger, putEvents } from '@/ledger/db';
 import { runTaxReport } from '@/tax/runTaxReport';
 import germanTax from '@/tax/jurisdictions/de';
@@ -247,5 +250,88 @@ describe('income rows', () => {
       value: '5',
     });
     expect(report.income[0].note).toMatch(/gewerbliche Einkünfte/);
+  });
+});
+
+describe('a real Kraken export', () => {
+  it('deducts the fee Kraken charges on the quote row of a buy', async () => {
+    // Kraken writes a trade as one row per asset and charges the fee on
+    // the euro row. Read row by row, that euro row was an event of its own
+    // with no crypto leg to carry the fee, and the 1.30 EUR never reached
+    // the cost basis. The parser groups a trade's rows, so it does now.
+    //
+    // Bitcoin is priced at 50,000 EUR, so the 0.01 BTC the fixture buys is
+    // worth exactly the 500 EUR paid: the lot's cost basis is 500 + 1.3.
+    vi.stubGlobal('fetch', flatRange(50000));
+    const text = readFileSync(
+      path.join(__dirname, '../src/sources/kraken-csv/fixtures/ledgers.csv'),
+      'utf8',
+    );
+    const { events } = krakenCsv.parse(text);
+    const imported: LedgerEvent[] = events.map((derived, index) => ({
+      ...derived,
+      id: `kraken-${index}`,
+      sourceId: 'kraken',
+    }));
+    // Found by its bitcoin leg, not its id, so this reads the same event
+    // whether the parser groups the trade or not.
+    const buy = imported.find(
+      (row) =>
+        row.kind === 'trade' &&
+        row.legs.some((one) => one.assetId === BTC && one.direction === 'in'),
+    );
+    const wallet = buy?.legs.find((row) => row.assetId === BTC)?.venue;
+    expect(wallet).toBeDefined();
+
+    await putEvents([
+      ...imported,
+      event({
+        id: 'sell',
+        sourceId: 'authored',
+        externalId: 'sell',
+        origin: 'authored',
+        timestamp: Date.UTC(2025, 5, 1),
+        legs: [
+          leg({
+            assetId: BTC,
+            amount: '1000000',
+            direction: 'out',
+            venue: wallet,
+          }),
+          leg({ assetId: EUR, amount: '600', direction: 'in', venue: wallet }),
+        ],
+      }),
+    ]);
+
+    const report = await runGermany(2025);
+
+    // The fixture's 2024 withdrawal took 0.005 BTC plus a 0.00005 BTC fee
+    // out of the lot first, so the sell matches the 0.00495 BTC left:
+    // 0.495 of the 501.3 EUR lot.
+    const sell = report.lines.find((line) => line.disposalEventId === 'sell');
+    expect(sell?.amount).toBe('495000');
+    expect(sell?.costBasis).toBe('248.1435');
+    expect(sell?.consumed).toHaveLength(1);
+    expect(sell?.consumed[0].acquisitionEventId).toBe(buy?.id);
+    expect(sell?.consumed[0].costBasis).toBe('248.1435');
+
+    // Named rather than waved through. The rest of the sell, which that
+    // withdrawal already consumed, has no lot; and the fixture's
+    // spot-to-staking transfer is two per-row events, so its outgoing ADA
+    // row reads as a disposal with no acquisition.
+    const transferOut = imported.find(
+      (row) => row.externalId === 'LSTKNG-A1B2C-D3E4F5',
+    );
+    expect(
+      report.unresolved.map((item) => [
+        item.kind,
+        item.sourceEventId,
+        item.assetId,
+        item.amount,
+      ]),
+    ).toEqual([
+      ['needs-cost-basis', 'sell', BTC, '505000'],
+      ['needs-cost-basis', transferOut?.id, ADA, '500000000'],
+    ]);
   });
 });
