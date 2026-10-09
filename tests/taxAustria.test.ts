@@ -51,6 +51,7 @@ const disposalFrom = (acquiredAt: number, gain: string): MatchedDisposal => ({
   timestamp: Date.UTC(2024, 5, 1),
   costBasis: '0',
   gain,
+  costs: '0',
   consumed: [
     {
       acquisitionEventId: 'pool',

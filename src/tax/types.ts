@@ -95,6 +95,15 @@ export type MatchedDisposal = {
   costBasis: string;
   gain: string;
   /**
+   * The valued costs deducted from `proceeds`, as a positive decimal
+   * string, '0' when there were none. Apportioned to the matched amount
+   * the same way `proceeds` is. Reported, not just applied, so a reader
+   * can reconcile `proceeds` against their exchange's own statement
+   * instead of meeting a figure that disagrees with it by an unexplained
+   * fee.
+   */
+  costs: string;
+  /**
    * The partition key (from `partitionBy`) the disposal was matched within.
    * Needed because moving-average's synthetic lot carries the disposal's
    * own timestamp as its acquiredAt rather than a real acquisition date -
@@ -296,6 +305,8 @@ export type TaxAssessment = {
  * `disposalEventId` instead, where it cannot be skipped.
  */
 export type ReportedDisposal = AssessedDisposal & {
+  /** From the matcher, see MatchedDisposal.costs. */
+  costs: string;
   /** How much of the asset left, in its own units. */
   amount: string;
   /** Which wallet or exchange it left from. */

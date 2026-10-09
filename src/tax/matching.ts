@@ -2,6 +2,7 @@ import Big from 'big.js';
 import {
   addAmounts,
   subtractAmounts,
+  sumAmounts,
   compareAmounts,
   isZeroAmount,
   normaliseAmount,
@@ -39,6 +40,19 @@ const proportion = (
   denominator: string,
 ): string =>
   divide(new Big(total).times(new Big(numerator)).toString(), denominator);
+
+/**
+ * The valued costs attached to an event, summed. A cost without a value is
+ * skipped: resolveValues has already listed it as unpriced, and this is
+ * where "not deducted" is made true - the same choice `matchFifo` makes for
+ * an acquisition with no value, which never becomes a lot of cost zero.
+ */
+const costsOf = (event: TaxEvent): string =>
+  sumAmounts(
+    (event.costs ?? []).flatMap((cost) =>
+      cost.value === undefined ? [] : [cost.value],
+    ),
+  );
 
 type FifoLot = {
   acquisitionEventId: string;
@@ -251,7 +265,9 @@ const matchFifo = (
       lots.push({
         acquisitionEventId: event.sourceEventId,
         amount: event.amount,
-        costBasis: event.value,
+        // Anschaffungsnebenkosten: a buy's fee is part of what the lot
+        // cost, so it comes back out of a later gain.
+        costBasis: addAmounts(event.value, costsOf(event)),
         acquiredAt: event.timestamp,
       });
       continue;
@@ -305,10 +321,15 @@ const matchFifo = (
       (total, lot) => addAmounts(total, lot.costBasis),
       '0',
     );
-    const proceeds =
-      compareAmounts(amountMatched, event.amount) === 0
-        ? event.value
-        : proportion(event.value, amountMatched, event.amount);
+    // Veräußerungskosten come off the proceeds before anything is
+    // apportioned, so a partially covered disposal carries its share of
+    // the fee along with its share of the sale.
+    const costs = costsOf(event);
+    const netValue = subtractAmounts(event.value, costs);
+    const fullyMatched = compareAmounts(amountMatched, event.amount) === 0;
+    const proceeds = fullyMatched
+      ? netValue
+      : proportion(netValue, amountMatched, event.amount);
 
     matched.push({
       disposalEventId: event.sourceEventId,
@@ -320,6 +341,9 @@ const matchFifo = (
       consumed,
       costBasis,
       gain: subtractAmounts(proceeds, costBasis),
+      costs: fullyMatched
+        ? costs
+        : proportion(costs, amountMatched, event.amount),
       partition,
     });
 
@@ -385,7 +409,10 @@ const matchMovingAverage = (
         continue;
       }
       pool.amount = addAmounts(pool.amount, event.amount);
-      pool.cost = addAmounts(pool.cost, event.value);
+      pool.cost = addAmounts(
+        pool.cost,
+        addAmounts(event.value, costsOf(event)),
+      );
       continue;
     }
 
@@ -413,10 +440,12 @@ const matchMovingAverage = (
     pool.amount = subtractAmounts(pool.amount, disposedAmount);
     pool.cost = subtractAmounts(pool.cost, costBasis);
 
-    const proceeds =
-      compareAmounts(disposedAmount, event.amount) === 0
-        ? event.value
-        : proportion(event.value, disposedAmount, event.amount);
+    const costs = costsOf(event);
+    const netValue = subtractAmounts(event.value, costs);
+    const fullyMatched = compareAmounts(disposedAmount, event.amount) === 0;
+    const proceeds = fullyMatched
+      ? netValue
+      : proportion(netValue, disposedAmount, event.amount);
 
     matched.push({
       disposalEventId: event.sourceEventId,
@@ -436,6 +465,9 @@ const matchMovingAverage = (
       ],
       costBasis,
       gain: subtractAmounts(proceeds, costBasis),
+      costs: fullyMatched
+        ? costs
+        : proportion(costs, disposedAmount, event.amount),
       partition,
     });
 

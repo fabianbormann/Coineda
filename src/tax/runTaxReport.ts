@@ -353,6 +353,7 @@ export const runTaxReport = async (
       amount: disposal.amount,
       venue: disposal.venue,
       consumed: disposal.consumed,
+      costs: disposal.costs,
     };
   });
 

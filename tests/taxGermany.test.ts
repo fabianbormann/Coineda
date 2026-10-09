@@ -35,6 +35,7 @@ const disposal = (
         heldDays,
       },
     ],
+    costs: '0',
     ...rest,
   };
 };
@@ -176,6 +177,7 @@ describe('german holding period', () => {
       timestamp: Date.UTC(2024, 5, 1),
       costBasis: '200',
       gain: '800',
+      costs: '0',
       consumed: [
         {
           acquisitionEventId: 'old',
@@ -524,6 +526,7 @@ describe('german holding period runs by calendar date', () => {
     proceeds: '6000',
     costBasis: '1000',
     gain: '5000',
+    costs: '0',
     timestamp: disposedAt,
     consumed: [
       {

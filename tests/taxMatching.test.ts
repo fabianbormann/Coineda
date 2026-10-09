@@ -539,3 +539,160 @@ describe('ordering at an identical timestamp', () => {
     expect(acquisitionFirst.matched).toEqual(disposalFirst.matched);
   });
 });
+
+describe('transaction costs', () => {
+  const eur = (amount: string) => ({
+    assetId: 'fiat:eur',
+    amount,
+    value: amount,
+  });
+
+  it("raises an acquisition's cost basis by its valued costs", () => {
+    const { matched } = match(
+      [
+        event({
+          sourceEventId: 'buy',
+          kind: 'acquisition',
+          amount: '10',
+          value: '100',
+          costs: [eur('2')],
+          timestamp: 1000,
+        }),
+        event({
+          sourceEventId: 'sell',
+          kind: 'disposal',
+          amount: '10',
+          value: '150',
+          timestamp: 2000,
+        }),
+      ],
+      'fifo',
+      pooled,
+    );
+
+    expect(matched[0].costBasis).toBe('102');
+    expect(matched[0].gain).toBe('48');
+    expect(matched[0].costs).toBe('0');
+  });
+
+  it("lowers a disposal's proceeds by its valued costs", () => {
+    const { matched } = match(
+      [
+        event({
+          sourceEventId: 'buy',
+          kind: 'acquisition',
+          amount: '10',
+          value: '100',
+          timestamp: 1000,
+        }),
+        event({
+          sourceEventId: 'sell',
+          kind: 'disposal',
+          amount: '10',
+          value: '150',
+          costs: [eur('3')],
+          timestamp: 2000,
+        }),
+      ],
+      'fifo',
+      pooled,
+    );
+
+    expect(matched[0].proceeds).toBe('147');
+    expect(matched[0].gain).toBe('47');
+    expect(matched[0].costs).toBe('3');
+  });
+
+  it('skips a cost the host could not value', () => {
+    const { matched } = match(
+      [
+        event({
+          sourceEventId: 'buy',
+          kind: 'acquisition',
+          amount: '10',
+          value: '100',
+          timestamp: 1000,
+        }),
+        event({
+          sourceEventId: 'sell',
+          kind: 'disposal',
+          amount: '10',
+          value: '150',
+          costs: [{ assetId: 'cardano:deadbeef.NoSuchToken', amount: '7' }],
+          timestamp: 2000,
+        }),
+      ],
+      'fifo',
+      pooled,
+    );
+
+    // Not deducted, and reported as not deducted: `costs` is what came
+    // off the proceeds, which is nothing.
+    expect(matched[0].proceeds).toBe('150');
+    expect(matched[0].costs).toBe('0');
+  });
+
+  it('apportions costs to the matched part of a partial disposal', () => {
+    // REVIEW FOCUS 3. Only 6 of the 10 sold have a lot. Both the proceeds
+    // and the costs follow the 6, so the matched line is internally
+    // consistent and the shortfall of 4 reports as before.
+    const { matched, shortfalls } = match(
+      [
+        event({
+          sourceEventId: 'buy',
+          kind: 'acquisition',
+          amount: '6',
+          value: '60',
+          timestamp: 1000,
+        }),
+        event({
+          sourceEventId: 'sell',
+          kind: 'disposal',
+          amount: '10',
+          value: '150',
+          costs: [eur('5')],
+          timestamp: 2000,
+        }),
+      ],
+      'fifo',
+      pooled,
+    );
+
+    expect(matched[0].amount).toBe('6');
+    // (150 - 5) * 6 / 10
+    expect(matched[0].proceeds).toBe('87');
+    expect(matched[0].costs).toBe('3');
+    expect(shortfalls).toHaveLength(1);
+    expect(shortfalls[0].amount).toBe('4');
+  });
+
+  it('applies costs in the averaged pool as well', () => {
+    const { matched } = match(
+      [
+        event({
+          sourceEventId: 'buy',
+          kind: 'acquisition',
+          amount: '10',
+          value: '100',
+          costs: [eur('2')],
+          timestamp: 1000,
+        }),
+        event({
+          sourceEventId: 'sell',
+          kind: 'disposal',
+          amount: '10',
+          value: '150',
+          costs: [eur('3')],
+          timestamp: 2000,
+        }),
+      ],
+      'moving-average',
+      pooled,
+    );
+
+    expect(matched[0].costBasis).toBe('102');
+    expect(matched[0].proceeds).toBe('147');
+    expect(matched[0].gain).toBe('45');
+    expect(matched[0].costs).toBe('3');
+  });
+});
