@@ -10,7 +10,8 @@ import {
 } from '@/ledger/amount';
 import { isFiatAsset } from '@/ledger/balances';
 import { fiatConsiderationOf } from '@/tax/consideration';
-import type { Leg, LedgerEvent } from '@/ledger/types';
+import { rewardKindOf } from '@/tax/rewardKinds';
+import type { Leg, LedgerEvent, RewardKind } from '@/ledger/types';
 import type {
   AssessedDisposal,
   AssessInput,
@@ -86,31 +87,23 @@ const LIABILITY_NOTE =
 const STAKING_INCOME_THRESHOLD_LABEL =
   'Tax-free threshold for staking income (§22 Nr. 3 EStG)';
 
-/**
- * Leader rewards are likely gewerbliche Einkünfte rather than §22 Nr. 3
- * sonstige Einkünfte, which this module does not model. Rather than silently
- * folding a leader reward into the wrong category, classify() tags it with
- * this note so a reader (or their accountant) knows the figure needs a
- * second look.
- */
-const LEADER_REWARD_UNCERTAIN_NOTE =
-  'Leader rewards may be gewerbliche Einkünfte rather than §22 Nr. 3 income. This classification is uncertain, so confirm it yourself before relying on it.';
+const BUSINESS_INCOME_NOTE =
+  'This reward may be gewerbliche Einkünfte rather than §22 Nr. 3 income. This classification is uncertain, so confirm it yourself before relying on it.';
+const AIRDROP_NOTE =
+  'Treated as received for a counter-performance (§22 Nr. 3 income at the value on receipt). An airdrop received for nothing is instead an acquisition at zero with no income; confirm which applies.';
+const OTHER_REWARD_NOTE =
+  'The source did not say what kind of reward this was, so it is treated as §22 Nr. 3 income at the value on receipt.';
 
-/** A staking provider record, carried in `raw` by the Cardano sources. Only
- *  `type` matters here: 'member' is plain §22 Nr. 3 income, 'leader' is the
- *  uncertain gewerbliche-Einkünfte case, and its absence (on a reward with no
- *  note identifying it as staking either) is an airdrop. */
-type StakingRewardRaw = {
-  epoch?: number;
-  /** The provider sends this as a JSON NUMBER, unlike the utxo endpoints'
-   *  strings, and `raw` is that payload verbatim - so this cannot claim to
-   *  be a string. Nothing here reads it (the amount a calculation uses is
-   *  the leg's own decimal string), but a typed claim that an amount is a
-   *  string when it is not is exactly the mistake this subsystem's first
-   *  invariant exists to prevent. See amountString in
-   *  src/sources/cardano/translator.ts. */
-  amount?: number | string;
-  type?: 'member' | 'leader';
+/** Exhaustive: a kind with no entry is deliberately noteless. */
+const REWARD_NOTES: Record<Exclude<RewardKind, 'fork'>, string | undefined> = {
+  staking: undefined,
+  lending: undefined,
+  liquidity: undefined,
+  leader: BUSINESS_INCOME_NOTE,
+  mining: BUSINESS_INCOME_NOTE,
+  masternode: BUSINESS_INCOME_NOTE,
+  airdrop: AIRDROP_NOTE,
+  other: OTHER_REWARD_NOTE,
 };
 
 /** A leg becomes a disposal (out) or acquisition (in) - unless it is fiat,
@@ -198,34 +191,20 @@ const classifyTrade = (event: LedgerEvent): TaxEvent[] => {
 };
 
 const classifyReward = (event: LedgerEvent): TaxEvent[] => {
-  const leg = event.legs[0];
+  // The reward's own leg: the principal that arrived. A fee leg on the
+  // same event is not the reward.
+  const leg = event.legs.find(
+    (one) => one.role === 'principal' && one.direction === 'in',
+  );
   if (!leg) {
     return [];
   }
-
-  const rawType = (event.raw as StakingRewardRaw | undefined)?.type;
-  const noteIdentifiesStaking = /staking/i.test(event.note ?? '');
-
-  if (rawType === undefined && !noteIdentifiesStaking) {
-    // An airdrop. Its tax treatment is unresolved, so this returns nothing
-    // rather than guessing - the host records it as an unclassified,
-    // unresolved item, which is how "not computed, with a stated reason" is
-    // represented without inventing a number.
+  const kind = rewardKindOf(event);
+  if (kind === undefined) {
+    // Nothing the source or the legacy signals can name: unclassified, so
+    // the host lists it rather than this guessing.
     return [];
   }
-
-  // The value at receipt is taxed as income under §22 Nr. 3 AND becomes the
-  // coins' cost basis for whatever disposes of them later - both events are
-  // emitted from the same leg, valued identically by the host.
-  const income: TaxEvent = {
-    sourceEventId: event.id,
-    kind: 'income',
-    assetId: leg.assetId,
-    amount: leg.amount,
-    timestamp: event.timestamp,
-    venue: leg.venue,
-    note: rawType === 'leader' ? LEADER_REWARD_UNCERTAIN_NOTE : undefined,
-  };
 
   const acquisition: TaxEvent = {
     sourceEventId: event.id,
@@ -236,6 +215,26 @@ const classifyReward = (event: LedgerEvent): TaxEvent[] => {
     venue: leg.venue,
   };
 
+  if (kind === 'fork') {
+    // BMF 06.03.2025: coins from a hard fork have no acquisition cost. The
+    // letter carries the ORIGINAL lot's acquisition date over; the ledger
+    // cannot link a fork to its parent lot yet, so the fork date is used,
+    // which is the shorter holding period and so the conservative side.
+    return [
+      { ...acquisition, consideration: { assetId: leg.assetId, amount: '0' } },
+    ];
+  }
+
+  const note = REWARD_NOTES[kind];
+  const income: TaxEvent = {
+    sourceEventId: event.id,
+    kind: 'income',
+    assetId: leg.assetId,
+    amount: leg.amount,
+    timestamp: event.timestamp,
+    venue: leg.venue,
+    ...(note === undefined ? {} : { note }),
+  };
   return [income, acquisition];
 };
 

@@ -86,6 +86,46 @@ const sampleEvents: LedgerEvent[] = [
       },
     ],
   },
+  {
+    // A airdrop reward, so the note Germany attaches to it reaches the
+    // key-coverage check.
+    id: 'e4',
+    sourceId: 's1',
+    externalId: 'x4',
+    timestamp: Date.UTC(2024, 8, 1),
+    kind: 'reward',
+    origin: 'derived',
+    rewardKind: 'airdrop',
+    legs: [
+      {
+        assetId: 'cardano:lovelace',
+        amount: '3',
+        direction: 'in',
+        venue: 'stake1',
+        role: 'principal',
+      },
+    ],
+  },
+  {
+    // A other reward, so the note Germany attaches to it reaches the
+    // key-coverage check.
+    id: 'e5',
+    sourceId: 's1',
+    externalId: 'x5',
+    timestamp: Date.UTC(2024, 9, 1),
+    kind: 'reward',
+    origin: 'derived',
+    rewardKind: 'other',
+    legs: [
+      {
+        assetId: 'cardano:lovelace',
+        amount: '3',
+        direction: 'in',
+        venue: 'stake1',
+        role: 'principal',
+      },
+    ],
+  },
 ];
 
 /**

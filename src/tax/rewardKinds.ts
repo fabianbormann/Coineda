@@ -1,4 +1,4 @@
-import type { RewardKind } from '@/ledger/types';
+import type { LedgerEvent, RewardKind } from '@/ledger/types';
 
 /** Translation keys, one per kind, printed at the head of an income row. */
 export const REWARD_KIND_LABELS: Record<RewardKind, string> = {
@@ -12,3 +12,22 @@ export const REWARD_KIND_LABELS: Record<RewardKind, string> = {
   fork: 'Hard fork',
   other: 'Other reward',
 };
+
+/**
+ * The kind of a reward written before `rewardKind` existed, from the two
+ * signals the modules used to read: the Cardano provider record in `raw`
+ * and the word "staking" in the note. Rows a source re-syncs get the typed
+ * field; this keeps imported rows readable until they are re-imported.
+ */
+export const legacyRewardKind = (
+  event: LedgerEvent,
+): RewardKind | undefined => {
+  const rawType = (event.raw as { type?: unknown } | undefined)?.type;
+  if (rawType === 'leader') return 'leader';
+  if (rawType === 'member') return 'staking';
+  if (/staking/i.test(event.note ?? '')) return 'staking';
+  return undefined;
+};
+
+export const rewardKindOf = (event: LedgerEvent): RewardKind | undefined =>
+  event.rewardKind ?? legacyRewardKind(event);

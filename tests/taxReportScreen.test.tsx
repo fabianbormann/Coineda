@@ -1673,7 +1673,7 @@ describe('the form and the report are separate steps', () => {
         id: 'reward',
         externalId: 'reward',
         kind: 'reward',
-        rewardKind: 'staking',
+        rewardKind: 'leader',
         timestamp: Date.UTC(new Date().getUTCFullYear(), 0, 2),
         // A leader reward, so the module's note is on the row as well.
         raw: { epoch: 1, type: 'leader' },
@@ -1700,7 +1700,9 @@ describe('the form and the report are separate steps', () => {
     const section = await screen.findByTestId('income-lines');
     expect(within(section).getByText(/stake-venue/)).toBeInTheDocument();
     expect(within(section).getByText(/value at receipt/i)).toBeInTheDocument();
-    expect(within(section).getByText(/staking reward/i)).toBeInTheDocument();
+    expect(
+      within(section).getByText(/pool operator reward/i),
+    ).toBeInTheDocument();
     expect(
       within(section).getByText(/gewerbliche Einkünfte/),
     ).toBeInTheDocument();

@@ -55,10 +55,11 @@ a taxable one. When `classify` returns `[]` for an event:
 Declare a kind in `handles` only when every event of that kind gets a
 confident answer from your rules — including the ones that confidently
 resolve to "not taxable". If your rules are only *partly* settled for a
-kind (Germany's and Austria's shared `reward` handling knows what a staking
-reward is but not what an airdrop is), leave that kind off `handles`
-entirely, so the still-unresolved sub-case keeps surfacing instead of
-disappearing the moment the kind as a whole is declared handled. Getting
+kind (a reward's kind is `rewardKindOf(event)` from `src/tax/rewardKinds.ts`;
+branch on it, never on `note`), leave that kind off `handles` entirely, so
+the still-unresolved sub-case keeps surfacing instead of disappearing the
+moment the kind as a whole is declared handled. Keep `'reward'` out of
+`handles` while any reward kind is unresolved. Getting
 this wrong in the other direction — declaring a kind your rules don't
 actually have an answer for — makes a real gap disappear exactly the way an
 unclassified kind is supposed to prevent.

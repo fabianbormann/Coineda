@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import germanTax, { heldMoreThanOneYear } from '@/tax/jurisdictions/de';
-import type { LedgerEvent } from '@/ledger/types';
+import type { LedgerEvent, RewardKind } from '@/ledger/types';
 import type { MatchedDisposal, TaxEvent } from '@/tax/types';
 import { subtractAmounts } from '@/ledger/amount';
 
@@ -815,5 +815,104 @@ describe('german holding period runs by calendar date', () => {
     expect(
       heldMoreThanOneYear(Date.UTC(2023, 2, 1), Date.UTC(2024, 2, 2)),
     ).toBe(true);
+  });
+});
+
+describe('german reward kinds', () => {
+  const reward = (
+    kind?: RewardKind,
+    legs?: LedgerEvent['legs'],
+    extra: Partial<LedgerEvent> = {},
+  ): LedgerEvent => ({
+    id: 'r',
+    sourceId: 's1',
+    externalId: 'x',
+    timestamp: Date.UTC(2025, 5, 1),
+    kind: 'reward',
+    origin: 'derived',
+    ...(kind === undefined ? {} : { rewardKind: kind }),
+    legs: legs ?? [
+      {
+        assetId: 'cardano:lovelace',
+        amount: '100',
+        direction: 'in',
+        venue: 'w',
+        role: 'principal',
+      },
+    ],
+    ...extra,
+  });
+  const incomeNote = (event: LedgerEvent) =>
+    germanTax.classify(event).find((one) => one.kind === 'income')?.note;
+
+  it.each(['staking', 'lending', 'liquidity'] as const)(
+    '%s is income plus acquisition with no note',
+    (kind) => {
+      const events = germanTax.classify(reward(kind));
+      expect(events.map((e) => e.kind).sort()).toEqual([
+        'acquisition',
+        'income',
+      ]);
+      expect(incomeNote(reward(kind))).toBeUndefined();
+    },
+  );
+
+  it.each(['leader', 'mining', 'masternode'] as const)(
+    '%s carries the business-income note',
+    (kind) => {
+      expect(incomeNote(reward(kind))).toMatch(/gewerblich/);
+    },
+  );
+
+  it('notes an airdrop as received for a counter-performance', () => {
+    expect(incomeNote(reward('airdrop'))).toMatch(
+      /counter-performance|Gegenleistung/i,
+    );
+  });
+
+  it('notes an other reward as unspecified by the source', () => {
+    expect(incomeNote(reward('other'))).toMatch(/did not say/);
+  });
+
+  it('treats a fork as a zero-cost acquisition and no income', () => {
+    const events = germanTax.classify(reward('fork'));
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      kind: 'acquisition',
+      consideration: { assetId: 'cardano:lovelace', amount: '0' },
+    });
+  });
+
+  it('returns nothing for a reward no signal can name', () => {
+    expect(germanTax.classify(reward())).toEqual([]);
+  });
+
+  it('reads the legacy member record as staking', () => {
+    const events = germanTax.classify(
+      reward(undefined, undefined, { raw: { type: 'member' } }),
+    );
+    expect(events.map((e) => e.kind).sort()).toEqual(['acquisition', 'income']);
+  });
+
+  it('takes the income amount from the principal leg, not a fee leg', () => {
+    const events = germanTax.classify(
+      reward('staking', [
+        {
+          assetId: 'cardano:lovelace',
+          amount: '1',
+          direction: 'out',
+          venue: 'w',
+          role: 'fee',
+        },
+        {
+          assetId: 'cardano:lovelace',
+          amount: '100',
+          direction: 'in',
+          venue: 'w',
+          role: 'principal',
+        },
+      ]),
+    );
+    expect(events.find((e) => e.kind === 'income')?.amount).toBe('100');
   });
 });

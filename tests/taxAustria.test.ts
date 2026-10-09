@@ -374,3 +374,46 @@ describe('what the austrian liability figure is', () => {
     );
   });
 });
+
+describe('austrian reward kinds', () => {
+  const reward = (kind?: LedgerEvent['rewardKind']): LedgerEvent => ({
+    id: 'r',
+    sourceId: 's1',
+    externalId: 'x',
+    timestamp: Date.UTC(2025, 5, 1),
+    kind: 'reward',
+    origin: 'derived',
+    ...(kind === undefined ? {} : { rewardKind: kind }),
+    legs: [
+      {
+        assetId: 'cardano:lovelace',
+        amount: '100',
+        direction: 'in',
+        venue: 'w',
+        role: 'principal',
+      },
+    ],
+  });
+
+  it('treats a fork as a zero-cost acquisition', () => {
+    const events = austrianTax.classify(reward('fork'));
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      kind: 'acquisition',
+      consideration: { assetId: 'cardano:lovelace', amount: '0' },
+    });
+  });
+
+  it('treats lending as income plus acquisition', () => {
+    expect(
+      austrianTax
+        .classify(reward('lending'))
+        .map((e) => e.kind)
+        .sort(),
+    ).toEqual(['acquisition', 'income']);
+  });
+
+  it('returns nothing for an unnamed reward', () => {
+    expect(austrianTax.classify(reward())).toEqual([]);
+  });
+});

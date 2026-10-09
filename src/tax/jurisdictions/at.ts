@@ -7,6 +7,7 @@ import {
 } from '@/ledger/amount';
 import { isFiatAsset } from '@/ledger/balances';
 import { fiatConsiderationOf } from '@/tax/consideration';
+import { rewardKindOf } from '@/tax/rewardKinds';
 import type { Leg, LedgerEvent } from '@/ledger/types';
 import type {
   AssessedDisposal,
@@ -87,43 +88,18 @@ const legToTaxEvent = (event: LedgerEvent, leg: Leg): TaxEvent[] => {
   ];
 };
 
-/** A staking provider record, carried in `raw` by the Cardano sources -
- *  same shape Germany's classifyReward reads. */
-type StakingRewardRaw = {
-  epoch?: number;
-  /** The provider sends this as a JSON NUMBER, unlike the utxo endpoints'
-   *  strings, and `raw` is that payload verbatim - so this cannot claim to
-   *  be a string. Nothing here reads it (the amount a calculation uses is
-   *  the leg's own decimal string), but a typed claim that an amount is a
-   *  string when it is not is exactly the mistake this subsystem's first
-   *  invariant exists to prevent. See amountString in
-   *  src/sources/cardano/translator.ts. */
-  amount?: number | string;
-  type?: 'member' | 'leader';
-};
-
 const classifyReward = (event: LedgerEvent): TaxEvent[] => {
-  const leg = event.legs[0];
+  const leg = event.legs.find(
+    (one) => one.role === 'principal' && one.direction === 'in',
+  );
   if (!leg) {
     return [];
   }
-
-  const rawType = (event.raw as StakingRewardRaw | undefined)?.type;
-  const noteIdentifiesStaking = /staking/i.test(event.note ?? '');
-
-  if (rawType === undefined && !noteIdentifiesStaking) {
-    // An airdrop - unresolved rather than guessed, same as Germany.
+  const kind = rewardKindOf(event);
+  if (kind === undefined) {
+    // Unresolved rather than guessed, same as Germany.
     return [];
   }
-
-  const income: TaxEvent = {
-    sourceEventId: event.id,
-    kind: 'income',
-    assetId: leg.assetId,
-    amount: leg.amount,
-    timestamp: event.timestamp,
-    venue: leg.venue,
-  };
 
   const acquisition: TaxEvent = {
     sourceEventId: event.id,
@@ -134,6 +110,21 @@ const classifyReward = (event: LedgerEvent): TaxEvent[] => {
     venue: leg.venue,
   };
 
+  if (kind === 'fork') {
+    // Coins from a fork have no acquisition cost.
+    return [
+      { ...acquisition, consideration: { assetId: leg.assetId, amount: '0' } },
+    ];
+  }
+
+  const income: TaxEvent = {
+    sourceEventId: event.id,
+    kind: 'income',
+    assetId: leg.assetId,
+    amount: leg.amount,
+    timestamp: event.timestamp,
+    venue: leg.venue,
+  };
   return [income, acquisition];
 };
 
