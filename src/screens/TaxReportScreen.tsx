@@ -1227,8 +1227,12 @@ export const TaxReportScreen = () => {
                           {t('No derivative settlements in this year.')}
                         </p>
                       ) : (
-                        assessment.capital.map((row) => (
-                          <Card key={row.sourceEventId}>
+                        // One settlement can yield a gain and a loss (its
+                        // principal and its fee) under one sourceEventId.
+                        assessment.capital.map((row, index) => (
+                          <Card
+                            key={`${row.sourceEventId}-${row.kind}-${index}`}
+                          >
                             <CardContent className="flex flex-col gap-1 text-sm">
                               <p className="font-medium">
                                 {formatDate(row.timestamp)} · {row.venue} ·{' '}

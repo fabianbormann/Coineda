@@ -1756,4 +1756,73 @@ describe('the derivatives section', () => {
     expect(screen.queryByText(/derivatives/i)).toBeNull();
     expect(screen.queryByTestId('capital-lines')).toBeNull();
   });
+
+  it('renders a gain and a loss from one settlement as two rows, each keyed', async () => {
+    // One derivative event can produce two capital events - a principal
+    // profit and the fee charged on it - with the same sourceEventId.
+    // Keyed on that id alone, React warned and could drop one of them.
+    const errors: unknown[][] = [];
+    const spy = vi
+      .spyOn(console, 'error')
+      .mockImplementation((...args: unknown[]) => {
+        errors.push(args);
+      });
+    try {
+      taxRegistry.push({
+        ...capitalModule(true),
+        handles: [...makeModule().handles, 'derivative'],
+        classify: (event) =>
+          event.kind === 'derivative'
+            ? event.legs.map((leg) => ({
+                sourceEventId: event.id,
+                kind:
+                  leg.role === 'fee'
+                    ? ('capital-loss' as const)
+                    : ('capital-gain' as const),
+                assetId: leg.assetId,
+                amount: leg.amount,
+                timestamp: event.timestamp,
+                venue: leg.venue,
+              }))
+            : classify(event),
+      });
+      await putEvents([
+        ledgerEvent({
+          id: 'settle',
+          externalId: 'settle',
+          kind: 'derivative',
+          derivative: { kind: 'pnl' },
+          legs: [
+            {
+              assetId: 'fiat:eur',
+              amount: '50',
+              direction: 'in',
+              venue: 'futures',
+              role: 'principal',
+            },
+            {
+              assetId: 'fiat:eur',
+              amount: '1',
+              direction: 'out',
+              venue: 'futures',
+              role: 'fee',
+            },
+          ],
+        }),
+      ]);
+
+      renderScreen();
+      await runReport('2025');
+
+      const lines = await screen.findByTestId('capital-lines');
+      expect(within(lines).getByText(/profit/i)).toBeInTheDocument();
+      expect(within(lines).getByText(/loss/i)).toBeInTheDocument();
+      const keyWarnings = errors
+        .map((args) => args.map(String).join(' '))
+        .filter((text) => /same key/i.test(text));
+      expect(keyWarnings).toEqual([]);
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
