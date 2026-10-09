@@ -1,4 +1,11 @@
-import type { LedgerEvent } from './types';
+import {
+  addAmounts,
+  compareAmounts,
+  subtractAmounts,
+  sumAmounts,
+} from './amount';
+import { netPrincipalLegs } from './balances';
+import type { LedgerEvent, Leg, LegDirection } from './types';
 
 /**
  * Transfers between the user's OWN venues, recognised across sources.
@@ -142,3 +149,124 @@ export const linkInternalTransfers = (
 /** Every event id that is one side of a linked transfer. */
 export const linkedEventIds = (links: TransferLink[]): Set<string> =>
   new Set(links.flatMap((link) => [link.fromEventId, link.toEventId]));
+
+/** The amount of `assetId` moving in `direction` across these legs,
+ *  optionally only those of one role. */
+const sumLegs = (
+  legs: Leg[],
+  assetId: string,
+  direction: LegDirection,
+  role?: Leg['role'],
+): string =>
+  sumAmounts(
+    legs
+      .filter(
+        (leg) =>
+          leg.assetId === assetId &&
+          leg.direction === direction &&
+          (role === undefined || leg.role === role),
+      )
+      .map((leg) => leg.amount),
+  );
+
+/**
+ * What a linked transfer consumed: the coins that left one of the user's
+ * venues and never arrived at the other.
+ *
+ * `linkInternalTransfers` pairs a withdrawal with its receipt and the host
+ * replaces the pair with a lot move of the ARRIVED amount. The difference -
+ * an explicit fee leg on an exchange withdrawal, the fee a UTXO chain hides
+ * in inputs minus change, gas paid in another asset on the same
+ * transaction - used to stay in the source partition as a phantom holding,
+ * or vanish with the dropped event. It really did leave the user's control,
+ * so it is returned here as a synthetic `transfer` event with one `out` leg
+ * per asset, for the jurisdiction to classify like any other outgoing leg:
+ * a disposal at market value, in the venue it left. Symmetrically, anything
+ * that arrived in a linked receipt beyond what the link carried becomes an
+ * `in` leg. Nothing here deducts anything: a network fee on a move to
+ * oneself is not a selling cost (owner's decision, 2026-10-09).
+ *
+ * Per asset, per linked event: residualOut = netOut + explicitFees −
+ * arrivedByLink, residualIn = netIn − arrivedByLink. `netPrincipalLegs`
+ * supplies the net so UTXO change is already subtracted. Only positive
+ * residuals are emitted; an event with none produces nothing.
+ */
+export const residualTransferEvents = (
+  events: LedgerEvent[],
+  links: TransferLink[],
+  ownedVenues: Set<string>,
+): LedgerEvent[] => {
+  const byId = new Map(events.map((event) => [event.id, event]));
+
+  // Per (event, direction): how much of each asset the links carried.
+  const carried = new Map<string, Map<string, string>>();
+  const record = (
+    eventId: string,
+    direction: LegDirection,
+    assetId: string,
+    amount: string,
+  ) => {
+    const key = `${eventId}|${direction}`;
+    const perAsset = carried.get(key) ?? new Map<string, string>();
+    perAsset.set(assetId, addAmounts(perAsset.get(assetId) ?? '0', amount));
+    carried.set(key, perAsset);
+  };
+  for (const link of links) {
+    record(link.fromEventId, 'out', link.assetId, link.amount);
+    record(link.toEventId, 'in', link.assetId, link.amount);
+  }
+
+  const residuals: LedgerEvent[] = [];
+  for (const [key, perAsset] of carried) {
+    const [eventId, direction] = key.split('|') as [string, LegDirection];
+    const original = byId.get(eventId);
+    if (original === undefined) {
+      continue;
+    }
+    const netted = netPrincipalLegs(original, ownedVenues);
+    const assets = [...new Set(original.legs.map((leg) => leg.assetId))];
+
+    const legs: Leg[] = [];
+    for (const assetId of assets) {
+      const net = sumLegs(netted.legs, assetId, direction, 'principal');
+      const fees =
+        direction === 'out'
+          ? sumLegs(original.legs, assetId, 'out', 'fee')
+          : '0';
+      const residual = subtractAmounts(
+        addAmounts(net, fees),
+        perAsset.get(assetId) ?? '0',
+      );
+      if (compareAmounts(residual, '0') <= 0) {
+        continue;
+      }
+      const venue =
+        original.legs.find(
+          (leg) => leg.assetId === assetId && leg.direction === direction,
+        )?.venue ?? original.legs[0].venue;
+      legs.push({
+        assetId,
+        amount: residual,
+        direction,
+        venue,
+        role: 'principal',
+      });
+    }
+    if (legs.length === 0) {
+      continue;
+    }
+
+    residuals.push({
+      id: `${original.id}:residual-${direction}`,
+      sourceId: original.sourceId,
+      externalId: `${original.externalId}:residual-${direction}`,
+      timestamp: original.timestamp,
+      kind: 'transfer',
+      origin: 'derived',
+      legs,
+      ...(original.txHash === undefined ? {} : { txHash: original.txHash }),
+    });
+  }
+
+  return residuals;
+};

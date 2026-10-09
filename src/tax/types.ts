@@ -384,6 +384,9 @@ export type ReportMethod = {
   /** Movements between the user's own venues, netted out before
    *  classification rather than reported as sales. */
   internalTransfersNetted: number;
+  /** Network fees on transfers between the user's own venues, each
+   *  treated as a disposal of the fee coins and not deducted. */
+  transferResiduals: number;
 };
 
 /**

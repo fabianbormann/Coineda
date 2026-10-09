@@ -6,7 +6,11 @@ import {
   ownedVenuesOf,
 } from '@/ledger/balances';
 import type { LedgerEvent } from '@/ledger/types';
-import { linkInternalTransfers, linkedEventIds } from '@/ledger/transfers';
+import {
+  linkInternalTransfers,
+  linkedEventIds,
+  residualTransferEvents,
+} from '@/ledger/transfers';
 import { match } from './matching';
 import { resolveValues } from './resolveValues';
 import { APP_VERSION } from '@/global/version';
@@ -161,9 +165,18 @@ export const runTaxReport = async (
   const transferLinks = linkInternalTransfers(allEvents, ownedVenues);
   const linked = linkedEventIds(transferLinks);
 
-  const consideredEvents = allEvents.filter(
+  const survivors = allEvents.filter(
     (event) => !isInternalTransfer(event, ownedVenues) && !linked.has(event.id),
   );
+  // What a linked pair consumed on the way - fees, gas - comes back as a
+  // synthetic event the jurisdiction classifies like any other outgoing
+  // leg. See residualTransferEvents for the rule.
+  const residuals = residualTransferEvents(
+    allEvents,
+    transferLinks,
+    ownedVenues,
+  );
+  const consideredEvents = [...survivors, ...residuals];
 
   /**
    * What the dropped pair is replaced BY.
@@ -319,7 +332,9 @@ export const runTaxReport = async (
   // shipped jurisdiction stamps a tax event with the ledger event's own id,
   // so this resolves for them; a module that mints its own ids simply gets
   // no hash, which is the same outcome as an exchange row that has none.
-  const eventById = new Map(allEvents.map((event) => [event.id, event]));
+  const eventById = new Map(
+    [...allEvents, ...residuals].map((event) => [event.id, event]),
+  );
   const withTxHash = (item: UnresolvedItem): UnresolvedItem => {
     const txHash = eventById.get(item.sourceEventId)?.txHash;
     return txHash === undefined ? item : { ...item, txHash };
@@ -396,8 +411,9 @@ export const runTaxReport = async (
     // what fetchHistory actually tries, in the order it tries them.
     priceSources: ['DefiLlama', 'ECB', 'CoinGecko'],
     appVersion: APP_VERSION,
-    eventsConsidered: consideredEvents.length,
-    internalTransfersNetted: allEvents.length - consideredEvents.length,
+    eventsConsidered: survivors.length,
+    internalTransfersNetted: allEvents.length - survivors.length,
+    transferResiduals: residuals.length,
   };
 
   return {

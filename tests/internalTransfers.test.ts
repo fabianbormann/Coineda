@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
-import { linkInternalTransfers, linkedEventIds } from '@/ledger/transfers';
+import {
+  linkInternalTransfers,
+  linkedEventIds,
+  residualTransferEvents,
+} from '@/ledger/transfers';
 import { match } from '@/tax/matching';
 import { ownedVenuesOf } from '@/ledger/balances';
 import { openLedger, putEvents } from '@/ledger/db';
@@ -635,5 +639,310 @@ describe('through runTaxReport, where the figures are actually produced', () => 
     });
 
     expect(report.lines.length + report.totals.omitted).toBeGreaterThan(0);
+  });
+});
+
+describe('the coins that left but never arrived', () => {
+  const HASH4 = 'cafe'.repeat(16);
+  const DAYS4 = ['2025-01-10', '2025-02-01', '2025-09-01'];
+
+  beforeEach(async () => {
+    const db = await openLedger();
+    for (const store of ['events', 'prices', 'settings'] as const) {
+      await db.clear(store);
+    }
+    // Every coin is worth 1 EUR per whole unit on every day, so residual
+    // amounts read directly as values.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const asked = String(url);
+        if (asked.includes('frankfurter')) {
+          return new Response(
+            JSON.stringify({
+              rates: Object.fromEntries(DAYS4.map((day) => [day, { EUR: 1 }])),
+            }),
+            { status: 200 },
+          );
+        }
+        if (asked.includes('llama.fi')) {
+          const coins = JSON.parse(
+            decodeURIComponent(/coins=([^&]+)/.exec(asked)?.[1] ?? '{}'),
+          ) as Record<string, number[]>;
+          return new Response(
+            JSON.stringify({
+              coins: Object.fromEntries(
+                Object.entries(coins).map(([coin, times]) => [
+                  coin,
+                  {
+                    prices: times.map((timestamp) => ({ timestamp, price: 1 })),
+                  },
+                ]),
+              ),
+            }),
+            { status: 200 },
+          );
+        }
+        return new Response(JSON.stringify({ prices: [] }), { status: 200 });
+      }),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const buyAt = (venue: string, amount: string): LedgerEvent => ({
+    id: `buy-${venue}`,
+    sourceId: 'src',
+    externalId: `buy-${venue}`,
+    timestamp: Date.UTC(2025, 0, 10),
+    kind: 'trade',
+    origin: 'derived',
+    legs: [
+      leg('in', venue, amount),
+      {
+        assetId: 'fiat:eur',
+        amount: '1',
+        direction: 'out',
+        venue,
+        role: 'principal',
+      },
+    ],
+  });
+
+  const run = () =>
+    runTaxReport(germanTax, { year: 2025, baseCurrency: 'eur' });
+
+  it('disposes of an explicit withdrawal fee at the exchange, and leaves no phantom behind', async () => {
+    // Bitpanda's shape: the principal is what arrives, the network fee is
+    // its own leg on top. 49,995,000 sat arrive; 5,000 sat were burned.
+    await putEvents([
+      buyAt('bitpanda', '50000000'),
+      event({
+        id: 'withdraw',
+        sourceId: 'bitpanda',
+        externalId: 'withdraw',
+        txHash: HASH4,
+        timestamp: Date.UTC(2025, 1, 1),
+        legs: [
+          leg('out', 'bitpanda', '49995000'),
+          leg('out', 'bitpanda', '5000', 'fee'),
+        ],
+      }),
+      event({
+        id: 'arrive',
+        sourceId: 'bitcoin',
+        externalId: 'arrive',
+        txHash: HASH4,
+        timestamp: Date.UTC(2025, 1, 1, 1),
+        legs: [leg('in', 'bc1qwallet', '49995000')],
+      }),
+      // Later, the whole arrived amount is sold from the wallet, and one
+      // satoshi is sold from the exchange where nothing should be left.
+      event({
+        id: 'sell-wallet',
+        sourceId: 'bitcoin',
+        externalId: 'sell-wallet',
+        timestamp: Date.UTC(2025, 8, 1),
+        kind: 'trade',
+        legs: [
+          leg('out', 'bc1qwallet', '49995000'),
+          {
+            assetId: 'fiat:eur',
+            amount: '1',
+            direction: 'in',
+            venue: 'bc1qwallet',
+            role: 'principal',
+          },
+        ],
+      }),
+      event({
+        id: 'sell-exchange',
+        sourceId: 'bitpanda',
+        externalId: 'sell-exchange',
+        timestamp: Date.UTC(2025, 8, 1, 1),
+        kind: 'trade',
+        legs: [
+          leg('out', 'bitpanda', '1'),
+          {
+            assetId: 'fiat:eur',
+            amount: '0.01',
+            direction: 'in',
+            venue: 'bitpanda',
+            role: 'principal',
+          },
+        ],
+      }),
+    ]);
+
+    const report = await run();
+
+    expect(report.method.transferResiduals).toBe(1);
+    const residual = report.lines.find(
+      (line) => line.disposalEventId === 'withdraw:residual-out',
+    );
+    expect(residual).toMatchObject({
+      amount: '5000',
+      venue: 'bitpanda',
+      costs: '0',
+    });
+    // The wallet sale finds exactly what arrived, with its share of the lot.
+    const walletSale = report.lines.find(
+      (line) => line.disposalEventId === 'sell-wallet',
+    );
+    expect(walletSale?.amount).toBe('49995000');
+    // And the exchange has nothing left: the fee coins were disposed of,
+    // not left behind as a phantom lot.
+    expect(
+      report.unresolved.map((item) => [item.kind, item.sourceEventId]),
+    ).toEqual([['needs-cost-basis', 'sell-exchange']]);
+  });
+
+  it('disposes of the fee a UTXO chain hides in inputs minus change', async () => {
+    // 0.5 BTC in, 0.0999 BTC change: 0.4001 left the wallet, 0.4 arrived.
+    await putEvents([
+      buyAt('bc1qa', '50000000'),
+      event({
+        id: 'send',
+        sourceId: 'bitcoin-a',
+        externalId: 'send',
+        txHash: HASH4,
+        timestamp: Date.UTC(2025, 1, 1),
+        legs: [leg('out', 'bc1qa', '50000000'), leg('in', 'bc1qa', '9990000')],
+      }),
+      event({
+        id: 'receive',
+        sourceId: 'bitcoin-b',
+        externalId: 'receive',
+        txHash: HASH4,
+        timestamp: Date.UTC(2025, 1, 1, 1),
+        legs: [leg('in', 'bc1qb', '40000000')],
+      }),
+    ]);
+
+    const report = await run();
+
+    expect(report.method.transferResiduals).toBe(1);
+    expect(
+      report.lines.map((line) => [
+        line.disposalEventId,
+        line.amount,
+        line.venue,
+      ]),
+    ).toEqual([['send:residual-out', '10000', 'bc1qa']]);
+  });
+
+  it('disposes of gas paid in another asset on the same transaction', async () => {
+    // An ERC-20 shape: the linked asset arrives whole, the gas is a fee
+    // leg in eth:native that has no link in this hash. It used to vanish
+    // with the dropped event.
+    await putEvents([
+      buyAt('bitpanda', '50000000'),
+      event({
+        id: 'withdraw',
+        sourceId: 'bitpanda',
+        externalId: 'withdraw',
+        txHash: HASH4,
+        timestamp: Date.UTC(2025, 1, 1),
+        legs: [
+          leg('out', 'bitpanda', '50000000'),
+          {
+            assetId: 'eth:native',
+            amount: '21000',
+            direction: 'out',
+            venue: 'bitpanda',
+            role: 'fee',
+          },
+        ],
+      }),
+      event({
+        id: 'arrive',
+        sourceId: 'bitcoin',
+        externalId: 'arrive',
+        txHash: HASH4,
+        timestamp: Date.UTC(2025, 1, 1, 1),
+        legs: [leg('in', 'bc1qwallet', '50000000')],
+      }),
+    ]);
+
+    const report = await run();
+
+    expect(report.method.transferResiduals).toBe(1);
+    // No ether was ever bought here, so the gas disposal has no lot and is
+    // reported as such - which is the point: it is reported.
+    expect(
+      report.unresolved.map((item) => [
+        item.kind,
+        item.sourceEventId,
+        item.assetId,
+        item.amount,
+      ]),
+    ).toEqual([
+      ['needs-cost-basis', 'withdraw:residual-out', 'eth:native', '21000'],
+    ]);
+  });
+
+  it('keeps the residuals of two events in one hash apart, under ids that cannot collide', () => {
+    // Pure, on the helper. One hash in which wallet A sends BTC to wallet B
+    // and receives a token from it: A is the sender of one link and the
+    // receiver of the other, B the reverse. Each event's own residual must
+    // survive under an id that names the event and the direction.
+    const TOKEN = 'cardano:deadbeef.Tok';
+    const a: LedgerEvent = event({
+      id: 'a',
+      txHash: HASH4,
+      legs: [
+        leg('out', 'wallet-a', '1000'),
+        leg('out', 'wallet-a', '10', 'fee'),
+        {
+          assetId: TOKEN,
+          amount: '5',
+          direction: 'in',
+          venue: 'wallet-a',
+          role: 'principal',
+        },
+      ],
+    });
+    const b: LedgerEvent = event({
+      id: 'b',
+      txHash: HASH4,
+      legs: [
+        leg('in', 'wallet-b', '1000'),
+        {
+          assetId: TOKEN,
+          amount: '7',
+          direction: 'out',
+          venue: 'wallet-b',
+          role: 'principal',
+        },
+      ],
+    });
+    const owned = ownedVenuesOf([a, b]);
+    const links = linkInternalTransfers([a, b], owned);
+    const residuals = residualTransferEvents([a, b], links, owned);
+
+    expect(residuals.map((row) => row.id).sort()).toEqual([
+      'a:residual-out',
+      'b:residual-out',
+    ]);
+    expect(residuals.find((row) => row.id === 'a:residual-out')?.legs).toEqual([
+      {
+        assetId: BTC,
+        amount: '10',
+        direction: 'out',
+        venue: 'wallet-a',
+        role: 'principal',
+      },
+    ]);
+    expect(residuals.find((row) => row.id === 'b:residual-out')?.legs).toEqual([
+      {
+        assetId: TOKEN,
+        amount: '2',
+        direction: 'out',
+        venue: 'wallet-b',
+        role: 'principal',
+      },
+    ]);
   });
 });

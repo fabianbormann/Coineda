@@ -432,7 +432,11 @@ describe('through a German report, where it actually matters', () => {
       baseCurrency: 'eur',
     });
 
-    expect(report.lines).toEqual([]);
-    expect(report.totals.taxableGain).toBe('0');
+    // The move itself is no sale. The 194 sat the sender spent beyond what
+    // arrived are the network fee: a disposal of the fee coins, nothing more.
+    expect(
+      report.lines.map((line) => [line.disposalEventId, line.amount]),
+    ).toEqual([['wallet-out:residual-out', '194']]);
+    expect(report.method.transferResiduals).toBe(1);
   });
 });

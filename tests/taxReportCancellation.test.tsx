@@ -66,6 +66,7 @@ const germanAssessment: TaxReport = {
     appVersion: '0.0.0-test',
     eventsConsidered: 1,
     internalTransfersNetted: 0,
+    transferResiduals: 0,
   },
 };
 
