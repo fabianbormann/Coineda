@@ -9,6 +9,7 @@ import {
   sumAmounts,
 } from '@/ledger/amount';
 import { isFiatAsset } from '@/ledger/balances';
+import { fiatConsiderationOf } from '@/tax/consideration';
 import type { Leg, LedgerEvent } from '@/ledger/types';
 import type {
   AssessedDisposal,
@@ -161,7 +162,15 @@ const classifyTrade = (event: LedgerEvent): TaxEvent[] => {
   const principals = event.legs.filter((leg) => leg.role === 'principal');
   const fees = event.legs.filter((leg) => leg.role === 'fee');
 
-  const taxEvents = principals.flatMap((leg) => legToTaxEvent(event, leg));
+  // The actual consideration, when the trade had a fiat side. Defined only
+  // when exactly one crypto leg faces exactly one fiat leg, so every tax
+  // event here is that one crypto leg and the map attaches to it alone.
+  const consideration = fiatConsiderationOf(event);
+  const taxEvents = principals
+    .flatMap((leg) => legToTaxEvent(event, leg))
+    .map((taxEvent) =>
+      consideration === undefined ? taxEvent : { ...taxEvent, consideration },
+    );
   const feeDisposals = fees.flatMap((leg) => legToTaxEvent(event, leg));
 
   if (fees.length === 0) {

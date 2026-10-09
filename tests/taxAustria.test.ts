@@ -170,6 +170,14 @@ describe('austrian classification', () => {
       austrianTax.partitionBy(alsoRecent),
     );
   });
+
+  it('values a sale at the euro received', () => {
+    const [disposal] = austrianTax.classify(sale);
+    expect(disposal.consideration).toEqual({
+      assetId: sale.legs.find((leg) => leg.assetId === 'fiat:eur')?.assetId,
+      amount: sale.legs.find((leg) => leg.assetId === 'fiat:eur')?.amount,
+    });
+  });
 });
 
 describe('austrian assessment', () => {

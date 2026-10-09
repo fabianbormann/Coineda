@@ -6,6 +6,7 @@ import {
   sumAmounts,
 } from '@/ledger/amount';
 import { isFiatAsset } from '@/ledger/balances';
+import { fiatConsiderationOf } from '@/tax/consideration';
 import type { Leg, LedgerEvent } from '@/ledger/types';
 import type {
   AssessedDisposal,
@@ -171,7 +172,12 @@ const classifyTrade = (event: LedgerEvent): TaxEvent[] => {
   // legToTaxEvent already drops the fiat leg itself - paying or receiving
   // euros is not a disposal of crypto - which leaves exactly the crypto
   // side of the trade.
-  return event.legs.flatMap((leg) => legToTaxEvent(event, leg));
+  const consideration = fiatConsiderationOf(event);
+  return event.legs
+    .flatMap((leg) => legToTaxEvent(event, leg))
+    .map((taxEvent) =>
+      consideration === undefined ? taxEvent : { ...taxEvent, consideration },
+    );
 };
 
 /**

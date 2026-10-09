@@ -3,6 +3,22 @@ import type { EventKind, LedgerEvent } from '@/ledger/types';
 export type TaxEventKind = 'acquisition' | 'disposal' | 'income';
 
 /**
+ * What was actually given or received for a tax event's leg, when the
+ * trade had a fiat side: the fiat leg's asset and amount.
+ *
+ * The BMF letter of 6 March 2025 asks for the actual consideration -
+ * Veräußerungserlös, Anschaffungskosten - and keeps market value for
+ * crypto-to-crypto exchanges, where no fiat changed hands. Valuing a euro
+ * buy at the coin's market price instead made every buy and sell line
+ * differ from the exchange statement by the day's spread.
+ */
+export type Consideration = {
+  assetId: string;
+  /** Decimal string. Never a JS number. */
+  amount: string;
+};
+
+/**
  * A transaction cost attributable to a tax event, in the asset it was paid
  * in: an exchange's trading fee, the network fee of a swap.
  *
@@ -43,6 +59,12 @@ export type TaxEvent = {
    * only values it.
    */
   costs?: TaxCost[];
+  /**
+   * Set by `classify` through `fiatConsiderationOf`. The host values the
+   * event at this instead of at the leg's own market price. Absent on a
+   * swap, which is valued at market by definition.
+   */
+  consideration?: Consideration;
   /** Why the module emitted this, for the audit trail. Display only. */
   note?: string;
 };

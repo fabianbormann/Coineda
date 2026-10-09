@@ -284,6 +284,56 @@ describe('german classification', () => {
     expect(events.map((e) => e.kind)).toEqual(['disposal', 'disposal']);
     expect(events.every((e) => e.costs === undefined)).toBe(true);
   });
+
+  it('values a euro buy at the euro paid, not the market price', () => {
+    const events = germanTax.classify(
+      trade([
+        {
+          assetId: 'fiat:eur',
+          amount: '500',
+          direction: 'out',
+          venue: 'kraken',
+          role: 'principal',
+        },
+        {
+          assetId: 'bitcoin:native',
+          amount: '1000000',
+          direction: 'in',
+          venue: 'kraken',
+          role: 'principal',
+        },
+      ]),
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0].consideration).toEqual({
+      assetId: 'fiat:eur',
+      amount: '500',
+    });
+  });
+
+  it('values a swap at market: no consideration', () => {
+    const events = germanTax.classify(
+      trade([
+        {
+          assetId: 'cardano:lovelace',
+          amount: '100',
+          direction: 'out',
+          venue: 'wallet-a',
+          role: 'principal',
+        },
+        {
+          assetId: 'bitcoin:native',
+          amount: '1',
+          direction: 'in',
+          venue: 'wallet-a',
+          role: 'principal',
+        },
+      ]),
+    );
+    expect(events.every((event) => event.consideration === undefined)).toBe(
+      true,
+    );
+  });
 });
 
 describe('german holding period', () => {
