@@ -226,7 +226,10 @@ export const parse = (input: string): ParseResult => {
         // same either way, but a jurisdiction's internal-transfer test
         // deliberately ignores fee legs, so mislabelling one turns a
         // transfer into a disposal.
-        role: isFee || isFuturesCommission ? 'fee' : 'principal',
+        // A negative futures commission is a cost; a positive one is a
+        // rebate, money received, so a principal inflow.
+        role:
+          isFee || (isFuturesCommission && moved.lt(0)) ? 'fee' : 'principal',
       },
     ];
 
@@ -268,7 +271,6 @@ export const parse = (input: string): ParseResult => {
       );
       if (partner) {
         partner.legs.push(...legs);
-        partner.externalId = `${at}#transfer#${coin}`;
         events.pop();
         waiting.splice(waiting.indexOf(partner), 1);
       } else {

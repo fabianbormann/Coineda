@@ -353,6 +353,33 @@ describe('Binance futures rows', () => {
     expect(isInternalTransfer(asLedger, new Set(['Spot', futures]))).toBe(true);
   });
 
+  it('gives each grouped wallet transfer its own id, even in the same second', () => {
+    const at = '2025-03-10 10:00:00';
+    const op = 'Transfer Between Main and Futures Wallet';
+    const pair = (n: number) => [
+      `1,${at},Spot,${op},USDT,-${n},`,
+      `1,${at},${futures},${op},USDT,${n},`,
+    ];
+    const different = binanceCsv.parse(csvOf(...pair(100), ...pair(50)));
+    expect(different.events).toHaveLength(2);
+    expect(new Set(different.events.map((e) => e.externalId)).size).toBe(2);
+    const identical = binanceCsv.parse(csvOf(...pair(100), ...pair(100)));
+    expect(identical.events).toHaveLength(2);
+    expect(new Set(identical.events.map((e) => e.externalId)).size).toBe(2);
+    expect(identical.events.every((e) => e.legs.length === 2)).toBe(true);
+  });
+
+  it('treats a positive futures commission as a received principal', () => {
+    const { events } = binanceCsv.parse(
+      csvOf(`1,2025-03-10 10:00:00,${futures},Commission,USDT,0.05,`),
+    );
+    expect(events[0].kind).toBe('derivative');
+    expect(events[0].derivative).toEqual({ kind: 'commission' });
+    expect(events[0].legs).toHaveLength(1);
+    expect(events[0].legs[0].direction).toBe('in');
+    expect(events[0].legs[0].role).toBe('principal');
+  });
+
   it('keeps a lone wallet-transfer row as a per-row transfer', () => {
     const { events } = binanceCsv.parse(
       csvOf(
