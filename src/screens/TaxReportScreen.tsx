@@ -1188,6 +1188,21 @@ export const TaxReportScreen = () => {
                             />
                           </p>
                         ))}
+                        {!isZeroAmount(
+                          assessment.capitalResult.notDeducted,
+                        ) && (
+                          <p>
+                            <span className="font-medium">
+                              {t('Not deducted')}:{' '}
+                            </span>
+                            <Money
+                              value={Number(
+                                assessment.capitalResult.notDeducted,
+                              )}
+                              currency={baseCurrency}
+                            />
+                          </p>
+                        )}
                         {!isZeroAmount(assessment.capitalResult.loss) && (
                           <p>
                             <span className="font-medium">
@@ -1250,7 +1265,17 @@ export const TaxReportScreen = () => {
                                   value={Number(row.value)}
                                   currency={baseCurrency}
                                 />
+                                {!row.deducted && (
+                                  <span className="ml-2 text-muted-foreground">
+                                    ({t('not deducted')})
+                                  </span>
+                                )}
                               </p>
+                              {row.note !== undefined && (
+                                <p className="text-muted-foreground">
+                                  {t(row.note)}
+                                </p>
+                              )}
                             </CardContent>
                           </Card>
                         ))

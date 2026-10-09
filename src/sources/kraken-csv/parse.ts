@@ -346,7 +346,12 @@ export const parse = (input: string): ParseResult => {
         ? { rewardKind: REWARD_KINDS[rawType] }
         : {}),
       ...(kind === 'derivative'
-        ? { derivative: { kind: rawType === 'rollover' ? 'rollover' : 'pnl' } }
+        ? {
+            derivative: {
+              kind: rawType === 'rollover' ? 'rollover' : 'pnl',
+              product: 'margin',
+            },
+          }
         : {}),
       // Provenance only, never parsed: the refid is what ties the two rows
       // of one trade together in Kraken's own export, which is what a

@@ -1718,8 +1718,9 @@ describe('the derivatives section', () => {
         ? {
             capital: {
               gains: '500',
-              losses: '205',
-              net: '295',
+              losses: '200',
+              notDeducted: '5',
+              net: '300',
               allowance: '1000',
               taxable: '0',
               loss: '0',
@@ -1740,6 +1741,7 @@ describe('the derivatives section', () => {
     expect(await screen.findByText(/derivatives/i)).toBeInTheDocument();
     expect(screen.getByText(/allowance applied/i)).toBeInTheDocument();
     expect(screen.getByText('Test capital note')).toBeInTheDocument();
+    expect(screen.getByText(/^not deducted/i)).toBeInTheDocument();
     expect(screen.getByTestId('capital-lines')).toHaveTextContent(
       /no derivative settlements/i,
     );
@@ -1783,6 +1785,9 @@ describe('the derivatives section', () => {
                 amount: leg.amount,
                 timestamp: event.timestamp,
                 venue: leg.venue,
+                ...(leg.role === 'fee'
+                  ? { deductible: false, note: 'Test row note' }
+                  : {}),
               }))
             : classify(event),
       });
@@ -1815,8 +1820,11 @@ describe('the derivatives section', () => {
       await runReport('2025');
 
       const lines = await screen.findByTestId('capital-lines');
-      expect(within(lines).getByText(/profit/i)).toBeInTheDocument();
-      expect(within(lines).getByText(/loss/i)).toBeInTheDocument();
+      expect(lines).toHaveTextContent(/· Profit/);
+      expect(lines).toHaveTextContent(/· Loss/);
+      // The fee's caveat and its undeducted state, from the tax event.
+      expect(within(lines).getByText('Test row note')).toBeInTheDocument();
+      expect(within(lines).getByText(/\(not deducted\)/i)).toBeInTheDocument();
       const keyWarnings = errors
         .map((args) => args.map(String).join(' '))
         .filter((text) => /same key/i.test(text));

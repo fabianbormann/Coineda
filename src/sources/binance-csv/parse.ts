@@ -251,7 +251,7 @@ export const parse = (input: string): ParseResult => {
       legs,
       ...(kind === 'reward' ? { rewardKind: REWARD_KINDS[operation] } : {}),
       ...(kind === 'derivative' && derivative !== undefined
-        ? { derivative: { kind: derivative } }
+        ? { derivative: { kind: derivative, product: 'futures' as const } }
         : {}),
       note: `Binance ${operation}`,
     };

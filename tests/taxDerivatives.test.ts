@@ -62,7 +62,7 @@ const runGermany = () =>
   runTaxReport(germanTax, { year: 2025, baseCurrency: 'eur' });
 
 describe('derivatives end to end', () => {
-  it('nets a profit, a loss and a rollover fee inside the allowance', async () => {
+  it('nets a profit and a loss inside the allowance, showing a rollover fee undeducted', async () => {
     await putEvents([
       eur('fee', 'rollover', 3, '5', 'out', 'fee'),
       eur('win', 'pnl', 1, '500', 'in'),
@@ -73,8 +73,9 @@ describe('derivatives end to end', () => {
 
     expect(report.capitalResult).toMatchObject({
       gains: '500',
-      losses: '205',
-      net: '295',
+      losses: '200',
+      notDeducted: '5',
+      net: '300',
       allowance: '1000',
       taxable: '0',
       loss: '0',
@@ -84,6 +85,12 @@ describe('derivatives end to end', () => {
       'lose',
       'fee',
     ]);
+    expect(report.capital.map((row) => row.deducted)).toEqual([
+      true,
+      true,
+      false,
+    ]);
+    expect(report.capital[2].note).toMatch(/margin rollover/);
     expect(report.totals.taxableGain).toBe('0');
     expect(report.totals.loss).toBe('0');
     expect(report.income).toEqual([]);

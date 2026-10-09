@@ -374,7 +374,10 @@ describe('Binance futures rows', () => {
       csvOf(`1,2025-03-10 10:00:00,${futures},Commission,USDT,0.05,`),
     );
     expect(events[0].kind).toBe('derivative');
-    expect(events[0].derivative).toEqual({ kind: 'commission' });
+    expect(events[0].derivative).toEqual({
+      kind: 'commission',
+      product: 'futures',
+    });
     expect(events[0].legs).toHaveLength(1);
     expect(events[0].legs[0].direction).toBe('in');
     expect(events[0].legs[0].role).toBe('principal');

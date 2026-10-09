@@ -1122,6 +1122,7 @@ describe('capital events on the report', () => {
         venue: 'futures',
         value: '40',
         kind: 'gain',
+        deducted: true,
         derivativeKind: 'pnl',
         instrument: 'BTCUSDT',
       },

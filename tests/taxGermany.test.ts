@@ -1125,4 +1125,57 @@ describe('german derivatives', () => {
     expect(base.thresholds).toHaveLength(2);
     expect(withCapital.totals).toEqual(base.totals);
   });
+
+  const MARGIN_NOTE =
+    'Margin trading is treated here as a Termingeschäft under §20 EStG. German practice is divided; it may instead be a §23 private sale at your personal rate. Confirm which applies.';
+  const ROLLOVER_NOTE =
+    'A margin rollover is a financing cost. It is shown here but not deducted: §20 Abs. 9 EStG allows no actual Werbungskosten beyond the allowance. Confirm whether it is deductible in your case.';
+
+  it('says a margin settlement is a contested §20 reading', () => {
+    const events = germanTax.classify({
+      ...derivative([{ asset: 'fiat:eur', direction: 'in' }]),
+      derivative: { kind: 'pnl', product: 'margin' },
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0].note).toBe(MARGIN_NOTE);
+    expect(events[0].deductible).toBeUndefined();
+  });
+
+  it('records a rollover fee as a loss it does not deduct', () => {
+    const btc = 'bitcoin:native';
+    const events = germanTax.classify({
+      ...derivative([{ asset: btc, direction: 'out', role: 'fee' }]),
+      derivative: { kind: 'rollover', product: 'margin' },
+    });
+    expect(events[0]).toMatchObject({
+      kind: 'capital-loss',
+      deductible: false,
+      note: ROLLOVER_NOTE,
+    });
+    // The coins still left: the disposal is a plain one.
+    expect(events[1].kind).toBe('disposal');
+    expect(events[1].note).toBeUndefined();
+    expect(events[1].deductible).toBeUndefined();
+  });
+
+  it('keeps an undeducted loss out of the losses and the net', () => {
+    const result = assessCapital(2024, [
+      { ...capitalEvent('capital-loss', '5'), deductible: false },
+      capitalEvent('capital-loss', '200'),
+    ]);
+    expect(result.capital).toMatchObject({
+      losses: '200',
+      notDeducted: '5',
+      net: '-200',
+      loss: '200',
+    });
+  });
+
+  it('adds no note to a futures settlement', () => {
+    const events = germanTax.classify({
+      ...derivative([{ asset: 'fiat:eur', direction: 'out' }]),
+      derivative: { kind: 'pnl', product: 'futures' },
+    });
+    expect(events[0].note).toBeUndefined();
+  });
 });

@@ -732,7 +732,7 @@ describe('Kraken margin and rollover rows', () => {
     );
     expect(events).toHaveLength(1);
     expect(events[0].kind).toBe('derivative');
-    expect(events[0].derivative).toEqual({ kind: 'pnl' });
+    expect(events[0].derivative).toEqual({ kind: 'pnl', product: 'margin' });
     expect(events[0].legs).toEqual([
       {
         assetId: 'fiat:eur',
@@ -755,7 +755,7 @@ describe('Kraken margin and rollover rows', () => {
     const { events } = krakenCsv.parse(
       [header, row('M2', 'margin', '-200.0000', '0.0000')].join('\n'),
     );
-    expect(events[0].derivative).toEqual({ kind: 'pnl' });
+    expect(events[0].derivative).toEqual({ kind: 'pnl', product: 'margin' });
     expect(events[0].legs).toEqual([
       {
         assetId: 'fiat:eur',
@@ -773,7 +773,10 @@ describe('Kraken margin and rollover rows', () => {
     );
     expect(events).toHaveLength(1);
     expect(events[0].kind).toBe('derivative');
-    expect(events[0].derivative).toEqual({ kind: 'rollover' });
+    expect(events[0].derivative).toEqual({
+      kind: 'rollover',
+      product: 'margin',
+    });
     expect(events[0].legs).toEqual([
       {
         assetId: 'fiat:eur',

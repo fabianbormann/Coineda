@@ -26,6 +26,12 @@ export type EventKind =
  *  payment, a margin rollover fee, or a futures commission. */
 export type DerivativeKind = 'pnl' | 'funding' | 'rollover' | 'commission';
 
+/** Which product a derivative settlement came from, as the source knows it:
+ *  a margin position (Kraken `margin`/`rollover` rows) or a futures
+ *  contract (Binance futures rows). Typed so a jurisdiction whose treatment
+ *  differs between the two can branch on it, never on the row's prose. */
+export type DerivativeProduct = 'margin' | 'futures';
+
 /**
  * What a `reward` event is, as the source knows it.
  *
@@ -62,8 +68,13 @@ export type LedgerEvent = {
    *  jurisdictions still read through their legacy heuristics. */
   rewardKind?: RewardKind;
   /** On `kind: 'derivative'` events: what the settlement was. `instrument`
-   *  is provenance only (a pair or symbol the row named), never parsed. */
-  derivative?: { kind: DerivativeKind; instrument?: string };
+   *  is provenance only (a pair or symbol the row named), never parsed.
+   *  `product` is absent on rows written before the field existed. */
+  derivative?: {
+    kind: DerivativeKind;
+    product?: DerivativeProduct;
+    instrument?: string;
+  };
   /** 'derived' rows are discarded and refetched on a re-sync; 'authored'
    *  rows are the user's own and travel in the checkpoint. */
   origin: 'derived' | 'authored';

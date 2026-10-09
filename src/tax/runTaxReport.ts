@@ -355,6 +355,8 @@ export const runTaxReport = async (
         value: event.value ?? '0',
         kind:
           event.kind === 'capital-gain' ? ('gain' as const) : ('loss' as const),
+        deducted: event.deductible !== false,
+        ...(event.note === undefined ? {} : { note: event.note }),
         ...(derivative === undefined
           ? {}
           : { derivativeKind: derivative.kind }),

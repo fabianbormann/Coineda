@@ -76,6 +76,13 @@ export type TaxEvent = {
   consideration?: Consideration;
   /** Why the module emitted this, for the audit trail. Display only. */
   note?: string;
+  /**
+   * On a `capital-loss`: `false` when the jurisdiction records the loss but
+   * does not deduct it (Germany: a margin rollover fee, which §20 Abs. 9
+   * EStG leaves undeductible beyond the allowance), so the report can show
+   * it as not deducted rather than drop it. Absent means deducted.
+   */
+  deductible?: boolean;
 };
 
 /**
@@ -296,7 +303,11 @@ export type ThresholdOutcome = {
  */
 export type CapitalResult = {
   gains: string;
+  /** Deducted losses only. */
   losses: string;
+  /** Losses recorded but not deducted (`TaxEvent.deductible === false`),
+   *  kept out of `losses` and `net`. '0' when there are none. */
+  notDeducted: string;
   net: string;
   /** The allowance applied (Sparer-Pauschbetrag for Germany). */
   allowance: string;
@@ -459,6 +470,10 @@ export type ReportedCapital = {
   venue: string;
   value: string;
   kind: 'gain' | 'loss';
+  /** False for a loss the jurisdiction records but does not deduct. */
+  deducted: boolean;
+  /** Translation key from the tax event: the caveat on this row. */
+  note?: string;
   derivativeKind?: DerivativeKind;
   instrument?: string;
 };

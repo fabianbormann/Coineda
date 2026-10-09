@@ -102,6 +102,14 @@ const SAVER_ALLOWANCE_SCOPE_NOTE =
 const CAPITAL_NOTE =
   'Capital income from Termingeschäfte under §20 Abs. 2 S. 1 Nr. 3 EStG. The estimate is the flat 25 % Abgeltungsteuer on the taxable amount, without Solidaritätszuschlag, Kirchensteuer or the Günstigerprüfung. Losses offset only other capital income (§20 Abs. 6 EStG).';
 const ABGELTUNGSTEUER_PERCENT = '25';
+/** On every capital event from a margin position: the §20 reading is the
+ *  one applied, and it is contested. Keyed on the typed `product`. */
+const MARGIN_NOTE =
+  'Margin trading is treated here as a Termingeschäft under §20 EStG. German practice is divided; it may instead be a §23 private sale at your personal rate. Confirm which applies.';
+/** On a rollover event's capital events, whose fee legs are recorded as a
+ *  loss that is not deducted. */
+const ROLLOVER_NOTE =
+  'A margin rollover is a financing cost. It is shown here but not deducted: §20 Abs. 9 EStG allows no actual Werbungskosten beyond the allowance. Confirm whether it is deductible in your case.';
 
 const BUSINESS_INCOME_NOTE =
   'This reward may be gewerbliche Einkünfte rather than §22 Nr. 3 income. This classification is uncertain, so confirm it yourself before relying on it.';
@@ -262,25 +270,38 @@ const classifyReward = (event: LedgerEvent): TaxEvent[] => {
  * paid) those coins, which keeps the lot ledger and later §23 sales right.
  * Fiat settlements have no holding and stay capital events only.
  */
-const classifyDerivative = (event: LedgerEvent): TaxEvent[] =>
-  event.legs.flatMap((leg) => {
+const classifyDerivative = (event: LedgerEvent): TaxEvent[] => {
+  const isRollover = event.derivative?.kind === 'rollover';
+  // One key per event, never two joined: the rollover note already names
+  // margin, so a rollover row carries it alone.
+  const note = isRollover
+    ? ROLLOVER_NOTE
+    : event.derivative?.product === 'margin'
+      ? MARGIN_NOTE
+      : undefined;
+  return event.legs.flatMap((leg) => {
     const isGain = leg.role === 'principal' && leg.direction === 'in';
-    const capital: TaxEvent = {
+    const base = {
       sourceEventId: event.id,
-      kind: isGain ? 'capital-gain' : 'capital-loss',
       assetId: leg.assetId,
       amount: leg.amount,
       timestamp: event.timestamp,
       venue: leg.venue,
     };
+    const capital: TaxEvent = {
+      ...base,
+      kind: isGain ? 'capital-gain' : 'capital-loss',
+      ...(note === undefined ? {} : { note }),
+      ...(isRollover && leg.role === 'fee' ? { deductible: false } : {}),
+    };
     if (isFiatAsset(leg.assetId)) {
       return [capital];
     }
-    return [
-      capital,
-      { ...capital, kind: isGain ? 'acquisition' : 'disposal' } as TaxEvent,
-    ];
+    // The holding side carries neither the note nor `deductible`: those
+    // describe the §20 figure, not the coins leaving or arriving.
+    return [capital, { ...base, kind: isGain ? 'acquisition' : 'disposal' }];
   });
+};
 
 /**
  * Pure and synchronous - no Date.now(), no Math.random(), no locale
@@ -467,9 +488,17 @@ const assess = (input: AssessInput): TaxAssessment => {
         .filter((event) => event.kind === 'capital-gain')
         .map((event) => event.value ?? '0'),
     );
+    const capitalLosses = input.capital.filter(
+      (event) => event.kind === 'capital-loss',
+    );
     const losses = sumAmounts(
-      input.capital
-        .filter((event) => event.kind === 'capital-loss')
+      capitalLosses
+        .filter((event) => event.deductible !== false)
+        .map((event) => event.value ?? '0'),
+    );
+    const notDeducted = sumAmounts(
+      capitalLosses
+        .filter((event) => event.deductible === false)
         .map((event) => event.value ?? '0'),
     );
     const net = subtractAmounts(gains, losses);
@@ -479,6 +508,7 @@ const assess = (input: AssessInput): TaxAssessment => {
     capital = {
       gains,
       losses,
+      notDeducted,
       net,
       allowance,
       taxable,

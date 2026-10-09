@@ -146,6 +146,45 @@ const sampleEvents: LedgerEvent[] = [
       },
     ],
   },
+  {
+    // A Kraken-shaped margin settlement, so a module's margin caveat is
+    // reached by the note check below.
+    id: 'e7',
+    sourceId: 's1',
+    externalId: 'x7',
+    timestamp: Date.UTC(2024, 10, 2),
+    kind: 'derivative',
+    origin: 'derived',
+    derivative: { kind: 'pnl', product: 'margin' },
+    legs: [
+      {
+        assetId: 'fiat:eur',
+        amount: '4',
+        direction: 'out',
+        venue: 'spot / main',
+        role: 'principal',
+      },
+    ],
+  },
+  {
+    // A margin rollover fee, for the rollover caveat.
+    id: 'e8',
+    sourceId: 's1',
+    externalId: 'x8',
+    timestamp: Date.UTC(2024, 10, 3),
+    kind: 'derivative',
+    origin: 'derived',
+    derivative: { kind: 'rollover', product: 'margin' },
+    legs: [
+      {
+        assetId: 'fiat:eur',
+        amount: '1',
+        direction: 'out',
+        venue: 'spot / main',
+        role: 'fee',
+      },
+    ],
+  },
 ];
 
 /** The sample events' capital events, valued, for assess to consume. */
