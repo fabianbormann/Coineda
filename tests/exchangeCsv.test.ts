@@ -9,7 +9,11 @@ import { findHeaderRow } from '@/sources/coinbase-csv/parse';
 import { readCsvRows } from '@/sources/csv/readCsv';
 import { detectFileModule } from '@/sources/csv/registry';
 import { toBaseUnits } from '@/sources/csv/ledgerShape';
-import { foldHoldings, ownedVenuesOf } from '@/ledger/balances';
+import {
+  foldHoldings,
+  isInternalTransfer,
+  ownedVenuesOf,
+} from '@/ledger/balances';
 import type { LedgerEvent } from '@/ledger/types';
 
 /**
@@ -284,5 +288,81 @@ describe('Coinbase', () => {
     }
     expect(message).toContain('alpha');
     expect(message).toContain('quantity transacted');
+  });
+});
+
+describe('Binance futures rows', () => {
+  const header = 'User_ID,UTC_Time,Account,Operation,Coin,Change,Remark';
+  // BTC stands in for the settlement asset: the asset table has no USDT,
+  // and the parser skips an asset it cannot scale.
+  const csvOf = (...lines: string[]): string => [header, ...lines].join('\n');
+  const futures = 'USDⓈ-M Futures';
+
+  it('maps realized pnl, funding and futures commission', () => {
+    const { events } = binanceCsv.parse(
+      csvOf(
+        `1,2025-03-10 10:00:00,${futures},Realized Profit and Loss,BTC,12.5,`,
+        `1,2025-03-10 11:00:00,${futures},Funding Fee,BTC,-0.3,`,
+        `1,2025-03-10 12:00:00,${futures},Funding Fee,BTC,0.2,`,
+        `1,2025-03-10 13:00:00,${futures},Commission,BTC,-0.05,`,
+      ),
+    );
+    expect(events.map((e) => e.kind)).toEqual([
+      'derivative',
+      'derivative',
+      'derivative',
+      'derivative',
+    ]);
+    expect(events.map((e) => e.derivative?.kind)).toEqual([
+      'pnl',
+      'funding',
+      'funding',
+      'commission',
+    ]);
+    expect(events.map((e) => e.legs.map((l) => l.direction))).toEqual([
+      ['in'],
+      ['out'],
+      ['in'],
+      ['out'],
+    ]);
+    expect(events[3].legs).toHaveLength(1);
+    expect(events[3].legs[0].role).toBe('fee');
+    expect(events[0].legs[0].role).toBe('principal');
+  });
+
+  it('leaves a Spot commission as an "other" reward', () => {
+    const { events } = binanceCsv.parse(
+      csvOf(`1,2025-03-10 10:00:00,Spot,Commission,BTC,0.001,`),
+    );
+    expect(events[0].kind).toBe('reward');
+    expect(events[0].rewardKind).toBe('other');
+    expect(events[0].derivative).toBeUndefined();
+  });
+
+  it('groups the two rows of a wallet transfer into one internal transfer', () => {
+    const at = '2025-03-10 10:00:00';
+    const { events } = binanceCsv.parse(
+      csvOf(
+        `1,${at},Spot,Transfer Between Main and Futures Wallet,BTC,-100,`,
+        `1,${at},${futures},Transfer Between Main and Futures Wallet,BTC,100,`,
+      ),
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0].kind).toBe('transfer');
+    expect(events[0].legs).toHaveLength(2);
+    expect(events[0].legs.every((l) => l.role === 'principal')).toBe(true);
+    const asLedger = { ...events[0], id: 'e1', sourceId: 's1' } as LedgerEvent;
+    expect(isInternalTransfer(asLedger, new Set(['Spot', futures]))).toBe(true);
+  });
+
+  it('keeps a lone wallet-transfer row as a per-row transfer', () => {
+    const { events } = binanceCsv.parse(
+      csvOf(
+        `1,2025-03-10 10:00:00,Spot,Transfer Between Main and Futures Wallet,BTC,-100,`,
+      ),
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0].kind).toBe('transfer');
+    expect(events[0].legs).toHaveLength(1);
   });
 });

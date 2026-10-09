@@ -14,7 +14,17 @@ export type Leg = {
 };
 
 export type EventKind =
-  'trade' | 'transfer' | 'reward' | 'fee' | 'fiat-in' | 'fiat-out';
+  | 'trade'
+  | 'transfer'
+  | 'reward'
+  | 'fee'
+  | 'fiat-in'
+  | 'fiat-out'
+  | 'derivative';
+
+/** What a derivative settlement was: realised profit or loss, a funding
+ *  payment, a margin rollover fee, or a futures commission. */
+export type DerivativeKind = 'pnl' | 'funding' | 'rollover' | 'commission';
 
 /**
  * What a `reward` event is, as the source knows it.
@@ -51,6 +61,9 @@ export type LedgerEvent = {
    *  Absent on rows written before the field existed, which the
    *  jurisdictions still read through their legacy heuristics. */
   rewardKind?: RewardKind;
+  /** On `kind: 'derivative'` events: what the settlement was. `instrument`
+   *  is provenance only (a pair or symbol the row named), never parsed. */
+  derivative?: { kind: DerivativeKind; instrument?: string };
   /** 'derived' rows are discarded and refetched on a re-sync; 'authored'
    *  rows are the user's own and travel in the checkpoint. */
   origin: 'derived' | 'authored';

@@ -73,6 +73,11 @@ const KINDS: Record<string, EventKind> = {
   earn: 'reward',
   dividend: 'reward',
   sale: 'trade',
+  // Realised settlements of a margin position, and the fee for keeping one
+  // open. `settled` rows stay skipped: they are spot movements the ledger
+  // cannot yet pair with the position.
+  margin: 'derivative',
+  rollover: 'derivative',
 };
 
 /** What each reward-bearing row type is. `earn` and `reward` are Kraken's
@@ -339,6 +344,9 @@ export const parse = (input: string): ParseResult => {
       ...(kind === 'reward' &&
       !(rawType === 'earn' && EARN_MOVEMENT_SUBTYPES.has(subtype))
         ? { rewardKind: REWARD_KINDS[rawType] }
+        : {}),
+      ...(kind === 'derivative'
+        ? { derivative: { kind: rawType === 'rollover' ? 'rollover' : 'pnl' } }
         : {}),
       // Provenance only, never parsed: the refid is what ties the two rows
       // of one trade together in Kraken's own export, which is what a

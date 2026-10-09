@@ -3,7 +3,12 @@ import { readCsv, type CsvRow } from '@/sources/csv/readCsv';
 import { makeSkipLog, toBaseUnits } from '@/sources/csv/ledgerShape';
 import type { ParseResult } from '@/sources/csv/types';
 import type { DerivedEvent } from '@/sources/types';
-import type { EventKind, Leg, RewardKind } from '@/ledger/types';
+import type {
+  DerivativeKind,
+  EventKind,
+  Leg,
+  RewardKind,
+} from '@/ledger/types';
 
 /**
  * Binance's "Transaction History" export.
@@ -58,7 +63,22 @@ const KINDS: Record<string, EventKind> = {
   'simple earn flexible interest': 'reward',
   distribution: 'reward',
   commission: 'reward',
+  'realized profit and loss': 'derivative',
+  'insurance fund compensation': 'derivative',
+  'funding fee': 'derivative',
+  'transfer between main and futures wallet': 'transfer',
 };
+
+/** What each futures settlement operation is. A futures `commission` is
+ *  handled apart, because the same operation name on Spot is a referral
+ *  reward. */
+const DERIVATIVE_KINDS: Record<string, DerivativeKind> = {
+  'realized profit and loss': 'pnl',
+  'insurance fund compensation': 'pnl',
+  'funding fee': 'funding',
+};
+
+const WALLET_TRANSFER = 'transfer between main and futures wallet';
 
 /** What each reward operation is. */
 const REWARD_KINDS: Record<string, RewardKind> = {
@@ -140,6 +160,8 @@ export const parse = (input: string): ParseResult => {
 
   const events: DerivedEvent[] = [];
   const skipped = makeSkipLog();
+  /** Wallet-transfer events still waiting for their other half. */
+  const pending = new Map<string, DerivedEvent[]>();
 
   rows.forEach((row, index) => {
     const operation = cell(row, 'operation').toLowerCase();
@@ -153,7 +175,15 @@ export const parse = (input: string): ParseResult => {
     }
 
     const isFee = FEE_OPERATIONS.has(operation);
-    const kind = isFee ? 'trade' : KINDS[operation];
+    // A commission paid in a futures account is a trading cost, not a
+    // referral reward: the same operation name means both on Binance.
+    const isFuturesCommission =
+      operation === 'commission' && /futures/i.test(account);
+    const kind: EventKind | undefined = isFee
+      ? 'trade'
+      : isFuturesCommission
+        ? 'derivative'
+        : KINDS[operation];
     if (kind === undefined) {
       skipped.note(`rows of operation "${operation}"`);
       return;
@@ -193,11 +223,15 @@ export const parse = (input: string): ParseResult => {
         // same either way, but a jurisdiction's internal-transfer test
         // deliberately ignores fee legs, so mislabelling one turns a
         // transfer into a disposal.
-        role: isFee ? 'fee' : 'principal',
+        role: isFee || isFuturesCommission ? 'fee' : 'principal',
       },
     ];
 
-    events.push({
+    const derivative: DerivativeKind | undefined = isFuturesCommission
+      ? 'commission'
+      : DERIVATIVE_KINDS[operation];
+
+    const event: DerivedEvent = {
       // Binance gives no row id. The timestamp alone collides across the
       // legs of one trade, so the row's position carries the identity -
       // which makes a re-import of the SAME export converge, and a re-export
@@ -210,8 +244,35 @@ export const parse = (input: string): ParseResult => {
       origin: 'derived',
       legs,
       ...(kind === 'reward' ? { rewardKind: REWARD_KINDS[operation] } : {}),
+      ...(kind === 'derivative' && derivative !== undefined
+        ? { derivative: { kind: derivative } }
+        : {}),
       note: `Binance ${operation}`,
-    });
+    };
+    events.push(event);
+
+    // The spot and futures halves of one wallet transfer are two rows with
+    // the same timestamp, coin and absolute amount and opposite signs.
+    // Grouped into one event they net to zero between two owned venues, as
+    // Kraken's spot-to-staking rows do; left apart, every futures top-up
+    // would read as a disposal. A row that never finds its partner stays
+    // the per-row event it already is.
+    if (operation === WALLET_TRANSFER) {
+      const key = `${at}|${coin.trim().toUpperCase()}|${moved.abs().toString()}`;
+      const waiting = pending.get(key) ?? [];
+      const partner = waiting.find(
+        (candidate) => candidate.legs[0].direction !== legs[0].direction,
+      );
+      if (partner) {
+        partner.legs.push(...legs);
+        partner.externalId = `${at}#transfer#${coin}`;
+        events.pop();
+        waiting.splice(waiting.indexOf(partner), 1);
+      } else {
+        waiting.push(event);
+        pending.set(key, waiting);
+      }
+    }
   });
 
   return { events, skipped: skipped.lines() };

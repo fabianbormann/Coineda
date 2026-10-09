@@ -31,6 +31,7 @@ const KIND_LABELS: Record<EventKind, string> = {
   fee: 'Fee',
   'fiat-in': 'Deposit',
   'fiat-out': 'Withdrawal',
+  derivative: 'Derivative settlement',
 };
 
 type Props = {

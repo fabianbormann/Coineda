@@ -714,3 +714,74 @@ describe('the asset codes a real export actually uses', () => {
     expect(events[1].legs[0].amount).toBe('500000');
   });
 });
+
+describe('Kraken margin and rollover rows', () => {
+  const header =
+    '"txid","refid","time","type","subtype","aclass","asset","wallet","amount","fee","balance"';
+  const row = (
+    txid: string,
+    type: string,
+    amount: string,
+    fee: string,
+  ): string =>
+    `"${txid}","R-${txid}","2025-10-01 13:43:14","${type}","","currency","ZEUR","spot / main","${amount}","${fee}","0"`;
+
+  it('records a profitable margin settlement as pnl with its fee', () => {
+    const { events } = krakenCsv.parse(
+      [header, row('M1', 'margin', '500.0000', '1.2500')].join('\n'),
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0].kind).toBe('derivative');
+    expect(events[0].derivative).toEqual({ kind: 'pnl' });
+    expect(events[0].legs).toEqual([
+      {
+        assetId: 'fiat:eur',
+        amount: '500',
+        direction: 'in',
+        venue: 'spot / main',
+        role: 'principal',
+      },
+      {
+        assetId: 'fiat:eur',
+        amount: '1.25',
+        direction: 'out',
+        venue: 'spot / main',
+        role: 'fee',
+      },
+    ]);
+  });
+
+  it('records a losing margin settlement as an outgoing principal', () => {
+    const { events } = krakenCsv.parse(
+      [header, row('M2', 'margin', '-200.0000', '0.0000')].join('\n'),
+    );
+    expect(events[0].derivative).toEqual({ kind: 'pnl' });
+    expect(events[0].legs).toEqual([
+      {
+        assetId: 'fiat:eur',
+        amount: '200',
+        direction: 'out',
+        venue: 'spot / main',
+        role: 'principal',
+      },
+    ]);
+  });
+
+  it('records a rollover as a fee-only derivative event', () => {
+    const { events } = krakenCsv.parse(
+      [header, row('M3', 'rollover', '0.0000', '5.0000')].join('\n'),
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0].kind).toBe('derivative');
+    expect(events[0].derivative).toEqual({ kind: 'rollover' });
+    expect(events[0].legs).toEqual([
+      {
+        assetId: 'fiat:eur',
+        amount: '5',
+        direction: 'out',
+        venue: 'spot / main',
+        role: 'fee',
+      },
+    ]);
+  });
+});
