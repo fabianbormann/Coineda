@@ -216,3 +216,36 @@ describe('trade fees reach the gain', () => {
     expect(report.lines.every((line) => line.costs === '0')).toBe(true);
   });
 });
+
+describe('income rows', () => {
+  it('prints a staking reward with its value, venue and the module note', async () => {
+    await putEvents([
+      event({
+        id: 'reward',
+        externalId: 'reward',
+        kind: 'reward',
+        timestamp: Date.UTC(2025, 3, 1),
+        raw: { epoch: 500, type: 'leader' },
+        legs: [
+          leg({
+            assetId: ADA,
+            amount: ada(5),
+            direction: 'in',
+            venue: 'stake1',
+          }),
+        ],
+      }),
+    ]);
+
+    const report = await runGermany(2025);
+
+    expect(report.income).toHaveLength(1);
+    expect(report.income[0]).toMatchObject({
+      assetId: ADA,
+      amount: ada(5),
+      venue: 'stake1',
+      value: '5',
+    });
+    expect(report.income[0].note).toMatch(/gewerbliche Einkünfte/);
+  });
+});

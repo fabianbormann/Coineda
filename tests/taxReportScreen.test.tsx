@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import 'fake-indexeddb/auto';
 import i18n from '@/i18n';
@@ -1565,5 +1565,39 @@ describe('the form and the report are separate steps', () => {
     expect(
       screen.getByRole('button', { name: /view the report|zum report/i }),
     ).toBeInTheDocument();
+  });
+
+  it('lists each income event under its own heading', async () => {
+    taxRegistry.push(germanTax);
+    await putEvents([
+      ledgerEvent({
+        id: 'reward',
+        externalId: 'reward',
+        kind: 'reward',
+        timestamp: Date.UTC(new Date().getUTCFullYear(), 0, 2),
+        raw: { epoch: 1, type: 'member' },
+        legs: [
+          {
+            assetId: 'fiat:eur',
+            amount: '5',
+            direction: 'in',
+            venue: 'stake-venue',
+            role: 'principal',
+          },
+        ],
+      }),
+    ]);
+
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /germany/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /run report/i }),
+    );
+
+    const section = await screen.findByTestId('income-lines');
+    expect(within(section).getByText(/stake-venue/)).toBeInTheDocument();
+    expect(within(section).getByText(/value at receipt/i)).toBeInTheDocument();
   });
 });

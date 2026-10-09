@@ -15,6 +15,7 @@ import type {
   MatchedDisposal,
   MatchingMethod,
   ReportedDisposal,
+  ReportedIncome,
   ReportMethod,
   TaxEvent,
   TaxModule,
@@ -248,6 +249,27 @@ export const runTaxReport = async (
       event.kind === 'income' && taxYearOf(event.timestamp) === options.year,
   );
 
+  // Sorted here rather than left to insertion order, which came from the
+  // order sources happened to sync in: a document's rows must not reorder
+  // between two runs of the same data.
+  const income: ReportedIncome[] = yearIncome
+    .map((event) => ({
+      sourceEventId: event.sourceEventId,
+      assetId: event.assetId,
+      amount: event.amount,
+      timestamp: event.timestamp,
+      venue: event.venue,
+      // `valued` only ever holds events resolveValues gave a value to;
+      // the fallback is for the type, not for a case that occurs.
+      value: event.value ?? '0',
+      ...(event.note === undefined ? {} : { note: event.note }),
+    }))
+    .sort(
+      (a, b) =>
+        a.timestamp - b.timestamp ||
+        a.sourceEventId.localeCompare(b.sourceEventId),
+    );
+
   const assessment = module.assess({
     year: options.year,
     matched: yearMatched,
@@ -374,6 +396,7 @@ export const runTaxReport = async (
   return {
     ...assessment,
     lines,
+    income,
     method,
     unresolved: [...assessment.unresolved, ...unresolved],
     omittedDisposals,

@@ -1330,7 +1330,50 @@ export const TaxReportScreen = () => {
                   )}
                 </div>
 
-                {/* 5. Unresolved items, grouped by kind, each reason shown
+                {/* 5. Income, one row per event. The total above is what
+                    the Freigrenze is tested against; these are what it is
+                    made of. Printed in full, like the disposals: a sum a
+                    reader cannot decompose is a sum they cannot check. */}
+                <div className="flex flex-col gap-2" data-testid="income-lines">
+                  <h3 className="text-sm font-semibold">{t('Income')}</h3>
+                  {assessment.income.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t('No income in this year.')}
+                    </p>
+                  ) : (
+                    assessment.income.map((row) => (
+                      <Card key={row.sourceEventId}>
+                        <CardContent className="flex flex-col gap-1 text-sm">
+                          <p className="font-medium">
+                            {formatDate(row.timestamp)} ·{' '}
+                            <span className="print:hidden">
+                              {symbolOf(row.assetId)} ·{' '}
+                            </span>
+                            <CryptoAmount
+                              value={row.amount}
+                              assetId={row.assetId}
+                            />{' '}
+                            · {row.venue}
+                          </p>
+                          <p>
+                            {t('Value at receipt')}:{' '}
+                            <Money
+                              value={Number(row.value)}
+                              currency={baseCurrency}
+                            />
+                          </p>
+                          {row.note !== undefined && (
+                            <p className="text-muted-foreground">
+                              {t(row.note)}
+                            </p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </div>
+
+                {/* 6. Unresolved items, grouped by kind, each reason shown
                     verbatim - never a resolution action, that is a later
                     milestone. */}
                 {assessment.unresolved.length > 0 && (

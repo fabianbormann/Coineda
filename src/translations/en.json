@@ -306,6 +306,8 @@
     "{{count}} other unresolved items are not disposals in this year - each one is listed below": "{{count}} other unresolved items are not disposals in this year - each one is listed below",
     "Tax-free gain": "Tax-free gain",
     "Income": "Income",
+    "No income in this year.": "No income in this year.",
+    "Value at receipt": "Value at receipt",
     "Estimated tax liability": "Estimated tax liability",
     "Thresholds": "Thresholds",
     "This is a Freigrenze: once the limit is reached, the entire gain becomes taxable, not just the excess.": "This is a Freigrenze: once the limit is reached, the entire gain becomes taxable, not just the excess.",

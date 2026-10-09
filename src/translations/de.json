@@ -306,6 +306,8 @@
     "{{count}} other unresolved items are not disposals in this year - each one is listed below": "{{count}} weitere offene Punkte sind keine Veräußerungen in diesem Jahr - jeder davon ist unten aufgeführt",
     "Tax-free gain": "Steuerfreier Gewinn",
     "Income": "Einkünfte",
+    "No income in this year.": "Keine Einkünfte in diesem Jahr.",
+    "Value at receipt": "Wert bei Zufluss",
     "Estimated tax liability": "Geschätzte Steuerschuld",
     "Thresholds": "Freigrenzen und Freibeträge",
     "This is a Freigrenze: once the limit is reached, the entire gain becomes taxable, not just the excess.": "Das ist eine Freigrenze: Sobald die Grenze erreicht ist, wird der gesamte Gewinn steuerpflichtig, nicht nur der übersteigende Teil.",

@@ -893,3 +893,103 @@ describe('naming what could not be computed', () => {
     expect(item.txHash).toBe('abc123def456');
   });
 });
+
+describe('income on the report', () => {
+  const incomeModule: TaxModule = {
+    ...stubModule,
+    classify: (event) =>
+      event.kind === 'reward'
+        ? event.legs.map((leg, index) => ({
+            sourceEventId: `${event.id}:${index}`,
+            kind: 'income' as const,
+            assetId: leg.assetId,
+            amount: leg.amount,
+            timestamp: event.timestamp,
+            venue: leg.venue,
+            note: 'Test note key',
+          }))
+        : stubModule.classify(event),
+  };
+
+  const rewardLeg = (assetId: string, amount: string) => ({
+    assetId,
+    amount,
+    direction: 'in' as const,
+    venue: 'stake1',
+    role: 'principal' as const,
+  });
+
+  it('carries every valued income event of the year, in date order', async () => {
+    await putEvents([
+      ledgerEvent({
+        id: 'r-late',
+        externalId: 'r-late',
+        kind: 'reward',
+        timestamp: Date.UTC(2025, 8, 1),
+        legs: [rewardLeg('fiat:eur', '5')],
+      }),
+      ledgerEvent({
+        id: 'r-early',
+        externalId: 'r-early',
+        kind: 'reward',
+        timestamp: Date.UTC(2025, 1, 1),
+        legs: [rewardLeg('fiat:eur', '3')],
+      }),
+      ledgerEvent({
+        id: 'r-other-year',
+        externalId: 'r-other-year',
+        kind: 'reward',
+        timestamp: Date.UTC(2024, 1, 1),
+        legs: [rewardLeg('fiat:eur', '9')],
+      }),
+    ]);
+
+    const report = await runTaxReport(incomeModule, {
+      year: 2025,
+      baseCurrency: 'eur',
+    });
+
+    expect(report.income.map((row) => row.sourceEventId)).toEqual([
+      'r-early:0',
+      'r-late:0',
+    ]);
+    expect(report.income[0]).toEqual({
+      sourceEventId: 'r-early:0',
+      assetId: 'fiat:eur',
+      amount: '3',
+      timestamp: Date.UTC(2025, 1, 1),
+      venue: 'stake1',
+      value: '3',
+      note: 'Test note key',
+    });
+  });
+
+  it('leaves an unpriced income event out of the rows and in the unresolved list', async () => {
+    // REVIEW FOCUS 5.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('', { status: 404 })),
+    );
+    await putEvents([
+      ledgerEvent({
+        id: 'r-unpriced',
+        externalId: 'r-unpriced',
+        kind: 'reward',
+        timestamp: Date.UTC(2025, 1, 1),
+        legs: [rewardLeg('cardano:deadbeef.NoSuchToken', '5')],
+      }),
+    ]);
+
+    const report = await runTaxReport(incomeModule, {
+      year: 2025,
+      baseCurrency: 'eur',
+    });
+
+    expect(report.income).toEqual([]);
+    const gap = report.unresolved.find(
+      (item) => item.sourceEventId === 'r-unpriced:0',
+    );
+    expect(gap?.kind).toBe('needs-price');
+    expect(gap?.taxEventKind).toBe('income');
+  });
+});

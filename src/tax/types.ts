@@ -358,6 +358,26 @@ export type ReportMethod = {
 };
 
 /**
+ * One income event as the report prints it: what arrived, where, when,
+ * and what it was worth that day. The sum of `value` over a year is what
+ * `totals.income` is tested against the §22 Nr. 3 Freigrenze, and a sum
+ * with no rows behind it is a figure a reader cannot check - the same
+ * reason disposals print their lots.
+ *
+ * `note` is the jurisdiction's own key (Germany's leader-reward caveat),
+ * rendered through t(). Before this it was never shown anywhere.
+ */
+export type ReportedIncome = {
+  sourceEventId: string;
+  assetId: string;
+  amount: string;
+  timestamp: number;
+  venue: string;
+  value: string;
+  note?: string;
+};
+
+/**
  * What `runTaxReport` returns: a module's assessment plus everything only
  * the host knows.
  *
@@ -369,6 +389,8 @@ export type ReportMethod = {
  */
 export type TaxReport = Omit<TaxAssessment, 'lines'> & {
   lines: ReportedDisposal[];
+  /** The valued income events of the year, in date order. */
+  income: ReportedIncome[];
   method: ReportMethod;
   /**
    * The items behind `totals.omitted`, not just how many there were.
