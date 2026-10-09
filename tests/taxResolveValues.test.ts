@@ -424,3 +424,124 @@ describe('transaction costs', () => {
     expect(costEntry?.taxEventKind).toBeUndefined();
   });
 });
+
+describe('consideration', () => {
+  it('values a euro buy at the euro paid, asking nobody', async () => {
+    const fetchMock = rangeStub(() => 2);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { valued, unpriced } = await resolveValues(
+      [
+        event({
+          kind: 'acquisition',
+          amount: '1000000',
+          consideration: { assetId: 'fiat:eur', amount: '500' },
+        }),
+      ],
+      'eur',
+    );
+
+    expect(valued[0].value).toBe('500');
+    expect(unpriced).toHaveLength(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('values a dollar sale at the euro value of the dollars received', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (String(url).includes('frankfurter')) {
+          return new Response(
+            JSON.stringify({
+              base: 'USD',
+              rates: { '2026-09-15': { EUR: 0.85 } },
+            }),
+            { status: 200 },
+          );
+        }
+        throw new Error(`nobody but the ECB may be asked: ${url}`);
+      }),
+    );
+
+    const { valued, unpriced } = await resolveValues(
+      [
+        event({
+          amount: '1000000',
+          consideration: { assetId: 'fiat:usd', amount: '100' },
+        }),
+      ],
+      'eur',
+    );
+
+    expect(unpriced).toHaveLength(0);
+    expect(valued[0].value).toBe('85');
+  });
+
+  it('lists an unpriceable consideration rather than falling back to market', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (String(url).includes('frankfurter')) {
+        return new Response(JSON.stringify({ base: 'XYZ', rates: {} }), {
+          status: 200,
+        });
+      }
+      return new Response(JSON.stringify({ prices: [] }), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { valued, unpriced } = await resolveValues(
+      [
+        event({
+          sourceEventId: 'odd-pair',
+          amount: '1000000',
+          consideration: { assetId: 'fiat:xyz', amount: '100' },
+        }),
+      ],
+      'eur',
+    );
+
+    expect(valued).toHaveLength(0);
+    expect(unpriced).toHaveLength(1);
+    expect(unpriced[0]).toMatchObject({
+      kind: 'needs-price',
+      sourceEventId: 'odd-pair',
+      taxEventKind: 'disposal',
+      reason: {
+        key: 'No price for {{asset}} on {{date}}.',
+        params: { asset: 'fiat:xyz', date: '2026-09-15' },
+      },
+    });
+    // The leg's own asset was never priced: the consideration IS the value.
+    expect(coinGeckoCalls(fetchMock)).toEqual([]);
+  });
+
+  it('never blames the free tier for a fiat asset the ECB does not list', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (String(url).includes('frankfurter')) {
+          return new Response(JSON.stringify({ base: 'XYZ', rates: {} }), {
+            status: 200,
+          });
+        }
+        return new Response(JSON.stringify({ prices: [] }), { status: 200 });
+      }),
+    );
+
+    const { unpriced } = await resolveValues(
+      [
+        event({
+          amount: '1000000',
+          timestamp: Date.UTC(2024, 8, 15, 12),
+          consideration: { assetId: 'fiat:xyz', amount: '100' },
+        }),
+      ],
+      'eur',
+    );
+
+    expect(unpriced).toHaveLength(1);
+    expect(unpriced[0].reason).toEqual({
+      key: 'No price for {{asset}} on {{date}}.',
+      params: { asset: 'fiat:xyz', date: '2024-09-15' },
+    });
+  });
+});

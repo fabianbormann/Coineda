@@ -888,6 +888,11 @@ export const TaxReportScreen = () => {
                           "Each event is valued at its asset's price on the UTC calendar day it happened, not at the price when this report was run.",
                         )}
                       </p>
+                      <p className="text-muted-foreground">
+                        {t(
+                          "Trades against a fiat currency are valued at the fiat amount actually paid or received, converted at the ECB reference rate when it is not the base currency; everything else at the day's market price.",
+                        )}
+                      </p>
                       <p>
                         <span className="font-medium">
                           {t('Price sources')}:{' '}

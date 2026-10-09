@@ -281,9 +281,11 @@ describe('a real Kraken export', () => {
     // with no crypto leg to carry the fee, and the 1.30 EUR never reached
     // the cost basis. The parser groups a trade's rows, so it does now.
     //
-    // Bitcoin is priced at 50,000 EUR, so the 0.01 BTC the fixture buys is
-    // worth exactly the 500 EUR paid: the lot's cost basis is 500 + 1.3.
-    vi.stubGlobal('fetch', flatRange(50000));
+    // Bitcoin is priced at 60,000 EUR, so the 0.01 BTC the fixture buys
+    // would be worth 600 at market - but 500 EUR is what was paid, and
+    // that, plus the 1.30 fee, is the lot's cost basis. Market price no
+    // longer enters a euro trade at all.
+    vi.stubGlobal('fetch', flatRange(60000));
     const text = readFileSync(
       path.join(__dirname, '../src/sources/kraken-csv/fixtures/ledgers.csv'),
       'utf8',

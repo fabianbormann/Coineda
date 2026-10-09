@@ -165,7 +165,7 @@ const lookUp = async (
       // vague "not covered".
       results.set(key, {
         reason:
-          Date.parse(`${date}T00:00:00Z`) < cutoff
+          !isFiatAsset(assetId) && Date.parse(`${date}T00:00:00Z`) < cutoff
             ? freeTierReason()
             : {
                 key: PRICE_REASON_KEYS[2],
@@ -180,7 +180,10 @@ const lookUp = async (
 
 /**
  * Values each event in the base currency, at the price its asset had on
- * the UTC calendar day the event happened - not today's price.
+ * the UTC calendar day the event happened - not today's price. A trade
+ * against fiat is valued at its `consideration`, the fiat amount actually
+ * paid or received, converted at the ECB rate when it is not the base
+ * currency.
  *
  * `fiat:{currency}` is resolved to exactly 1 before the cache or the
  * provider are even consulted, the same rule resolveSpotPrices already
@@ -216,8 +219,16 @@ export const resolveValues = async (
       pairs.set(key, { assetId, date });
     }
   };
+  /** The asset and amount an event is valued BY: its consideration when
+   *  the trade had a fiat side, otherwise its own leg. */
+  const basisOf = (taxEvent: TaxEvent): { assetId: string; amount: string } =>
+    taxEvent.consideration ?? {
+      assetId: taxEvent.assetId,
+      amount: taxEvent.amount,
+    };
+
   for (const taxEvent of events) {
-    need(taxEvent.assetId, taxEvent.timestamp);
+    need(basisOf(taxEvent).assetId, taxEvent.timestamp);
     for (const cost of taxEvent.costs ?? []) {
       need(cost.assetId, taxEvent.timestamp);
     }
@@ -257,7 +268,13 @@ export const resolveValues = async (
   const unpriced: UnresolvedItem[] = [];
 
   for (const taxEvent of events) {
-    const own = valueAt(taxEvent.assetId, taxEvent.amount, taxEvent.timestamp);
+    // Valued at the consideration when there is one - the euro actually
+    // paid or received - and never at the leg's market price in its place:
+    // a consideration that cannot be priced is listed, because quietly
+    // substituting the market value would bring back the spread the
+    // consideration exists to remove.
+    const basis = basisOf(taxEvent);
+    const own = valueAt(basis.assetId, basis.amount, taxEvent.timestamp);
     if ('reason' in own) {
       unpriced.push({
         kind: 'needs-price',

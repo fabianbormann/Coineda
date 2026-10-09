@@ -236,7 +236,9 @@ describe('the host nets an event before a jurisdiction classifies it', () => {
         kind: 'trade',
         legs: [
           leg({ amount: ada(498), direction: 'out' }),
-          leg({ amount: '498', direction: 'in', assetId: 'fiat:eur' }),
+          // The euro actually received now values the sale, so it has to be
+          // what 498 ADA fetch at the rising price of 3, not a stale 498.
+          leg({ amount: '1494', direction: 'in', assetId: 'fiat:eur' }),
         ],
       }),
     ]);
