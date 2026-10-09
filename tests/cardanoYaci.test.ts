@@ -152,12 +152,45 @@ describe('cardano-yaci', () => {
     } while (cursor !== null);
     expect(rewards.length).toBeGreaterThan(0);
     for (const event of rewards) {
-      const type = (event.raw as { type: string }).type;
-      expect(event.rewardKind).toBe(type === 'leader' ? 'leader' : 'staking');
+      expect((event.raw as { type: string }).type).toBe('member');
+      expect(event.rewardKind).toBe('staking');
     }
-    // The recorded rewards are member rewards; the leader branch is the
-    // one-line ternary in the translator, not reachable from these fixtures.
-    expect(rewards.some((e) => e.rewardKind === 'staking')).toBe(true);
+  });
+
+  it('types only member and leader records, never a deposit refund', async () => {
+    // The recorded rewards are all member rewards, so the other provider
+    // types are served by retyping two of them. A pool deposit refund is
+    // not a staking reward: it must carry no kind, so the tax module lists
+    // it as unclassified instead of taxing it as income.
+    const fixtures = withRewardsForTrackedAccount(await loadFixtures());
+    const recorded = fixtures.get(rewardsUrl(TRACKED_STAKE))!;
+    const body = (recorded.body as { type: string }[]).map((record, index) =>
+      index === 0
+        ? { ...record, type: 'leader' }
+        : index === 1
+          ? { ...record, type: 'pool_deposit_refund' }
+          : record,
+    );
+    stubFetch(
+      new Map(fixtures).set(rewardsUrl(TRACKED_STAKE), { ...recorded, body }),
+    );
+    const rewards = [];
+    let cursor: string | null = null;
+    do {
+      const page: Awaited<ReturnType<typeof cardanoYaci.fetchEvents>> =
+        await cardanoYaci.fetchEvents(config, cursor);
+      rewards.push(...page.events.filter((e) => e.kind === 'reward'));
+      cursor = page.cursor;
+    } while (cursor !== null);
+    const kindByType = new Map(
+      rewards.map((event) => [
+        (event.raw as { type: string }).type,
+        'rewardKind' in event ? event.rewardKind : 'absent',
+      ]),
+    );
+    expect(kindByType.get('member')).toBe('staking');
+    expect(kindByType.get('leader')).toBe('leader');
+    expect(kindByType.get('pool_deposit_refund')).toBe('absent');
   });
 
   it('declares every kind the shared translator can emit', () => {

@@ -25,6 +25,10 @@ export const legacyRewardKind = (
   const rawType = (event.raw as { type?: unknown } | undefined)?.type;
   if (rawType === 'leader') return 'leader';
   if (rawType === 'member') return 'staking';
+  // A Cardano record of any other type (a pool deposit refund, a treasury
+  // payout) is not a staking reward, and its note still says "staking
+  // reward (...)": the record decides, and the note must not promote it.
+  if (rawType !== undefined) return undefined;
   if (/staking/i.test(event.note ?? '')) return 'staking';
   return undefined;
 };

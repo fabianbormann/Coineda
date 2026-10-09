@@ -3,6 +3,7 @@ import germanTax, { heldMoreThanOneYear } from '@/tax/jurisdictions/de';
 import type { LedgerEvent, RewardKind } from '@/ledger/types';
 import type { MatchedDisposal, TaxEvent } from '@/tax/types';
 import { subtractAmounts } from '@/ledger/amount';
+import { legacyRewardKind } from '@/tax/rewardKinds';
 
 const disposal = (
   overrides: Partial<MatchedDisposal> & { heldDays: number; gain: string },
@@ -892,6 +893,18 @@ describe('german reward kinds', () => {
       reward(undefined, undefined, { raw: { type: 'member' } }),
     );
     expect(events.map((e) => e.kind).sort()).toEqual(['acquisition', 'income']);
+  });
+
+  it('never reads a Cardano deposit refund as staking from its note', () => {
+    // The translator's note says "staking reward (...)" for every provider
+    // record; the record's own type decides, so the note cannot promote a
+    // pool deposit refund into staking income.
+    const refund = reward(undefined, undefined, {
+      raw: { type: 'pool_deposit_refund' },
+      note: 'staking reward (pool_deposit_refund), epoch 1',
+    });
+    expect(legacyRewardKind(refund)).toBeUndefined();
+    expect(germanTax.classify(refund)).toEqual([]);
   });
 
   it('takes the income amount from the principal leg, not a fee leg', () => {

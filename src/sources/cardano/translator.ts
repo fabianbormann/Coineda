@@ -53,6 +53,9 @@ type AddressTransaction = {
   block_time: number;
 };
 
+const rewardKindOfType = (type: string): RewardKind | undefined =>
+  type === 'member' ? 'staking' : type === 'leader' ? 'leader' : undefined;
+
 type EpochReward = {
   epoch: number;
   /** A JSON NUMBER here, unlike the utxo endpoints' strings - see
@@ -194,6 +197,7 @@ export const fetchRewardEvents = async (
 
   const events: DerivedEvent[] = [];
   for (const reward of rewards) {
+    const rewardKind = rewardKindOfType(reward.type);
     events.push({
       // Stable across replays, which is what the host's dedupe on
       // (sourceId, externalId) depends on: one reward per account per epoch
@@ -207,9 +211,12 @@ export const fetchRewardEvents = async (
       // data rather than only as prose in `note` - a jurisdiction that taxes
       // a pool operator's leader rewards as business income needs to branch
       // on it, and branching on a sentence is not a contract.
-      rewardKind: (reward.type === 'leader'
-        ? 'leader'
-        : 'staking') as RewardKind,
+      //
+      // Only the two delegation reward types are typed. Anything else the
+      // provider reports here (a pool deposit refund, a treasury or reserves
+      // payout) is not a staking reward, so it carries no kind and surfaces
+      // as unclassified rather than being taxed as income by default.
+      ...(rewardKind === undefined ? {} : { rewardKind }),
       raw: reward,
       legs: [
         {
