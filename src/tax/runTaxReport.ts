@@ -60,6 +60,17 @@ export const HOST_REASON_KEYS = [
   'No acquisition is on record for this disposal.',
 ] as const;
 
+/**
+ * What a report line says when it is the coins a transfer between the
+ * user's own venues consumed (see residualTransferEvents). Without it the
+ * printed report shows an unexplained few satoshi leaving an exchange, and
+ * a reader cannot tie the method sheet's count to any line. Exported, like
+ * HOST_REASON_KEYS, so the conformance gate can check it is keyed in every
+ * locale.
+ */
+export const RESIDUAL_ORIGIN_KEY =
+  'Network fee on a transfer between your own wallets, disposed of at market value and not deducted.';
+
 /** A ledger event the module's `classify` produced nothing for. Recorded
  *  so a new `EventKind` the module has not been taught about cannot vanish
  *  from a report silently - it shows up as something to resolve instead.
@@ -373,6 +384,8 @@ export const runTaxReport = async (
     }
   }
 
+  const residualIds = new Set(residuals.map((event) => event.id));
+
   const lines: ReportedDisposal[] = assessment.lines.map((line) => {
     const queue = byDisposalId.get(line.disposalEventId);
     // Narrowed by assetId first, because a module's line carries one and a
@@ -392,12 +405,23 @@ export const runTaxReport = async (
         `tax module "${module.manifest.id}" assessed a disposal it was not handed: ${line.disposalEventId} (${line.assetId})`,
       );
     }
-    return {
+    const reported: ReportedDisposal = {
       ...line,
       amount: disposal.amount,
       venue: disposal.venue,
       consumed: disposal.consumed,
       costs: disposal.costs,
+    };
+    if (!residualIds.has(line.disposalEventId)) {
+      return reported;
+    }
+    const txHash = eventById.get(line.disposalEventId)?.txHash;
+    return {
+      ...reported,
+      origin:
+        txHash === undefined
+          ? { key: RESIDUAL_ORIGIN_KEY }
+          : { key: RESIDUAL_ORIGIN_KEY, txHash },
     };
   });
 

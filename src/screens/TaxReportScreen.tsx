@@ -1319,6 +1319,19 @@ export const TaxReportScreen = () => {
                           <p className="text-muted-foreground">
                             {t(line.reason.key, line.reason.params)}
                           </p>
+                          {line.origin !== undefined && (
+                            <p className="text-muted-foreground">
+                              {t(line.origin.key)}
+                              {line.origin.txHash !== undefined && (
+                                <>
+                                  {' · '}
+                                  <span className="font-mono break-all">
+                                    {line.origin.txHash}
+                                  </span>
+                                </>
+                              )}
+                            </p>
+                          )}
                           {/* The lots behind the figures.
                               A holding period is a claim about WHEN
                               something was bought, and a report that states

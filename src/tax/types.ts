@@ -351,6 +351,13 @@ export type ReportedDisposal = AssessedDisposal & {
    * document filed with an authority.
    */
   consumed: ConsumedLot[];
+  /**
+   * Set by the host when this disposal is the coins a transfer between the
+   * user's own venues consumed (see residualTransferEvents): a translation
+   * key explaining the line, and the on-chain hash where one is known, so a
+   * reader can tie it to the movement it belongs to.
+   */
+  origin?: { key: string; txHash?: string };
 };
 
 /**

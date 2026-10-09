@@ -8,7 +8,7 @@ import {
 import { match } from '@/tax/matching';
 import { ownedVenuesOf } from '@/ledger/balances';
 import { openLedger, putEvents } from '@/ledger/db';
-import { runTaxReport } from '@/tax/runTaxReport';
+import { RESIDUAL_ORIGIN_KEY, runTaxReport } from '@/tax/runTaxReport';
 import germanTax from '@/tax/jurisdictions/de';
 import type { LedgerEvent } from '@/ledger/types';
 import type { LotMove, TaxEvent } from '@/tax/types';
@@ -786,6 +786,11 @@ describe('the coins that left but never arrived', () => {
       amount: '5000',
       venue: 'bitpanda',
       costs: '0',
+    });
+    // Labelled, so a reader can tie the line to the movement it belongs to.
+    expect(residual?.origin).toEqual({
+      key: RESIDUAL_ORIGIN_KEY,
+      txHash: HASH4,
     });
     // The wallet sale finds exactly what arrived, with its share of the lot.
     const walletSale = report.lines.find(

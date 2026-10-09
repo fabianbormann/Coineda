@@ -363,6 +363,96 @@ describe('running a report', () => {
     expect(screen.getAllByText(/fees deducted/i)).not.toHaveLength(0);
     expect(screen.getAllByText(/sale value/i)).not.toHaveLength(0);
   });
+
+  it('labels a transfer fee disposal and states the count on the method sheet', async () => {
+    // A withdrawal from bitpanda to the user's own wallet, with a network
+    // fee leg on top. The fee coins come back as a residual disposal; a
+    // reader must be able to tell why an unexplained few satoshi left
+    // bitpanda, and tie it to the method sheet's count.
+    vi.stubGlobal('fetch', flatRange(1));
+    taxRegistry.push(germanTax);
+    const year = new Date().getUTCFullYear();
+    const hash = 'beef'.repeat(16);
+    await putEvents([
+      ledgerEvent({
+        id: 'buy',
+        externalId: 'buy',
+        kind: 'trade',
+        timestamp: Date.UTC(year, 0, 2),
+        legs: [
+          {
+            assetId: 'fiat:eur',
+            amount: '100',
+            direction: 'out',
+            venue: 'bitpanda',
+            role: 'principal',
+          },
+          {
+            assetId: 'bitcoin:native',
+            amount: '50000000',
+            direction: 'in',
+            venue: 'bitpanda',
+            role: 'principal',
+          },
+        ],
+      }),
+      ledgerEvent({
+        id: 'withdraw',
+        externalId: 'withdraw',
+        sourceId: 'bitpanda',
+        txHash: hash,
+        timestamp: Date.UTC(year, 0, 3),
+        legs: [
+          {
+            assetId: 'bitcoin:native',
+            amount: '49995000',
+            direction: 'out',
+            venue: 'bitpanda',
+            role: 'principal',
+          },
+          {
+            assetId: 'bitcoin:native',
+            amount: '5000',
+            direction: 'out',
+            venue: 'bitpanda',
+            role: 'fee',
+          },
+        ],
+      }),
+      ledgerEvent({
+        id: 'arrive',
+        externalId: 'arrive',
+        sourceId: 'bitcoin',
+        txHash: hash,
+        timestamp: Date.UTC(year, 0, 3, 1),
+        legs: [
+          {
+            assetId: 'bitcoin:native',
+            amount: '49995000',
+            direction: 'in',
+            venue: 'bc1qwallet',
+            role: 'principal',
+          },
+        ],
+      }),
+    ]);
+
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /germany/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /run report/i }),
+    );
+
+    expect(
+      await screen.findAllByText(/network fee on a transfer between/i),
+    ).not.toHaveLength(0);
+    expect(screen.getAllByText(hash)).not.toHaveLength(0);
+    expect(
+      screen.getAllByText(/treated as disposals|treated as a disposal/i),
+    ).not.toHaveLength(0);
+  });
 });
 
 describe('the unresolved list', () => {
