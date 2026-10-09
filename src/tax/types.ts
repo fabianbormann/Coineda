@@ -1,6 +1,12 @@
-import type { EventKind, LedgerEvent, RewardKind } from '@/ledger/types';
+import type {
+  DerivativeKind,
+  EventKind,
+  LedgerEvent,
+  RewardKind,
+} from '@/ledger/types';
 
-export type TaxEventKind = 'acquisition' | 'disposal' | 'income';
+export type TaxEventKind =
+  'acquisition' | 'disposal' | 'income' | 'capital-gain' | 'capital-loss';
 
 /**
  * What was actually given or received for a tax event's leg, when the
@@ -283,8 +289,28 @@ export type ThresholdOutcome = {
   scopeNote?: string;
 };
 
+/**
+ * The year's derivative (Kapitalvermögen) result as a jurisdiction
+ * computed it. Optional on an assessment: only a module that classifies
+ * capital events returns one.
+ */
+export type CapitalResult = {
+  gains: string;
+  losses: string;
+  net: string;
+  /** The allowance applied (Sparer-Pauschbetrag for Germany). */
+  allowance: string;
+  taxable: string;
+  /** Positive carry-forward loss, or '0'. */
+  loss: string;
+  estimatedTax?: string;
+  /** Translation key: what the figures are and what estimatedTax leaves out. */
+  note: string;
+};
+
 export type TaxAssessment = {
   year: number;
+  capital?: CapitalResult;
   lines: AssessedDisposal[];
   totals: {
     taxableGain: string;
@@ -424,6 +450,19 @@ export type ReportedIncome = {
   rewardKind?: RewardKind;
 };
 
+/** One capital gain or loss event (a derivative settlement) as printed. */
+export type ReportedCapital = {
+  sourceEventId: string;
+  assetId: string;
+  amount: string;
+  timestamp: number;
+  venue: string;
+  value: string;
+  kind: 'gain' | 'loss';
+  derivativeKind?: DerivativeKind;
+  instrument?: string;
+};
+
 /**
  * What `runTaxReport` returns: a module's assessment plus everything only
  * the host knows.
@@ -434,10 +473,17 @@ export type ReportedIncome = {
  * Naming the two separately is what lets the report grow provenance and a
  * method sheet without widening the contract every contributor implements.
  */
-export type TaxReport = Omit<TaxAssessment, 'lines'> & {
+export type TaxReport = Omit<TaxAssessment, 'lines' | 'capital'> & {
   lines: ReportedDisposal[];
   /** The valued income events of the year, in date order. */
   income: ReportedIncome[];
+  /** The valued capital events of the year, in date order. */
+  capital: ReportedCapital[];
+  /**
+   * The module's capital figures (`TaxAssessment.capital`), renamed because
+   * `capital` on the report is the row list. Absent when the module has none.
+   */
+  capitalResult?: CapitalResult;
   method: ReportMethod;
   /**
    * The items behind `totals.omitted`, not just how many there were.
@@ -455,6 +501,8 @@ export type AssessInput = {
   year: number;
   matched: MatchedDisposal[];
   income: TaxEvent[];
+  /** Capital gain/loss events of the year (derivative settlements). */
+  capital: TaxEvent[];
   /** Optional personal rate as a decimal string percentage, e.g. '42'. */
   rate?: string;
 };

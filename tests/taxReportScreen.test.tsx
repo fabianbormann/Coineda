@@ -1708,3 +1708,52 @@ describe('the form and the report are separate steps', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('the derivatives section', () => {
+  const capitalModule = (withCapital: boolean): TaxModule => ({
+    ...makeModule(),
+    assess: (input) => ({
+      ...assess(input),
+      ...(withCapital
+        ? {
+            capital: {
+              gains: '500',
+              losses: '205',
+              net: '295',
+              allowance: '1000',
+              taxable: '0',
+              loss: '0',
+              note: 'Test capital note',
+            },
+          }
+        : {}),
+    }),
+  });
+
+  it('renders the figures and the note when the assessment carries capital', async () => {
+    taxRegistry.push(capitalModule(true));
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+
+    expect(await screen.findByText(/derivatives/i)).toBeInTheDocument();
+    expect(screen.getByText(/allowance applied/i)).toBeInTheDocument();
+    expect(screen.getByText('Test capital note')).toBeInTheDocument();
+    expect(screen.getByTestId('capital-lines')).toHaveTextContent(
+      /no derivative settlements/i,
+    );
+  });
+
+  it('renders no such section when the assessment has no capital', async () => {
+    taxRegistry.push(capitalModule(false));
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+
+    await screen.findByText(/taxable gain/i);
+    expect(screen.queryByText(/derivatives/i)).toBeNull();
+    expect(screen.queryByTestId('capital-lines')).toBeNull();
+  });
+});

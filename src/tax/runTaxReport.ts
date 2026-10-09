@@ -20,6 +20,7 @@ import type {
   MatchedDisposal,
   MatchingMethod,
   ReportedDisposal,
+  ReportedCapital,
   ReportedIncome,
   ReportMethod,
   TaxEvent,
@@ -286,6 +287,12 @@ export const runTaxReport = async (
       event.kind === 'income' && taxYearOf(event.timestamp) === options.year,
   );
 
+  const yearCapital = valued.filter(
+    (event) =>
+      (event.kind === 'capital-gain' || event.kind === 'capital-loss') &&
+      taxYearOf(event.timestamp) === options.year,
+  );
+
   // The ledger event behind an item, where the id still matches one. Every
   // shipped jurisdiction stamps a tax event with the ledger event's own id,
   // so this resolves for them; a module that mints its own ids simply gets
@@ -329,10 +336,41 @@ export const runTaxReport = async (
             : 0),
     );
 
+  const capital: ReportedCapital[] = yearCapital
+    .map((event) => {
+      const derivative = eventById.get(event.sourceEventId)?.derivative;
+      return {
+        sourceEventId: event.sourceEventId,
+        assetId: event.assetId,
+        amount: event.amount,
+        timestamp: event.timestamp,
+        venue: event.venue,
+        value: event.value ?? '0',
+        kind:
+          event.kind === 'capital-gain' ? ('gain' as const) : ('loss' as const),
+        ...(derivative === undefined
+          ? {}
+          : { derivativeKind: derivative.kind }),
+        ...(derivative?.instrument === undefined
+          ? {}
+          : { instrument: derivative.instrument }),
+      };
+    })
+    .sort(
+      (a, b) =>
+        a.timestamp - b.timestamp ||
+        (a.sourceEventId < b.sourceEventId
+          ? -1
+          : a.sourceEventId > b.sourceEventId
+            ? 1
+            : 0),
+    );
+
   const assessment = module.assess({
     year: options.year,
     matched: yearMatched,
     income: yearIncome,
+    capital: yearCapital,
     rate: options.rate,
   });
 
@@ -475,10 +513,14 @@ export const runTaxReport = async (
     ).length,
   };
 
+  const { capital: capitalResult, ...assessed } = assessment;
+
   return {
-    ...assessment,
+    ...assessed,
+    ...(capitalResult === undefined ? {} : { capitalResult }),
     lines,
     income,
+    capital,
     method,
     unresolved: [...assessment.unresolved, ...unresolved],
     omittedDisposals,

@@ -41,6 +41,7 @@ const germanAssessment: TaxReport = {
   year: 2024,
   lines: [],
   income: [],
+  capital: [],
   totals: {
     taxableGain: GERMAN_TAXABLE_GAIN,
     exemptGain: '0',

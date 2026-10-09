@@ -1061,3 +1061,119 @@ describe('income on the report', () => {
     expect(gap?.taxEventKind).toBe('income');
   });
 });
+
+describe('capital events on the report', () => {
+  const capitalModule: TaxModule = {
+    ...stubModule,
+    handles: [...stubModule.handles, 'derivative'],
+    classify: (event) =>
+      event.kind === 'derivative'
+        ? event.legs.map((leg) => ({
+            sourceEventId: event.id,
+            kind:
+              leg.direction === 'in'
+                ? ('capital-gain' as const)
+                : ('capital-loss' as const),
+            assetId: leg.assetId,
+            amount: leg.amount,
+            timestamp: event.timestamp,
+            venue: leg.venue,
+          }))
+        : stubModule.classify(event),
+  };
+
+  const settlement = (
+    id: string,
+    assetId: string,
+    amount: string,
+    direction: 'in' | 'out' = 'in',
+  ) =>
+    ledgerEvent({
+      id,
+      externalId: id,
+      kind: 'derivative',
+      derivative: { kind: 'pnl', instrument: 'BTCUSDT' },
+      timestamp: Date.UTC(2025, 3, 1),
+      legs: [
+        {
+          assetId,
+          amount,
+          direction,
+          venue: 'futures',
+          role: 'principal',
+        },
+      ],
+    });
+
+  it('lists a valued settlement as a capital row, not a line or income', async () => {
+    await putEvents([settlement('d1', 'fiat:eur', '40')]);
+
+    const report = await runTaxReport(capitalModule, {
+      year: 2025,
+      baseCurrency: 'eur',
+    });
+
+    expect(report.capital).toEqual([
+      {
+        sourceEventId: 'd1',
+        assetId: 'fiat:eur',
+        amount: '40',
+        timestamp: Date.UTC(2025, 3, 1),
+        venue: 'futures',
+        value: '40',
+        kind: 'gain',
+        derivativeKind: 'pnl',
+        instrument: 'BTCUSDT',
+      },
+    ]);
+    expect(report.lines).toEqual([]);
+    expect(report.income).toEqual([]);
+    expect(report.capitalResult).toBeUndefined();
+  });
+
+  it('hands the module the year capital events and marks a loss as a loss', async () => {
+    await putEvents([
+      settlement('d1', 'fiat:eur', '40'),
+      settlement('d2', 'fiat:eur', '15', 'out'),
+    ]);
+    const seen: number[] = [];
+    const spying: TaxModule = {
+      ...capitalModule,
+      assess: (input) => {
+        seen.push(input.capital.length);
+        return capitalModule.assess(input);
+      },
+    };
+
+    const report = await runTaxReport(spying, {
+      year: 2025,
+      baseCurrency: 'eur',
+    });
+
+    expect(seen).toEqual([2]);
+    expect(report.capital.map((row) => row.kind)).toEqual(['gain', 'loss']);
+  });
+
+  it('lists an unpriceable settlement as unresolved and never as an omitted disposal', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('', { status: 404 })),
+    );
+    await putEvents([
+      settlement('d-unpriced', 'cardano:deadbeef.NoSuchToken', '5'),
+    ]);
+
+    const report = await runTaxReport(capitalModule, {
+      year: 2025,
+      baseCurrency: 'eur',
+    });
+
+    expect(report.capital).toEqual([]);
+    const gap = report.unresolved.find(
+      (item) => item.sourceEventId === 'd-unpriced',
+    );
+    expect(gap?.kind).toBe('needs-price');
+    expect(gap?.taxEventKind).toBe('capital-gain');
+    expect(report.totals.omitted).toBe(0);
+  });
+});

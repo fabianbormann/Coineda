@@ -266,6 +266,7 @@ describe('austrian assessment', () => {
       year: 2024,
       matched: [disposalFrom(ALT_CUTOFF - 86_400_000, '5000')],
       income: [],
+      capital: [],
     });
     expect(report.totals.exemptGain).toBe('5000');
     expect(report.totals.taxableGain).toBe('0');
@@ -278,6 +279,7 @@ describe('austrian assessment', () => {
       year: 2024,
       matched: [disposalFrom(ALT_CUTOFF, '5000')],
       income: [],
+      capital: [],
     });
     expect(report.totals.taxableGain).toBe('5000');
   });
@@ -287,6 +289,7 @@ describe('austrian assessment', () => {
       year: 2024,
       matched: [disposalFrom(Date.UTC(2022, 0, 1), '5000')],
       income: [],
+      capital: [],
     });
     expect(report.totals.taxableGain).toBe('5000');
   });
@@ -296,6 +299,7 @@ describe('austrian assessment', () => {
       year: 2024,
       matched: [disposalFrom(Date.UTC(2022, 0, 1), '1000')],
       income: [],
+      capital: [],
     });
     expect(report.estimatedLiability).toBe('275');
   });
@@ -305,6 +309,7 @@ describe('austrian assessment', () => {
       year: 2024,
       matched: [disposalFrom(Date.UTC(2022, 0, 1), '50')],
       income: [],
+      capital: [],
     });
     expect(report.thresholds).toEqual([]);
     expect(report.totals.taxableGain).toBe('50');
@@ -321,6 +326,7 @@ describe('austrian rationales', () => {
       year: 2024,
       matched: [disposalFrom(Date.UTC(2020, 0, 1), '1000')],
       income: [],
+      capital: [],
     });
 
     expect(report.lines[0].reason).toEqual({
@@ -333,6 +339,7 @@ describe('austrian rationales', () => {
       year: 2024,
       matched: [disposalFrom(Date.UTC(2022, 0, 1), '1000')],
       income: [],
+      capital: [],
     });
 
     expect(report.lines[0].reason).toEqual({
@@ -347,6 +354,7 @@ describe('austrian loss handling', () => {
       year: 2024,
       matched: [disposalFrom(Date.UTC(2022, 0, 1), '-750')],
       income: [],
+      capital: [],
     });
 
     expect(report.totals.taxableGain).toBe('0');
@@ -366,6 +374,7 @@ describe('what the austrian liability figure is', () => {
       year: 2024,
       matched: [disposalFrom(Date.UTC(2022, 0, 1), '1000')],
       income: [],
+      capital: [],
     });
 
     expect(report.estimatedLiability).toBe('275');

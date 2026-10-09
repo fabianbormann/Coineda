@@ -378,6 +378,7 @@ describe('german holding period', () => {
       year: 2024,
       matched: [disposal({ heldDays: 367, gain: '5000' })],
       income: [],
+      capital: [],
     });
     expect(report.totals.exemptGain).toBe('5000');
     expect(report.totals.taxableGain).toBe('0');
@@ -391,6 +392,7 @@ describe('german holding period', () => {
       year: 2024,
       matched: [disposal({ heldDays: 365, gain: '5000' })],
       income: [],
+      capital: [],
     });
     expect(report.totals.taxableGain).toBe('5000');
     expect(report.totals.exemptGain).toBe('0');
@@ -431,6 +433,7 @@ describe('german holding period', () => {
       year: 2024,
       matched: [partly],
       income: [],
+      capital: [],
     });
 
     // Proceeds split by amount: 500 each. Exempt leg gains 400, taxable
@@ -464,6 +467,7 @@ describe('german Freigrenze', () => {
       year: 2024,
       matched: [disposal({ heldDays: 10, gain: '999' })],
       income: [],
+      capital: [],
     });
     expect(report.totals.taxableGain).toBe('0');
     expect(report.thresholds[0]).toMatchObject({
@@ -482,6 +486,7 @@ describe('german Freigrenze', () => {
       year: 2024,
       matched: [disposal({ heldDays: 10, gain: '1000' })],
       income: [],
+      capital: [],
     });
     expect(report.totals.taxableGain).toBe('1000');
     expect(report.thresholds[0].exceeded).toBe(true);
@@ -490,8 +495,18 @@ describe('german Freigrenze', () => {
   it('uses the 600 limit for 2023 and 1000 for 2024', () => {
     // GOLDEN CASE 5. Identical gains, different years, different answers.
     const matched = [disposal({ heldDays: 10, gain: '800' })];
-    const y2023 = germanTax.assess({ year: 2023, matched, income: [] });
-    const y2024 = germanTax.assess({ year: 2024, matched, income: [] });
+    const y2023 = germanTax.assess({
+      year: 2023,
+      matched,
+      income: [],
+      capital: [],
+    });
+    const y2024 = germanTax.assess({
+      year: 2024,
+      matched,
+      income: [],
+      capital: [],
+    });
 
     expect(y2023.thresholds[0].limit).toBe('600');
     expect(y2023.totals.taxableGain).toBe('800');
@@ -510,6 +525,7 @@ describe('german Freigrenze', () => {
         disposal({ disposalEventId: 'lose', heldDays: 10, gain: '-400' }),
       ],
       income: [],
+      capital: [],
     });
     expect(report.thresholds[0].actual).toBe('800');
     expect(report.totals.taxableGain).toBe('0');
@@ -521,6 +537,7 @@ describe('german losses', () => {
     // GOLDEN CASE 6. §23 losses offset only §23 gains.
     const report = germanTax.assess({
       year: 2024,
+      capital: [],
       matched: [disposal({ heldDays: 10, gain: '-5000' })],
       income: [
         {
@@ -544,6 +561,7 @@ describe('german staking income threshold', () => {
     // GOLDEN CASE 7.
     const report = germanTax.assess({
       year: 2024,
+      capital: [],
       matched: [],
       income: [
         {
@@ -565,6 +583,7 @@ describe('german staking income threshold', () => {
   it('taxes all staking income at exactly 256', () => {
     const report = germanTax.assess({
       year: 2024,
+      capital: [],
       matched: [],
       income: [
         {
@@ -588,6 +607,7 @@ describe('german rate handling', () => {
       year: 2024,
       matched: [disposal({ heldDays: 10, gain: '5000' })],
       income: [],
+      capital: [],
     });
     expect(report.estimatedLiability).toBeUndefined();
   });
@@ -597,6 +617,7 @@ describe('german rate handling', () => {
       year: 2024,
       matched: [disposal({ heldDays: 10, gain: '1000' })],
       income: [],
+      capital: [],
       rate: '42',
     });
     // 1000 at 42% = 420, exactly. The flat 5.5% Solidaritätszuschlag this
@@ -615,6 +636,7 @@ describe('german rationales', () => {
       year: 2024,
       matched: [disposal({ heldDays: 400, gain: '500' })],
       income: [],
+      capital: [],
     });
 
     expect(report.lines[0].reason).toEqual({
@@ -627,6 +649,7 @@ describe('german rationales', () => {
       year: 2024,
       matched: [disposal({ heldDays: 10, gain: '500' })],
       income: [],
+      capital: [],
     });
 
     expect(report.lines[0].reason).toEqual({
@@ -657,6 +680,7 @@ describe('german rationales', () => {
       year: 2024,
       matched: [split],
       income: [],
+      capital: [],
     });
 
     expect(report.lines[0].reason.key).toBe(
@@ -676,6 +700,7 @@ describe('german loss handling', () => {
       year: 2024,
       matched: [disposal({ heldDays: 10, gain: '-750' })],
       income: [],
+      capital: [],
     });
 
     expect(report.totals.taxableGain).toBe('0');
@@ -687,6 +712,7 @@ describe('german loss handling', () => {
       year: 2024,
       matched: [disposal({ heldDays: 10, gain: '300' })],
       income: [],
+      capital: [],
     });
 
     expect(report.totals.taxableGain).toBe('0');
@@ -706,6 +732,7 @@ describe('german threshold scope notes', () => {
       year: 2024,
       matched: [disposal({ heldDays: 10, gain: '500' })],
       income: [],
+      capital: [],
     });
 
     const [privateSale, otherIncome] = report.thresholds;
@@ -727,6 +754,7 @@ describe('what the estimated liability leaves out', () => {
       year: 2024,
       matched: [disposal({ heldDays: 10, gain: '2000' })],
       income: [],
+      capital: [],
       rate: '42',
     });
 
@@ -740,6 +768,7 @@ describe('what the estimated liability leaves out', () => {
       year: 2024,
       matched: [disposal({ heldDays: 10, gain: '2000' })],
       income: [],
+      capital: [],
     });
 
     expect(report.estimatedLiability).toBeUndefined();
@@ -780,6 +809,7 @@ describe('german holding period runs by calendar date', () => {
       year: new Date(disposedAt).getUTCFullYear(),
       matched: [disposalOn(acquiredAt, disposedAt)],
       income: [],
+      capital: [],
     }).totals.taxableGain;
 
   it('taxes a sale on the anniversary even when a leap day made it 366 days', () => {

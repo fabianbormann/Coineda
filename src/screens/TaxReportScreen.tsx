@@ -1158,6 +1158,103 @@ export const TaxReportScreen = () => {
                   </CardContent>
                 </Card>
 
+                {/* 2b. Derivatives (§20 EStG). Only a jurisdiction that
+                    classifies capital events returns `capitalResult`; for
+                    every other report the section does not exist. */}
+                {assessment.capitalResult !== undefined && (
+                  <div className="flex flex-col gap-2" data-testid="capital">
+                    <h3 className="text-sm font-semibold">
+                      {t('Derivatives (§20 EStG)')}
+                    </h3>
+                    <Card>
+                      <CardContent className="flex flex-col gap-1 text-sm">
+                        {(
+                          [
+                            ['Gains', assessment.capitalResult.gains],
+                            ['Losses', assessment.capitalResult.losses],
+                            ['Net result', assessment.capitalResult.net],
+                            [
+                              'Allowance applied',
+                              assessment.capitalResult.allowance,
+                            ],
+                            ['Taxable', assessment.capitalResult.taxable],
+                          ] as const
+                        ).map(([label, figure]) => (
+                          <p key={label}>
+                            <span className="font-medium">{t(label)}: </span>
+                            <Money
+                              value={Number(figure)}
+                              currency={baseCurrency}
+                            />
+                          </p>
+                        ))}
+                        {!isZeroAmount(assessment.capitalResult.loss) && (
+                          <p>
+                            <span className="font-medium">
+                              {t('Loss to declare')}:{' '}
+                            </span>
+                            <Money
+                              value={Number(assessment.capitalResult.loss)}
+                              currency={baseCurrency}
+                            />
+                          </p>
+                        )}
+                        {assessment.capitalResult.estimatedTax !==
+                          undefined && (
+                          <p>
+                            <span className="font-medium">
+                              {t('Estimated tax liability')}:{' '}
+                            </span>
+                            <Money
+                              value={Number(
+                                assessment.capitalResult.estimatedTax,
+                              )}
+                              currency={baseCurrency}
+                            />
+                          </p>
+                        )}
+                        <p className="text-muted-foreground">
+                          {t(assessment.capitalResult.note)}
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <div
+                      className="flex flex-col gap-2"
+                      data-testid="capital-lines"
+                    >
+                      {assessment.capital.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          {t('No derivative settlements in this year.')}
+                        </p>
+                      ) : (
+                        assessment.capital.map((row) => (
+                          <Card key={row.sourceEventId}>
+                            <CardContent className="flex flex-col gap-1 text-sm">
+                              <p className="font-medium">
+                                {formatDate(row.timestamp)} · {row.venue} ·{' '}
+                                <CryptoAmount
+                                  value={row.amount}
+                                  assetId={row.assetId}
+                                />{' '}
+                                · {t(row.kind === 'gain' ? 'Profit' : 'Loss')}
+                                {row.instrument !== undefined && (
+                                  <> · {row.instrument}</>
+                                )}
+                              </p>
+                              <p>
+                                <Money
+                                  value={Number(row.value)}
+                                  currency={baseCurrency}
+                                />
+                              </p>
+                            </CardContent>
+                          </Card>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* 3. Threshold outcomes, including when not exceeded. */}
                 {assessment.thresholds.length > 0 && (
                   <div className="flex flex-col gap-2">

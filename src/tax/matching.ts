@@ -106,7 +106,13 @@ export const match = (
   };
 
   for (const event of events) {
-    if (event.kind === 'income') {
+    // Income and capital events are never lots or disposals; only the
+    // module's assess() consumes them.
+    if (
+      event.kind === 'income' ||
+      event.kind === 'capital-gain' ||
+      event.kind === 'capital-loss'
+    ) {
       continue;
     }
     groupFor(event.assetId).events.push(event);

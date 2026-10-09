@@ -223,6 +223,7 @@ describe.each(taxRegistry.map((m) => [m.manifest.id, m] as const))(
           year: 2024,
           matched: [matched],
           income: [],
+          capital: [],
         }).lines) {
           keys.add(line.reason.key);
         }
@@ -262,6 +263,7 @@ describe.each(taxRegistry.map((m) => [m.manifest.id, m] as const))(
             year: 2024,
             matched: [matched],
             income: [],
+            capital: [],
             rate,
           });
           for (const threshold of assessed.thresholds) {
@@ -290,6 +292,7 @@ describe.each(taxRegistry.map((m) => [m.manifest.id, m] as const))(
           year: 2024,
           matched: [reasonFixtures[0]],
           income: [],
+          capital: [],
           rate,
         });
         expect(assessed.liabilityNote !== undefined).toBe(

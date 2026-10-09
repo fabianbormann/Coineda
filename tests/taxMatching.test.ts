@@ -697,3 +697,49 @@ describe('transaction costs', () => {
     expect(matched[0].costs).toBe('3');
   });
 });
+
+describe('capital events', () => {
+  it('are ignored: no lot, no disposal, no shortfall', () => {
+    const base = [
+      event({
+        sourceEventId: 'buy',
+        kind: 'acquisition',
+        amount: '10',
+        value: '100',
+        timestamp: 1000,
+      }),
+      event({
+        sourceEventId: 'sell',
+        kind: 'disposal',
+        amount: '4',
+        value: '200',
+        timestamp: 3000,
+      }),
+    ];
+    const without = match(base, 'fifo', pooled);
+    const withCapital = match(
+      [
+        ...base,
+        event({
+          sourceEventId: 'cap-gain',
+          kind: 'capital-gain',
+          amount: '500',
+          value: '500',
+          timestamp: 2000,
+        }),
+        event({
+          sourceEventId: 'cap-loss',
+          kind: 'capital-loss',
+          amount: '900',
+          value: '900',
+          timestamp: 2500,
+        }),
+      ],
+      'fifo',
+      pooled,
+    );
+
+    expect(withCapital.matched).toEqual(without.matched);
+    expect(withCapital.shortfalls).toEqual([]);
+  });
+});
