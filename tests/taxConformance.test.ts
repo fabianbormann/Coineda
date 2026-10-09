@@ -87,7 +87,7 @@ const sampleEvents: LedgerEvent[] = [
     ],
   },
   {
-    // A airdrop reward, so the note Germany attaches to it reaches the
+    // An airdrop reward, so the note Germany attaches to it reaches the
     // key-coverage check.
     id: 'e4',
     sourceId: 's1',
@@ -107,7 +107,7 @@ const sampleEvents: LedgerEvent[] = [
     ],
   },
   {
-    // A other reward, so the note Germany attaches to it reaches the
+    // Another reward kind, so the note Germany attaches to it reaches the
     // key-coverage check.
     id: 'e5',
     sourceId: 's1',

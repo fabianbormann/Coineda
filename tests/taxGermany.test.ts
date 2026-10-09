@@ -874,6 +874,8 @@ describe('german reward kinds', () => {
     expect(incomeNote(reward('airdrop'))).toMatch(
       /counter-performance|Gegenleistung/i,
     );
+    // Points at the guidance rather than asserting the alternative outcome.
+    expect(incomeNote(reward('airdrop'))).toMatch(/BMF 06\.03\.2025/);
   });
 
   it('notes an other reward as unspecified by the source', () => {

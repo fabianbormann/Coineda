@@ -60,8 +60,6 @@ const KINDS: Record<string, EventKind> = {
   commission: 'reward',
 };
 
-/** Fee rows are their own operation on Binance, and are charged as a fee
- *  leg rather than a disposal of their own. */
 /** What each reward operation is. */
 const REWARD_KINDS: Record<string, RewardKind> = {
   'staking rewards': 'staking',
@@ -70,6 +68,8 @@ const REWARD_KINDS: Record<string, RewardKind> = {
   commission: 'other',
 };
 
+/** Fee rows are their own operation on Binance, and are charged as a fee
+ *  leg rather than a disposal of their own. */
 const FEE_OPERATIONS = new Set(['fee', 'transaction fee', 'trading fee']);
 
 const cell = (row: CsvRow, column: string): string => {

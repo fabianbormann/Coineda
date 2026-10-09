@@ -11,6 +11,9 @@ export type TaxEventKind = 'acquisition' | 'disposal' | 'income';
  * crypto-to-crypto exchanges, where no fiat changed hands. Valuing a euro
  * buy at the coin's market price instead made every buy and sell line
  * differ from the exchange statement by the day's spread.
+ *
+ * A jurisdiction may also set a zero consideration in the leg's own asset
+ * to record an acquisition at no cost (a hard fork).
  */
 export type Consideration = {
   assetId: string;

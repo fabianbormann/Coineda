@@ -101,6 +101,45 @@ describe('reward kinds end to end', () => {
     expect(report.unresolved).toEqual([]);
   });
 
+  it('gives a fork of a token with no price source a zero cost basis', async () => {
+    // Nothing can price this token, and nothing needs to: the fork's zero
+    // consideration values the acquisition and the sale's euro leg values
+    // the disposal, so no price lookup is left unresolved.
+    const TOKEN = 'cardano:deadbeef.NoSuchToken';
+    await putEvents([
+      {
+        id: 'fork',
+        sourceId: 's1',
+        externalId: 'fork',
+        timestamp: Date.UTC(2025, 2, 1),
+        kind: 'reward',
+        origin: 'derived',
+        rewardKind: 'fork',
+        legs: [leg({ assetId: TOKEN, amount: '100', direction: 'in' })],
+      },
+      {
+        id: 'sell',
+        sourceId: 's1',
+        externalId: 'sell',
+        timestamp: Date.UTC(2025, 8, 1),
+        kind: 'trade',
+        origin: 'derived',
+        legs: [
+          leg({ assetId: TOKEN, amount: '100', direction: 'out' }),
+          leg({ assetId: EUR, amount: '50', direction: 'in' }),
+        ],
+      },
+    ]);
+
+    const report = await runGermany();
+
+    expect(report.income).toHaveLength(0);
+    expect(report.lines).toHaveLength(1);
+    expect(report.lines[0].costBasis).toBe('0');
+    expect(report.lines[0].gain).toBe('50');
+    expect(report.unresolved).toEqual([]);
+  });
+
   it('counts lending and staking together against the income Freigrenze', async () => {
     await putEvents([
       reward('lend', 'lending', 10, 2),

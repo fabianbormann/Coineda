@@ -271,6 +271,8 @@ describe('income rows', () => {
       value: '5',
     });
     expect(report.income[0].note).toMatch(/gewerbliche Einkünfte/);
+    // A legacy row with no typed field is labelled from its provider record.
+    expect(report.income[0].rewardKind).toBe('leader');
   });
 });
 

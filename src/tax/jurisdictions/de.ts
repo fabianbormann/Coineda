@@ -95,7 +95,7 @@ const OTHER_INCOME_SCOPE_NOTE =
 const BUSINESS_INCOME_NOTE =
   'This reward may be gewerbliche Einkünfte rather than §22 Nr. 3 income. This classification is uncertain, so confirm it yourself before relying on it.';
 const AIRDROP_NOTE =
-  'Treated as received for a counter-performance (§22 Nr. 3 income at the value on receipt). An airdrop received for nothing is instead an acquisition at zero with no income; confirm which applies.';
+  'Treated as received for a counter-performance (§22 Nr. 3 income at the value on receipt). An airdrop received for nothing may not be income at receipt; see BMF 06.03.2025 on airdrops and confirm which applies.';
 const OTHER_REWARD_NOTE =
   'The source did not say what kind of reward this was, so it is treated as §22 Nr. 3 income at the value on receipt.';
 

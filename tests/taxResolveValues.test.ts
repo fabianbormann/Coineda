@@ -349,6 +349,27 @@ describe('a zero amount', () => {
     expect(unpriced).toHaveLength(0);
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('still values a non-zero cost on a zero-amount event', async () => {
+    // The zero shortcut values the amount, not the event: a fee paid on it
+    // is real money and must still reach the cost basis.
+    const fetchMock = rangeStub(() => 2);
+    vi.stubGlobal('fetch', fetchMock);
+    const { valued, unpriced } = await resolveValues(
+      [
+        event({
+          kind: 'acquisition',
+          amount: '0',
+          costs: [{ assetId: 'fiat:eur', amount: '2' }],
+        }),
+      ],
+      'eur',
+    );
+    expect(valued).toHaveLength(1);
+    expect(valued[0].value).toBe('0');
+    expect(valued[0].costs?.[0].value).toBe('2');
+    expect(unpriced).toHaveLength(0);
+  });
 });
 
 describe('transaction costs', () => {

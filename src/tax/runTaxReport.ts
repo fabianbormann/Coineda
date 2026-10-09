@@ -13,6 +13,7 @@ import {
 } from '@/ledger/transfers';
 import { match } from './matching';
 import { resolveValues } from './resolveValues';
+import { rewardKindOf } from '@/tax/rewardKinds';
 import { APP_VERSION } from '@/global/version';
 import type {
   LotMove,
@@ -297,7 +298,11 @@ export const runTaxReport = async (
   // between two runs of the same data.
   const income: ReportedIncome[] = yearIncome
     .map((event) => {
-      const rewardKind = eventById.get(event.sourceEventId)?.rewardKind;
+      // Through rewardKindOf, so a legacy row with no typed field is
+      // labelled from the same signals the module classified it by.
+      const source = eventById.get(event.sourceEventId);
+      const rewardKind =
+        source === undefined ? undefined : rewardKindOf(source);
       return {
         sourceEventId: event.sourceEventId,
         assetId: event.assetId,

@@ -61,16 +61,6 @@ export const sniff = (text: string): boolean => {
  *
  * A type absent from here is SKIPPED and reported, never guessed at.
  */
-/** What each reward-bearing row type is. `earn` and `reward` are Kraken's
- *  staking programmes (bonded, flexible, liquid); `dividend` is paid on
- *  tokenised products and the parser knows no more than that. */
-const REWARD_KINDS: Record<string, RewardKind> = {
-  staking: 'staking',
-  reward: 'staking',
-  earn: 'staking',
-  dividend: 'other',
-};
-
 const KINDS: Record<string, EventKind> = {
   deposit: 'transfer',
   withdrawal: 'transfer',
@@ -83,6 +73,16 @@ const KINDS: Record<string, EventKind> = {
   earn: 'reward',
   dividend: 'reward',
   sale: 'trade',
+};
+
+/** What each reward-bearing row type is. `earn` and `reward` are Kraken's
+ *  staking programmes (bonded, flexible, liquid); `dividend` is paid on
+ *  tokenised products and the parser knows no more than that. */
+const REWARD_KINDS: Record<string, RewardKind> = {
+  staking: 'staking',
+  reward: 'staking',
+  earn: 'staking',
+  dividend: 'other',
 };
 
 /**
