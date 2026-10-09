@@ -303,8 +303,15 @@ export type ThresholdOutcome = {
  */
 /**
  * A loss carried INTO the year, as the Finanzamt stated it (user-entered
- * decimal strings in the base currency). Per pot: §23 private sales and §20
- * capital income are separate pots and never offset each other.
+ * decimal strings in the base currency).
+ *
+ * Strictly per pot. A carry-forward offsets only income of the same kind it
+ * arose in: a §23 private-sale loss reduces only §23 gains, a §20 loss only
+ * §20 income, and never across Einkunftsarten (§23 Abs. 3 S. 7-8, §20 Abs.
+ * 6 EStG). `capital` is the general §20 pot ONLY - losses from selling
+ * shares (§20 Abs. 6 S. 4, the Aktien pot) offset only gains from selling
+ * shares, which this app does not compute, so they must never be entered
+ * or applied here.
  */
 export type CarryForward = { privateSales?: string; capital?: string };
 

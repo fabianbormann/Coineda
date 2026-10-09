@@ -908,7 +908,7 @@ export const TaxReportScreen = () => {
                       <div className="flex flex-col gap-2">
                         <Label htmlFor="tax-report-carry-capital">
                           {t(
-                            'Loss carried into {{year}} under §20 EStG (as stated by the Finanzamt)',
+                            'Loss carried into {{year}} under §20 EStG, excluding losses from selling shares (§20 Abs. 6 S. 4), as stated in the Verlustfeststellungsbescheid',
                             { year },
                           )}
                         </Label>

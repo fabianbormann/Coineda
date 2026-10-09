@@ -306,7 +306,6 @@
     "Your personal tax rate (optional)": "Dein persönlicher Steuersatz (optional)",
     "A percentage, e.g. 42. Used only to estimate what you would owe - leave it empty to skip that figure.": "Ein Prozentsatz, z. B. 42. Wird nur verwendet, um deine Steuerschuld zu schätzen - lass das Feld leer, um diese Zahl zu überspringen.",
     "Loss carried into {{year}} under §23 EStG (as stated by the Finanzamt)": "In {{year}} vorgetragener Verlust nach §23 EStG (laut Finanzamt)",
-    "Loss carried into {{year}} under §20 EStG (as stated by the Finanzamt)": "In {{year}} vorgetragener Verlust nach §20 EStG (laut Finanzamt)",
     "From your Verlustfeststellungsbescheid. Only the Finanzamt knows this figure; stored only on this device.": "Aus deinem Verlustfeststellungsbescheid. Nur das Finanzamt kennt diese Zahl; nur auf diesem Gerät gespeichert.",
     "Enter an amount like 1234.56": "Gib einen Betrag wie 1234.56 ein",
     "Loss carried forward: {{declared}} declared · {{used}} used · {{remaining}} remaining": "Verlustvortrag: {{declared}} erklärt · {{used}} verbraucht · {{remaining}} verbleibend",
@@ -541,6 +540,7 @@
     "Commission": "Kommission",
     "Gain to declare (before loss carry-forward)": "Zu erklärender Gewinn (vor Verlustvortrag)",
     "Taxable gain after carry-forward (estimate)": "Steuerpflichtiger Gewinn nach Verlustvortrag (Schätzung)",
-    "The Finanzamt applies the carry-forward it has recorded; declare the gain before it.": "Das Finanzamt rechnet den festgestellten Verlustvortrag selbst an; erkläre den Gewinn davor."
+    "The Finanzamt applies the carry-forward it has recorded; declare the gain before it.": "Das Finanzamt rechnet den festgestellten Verlustvortrag selbst an; erkläre den Gewinn davor.",
+    "Loss carried into {{year}} under §20 EStG, excluding losses from selling shares (§20 Abs. 6 S. 4), as stated in the Verlustfeststellungsbescheid": "Verlustvortrag nach §20 EStG, ohne Aktienverluste (§20 Abs. 6 S. 4), laut Verlustfeststellungsbescheid"
   }
 }

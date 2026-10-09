@@ -1934,7 +1934,13 @@ describe('the loss carry-forward inputs', () => {
   it('renders for Germany and not for a module without support', async () => {
     await openGermany();
     expect(await screen.findByLabelText(/under §23 EStG/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/under §20 EStG/i)).toBeInTheDocument();
+    // The share-loss pot (§20 Abs. 6 S. 4) is excluded in the label itself:
+    // it offsets only share gains, which this app never computes.
+    expect(
+      screen.getByLabelText(
+        /under §20 EStG, excluding losses from selling shares \(§20 Abs\. 6 S\. 4\)/i,
+      ),
+    ).toBeInTheDocument();
   });
 
   it('does not render for a module that ignores it', async () => {
