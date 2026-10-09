@@ -305,7 +305,6 @@
     "These rules have not been checked in {{months}} months. Verify them yourself before relying on this report.": "Diese Regeln wurden seit {{months}} Monaten nicht mehr geprüft. Prüfe sie selbst, bevor du dich auf diesen Report verlässt.",
     "Your personal tax rate (optional)": "Dein persönlicher Steuersatz (optional)",
     "A percentage, e.g. 42. Used only to estimate what you would owe - leave it empty to skip that figure.": "Ein Prozentsatz, z. B. 42. Wird nur verwendet, um deine Steuerschuld zu schätzen - lass das Feld leer, um diese Zahl zu überspringen.",
-    "Loss carried into {{year}} under §23 EStG (as stated by the Finanzamt)": "In {{year}} vorgetragener Verlust nach §23 EStG (laut Finanzamt)",
     "From your Verlustfeststellungsbescheid. Only the Finanzamt knows this figure; stored only on this device.": "Aus deinem Verlustfeststellungsbescheid. Nur das Finanzamt kennt diese Zahl; nur auf diesem Gerät gespeichert.",
     "Enter an amount like 1234.56": "Gib einen Betrag wie 1234.56 ein",
     "Enter a valid year": "Gib ein gültiges Jahr ein",
@@ -540,8 +539,9 @@
     "Gain to declare (before loss carry-forward)": "Zu erklärender Gewinn (vor Verlustvortrag)",
     "Taxable gain after carry-forward (estimate)": "Steuerpflichtiger Gewinn nach Verlustvortrag (Schätzung)",
     "The Finanzamt applies the carry-forward it has recorded; declare the gain before it.": "Das Finanzamt rechnet den festgestellten Verlustvortrag selbst an; erkläre den Gewinn davor.",
-    "Loss carried into {{year}} under §20 EStG, excluding losses from selling shares (§20 Abs. 6 S. 4), as stated in the Verlustfeststellungsbescheid": "Verlustvortrag nach §20 EStG, ohne Aktienverluste (§20 Abs. 6 S. 4), laut Verlustfeststellungsbescheid",
     "Loss carry-forward as stated by the Finanzamt: {{declared}} · {{used}} used this year · {{remaining}} remaining": "Verlustvortrag laut Bescheid: {{declared}} · davon verrechnet {{used}} · verbleibend {{remaining}}",
-    "The Finanzamt adds the remaining carry-forward to this itself.": "Das Finanzamt rechnet den verbleibenden Verlustvortrag selbst hinzu."
+    "The Finanzamt adds the remaining carry-forward to this itself.": "Das Finanzamt rechnet den verbleibenden Verlustvortrag selbst hinzu.",
+    "Remaining loss carry-forward under §23 EStG as at 31 Dec {{prevYear}} (Verlustfeststellungsbescheid)": "Verbleibender Verlustvortrag nach §23 EStG zum 31.12.{{prevYear}} (laut Verlustfeststellungsbescheid)",
+    "Remaining loss carry-forward under §20 EStG as at 31 Dec {{prevYear}}, excluding losses from selling shares (§20 Abs. 6 S. 4)": "Verbleibender Verlustvortrag nach §20 EStG zum 31.12.{{prevYear}}, ohne Aktienverluste (§20 Abs. 6 S. 4)"
   }
 }

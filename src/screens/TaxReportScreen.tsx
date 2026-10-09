@@ -75,6 +75,9 @@ type RunRequest = {
 /** Decimal point only: `1.000,50` must be rejected, not silently misread. */
 const CARRY_AMOUNT = /^\d+(\.\d+)?$/;
 
+/** A year the carry-forward can be stored under and labelled with. */
+const CARRY_YEAR = /^\d+$/;
+
 /** Printed under a figure a carry-forward has reduced: the return takes the
  *  figure before it. Shared by the Result and derivatives cards. */
 const CARRY_APPLIED_BY_FINANZAMT =
@@ -353,6 +356,12 @@ export const TaxReportScreen = () => {
     });
   };
 
+  /** The year the carry inputs are keyed by and the Bescheid's "as at"
+   *  year before it, or null while the year field does not hold one. */
+  const carryYear = CARRY_YEAR.test(year.trim())
+    ? { prevYear: Number(year.trim()) - 1 }
+    : null;
+
   /** Seeds the two inputs from the stored figure for `nextYear`. */
   const loadCarryFor = (nextYear: string) => {
     const stored = lossRecord[nextYear];
@@ -363,7 +372,7 @@ export const TaxReportScreen = () => {
 
   /** Written on blur, keyed by the year carried into. */
   const persistCarry = () => {
-    if (!taxpayerLoaded || !/^\d+$/.test(year.trim())) {
+    if (!taxpayerLoaded || !CARRY_YEAR.test(year.trim())) {
       return;
     }
     const key = year.trim();
@@ -888,13 +897,16 @@ export const TaxReportScreen = () => {
                       )}
                     </p>
                   </div>
-                  {module?.manifest.supportsCarryForward && (
+                  {/* Only for a year that parses: the labels name the
+                      Bescheid's "as at 31 Dec" date, the year before, and
+                      a year that cannot be stored under cannot be named. */}
+                  {module?.manifest.supportsCarryForward && carryYear && (
                     <>
                       <div className="flex flex-col gap-2">
                         <Label htmlFor="tax-report-carry-private">
                           {t(
-                            'Loss carried into {{year}} under §23 EStG (as stated by the Finanzamt)',
-                            { year },
+                            'Remaining loss carry-forward under §23 EStG as at 31 Dec {{prevYear}} (Verlustfeststellungsbescheid)',
+                            { prevYear: carryYear.prevYear },
                           )}
                         </Label>
                         <Input
@@ -913,8 +925,8 @@ export const TaxReportScreen = () => {
                       <div className="flex flex-col gap-2">
                         <Label htmlFor="tax-report-carry-capital">
                           {t(
-                            'Loss carried into {{year}} under §20 EStG, excluding losses from selling shares (§20 Abs. 6 S. 4), as stated in the Verlustfeststellungsbescheid',
-                            { year },
+                            'Remaining loss carry-forward under §20 EStG as at 31 Dec {{prevYear}}, excluding losses from selling shares (§20 Abs. 6 S. 4)',
+                            { prevYear: carryYear.prevYear },
                           )}
                         </Label>
                         <Input

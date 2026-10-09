@@ -1933,12 +1933,22 @@ describe('the loss carry-forward inputs', () => {
 
   it('renders for Germany and not for a module without support', async () => {
     await openGermany();
-    expect(await screen.findByLabelText(/under §23 EStG/i)).toBeInTheDocument();
+    // Named as the Bescheid names it: the remaining figure as at the end of
+    // the PREVIOUS year.
+    expect(
+      await screen.findByLabelText(
+        new RegExp(
+          `^Remaining loss carry-forward under §23 EStG as at 31 Dec ${thisYear - 1} \\(Verlustfeststellungsbescheid\\)$`,
+        ),
+      ),
+    ).toBeInTheDocument();
     // The share-loss pot (§20 Abs. 6 S. 4) is excluded in the label itself:
     // it offsets only share gains, which this app never computes.
     expect(
       screen.getByLabelText(
-        /under §20 EStG, excluding losses from selling shares \(§20 Abs\. 6 S\. 4\)/i,
+        new RegExp(
+          `^Remaining loss carry-forward under §20 EStG as at 31 Dec ${thisYear - 1}, excluding losses from selling shares \\(§20 Abs\\. 6 S\\. 4\\)$`,
+        ),
       ),
     ).toBeInTheDocument();
   });
@@ -1967,8 +1977,13 @@ describe('the loss carry-forward inputs', () => {
 
     const yearInput = screen.getByLabelText(/tax year/i);
     await userEvent.clear(yearInput);
+    // No year, no "as at" date to name - so no input to label.
+    expect(screen.queryByLabelText(/under §23 EStG/i)).toBeNull();
     await userEvent.type(yearInput, String(thisYear - 1));
     expect(screen.getByLabelText(/under §23 EStG/i)).toHaveValue('');
+    expect(
+      screen.getByLabelText(new RegExp(`as at 31 Dec ${thisYear - 2} \\(`)),
+    ).toBeInTheDocument();
 
     await userEvent.clear(yearInput);
     await userEvent.type(yearInput, String(thisYear));
