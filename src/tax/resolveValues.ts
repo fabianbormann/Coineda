@@ -8,6 +8,7 @@ import {
 import { fetchHistory } from '@/prices/history';
 import { valueOf } from '@/prices/scale';
 import { getSettings } from '@/settings/settingsStore';
+import { isFiatAsset } from '@/ledger/balances';
 import { normaliseAmount } from '@/ledger/amount';
 import type { TaxCost, TaxEvent, TaxReason, UnresolvedItem } from '@/tax/types';
 
@@ -104,7 +105,9 @@ const lookUp = async (
       results.set(key, { price: cached });
       continue;
     }
-    if (!COINGECKO_IDS[assetId]) {
+    // A fiat asset has no CoinGecko id and needs none: fetchHistory prices
+    // it by the ECB rate.
+    if (!COINGECKO_IDS[assetId] && !isFiatAsset(assetId)) {
       results.set(key, {
         reason: {
           key: PRICE_REASON_KEYS[1],

@@ -47,7 +47,7 @@ export class EcbRateError extends Error {
 const isoDay = (at: number): string => new Date(at).toISOString().slice(0, 10);
 
 /**
- * How many units of `currency` one US dollar bought, per requested day.
+ * How many units of `to` one unit of `from` bought, per requested day.
  *
  * Fetched as one range covering every day asked for - the span between the
  * earliest and latest, which for a tax year is a single request whatever
@@ -57,12 +57,13 @@ const isoDay = (at: number): string => new Date(at).toISOString().slice(0, 10);
  * MAX_CARRY_DAYS, and is simply absent beyond that. The caller reports it,
  * rather than this inventing one.
  *
- * Returns rates of exactly 1 for 'usd' without asking anybody: the quotes
- * being converted are already in dollars.
+ * Returns rates of exactly 1 for the same currency on both sides without
+ * asking anybody.
  */
-export const fetchUsdRates = async (
+export const fetchRates = async (
   isoDates: string[],
-  currency: string,
+  from: string,
+  to: string,
   signal?: AbortSignal,
 ): Promise<Map<string, string>> => {
   const rates = new Map<string, string>();
@@ -71,8 +72,9 @@ export const fetchUsdRates = async (
     return rates;
   }
 
-  const symbol = currency.toUpperCase();
-  if (symbol === 'USD') {
+  const base = from.toUpperCase();
+  const symbol = to.toUpperCase();
+  if (base === symbol) {
     for (const day of days) {
       rates.set(day, '1');
     }
@@ -81,13 +83,13 @@ export const fetchUsdRates = async (
 
   // The range starts before the earliest day asked for, so a Monday at the
   // very start of the span can still carry back to the Friday before it.
-  const from = isoDay(
+  const start = isoDay(
     Date.parse(`${days[0]}T00:00:00Z`) - MAX_CARRY_DAYS * DAY_MS,
   );
-  const to = days[days.length - 1];
+  const end = days[days.length - 1];
 
   const response = await fetch(
-    `${ROOT}/${from}..${to}?base=USD&symbols=${encodeURIComponent(symbol)}`,
+    `${ROOT}/${start}..${end}?base=${encodeURIComponent(base)}&symbols=${encodeURIComponent(symbol)}`,
     {
       headers: { Accept: 'application/json' },
       signal: signal ?? AbortSignal.timeout(TIMEOUT_MS),
@@ -122,3 +124,12 @@ export const fetchUsdRates = async (
 
   return rates;
 };
+
+/** How many units of `currency` one US dollar bought, per requested day:
+ *  the conversion DefiLlama's dollar quotes need. */
+export const fetchUsdRates = (
+  isoDates: string[],
+  currency: string,
+  signal?: AbortSignal,
+): Promise<Map<string, string>> =>
+  fetchRates(isoDates, 'usd', currency, signal);

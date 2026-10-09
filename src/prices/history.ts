@@ -1,7 +1,8 @@
 import Big from 'big.js';
 import { fetchHistoricalPrices } from './coingecko';
 import { fetchUsdHistory, pairKey } from './defillama';
-import { fetchUsdRates } from './ecb';
+import { fetchRates, fetchUsdRates } from './ecb';
+import { isFiatAsset } from '@/ledger/balances';
 
 export { pairKey };
 
@@ -56,7 +57,34 @@ export const fetchHistory = async (
     return { prices, failures };
   }
 
-  const everyDay = [...new Set([...wanted.values()].flat())];
+  // Fiat assets first and separately: a `fiat:usd` consideration is priced
+  // by the ECB's own reference rate for that day - one unit of the currency
+  // in the base currency - and is never a question for a crypto price
+  // provider. One request per fiat currency covers the whole span.
+  const crypto = new Map<string, string[]>();
+  for (const [assetId, dates] of wanted) {
+    if (!isFiatAsset(assetId)) {
+      crypto.set(assetId, dates);
+      continue;
+    }
+    const ccy = assetId.slice('fiat:'.length);
+    try {
+      const rates = await fetchRates(dates, ccy, currency, signal);
+      for (const date of dates) {
+        const rate = rates.get(date);
+        if (rate !== undefined) {
+          prices.set(pairKey(assetId, date), rate);
+        }
+      }
+    } catch (error) {
+      failures.set(assetId, error);
+    }
+  }
+  if (crypto.size === 0) {
+    return { prices, failures };
+  }
+
+  const everyDay = [...new Set([...crypto.values()].flat())];
 
   // ONE request for every asset and every day, and ONE for the whole FX
   // span. A report that needed eighty days priced used to issue eighty
@@ -65,7 +93,7 @@ export const fetchHistory = async (
   let rates = new Map<string, string>();
   try {
     [usd, rates] = await Promise.all([
-      fetchUsdHistory(wanted, signal),
+      fetchUsdHistory(crypto, signal),
       fetchUsdRates(everyDay, currency, signal),
     ]);
   } catch {
@@ -77,7 +105,7 @@ export const fetchHistory = async (
     // worth showing. See the note in the fallback loop below.
   }
 
-  for (const [assetId, dates] of wanted) {
+  for (const [assetId, dates] of crypto) {
     for (const date of dates) {
       const key = pairKey(assetId, date);
       const quote = usd.get(key);
@@ -91,7 +119,7 @@ export const fetchHistory = async (
   // Whatever is still missing goes to CoinGecko, per asset, exactly as
   // before. On a recent report this list is usually empty and no request is
   // made at all.
-  for (const [assetId, dates] of wanted) {
+  for (const [assetId, dates] of crypto) {
     const outstanding = dates.filter(
       (date) => !prices.has(pairKey(assetId, date)),
     );

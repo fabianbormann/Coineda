@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { fetchUsdHistory, NEAREST_LIMIT_MS } from '@/prices/defillama';
-import { fetchUsdRates, MAX_CARRY_DAYS } from '@/prices/ecb';
+import { fetchRates, fetchUsdRates, MAX_CARRY_DAYS } from '@/prices/ecb';
 import { fetchHistory, inCurrency } from '@/prices/history';
 import { resolveValues } from '@/tax/resolveValues';
 import { openLedger } from '@/ledger/db';
@@ -329,5 +329,94 @@ describe('end to end, through the tax resolver', () => {
     expect(unpriced).toHaveLength(0);
     // 10 ADA at 1.74 USD x 0.818 = 14.2332 EUR.
     expect(valued[0].value).toBe('14.2332');
+  });
+});
+
+describe('rates between two currencies', () => {
+  it('asks for the pair it was given', async () => {
+    const asked: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        asked.push(String(url));
+        return new Response(
+          JSON.stringify({
+            base: 'GBP',
+            rates: { '2021-06-01': { EUR: 1.1627 } },
+          }),
+          { status: 200 },
+        );
+      }),
+    );
+    const rates = await fetchRates(['2021-06-01'], 'gbp', 'eur');
+    expect(asked).toHaveLength(1);
+    expect(asked[0]).toContain('base=GBP');
+    expect(asked[0]).toContain('symbols=EUR');
+    expect(rates.get('2021-06-01')).toBe('1.1627');
+  });
+
+  it('answers 1 without a request when the currencies are the same', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const rates = await fetchRates(['2021-06-01'], 'EUR', 'eur');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(rates.get('2021-06-01')).toBe('1');
+  });
+});
+
+describe('fiat assets in the history', () => {
+  it('prices a dollar at the ECB rate for that day, asking nobody else', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (String(url).includes('frankfurter')) {
+          return new Response(ratesBody({ '2021-06-01': 0.818 }), {
+            status: 200,
+          });
+        }
+        throw new Error(`only the ECB may be asked for a fiat asset: ${url}`);
+      }),
+    );
+
+    const { prices, failures } = await fetchHistory(
+      new Map([['fiat:usd', ['2021-06-01']]]),
+      'eur',
+    );
+    expect(failures.size).toBe(0);
+    expect(prices.get('fiat:usd|2021-06-01')).toBe('0.818');
+  });
+
+  it('leaves a fiat currency the ECB does not publish unpriced, as a gap not a failure', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (String(url).includes('frankfurter')) {
+          return new Response(JSON.stringify({ base: 'XYZ', rates: {} }), {
+            status: 200,
+          });
+        }
+        throw new Error(`only the ECB may be asked for a fiat asset: ${url}`);
+      }),
+    );
+
+    const { prices, failures } = await fetchHistory(
+      new Map([['fiat:xyz', ['2021-06-01']]]),
+      'eur',
+    );
+    expect(prices.size).toBe(0);
+    expect(failures.size).toBe(0);
+  });
+
+  it('records a rate service outage against the fiat asset', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('down', { status: 503 })),
+    );
+    const { prices, failures } = await fetchHistory(
+      new Map([['fiat:usd', ['2021-06-01']]]),
+      'eur',
+    );
+    expect(prices.size).toBe(0);
+    expect(failures.has('fiat:usd')).toBe(true);
   });
 });
