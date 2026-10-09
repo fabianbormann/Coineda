@@ -65,6 +65,7 @@ const germanAssessment: TaxReport = {
     valuation: 'utc-day',
     priceSources: ['DefiLlama', 'ECB', 'CoinGecko'],
     appVersion: '0.0.0-test',
+    rulesVersion: '1.0.0',
     eventsConsidered: 1,
     internalTransfersNetted: 0,
     transferResiduals: 0,

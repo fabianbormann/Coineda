@@ -632,6 +632,39 @@ const germanTax: TaxModule = {
     jurisdiction: 'Germany',
     contributor: 'Fabian Bormann',
     rulesCheckedOn: '2026-10-10',
+    rulesVersion: '1.4.0',
+    changelog: [
+      {
+        version: '1.4.0',
+        date: '2026-10-10',
+        summary:
+          "Declared loss carry-forward applied to §23 after the Freigrenze test and to §20 before the saver's allowance.",
+      },
+      {
+        version: '1.3.0',
+        date: '2026-10-10',
+        summary:
+          "Derivative settlements taxed as capital income under §20 EStG with the saver's allowance; margin flagged as contested; rollover not deducted.",
+      },
+      {
+        version: '1.2.0',
+        date: '2026-10-10',
+        summary:
+          'Typed reward kinds (staking, lending, mining, airdrop, fork); trades valued at the fiat actually paid or received; transfer fees disposed of at market.',
+      },
+      {
+        version: '1.1.0',
+        date: '2026-10-09',
+        summary:
+          'Holding period by calendar date; trade fees deducted as Werbungskosten; income itemised.',
+      },
+      {
+        version: '1.0.0',
+        date: '2026-10-01',
+        summary:
+          'Initial rules: §23 FIFO per venue with the Freigrenze and one-year exemption, §22 Nr. 3 staking income.',
+      },
+    ],
     partitionLabel:
       'Lots are matched per wallet or exchange, not pooled across the portfolio.',
     references: [

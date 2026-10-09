@@ -11,7 +11,7 @@ import { REWARD_KIND_LABELS } from '@/tax/rewardKinds';
 import { DERIVATIVE_KIND_LABELS } from '@/tax/derivativeKinds';
 import { PRICE_REASON_KEYS } from '@/tax/resolveValues';
 import type { LedgerEvent } from '@/ledger/types';
-import type { MatchedDisposal, TaxEvent } from '@/tax/types';
+import type { MatchedDisposal, TaxEvent, TaxManifest } from '@/tax/types';
 
 const locale = (name: string): Record<string, string> =>
   JSON.parse(
@@ -20,6 +20,35 @@ const locale = (name: string): Record<string, string> =>
       'utf8',
     ),
   ).translation;
+
+/** The versioning gate as a predicate, so it can be shown to fail on a bad
+ *  manifest as well as pass on the real ones. */
+const versionProblems = (
+  manifest: Pick<TaxManifest, 'rulesVersion' | 'changelog' | 'rulesCheckedOn'>,
+): string[] => {
+  const problems: string[] = [];
+  const { changelog } = manifest;
+  if (changelog.length === 0) {
+    return ['empty changelog'];
+  }
+  if (manifest.rulesVersion !== changelog[0].version) {
+    problems.push('rulesVersion is not the newest changelog entry');
+  }
+  for (const entry of changelog) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(entry.date)) {
+      problems.push(`bad date ${entry.date}`);
+    }
+  }
+  for (let i = 1; i < changelog.length; i++) {
+    if (changelog[i].date > changelog[i - 1].date) {
+      problems.push('changelog is not newest first');
+    }
+  }
+  if (manifest.rulesCheckedOn < changelog[0].date) {
+    problems.push('rulesCheckedOn predates the newest changelog entry');
+  }
+  return problems;
+};
 
 const en = locale('en');
 const de = locale('de');
@@ -393,6 +422,10 @@ describe.each(taxRegistry.map((m) => [m.manifest.id, m] as const))(
       );
     });
 
+    it('keeps its rule-set version consistent with its changelog', () => {
+      expect(versionProblems(module.manifest)).toEqual([]);
+    });
+
     it('cites at least one reference', () => {
       expect(module.manifest.references.length).toBeGreaterThan(0);
     });
@@ -502,5 +535,36 @@ describe('host reason keys', () => {
   ])('keys %s in both locales', (key) => {
     expect(en[key], `missing from en.json: ${key}`).toBeDefined();
     expect(de[key], `missing from de.json: ${key}`).toBeDefined();
+  });
+});
+
+describe('the rule-set versioning gate', () => {
+  const good = {
+    rulesVersion: '1.1.0',
+    rulesCheckedOn: '2026-10-10',
+    changelog: [
+      { version: '1.1.0', date: '2026-10-10', summary: 'b' },
+      { version: '1.0.0', date: '2026-10-01', summary: 'a' },
+    ],
+  };
+
+  it('accepts a consistent manifest', () => {
+    expect(versionProblems(good)).toEqual([]);
+  });
+
+  it('rejects a reordered changelog', () => {
+    expect(
+      versionProblems({ ...good, changelog: [...good.changelog].reverse() }),
+    ).not.toEqual([]);
+  });
+
+  it('rejects a version that is not the newest entry', () => {
+    expect(versionProblems({ ...good, rulesVersion: '1.0.0' })).not.toEqual([]);
+  });
+
+  it('rejects rules checked before the newest change', () => {
+    expect(
+      versionProblems({ ...good, rulesCheckedOn: '2026-10-05' }),
+    ).not.toEqual([]);
   });
 });

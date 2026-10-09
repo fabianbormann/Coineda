@@ -305,7 +305,22 @@ const austrianTax: TaxModule = {
     id: 'at',
     jurisdiction: 'Austria',
     contributor: 'Fabian Bormann',
-    rulesCheckedOn: '2026-10-01',
+    rulesCheckedOn: '2026-10-10',
+    rulesVersion: '1.0.1',
+    changelog: [
+      {
+        version: '1.0.1',
+        date: '2026-10-10',
+        summary:
+          'Sales valued at the fiat actually received; hard forks acquired at zero.',
+      },
+      {
+        version: '1.0.0',
+        date: '2026-10-01',
+        summary:
+          'Initial rules: flat 27.5 % KESt, Altvermögen/Neuvermögen pooling.',
+      },
+    ],
     partitionLabel:
       'Cost is pooled per asset across the portfolio, split only between Altvermögen and Neuvermögen.',
     references: ['ÖkoStRefG 2022', '§27a Abs. 4 Z 3 EStG', '§27b EStG'],

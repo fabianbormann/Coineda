@@ -764,7 +764,9 @@ export const TaxReportScreen = () => {
                       contributor: disclaimer.contributor,
                     })}
                     {' · '}
-                    {t('Rules last checked on {{date}}', {
+                    {t('Rule set {{id}} {{version}}, checked on {{date}}', {
+                      id: module.manifest.id,
+                      version: disclaimer.rulesVersion,
                       date: new Intl.DateTimeFormat(i18n.language, {
                         dateStyle: 'medium',
                       }).format(Date.parse(disclaimer.rulesCheckedOn)),
@@ -1036,6 +1038,9 @@ export const TaxReportScreen = () => {
                           {t('Produced by')}:{' '}
                         </span>
                         Coineda {assessment.method.appVersion}
+                        {' · '}
+                        {t('Rule set')} {module.manifest.id}{' '}
+                        {assessment.method.rulesVersion}
                       </p>
                       <p className="text-muted-foreground">
                         {t(

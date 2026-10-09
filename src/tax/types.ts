@@ -448,6 +448,8 @@ export type ReportMethod = {
   valuation: 'utc-day';
   priceSources: string[];
   appVersion: string;
+  /** The jurisdiction's rule-set version this report was produced under. */
+  rulesVersion: string;
   /** Ledger events the jurisdiction was asked to classify, after internal
    *  transfers were removed. */
   eventsConsidered: number;
@@ -558,6 +560,10 @@ export type TaxManifest = {
   contributor: string;
   /** ISO date (YYYY-MM-DD) the contributor last verified the rules. */
   rulesCheckedOn: string;
+  /** Semantic version of this rule set; printed on every report and tied to `changelog[0]`. */
+  rulesVersion: string;
+  /** Newest first. English prose for contributors and reviewers; the report prints only the version. */
+  changelog: { version: string; date: string; summary: string }[];
   /** Citations so a reader can verify rather than trust. */
   references: string[];
   /**

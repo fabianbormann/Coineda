@@ -21,6 +21,7 @@ export type Disclaimer = {
   jurisdiction: string;
   contributor: string;
   rulesCheckedOn: string;
+  rulesVersion: string;
   references: string[];
   monthsSinceChecked: number;
   stale: boolean;
@@ -64,6 +65,7 @@ export const buildDisclaimer = (
     jurisdiction: manifest.jurisdiction,
     contributor: manifest.contributor,
     rulesCheckedOn: manifest.rulesCheckedOn,
+    rulesVersion: manifest.rulesVersion,
     references: manifest.references,
     monthsSinceChecked,
     stale: monthsSinceChecked > STALE_AFTER_MONTHS,

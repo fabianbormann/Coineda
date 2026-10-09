@@ -19,6 +19,8 @@ const stubModule: TaxModule = {
     jurisdiction: 'Testland',
     contributor: 'Test Suite',
     rulesCheckedOn: '2026-10-01',
+    rulesVersion: '1.0.0',
+    changelog: [{ version: '1.0.0', date: '2026-10-01', summary: 'Initial.' }],
     partitionLabel: 'Test partition',
     references: ['none'],
     supportedYears: { from: 2024, to: 2026 },

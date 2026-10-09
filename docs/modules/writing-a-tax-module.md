@@ -184,6 +184,14 @@ Keep `rulesCheckedOn` current when you touch the rules, and keep
 `references` precise enough that someone else can go verify your work
 instead of trusting it.
 
+`rulesVersion` and `changelog` sit beside them: a semantic version of your
+rule set, printed on every report, and a newest-first list of
+`{ version, date, summary }` entries. Whenever a rule changes, bump the
+version and add an entry; the conformance gate enforces that
+`rulesVersion` equals `changelog[0].version`, dates are ISO and not
+increasing down the list, and `rulesCheckedOn` is not older than the newest
+entry.
+
 ## Golden fixtures, and proving each one load-bearing
 
 Your PR must include fixture-driven tests ("golden cases") that pin down the

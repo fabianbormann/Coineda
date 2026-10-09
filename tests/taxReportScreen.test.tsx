@@ -81,6 +81,8 @@ const baseManifest: TaxManifest = {
   jurisdiction: 'Testland',
   contributor: 'Test Suite',
   rulesCheckedOn: '2025-01-01',
+  rulesVersion: '1.0.0',
+  changelog: [{ version: '1.0.0', date: '2025-01-01', summary: 'Initial.' }],
   partitionLabel: 'Test partition',
   references: ['Test Statute §1'],
   supportedYears: { from: 2020, to: 2030 },
@@ -452,6 +454,27 @@ describe('running a report', () => {
     expect(
       screen.getAllByText(/treated as disposals|treated as a disposal/i),
     ).not.toHaveLength(0);
+  });
+});
+
+describe('the rule-set version', () => {
+  it('prints on the method sheet and in the disclaimer after a German run', async () => {
+    vi.stubGlobal('fetch', flatRange(1));
+    taxRegistry.push(germanTax);
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /germany/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /run report/i }),
+    );
+
+    expect(await screen.findAllByText(/rule set de 1\.4\.0/i)).not.toHaveLength(
+      0,
+    );
+    expect(
+      screen.getByText(/rule set de 1\.4\.0, checked on/i),
+    ).toBeInTheDocument();
   });
 });
 

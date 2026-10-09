@@ -516,6 +516,7 @@ export const runTaxReport = async (
     // what fetchHistory actually tries, in the order it tries them.
     priceSources: ['DefiLlama', 'ECB', 'CoinGecko'],
     appVersion: APP_VERSION,
+    rulesVersion: module.manifest.rulesVersion,
     eventsConsidered: survivors.length,
     internalTransfersNetted: allEvents.length - survivors.length,
     // Only the fees: the sentence this count feeds describes network fee
