@@ -80,6 +80,11 @@ const CARRY_AMOUNT = /^\d+(\.\d+)?$/;
 const CARRY_APPLIED_BY_FINANZAMT =
   'The Finanzamt applies the carry-forward it has recorded; declare the gain before it.';
 
+/** Printed under "Loss to declare" when a carry-forward was entered: the
+ *  loss to declare is the year's own, and the Finanzamt adds the carry. */
+const CARRY_ADDED_BY_FINANZAMT =
+  'The Finanzamt adds the remaining carry-forward to this itself.';
+
 const DEFAULT_CURRENCY = 'eur';
 
 /** Translated wrapper text per UnresolvedItem.kind, so the raw `reason`
@@ -1185,7 +1190,7 @@ export const TaxReportScreen = () => {
                     {assessment.carryForward?.privateSales && (
                       <p data-testid="carry-forward-private">
                         {t(
-                          'Loss carried forward: {{declared}} declared · {{used}} used · {{remaining}} remaining',
+                          'Loss carry-forward as stated by the Finanzamt: {{declared}} · {{used}} used this year · {{remaining}} remaining',
                           {
                             declared: formatFiat(
                               Number(
@@ -1297,6 +1302,12 @@ export const TaxReportScreen = () => {
                         </span>
                       </p>
                     )}
+                    {!isZeroAmount(assessment.totals.loss) &&
+                      assessment.carryForward?.privateSales && (
+                        <p className="text-sm text-muted-foreground">
+                          {t(CARRY_ADDED_BY_FINANZAMT)}
+                        </p>
+                      )}
                     {/* Labelled by sign. The exempt side is a NET, so a
                         year whose long-held lots lost money puts a negative
                         number here - and the recorded report printed
@@ -1406,7 +1417,7 @@ export const TaxReportScreen = () => {
                         {assessment.carryForward?.capital && (
                           <p data-testid="carry-forward-capital">
                             {t(
-                              'Loss carried forward: {{declared}} declared · {{used}} used · {{remaining}} remaining',
+                              'Loss carry-forward as stated by the Finanzamt: {{declared}} · {{used}} used this year · {{remaining}} remaining',
                               {
                                 declared: formatFiat(
                                   Number(
@@ -1442,6 +1453,12 @@ export const TaxReportScreen = () => {
                             />
                           </p>
                         )}
+                        {!isZeroAmount(assessment.capitalResult.loss) &&
+                          assessment.carryForward?.capital && (
+                            <p className="text-muted-foreground">
+                              {t(CARRY_ADDED_BY_FINANZAMT)}
+                            </p>
+                          )}
                         {assessment.capitalResult.estimatedTax !==
                           undefined && (
                           <p>

@@ -2020,7 +2020,11 @@ describe('the loss carry-forward inputs', () => {
     );
 
     const line = await screen.findByTestId('carry-forward-private');
-    expect(line).toHaveTextContent(/used/i);
+    // "Declared" is what the user does with "Loss to declare"; the carry is
+    // the Finanzamt's figure and says so.
+    expect(line).toHaveTextContent(/as stated by the Finanzamt/);
+    expect(line).not.toHaveTextContent(/declared/i);
+    expect(line).toHaveTextContent(/€500\.00 used this year/);
     expect(line).toHaveTextContent(/€0\.00 remaining/);
     expect(screen.getAllByText(/1,500\.00/).length).toBeGreaterThan(0);
 
@@ -2037,6 +2041,48 @@ describe('the loss carry-forward inputs', () => {
     expect(
       screen.getByText(
         /the finanzamt applies the carry-forward it has recorded; declare the gain before it\./i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('says under a loss that the Finanzamt adds the remaining carry-forward', async () => {
+    vi.stubGlobal('fetch', flatRange(1));
+    await putEvents([
+      ledgerEvent({
+        id: 'buy',
+        externalId: 'buy',
+        kind: 'trade',
+        timestamp: Date.UTC(thisYear, 0, 2),
+        legs: [
+          leg('fiat:eur', '1000', 'out'),
+          leg('cardano:lovelace', '1000000000', 'in'),
+        ],
+      }),
+      ledgerEvent({
+        id: 'sell',
+        externalId: 'sell',
+        kind: 'trade',
+        timestamp: Date.UTC(thisYear, 0, 3),
+        legs: [
+          leg('cardano:lovelace', '1000000000', 'out'),
+          leg('fiat:eur', '600', 'in'),
+        ],
+      }),
+    ]);
+    await openGermany();
+    await userEvent.type(
+      await screen.findByLabelText(/under §23 EStG/i),
+      '500',
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /run report/i }),
+    );
+
+    await screen.findByTestId('carry-forward-private');
+    expect(screen.getByText(/^loss to declare/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /the finanzamt adds the remaining carry-forward to this itself\./i,
       ),
     ).toBeInTheDocument();
   });

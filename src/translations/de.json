@@ -308,7 +308,6 @@
     "Loss carried into {{year}} under §23 EStG (as stated by the Finanzamt)": "In {{year}} vorgetragener Verlust nach §23 EStG (laut Finanzamt)",
     "From your Verlustfeststellungsbescheid. Only the Finanzamt knows this figure; stored only on this device.": "Aus deinem Verlustfeststellungsbescheid. Nur das Finanzamt kennt diese Zahl; nur auf diesem Gerät gespeichert.",
     "Enter an amount like 1234.56": "Gib einen Betrag wie 1234.56 ein",
-    "Loss carried forward: {{declared}} declared · {{used}} used · {{remaining}} remaining": "Verlustvortrag: {{declared}} erklärt · {{used}} verbraucht · {{remaining}} verbleibend",
     "Enter a valid year": "Gib ein gültiges Jahr ein",
     "Running your tax report… this can take a while because historical prices are looked up one at a time.": "Dein Steuerreport wird erstellt … das kann dauern, weil historische Preise einzeln abgefragt werden.",
     "Could not run the report: {{detail}}": "Report konnte nicht erstellt werden: {{detail}}",
@@ -541,6 +540,8 @@
     "Gain to declare (before loss carry-forward)": "Zu erklärender Gewinn (vor Verlustvortrag)",
     "Taxable gain after carry-forward (estimate)": "Steuerpflichtiger Gewinn nach Verlustvortrag (Schätzung)",
     "The Finanzamt applies the carry-forward it has recorded; declare the gain before it.": "Das Finanzamt rechnet den festgestellten Verlustvortrag selbst an; erkläre den Gewinn davor.",
-    "Loss carried into {{year}} under §20 EStG, excluding losses from selling shares (§20 Abs. 6 S. 4), as stated in the Verlustfeststellungsbescheid": "Verlustvortrag nach §20 EStG, ohne Aktienverluste (§20 Abs. 6 S. 4), laut Verlustfeststellungsbescheid"
+    "Loss carried into {{year}} under §20 EStG, excluding losses from selling shares (§20 Abs. 6 S. 4), as stated in the Verlustfeststellungsbescheid": "Verlustvortrag nach §20 EStG, ohne Aktienverluste (§20 Abs. 6 S. 4), laut Verlustfeststellungsbescheid",
+    "Loss carry-forward as stated by the Finanzamt: {{declared}} · {{used}} used this year · {{remaining}} remaining": "Verlustvortrag laut Bescheid: {{declared}} · davon verrechnet {{used}} · verbleibend {{remaining}}",
+    "The Finanzamt adds the remaining carry-forward to this itself.": "Das Finanzamt rechnet den verbleibenden Verlustvortrag selbst hinzu."
   }
 }

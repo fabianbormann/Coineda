@@ -318,6 +318,9 @@ export type CarryForward = { privateSales?: string; capital?: string };
 /** What happened to one declared carry-forward. `used <= gain`,
  *  `remaining = declared - used`. */
 export type CarryForwardOutcome = {
+  /** The figure as DECLARED BY THE FINANZAMT in its Verlustfeststellungs-
+   *  bescheid and entered by the user - not something the user declares.
+   *  The report prints it as "as stated by the Finanzamt". */
   declared: string;
   used: string;
   remaining: string;
