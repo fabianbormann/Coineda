@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.13](https://github.com/fabianbormann/Coineda/compare/v0.2.12...v0.2.13) (2026-10-09)
+
+
+### Features
+
+* pour the journey into a jar along a timeline ([eedbc7e](https://github.com/fabianbormann/Coineda/commit/eedbc7ecf950fb4601fa67cceeb398ef69c2a3d4))
+
 ## [0.2.12](https://github.com/fabianbormann/Coineda/compare/v0.2.11...v0.2.12) (2026-10-07)
 
 
