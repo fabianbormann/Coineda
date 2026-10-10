@@ -278,7 +278,13 @@ export const openCheckpoint = async (
  */
 export const restoreCheckpoint = async (
   checkpoint: Checkpoint,
+  options: { stripCredentials?: boolean } = {},
 ): Promise<void> => {
+  // Only the review path strips: a backup restored through onboarding keeps
+  // its credentials, while a review copy must never hold them.
+  const sources = options.stripCredentials
+    ? checkpoint.sources.map((s) => ({ ...s, config: {} }))
+    : checkpoint.sources;
   const events = [
     ...checkpoint.authoredEvents,
     ...(checkpoint.derivedEvents ?? []),
@@ -301,7 +307,7 @@ export const restoreCheckpoint = async (
       key: SETTINGS_KEY,
       value: normalizeSettings(checkpoint.settings),
     });
-    for (const source of checkpoint.sources) {
+    for (const source of sources) {
       await tx.objectStore('sources').put(source);
     }
     // Through the identity index, exactly as `putEvents` does, NOT a bare

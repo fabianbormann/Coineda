@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { ClientContext } from './ClientContext';
+import { OpenForReviewDialog } from './OpenForReviewDialog';
 import {
   createClient,
   listClients,
@@ -35,6 +36,7 @@ export const ClientMenu = () => {
   const { t } = useTranslation();
   const [mode, setMode] = useState<Mode>(null);
   const [text, setText] = useState('');
+  const [reviewOpen, setReviewOpen] = useState(false);
 
   // The shell is also rendered without a provider in isolation tests.
   if (!ctx) return null;
@@ -55,6 +57,12 @@ export const ClientMenu = () => {
     setMode(m);
   };
   const close = () => setMode(null);
+
+  const closeReview = async () => {
+    await removeClient(client.id);
+    const next = listClients().find((c) => c.kind === 'client');
+    if (next) await switchTo(next.id);
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,11 +131,25 @@ export const ClientMenu = () => {
             </p>
           )}
           <DropdownMenuSeparator />
-          <DropdownMenuItem disabled>
+          <DropdownMenuItem onSelect={() => setReviewOpen(true)}>
             {t('Open a checkpoint for review')}
           </DropdownMenuItem>
+          {client.kind === 'review' && (
+            <>
+              <DropdownMenuLabel className="font-normal text-muted-foreground">
+                {t('Review of {{file}} — read-only', {
+                  file: client.review?.file ?? labelOf(client),
+                })}
+              </DropdownMenuLabel>
+              <DropdownMenuItem onSelect={() => void closeReview()}>
+                {t('Close review')}
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <OpenForReviewDialog open={reviewOpen} onOpenChange={setReviewOpen} />
 
       <Dialog open={mode !== null} onOpenChange={(o) => !o && close()}>
         <DialogContent>

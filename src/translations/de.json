@@ -594,6 +594,14 @@
     "My portfolio": "Mein Portfolio",
     "Open a checkpoint for review": "Checkpoint zur Prüfung öffnen",
     "Create": "Erstellen",
+    "Open": "Öffnen",
+    "This is a handover checkpoint without the derived events; ask for a backup checkpoint to review the report.": "Das ist ein Übergabe-Checkpoint ohne die abgeleiteten Ereignisse; bitte um einen Backup-Checkpoint, um den Bericht zu prüfen.",
+    "Fingerprint matches the checkpoint.": "Der Fingerprint stimmt mit dem Checkpoint überein.",
+    "Fingerprint does NOT match the checkpoint.": "Der Fingerprint stimmt NICHT mit dem Checkpoint überein.",
+    "The checkpoint stores no fingerprint.": "Der Checkpoint enthält keinen Fingerprint.",
+    "Close review": "Prüfung beenden",
+    "Review of {{file}} — read-only": "Prüfung von {{file}} — nur lesen",
+    "Client": "Mandant",
     "This permanently deletes {{label}} and all its data from this device. Type the label to confirm": "Dadurch wird {{label}} mit allen Daten unwiderruflich von diesem Gerät gelöscht. Gib zur Bestätigung die Bezeichnung ein"
   }
 }

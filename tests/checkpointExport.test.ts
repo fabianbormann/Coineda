@@ -18,7 +18,13 @@ import {
   putManualLink,
 } from '@/ledger/manualLinks';
 import { putSettings } from '@/settings/settingsStore';
-import { getAllEvents, openLedger, putSource, putEvents } from '@/ledger/db';
+import {
+  getAllEvents,
+  getSources,
+  openLedger,
+  putSource,
+  putEvents,
+} from '@/ledger/db';
 import type { LedgerEvent } from '@/ledger/types';
 
 /**
@@ -505,5 +511,21 @@ describe('what each scope carries', () => {
     await expect(openCheckpoint(sealed, secret)).rejects.toThrow(
       /unexpected shape/i,
     );
+  });
+});
+
+describe('restoreCheckpoint stripCredentials', () => {
+  it('blanks every source config only when asked', async () => {
+    await putSource({
+      id: 'k',
+      moduleId: 'kraken-csv',
+      label: 'K',
+      config: { apiKey: 'sekrit' },
+    });
+    const checkpoint = await buildCheckpoint('backup');
+    await restoreCheckpoint(checkpoint);
+    expect((await getSources())[0].config).toEqual({ apiKey: 'sekrit' });
+    await restoreCheckpoint(checkpoint, { stripCredentials: true });
+    expect((await getSources())[0].config).toEqual({});
   });
 });

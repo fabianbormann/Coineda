@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import 'fake-indexeddb/auto';
 import App from '../src/App';
@@ -9,6 +9,7 @@ import {
   createClient,
   createReviewClient,
   listClients,
+  setActiveClient,
 } from '@/clients/registry';
 import i18n from '@/i18n';
 import { setOnboarded } from '@/settings/settingsStore';
@@ -117,7 +118,24 @@ describe('ClientMenu', () => {
     ).toBeInTheDocument();
   });
 
-  it('badges review entries read-only and renders the checkpoint item disabled', async () => {
+  it('closes a review client and returns to the first client', async () => {
+    const review = createReviewClient('Checkpoint 2025', {
+      omittedEventCount: 0,
+      file: 'x.coineda',
+      verdict: 'none',
+    });
+    await setActiveClient(review.id);
+    await setOnboarded();
+    render(<App />);
+    await openMenu();
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: /close review/i }),
+    );
+    await waitFor(() => expect(activeClient().kind).toBe('client'));
+    expect(listClients().some((c) => c.kind === 'review')).toBe(false);
+  });
+
+  it('badges review entries read-only and enables the checkpoint item', async () => {
     createReviewClient('Checkpoint 2025', {
       omittedEventCount: 0,
       file: 'x.json',
@@ -131,7 +149,7 @@ describe('ClientMenu', () => {
     expect(review).toHaveTextContent('read-only');
     expect(
       screen.getByRole('menuitem', { name: /open a checkpoint for review/i }),
-    ).toHaveAttribute('aria-disabled', 'true');
+    ).not.toHaveAttribute('aria-disabled', 'true');
   });
 
   it('confirms deletion against the displayed label in German', async () => {

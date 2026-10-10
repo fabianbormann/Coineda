@@ -594,6 +594,14 @@
     "My portfolio": "My portfolio",
     "Open a checkpoint for review": "Open a checkpoint for review",
     "Create": "Create",
+    "Open": "Open",
+    "This is a handover checkpoint without the derived events; ask for a backup checkpoint to review the report.": "This is a handover checkpoint without the derived events; ask for a backup checkpoint to review the report.",
+    "Fingerprint matches the checkpoint.": "Fingerprint matches the checkpoint.",
+    "Fingerprint does NOT match the checkpoint.": "Fingerprint does NOT match the checkpoint.",
+    "The checkpoint stores no fingerprint.": "The checkpoint stores no fingerprint.",
+    "Close review": "Close review",
+    "Review of {{file}} — read-only": "Review of {{file}} — read-only",
+    "Client": "Client",
     "This permanently deletes {{label}} and all its data from this device. Type the label to confirm": "This permanently deletes {{label}} and all its data from this device. Type the label to confirm"
   }
 }
