@@ -22,6 +22,8 @@ import {
 } from '@/clients/registry';
 import { writeDeviceEgress, writeDeviceEndpoints } from '@/config/deviceConfig';
 import { flatRange } from './priceRangeStub';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import type {
   AssessInput,
   TaxAssessment,
@@ -3562,5 +3564,158 @@ describe('the egress line in German', () => {
     } finally {
       await i18n.changeLanguage('en');
     }
+  });
+});
+
+describe('the DAC8 / CARF reconciliation', () => {
+  const originalCreate = URL.createObjectURL;
+  const originalRevoke = URL.revokeObjectURL;
+  afterEach(() => {
+    URL.createObjectURL = originalCreate;
+    URL.revokeObjectURL = originalRevoke;
+    vi.restoreAllMocks();
+  });
+
+  const carfXml = () =>
+    readFileSync(path.join(__dirname, 'assets', 'carf', 'plain.xml'), 'utf8');
+
+  const seedBitpanda = async () => {
+    await putSource({
+      id: 's-bitpanda',
+      moduleId: 'bitpanda',
+      label: 'Bitpanda',
+      config: {},
+    });
+    await putEvents([
+      ledgerEvent({
+        id: 'carf-in',
+        externalId: 'carf-in',
+        sourceId: 's-bitpanda',
+        kind: 'fiat-in',
+        timestamp: Date.UTC(2026, 1, 1),
+        legs: [
+          {
+            assetId: 'fiat:eur',
+            amount: '100',
+            direction: 'in',
+            venue: 'bitpanda',
+            role: 'principal',
+          },
+        ],
+      }),
+    ]);
+  };
+
+  /** Opens the dialog from the action bar, drops the fixture and compares. */
+  const reconcileWithFixture = async () => {
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: 'Reconcile with a CARF report',
+      }),
+    );
+    const box = await screen.findByRole('dialog');
+    const input = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
+    await userEvent.upload(
+      input,
+      new File([carfXml()], 'carf.xml', { type: 'text/xml' }),
+    );
+    await within(box).findByRole('radio', { name: /erika mustermann/i });
+    await userEvent.click(within(box).getByRole('button', { name: 'Compare' }));
+    return screen.findByTestId('carf-reconciliation');
+  };
+
+  it('offers the reconciliation in the action bar and prints the section', async () => {
+    taxRegistry.push(makeModule());
+    await seedBitpanda();
+    renderScreen();
+    await runReport('2026');
+
+    const button = await screen.findByRole('button', {
+      name: 'Reconcile with a CARF report',
+    });
+    expect(button.closest('.print\\:hidden')).not.toBeNull();
+
+    const section = await reconcileWithFixture();
+    expect(section.closest('[data-print="document"]')).not.toBeNull();
+    expect(section.closest('.print\\:hidden')).toBeNull();
+    expect(
+      within(section).getByRole('heading', {
+        name: 'DAC8 / CARF reconciliation',
+      }),
+    ).toBeInTheDocument();
+    expect(section.textContent).toContain('Bitpanda GmbH');
+    expect(section.textContent).toContain('DE2026BITPANDA0001');
+    expect(section.textContent).toContain('Erika Mustermann');
+    expect(section.textContent).toMatch(
+      /\d+ match, \d+ differ, \d+ missing on one side, \d+ not compared, 1 not recognised/,
+    );
+    const btcRow = within(section)
+      .getAllByRole('row')
+      .find((row) => /^BTC/.test(row.textContent ?? ''));
+    expect(btcRow).toBeDefined();
+    expect(btcRow?.textContent).toContain('Not in the ledger');
+    expect(section.textContent).toContain(
+      'Only the figures above were read from the file; the file itself is not stored.',
+    );
+    // The user's address and birth date are never shown.
+    expect(section.textContent).not.toContain('Heidestraße');
+    expect(section.textContent).not.toContain('1964-08-12');
+  });
+
+  it('downloads the reconciliation as CSV from a print-hidden button', async () => {
+    taxRegistry.push(makeModule());
+    await seedBitpanda();
+    const blobs: Blob[] = [];
+    const createObjectURL = vi.fn((blob: Blob) => {
+      blobs.push(blob);
+      return 'blob:test';
+    });
+    URL.createObjectURL = createObjectURL;
+    URL.revokeObjectURL = vi.fn();
+    const names: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      names.push(this.download);
+    });
+    renderScreen();
+    await runReport('2026');
+    const section = await reconcileWithFixture();
+
+    const csvButton = within(section).getByRole('button', {
+      name: 'Download reconciliation (CSV)',
+    });
+    expect(csvButton.closest('.print\\:hidden')).not.toBeNull();
+    await userEvent.click(csvButton);
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(names[0]).toMatch(/^carf-reconciliation-2026-[0-9a-f]{12}\.csv$/);
+    const text = new TextDecoder().decode(await readBlob(blobs[0]));
+    expect(text.split('\r\n')[0]).toMatch(/^asset,category,verdict,/);
+    expect(text).toContain('BTC,fiat-in,missing-own');
+  });
+
+  it('clears the section when the report is run again', async () => {
+    taxRegistry.push(makeModule());
+    await seedBitpanda();
+    renderScreen();
+    await runReport('2026');
+    await reconcileWithFixture();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /change your answers/i }),
+    );
+    expect(screen.queryByTestId('carf-reconciliation')).toBeNull();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /run report/i }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByText(/running your tax report/i)).toBeNull(),
+    );
+    await screen.findByRole('button', {
+      name: 'Reconcile with a CARF report',
+    });
+    expect(screen.queryByTestId('carf-reconciliation')).toBeNull();
   });
 });

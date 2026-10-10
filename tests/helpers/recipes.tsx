@@ -15,6 +15,9 @@ import { MainScreen } from '@/screens/MainScreen';
 import { TaxReportScreen } from '@/screens/TaxReportScreen';
 import { AddSourceDialog } from '@/screens/AddSourceDialog';
 import { MapCsvDialog } from '@/screens/MapCsvDialog';
+import { CarfReconcileDialog } from '@/screens/CarfReconcileDialog';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { ExportCheckpointDialog } from '@/checkpoint/ExportCheckpointDialog';
 import { OpenForReviewDialog } from '@/clients/OpenForReviewDialog';
 import { ClientContext } from '@/clients/ClientContext';
@@ -411,6 +414,57 @@ const runGermanReport = async () => {
   );
 };
 
+// ---- CARF reconciliation -------------------------------------------------
+
+const carfXml = () =>
+  readFileSync(join(__dirname, '..', 'assets', 'carf', 'plain.xml'), 'utf8');
+
+/** One deposit at the Bitpanda venue in 2026, the fixture's year. The
+ *  source is a mapped CSV labelled Bitpanda rather than the `bitpanda` pull
+ *  module, because `registerStubModules` empties the pull registry for the
+ *  recipes that run before these. */
+const carfTaxEvents: LedgerEvent[] = [
+  {
+    id: 'carf-in',
+    sourceId: 's-bitpanda',
+    externalId: 'carf-in',
+    timestamp: Date.UTC(2026, 1, 1),
+    kind: 'fiat-in',
+    origin: 'derived',
+    legs: [{ ...eurLeg('in'), venue: 'bitpanda' }],
+  },
+];
+
+const renderCarfDialog = () =>
+  render(
+    <CarfReconcileDialog
+      open
+      onOpenChange={vi.fn()}
+      taxYear={2026}
+      baseCurrency="eur"
+      sources={[
+        {
+          id: 's-bitpanda',
+          moduleId: 'mapped-csv',
+          label: 'Bitpanda',
+          config: {},
+        },
+        { id: 's-kraken', moduleId: 'kraken-csv', label: 'Kraken', config: {} },
+      ]}
+      directory={[]}
+      events={[]}
+      valueOf={() => undefined}
+      taxNumber="12/345/678/901"
+      onReconciled={vi.fn()}
+    />,
+  );
+
+const uploadCarf = () =>
+  userEvent.upload(
+    document.querySelector('input[type="file"]') as HTMLInputElement,
+    new File([carfXml()], 'carf.xml', { type: 'text/xml' }),
+  );
+
 // ---- Onboarding ----------------------------------------------------------
 
 const renderOnboarding = async () => {
@@ -521,6 +575,61 @@ export const recipes: Recipe[] = [
       await openJurisdiction(germanTax, /germany/i);
       const advisor = await screen.findByLabelText(/^advisor number/i);
       await waitFor(() => expect(advisor).toBeEnabled());
+    },
+  },
+  {
+    name: 'CarfReconcileDialog step 1',
+    render: async () => {
+      await freshDevice();
+      renderCarfDialog();
+      await within(await dialog()).findByText(
+        'Drop the file here, or click to choose one',
+      );
+    },
+  },
+  {
+    name: 'CarfReconcileDialog step 2',
+    render: async () => {
+      await freshDevice();
+      renderCarfDialog();
+      const box = await dialog();
+      await uploadCarf();
+      await within(box).findByRole('radio', { name: /erika mustermann/i });
+    },
+  },
+  {
+    name: 'TaxReportScreen CARF reconciliation section',
+    render: async () => {
+      await freshDevice();
+      await putSource({
+        id: 's-bitpanda',
+        moduleId: 'mapped-csv',
+        label: 'Bitpanda',
+        config: {},
+      });
+      await putEvents(carfTaxEvents);
+      await openJurisdiction(testTaxModule, /testland/i);
+      const year = await screen.findByLabelText(/tax year/i);
+      await userEvent.clear(year);
+      await userEvent.type(year, '2026');
+      await userEvent.click(
+        await screen.findByRole('button', { name: /run report/i }),
+      );
+      await userEvent.click(
+        await screen.findByRole(
+          'button',
+          { name: 'Reconcile with a CARF report' },
+          { timeout: 5000 },
+        ),
+      );
+      const box = await dialog();
+      await uploadCarf();
+      await within(box).findByRole('radio', { name: /erika mustermann/i });
+      await userEvent.click(
+        within(box).getByRole('button', { name: 'Compare' }),
+      );
+      await screen.findByTestId('carf-reconciliation');
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     },
   },
   {

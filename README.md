@@ -113,6 +113,10 @@ Freigrenzen and any loss carry-forward; those are applied in the tax return, not
 under §20 are not included. The file has not been verified against a DATEV installation, so have your
 advisor try an import first.
 
+A provider's DAC8 / CARF report (the XML it sends the BZSt, from the 2026 reporting year on) can be
+compared with the ledger per asset and category on the report screen; see
+[docs/carf-reconciliation.md](docs/carf-reconciliation.md).
+
 > **Coineda gives no tax, legal or accounting advice.** The rules are a community contribution,
 > written to the best of the contributors' knowledge, and may be wrong for your situation or
 > incomplete for your country. Verify a report against the cited references, or with a professional,

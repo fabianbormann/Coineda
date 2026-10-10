@@ -46,7 +46,15 @@ import {
 import { ClientContext } from '@/clients/ClientContext';
 import { labelOf, listClients } from '@/clients/registry';
 import { shortFingerprint } from '@/ledger/fingerprint';
-import { activeLedgerName, getAllEvents, getSources } from '@/ledger/db';
+import { activeLedgerName, getSources } from '@/ledger/db';
+import { getLinkedEvents } from '@/ledger/manualLinks';
+import type { LedgerEvent, SourceRecord } from '@/ledger/types';
+import { reconciliationToCsv, type CarfReconciliation } from '@/carf/reconcile';
+import { CarfReconcileDialog } from '@/screens/CarfReconcileDialog';
+import {
+  CarfReconciliationSection,
+  reconciliationFilename,
+} from '@/screens/CarfReconciliationSection';
 import {
   buildSourceDirectory,
   type SourceDirectoryEntry,
@@ -359,6 +367,18 @@ export const TaxReportScreen = () => {
   const [sourceDirectory, setSourceDirectory] = useState<
     SourceDirectoryEntry[]
   >([]);
+  // Read at the same moment as the directory, for the CARF reconciliation:
+  // the sources to pick the provider from and the linked ledger events.
+  const [reportSources, setReportSources] = useState<SourceRecord[]>([]);
+  const [reportEvents, setReportEvents] = useState<LedgerEvent[]>([]);
+  // A comparison with a provider's CARF report. Screen state only: never
+  // persisted, and dropped whenever the report it was made against goes.
+  const [reconciliation, setReconciliation] =
+    useState<CarfReconciliation | null>(null);
+  const [carfOpen, setCarfOpen] = useState(false);
+  if (step !== 'report' && reconciliation !== null) {
+    setReconciliation(null);
+  }
 
   // Settings are read once, on mount. This used to be a reset block keyed
   // on an `open` prop, re-running every time the dialog reopened; a screen
@@ -516,6 +536,7 @@ export const TaxReportScreen = () => {
     setStatus('loading');
     setError(null);
     setAssessment(null);
+    setReconciliation(null);
     // A fresh object every time, so pressing Run again re-triggers the
     // effect below even with identical inputs.
     const trimmedKey = apiKey.trim();
@@ -581,11 +602,13 @@ export const TaxReportScreen = () => {
         }
         const [sources, events] = await Promise.all([
           getSources(),
-          getAllEvents(),
+          getLinkedEvents(),
         ]);
         if (cancelled) {
           return;
         }
+        setReportSources(sources);
+        setReportEvents(events);
         setSourceDirectory(
           buildSourceDirectory(
             // A source saved with the single `address` of before address
@@ -691,6 +714,32 @@ export const TaxReportScreen = () => {
       registerToCsv(assessment.register),
       registerFilename(assessment.year, assessment.method.fingerprint, 'csv'),
       'text/csv;charset=utf-8',
+    );
+  };
+
+  /** The register value of an event's leg in an asset, for the CARF
+   *  comparison: the first row with that event and asset. */
+  const registerValues = useMemo(() => {
+    const values = new Map<string, string | undefined>();
+    for (const row of assessment?.register ?? []) {
+      const key = `${row.sourceEventId}|${row.assetId}`;
+      if (!values.has(key)) {
+        values.set(key, row.value);
+      }
+    }
+    return values;
+  }, [assessment]);
+  const valueOf = (sourceEventId: string, assetId: string) =>
+    registerValues.get(`${sourceEventId}|${assetId}`);
+
+  const handleDownloadReconciliation = () => {
+    if (!reconciliation) {
+      return;
+    }
+    download(
+      reconciliationToCsv(reconciliation),
+      reconciliationFilename(reconciliation),
+      'text/csv',
     );
   };
 
@@ -1430,6 +1479,16 @@ export const TaxReportScreen = () => {
                       </Card>
                     ))}
                   </div>
+                )}
+
+                {/* 1c. A provider's CARF (DAC8) report held against the
+                    ledger, when one was compared. Prints with the report;
+                    the file hash ties the printout to the XML. */}
+                {reconciliation && (
+                  <CarfReconciliationSection
+                    reconciliation={reconciliation}
+                    onDownload={handleDownloadReconciliation}
+                  />
                 )}
 
                 {/* 2. Totals, with `omitted` welded to `taxableGain` in the
@@ -2607,6 +2666,27 @@ export const TaxReportScreen = () => {
                         </DialogContent>
                       </Dialog>
                     </>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setCarfOpen(true)}
+                  >
+                    {t('Reconcile with a CARF report')}
+                  </Button>
+                  {assessment && (
+                    <CarfReconcileDialog
+                      open={carfOpen}
+                      onOpenChange={setCarfOpen}
+                      taxYear={assessment.year}
+                      baseCurrency={assessment.method.baseCurrency}
+                      sources={reportSources}
+                      directory={sourceDirectory}
+                      events={reportEvents}
+                      valueOf={valueOf}
+                      taxNumber={taxNumber}
+                      onReconciled={setReconciliation}
+                    />
                   )}
                   <span className="text-xs text-muted-foreground">
                     {t(
