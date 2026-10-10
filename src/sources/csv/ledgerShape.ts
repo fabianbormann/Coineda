@@ -47,7 +47,8 @@ export const normaliseDecimal = (value: string): string => {
   const stripped = value.replace(/\s/g, '');
   const hasDot = stripped.includes('.');
   const hasComma = stripped.includes(',');
-  if (hasDot && hasComma) {
+  const count = (char: string) => stripped.split(char).length - 1;
+  if ((hasDot && hasComma) || count(',') > 1 || count('.') > 1) {
     throw new AmbiguousDecimalError(value);
   }
   return hasComma ? stripped.replace(',', '.') : stripped;

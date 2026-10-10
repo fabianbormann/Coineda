@@ -12,6 +12,7 @@ describe('sniffDelimiter', () => {
     expect(sniffDelimiter('a\tb\tc')).toBe('\t');
     expect(sniffDelimiter('a,b,c')).toBe(',');
     expect(sniffDelimiter('a')).toBe(',');
+    expect(sniffDelimiter('a,b,"c;d"')).toBe(',');
   });
 
   it.each(['kraken-csv', 'binance-csv', 'coinbase-csv'])(
@@ -56,5 +57,7 @@ describe('normaliseDecimal', () => {
   });
   it('refuses both separators', () => {
     expect(() => normaliseDecimal('1.234,5')).toThrow(AmbiguousDecimalError);
+    expect(() => normaliseDecimal('1,234,567')).toThrow(AmbiguousDecimalError);
+    expect(() => normaliseDecimal('1.234.567')).toThrow(AmbiguousDecimalError);
   });
 });
