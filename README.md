@@ -68,6 +68,7 @@ when you are done except the tab.
 | Binance           | CSV export                               |
 | Coinbase          | CSV export                               |
 | Kraken            | CSV export                               |
+| Ledger Live       | Operation history CSV export             |
 
 Modules ship in the bundle and arrive by reviewed pull request, never by download at runtime: a
 source module runs beside your exchange keys, and that is not a place for code nobody has read.

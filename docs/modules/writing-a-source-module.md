@@ -320,6 +320,45 @@ export const registry: SourceModule[] = [
 `findModule(id)` looks modules up by `manifest.id`, which is also what
 `scripts/record-fixtures.ts` takes as its first argument.
 
+## File modules
+
+Exchanges that refuse a browser (no CORS) are read from a file the user
+exports instead. A file module is a `FileSourceModule` (`src/sources/csv/types.ts`)
+registered in `fileRegistry` in `src/sources/csv/registry.ts`. It is as pure as
+a pull module: text in, events out, no storage and no network.
+
+- **`sniff(text)`** decides from the HEADER, never the filename, whether the
+  text is this provider's export. It must be cheap, must return `false`
+  (not throw) for `''`, unrelated CSV and control characters, and must not
+  claim another module's fixture - registry order matters because the first
+  match wins.
+- **`parse(text)`** returns `{ events, skipped }`. It throws only when the
+  text is not this format at all, naming the columns it found. A row it
+  cannot represent is a `ParseResult.skipped` entry, one human-readable
+  sentence per reason (an unknown asset, an operation with no rules, an
+  unreadable time or amount), never a silent drop and never an exception.
+- **Never guess a ticker.** Resolve symbols through `resolveSymbol` from
+  `src/assets/catalogue.ts`. An ambiguous or unknown symbol is skipped with a
+  reason, not mapped to the likeliest asset: a wrong asset id is a wrong
+  tax result.
+- **Deterministic `externalId`.** Use the export's own row id when it has one;
+  otherwise derive it from stable row content so re-importing the same file
+  converges instead of duplicating.
+- **`txHash`** goes on the event whenever the export carries one, so it can be
+  matched with the same movement seen from a chain source.
+- **Amounts** are base-unit integer strings for non-fiat assets and decimal
+  strings for `fiat:` assets, like pull modules.
+
+### The file conformance gate
+
+`tests/fileConformance.test.ts` iterates `fileRegistry` and checks every
+module with no per-module test: unique kebab-case ids, `label` and `help` in
+both locale files, safe `sniff`, the shared per-event checks
+(`checkDerivedEvent` in `src/sources/conformance.ts`) over the first `.csv` in
+the module's `fixtures/` directory, unique `externalId`s, and that no other
+module's `sniff` accepts that fixture. Commit a realistic anonymised
+`fixtures/*.csv` with your module; without one the gate cannot run.
+
 ## Generating a module with an LLM
 
 This interface is deliberately narrow enough that a model can write a

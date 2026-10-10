@@ -24,7 +24,16 @@ export type ConformanceFixture = {
  */
 export const MAX_PAGES = 1000;
 
-const checkEvent = (event: DerivedEvent, module: SourceModule): void => {
+/**
+ * The per-event checks, shared by the pull gate (`runConformance`) and the
+ * file-module gate (tests/fileConformance.test.ts). Only `id` and `emits`
+ * of the manifest are read, so either manifest shape fits.
+ */
+export const checkDerivedEvent = (
+  event: DerivedEvent,
+  manifest: { id: string; emits: readonly string[] },
+): void => {
+  const module = { manifest };
   if (!module.manifest.emits.includes(event.kind)) {
     throw new Error(
       `${module.manifest.id}: emitted kind '${event.kind}' but its manifest does not declare it`,
@@ -73,7 +82,7 @@ const drain = async (
   for (let page = 0; page < MAX_PAGES; page += 1) {
     const result = await module.fetchEvents(fixture.config, cursor);
     for (const event of result.events) {
-      checkEvent(event, module);
+      checkDerivedEvent(event, module.manifest);
       if (seen.has(event.externalId)) {
         throw new Error(
           `${module.manifest.id}: emitted duplicate externalId '${event.externalId}' in one run`,
