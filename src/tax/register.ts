@@ -375,6 +375,7 @@ export const reportToJson = (
       income: report.income,
       capital: report.capital,
       capitalResult: report.capitalResult ?? null,
+      filing: report.filing ?? null,
       omittedDisposals: report.omittedDisposals,
       unresolved: report.unresolved,
       register: report.register,

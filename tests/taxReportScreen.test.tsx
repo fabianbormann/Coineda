@@ -2403,3 +2403,93 @@ describe('the loss carry-forward inputs', () => {
     expect(screen.queryByText(/declare the gain before it/i)).toBeNull();
   });
 });
+
+describe('the filing aid', () => {
+  const filingModule = (filing: TaxAssessment['filing']): TaxModule => ({
+    ...makeModule(),
+    assess: (input) => ({ ...assess(input), filing }),
+  });
+  const verified: TaxAssessment['filing'] = {
+    year: 2025,
+    linesVerified: true,
+    sections: [
+      {
+        title: 'Private sales - crypto assets',
+        form: 'Anlage SO',
+        entries: [
+          {
+            label: 'Total proceeds',
+            amount: '1500.50',
+            reference: { form: 'Anlage SO', line: 48 },
+          },
+          {
+            label: 'Total proceeds',
+            amount: '-20',
+            reference: { form: 'Anlage SO', line: 50 },
+          },
+        ],
+      },
+    ],
+  };
+
+  it('prints the line labels and the threshold sentence for a verified year', async () => {
+    taxRegistry.push(filingModule(verified));
+    await putEvents([acquisitionEvent, disposalEvent]);
+    renderScreen();
+    await runReport('2025');
+
+    expect(
+      screen.getByRole('heading', {
+        name: /filing aid — anlage so and anlage kap 2025/i,
+      }),
+    ).toBeInTheDocument();
+    const section = screen.getByTestId('filing-aid');
+    expect(within(section).getByText(/line 48/i)).toBeInTheDocument();
+    expect(within(section).getByText(/1,500\.50/)).toBeInTheDocument();
+    // A loss to declare keeps its sign.
+    expect(within(section).getByText(/-.*20\.00/)).toBeInTheDocument();
+    expect(
+      within(section).getByText(/the finanzamt applies the freigrenzen/i),
+    ).toBeInTheDocument();
+    expect(within(section).queryByText(/not verified/i)).toBeNull();
+    expect(section.className).not.toMatch(/print:hidden/);
+  });
+
+  it('says the lines are not verified and prints no line label', async () => {
+    taxRegistry.push(
+      filingModule({
+        year: 2024,
+        linesVerified: false,
+        sections: [
+          {
+            title: 'Private sales - crypto assets',
+            form: 'Anlage SO',
+            entries: [{ label: 'Total proceeds', amount: '100' }],
+          },
+        ],
+      }),
+    );
+    await putEvents([acquisitionEvent, disposalEvent]);
+    renderScreen();
+    await runReport('2024');
+
+    const section = screen.getByTestId('filing-aid');
+    expect(
+      within(section).getByText(
+        /the line numbers of the 2024 form are not verified; use the section names\./i,
+      ),
+    ).toBeInTheDocument();
+    expect(within(section).queryByText(/line \d/i)).toBeNull();
+    expect(within(section).getByText(/total proceeds/i)).toBeInTheDocument();
+  });
+
+  it('shows no filing aid when the module supplies none', async () => {
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+    renderScreen();
+    await runReport('2025');
+
+    expect(screen.queryByTestId('filing-aid')).toBeNull();
+    expect(screen.queryByText(/filing aid/i)).toBeNull();
+  });
+});

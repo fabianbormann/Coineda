@@ -1676,6 +1676,74 @@ export const TaxReportScreen = () => {
                     </div>
                   </div>
                 )}
+                {/* 2c. Filing aid. Printed: it is the page a user holds
+                    beside the form. Absent for a module that supplies no
+                    `filing`. Line numbers print only when the year's form
+                    was verified (each entry then carries a reference). */}
+                {assessment.filing !== undefined && (
+                  <div className="flex flex-col gap-2" data-testid="filing-aid">
+                    <h3 className="text-sm font-semibold">
+                      {t('Filing aid — Anlage SO and Anlage KAP {{year}}', {
+                        year: assessment.filing.year,
+                      })}
+                    </h3>
+                    {!assessment.filing.linesVerified && (
+                      <p className="text-sm text-muted-foreground">
+                        {t(
+                          'The line numbers of the {{year}} form are not verified; use the section names.',
+                          { year: assessment.filing.year },
+                        )}
+                      </p>
+                    )}
+                    {assessment.filing.sections.map((section) => (
+                      <Card key={section.title}>
+                        <CardContent className="flex flex-col gap-1 text-sm">
+                          <p className="font-medium">{t(section.title)}</p>
+                          {section.entries.map((entry, index) => (
+                            <div key={`${entry.label}-${index}`}>
+                              <p>
+                                {entry.reference !== undefined && (
+                                  <span className="text-muted-foreground">
+                                    {t('Line {{line}}', {
+                                      line: entry.reference.line,
+                                    })}
+                                    {' · '}
+                                  </span>
+                                )}
+                                <span className="font-medium">
+                                  {t(entry.label)}
+                                  {entry.amount !== undefined ||
+                                  entry.text !== undefined
+                                    ? ': '
+                                    : ''}
+                                </span>
+                                {entry.amount !== undefined && (
+                                  <Money
+                                    value={Number(entry.amount)}
+                                    currency={baseCurrency}
+                                  />
+                                )}
+                                {entry.text !== undefined && (
+                                  <span>{entry.text}</span>
+                                )}
+                              </p>
+                              {entry.note !== undefined && (
+                                <p className="text-muted-foreground">
+                                  {t(entry.note)}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </CardContent>
+                      </Card>
+                    ))}
+                    <p className="text-sm text-muted-foreground">
+                      {t(
+                        "The Finanzamt applies the Freigrenzen, the saver's allowance and any loss carry-forward itself; they are not typed in.",
+                      )}
+                    </p>
+                  </div>
+                )}
 
                 {/* 3. Threshold outcomes, including when not exceeded. */}
                 {assessment.thresholds.length > 0 && (

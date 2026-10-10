@@ -576,6 +576,10 @@
     "Result of the other income": "Ergebnis der sonstigen Leistungen",
     "Gains from derivatives": "Gewinne aus Termingeschäften",
     "Losses from derivatives": "Verluste aus Termingeschäften",
-    "The Freigrenzen, the saver's allowance and any loss carry-forward are applied by the Finanzamt itself; they are not typed in.": "Freigrenzen, Sparer-Pauschbetrag und Verlustvortrag wendet das Finanzamt selbst an; du trägst sie nicht ein."
+    "The Freigrenzen, the saver's allowance and any loss carry-forward are applied by the Finanzamt itself; they are not typed in.": "Freigrenzen, Sparer-Pauschbetrag und Verlustvortrag wendet das Finanzamt selbst an; du trägst sie nicht ein.",
+    "Filing aid — Anlage SO and Anlage KAP {{year}}": "Ausfüllhilfe — Anlage SO und Anlage KAP {{year}}",
+    "Line {{line}}": "Zeile {{line}}",
+    "The line numbers of the {{year}} form are not verified; use the section names.": "Die Zeilennummern des Formulars {{year}} sind nicht geprüft; nutze die Abschnittsnamen.",
+    "The Finanzamt applies the Freigrenzen, the saver's allowance and any loss carry-forward itself; they are not typed in.": "Freigrenzen, Sparer-Pauschbetrag und Verlustvortrag wendet das Finanzamt selbst an; sie werden nicht eingetragen."
   }
 }

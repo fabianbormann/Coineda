@@ -426,6 +426,34 @@ describe('reportToJson and filenames', () => {
     expect('sourceDirectory' in parsed).toBe(false);
   });
 
+  it('carries the filing aid when present and null otherwise', () => {
+    const filing = {
+      year: 2025,
+      linesVerified: true,
+      sections: [
+        {
+          title: 'Private sales - crypto assets',
+          form: 'Anlage SO',
+          entries: [
+            {
+              label: 'Total proceeds',
+              amount: '10',
+              reference: { form: 'Anlage SO', line: 48 },
+            },
+          ],
+        },
+      ],
+    };
+    const withFiling = JSON.parse(
+      reportToJson({ ...report(build()), filing } as unknown as TaxReport, {
+        generatedAt,
+      }),
+    );
+    expect(withFiling.filing).toEqual(filing);
+    const without = JSON.parse(reportToJson(report(build()), { generatedAt }));
+    expect(without.filing).toBeNull();
+  });
+
   it('carries the source directory when the caller supplies it', () => {
     const sourceDirectory: SourceDirectoryEntry[] = [
       {

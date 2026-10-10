@@ -576,6 +576,10 @@
     "Result of the other income": "Result of the other income",
     "Gains from derivatives": "Gains from derivatives",
     "Losses from derivatives": "Losses from derivatives",
-    "The Freigrenzen, the saver's allowance and any loss carry-forward are applied by the Finanzamt itself; they are not typed in.": "The Freigrenzen, the saver's allowance and any loss carry-forward are applied by the Finanzamt itself; they are not typed in."
+    "The Freigrenzen, the saver's allowance and any loss carry-forward are applied by the Finanzamt itself; they are not typed in.": "The Freigrenzen, the saver's allowance and any loss carry-forward are applied by the Finanzamt itself; they are not typed in.",
+    "Filing aid — Anlage SO and Anlage KAP {{year}}": "Filing aid — Anlage SO and Anlage KAP {{year}}",
+    "Line {{line}}": "Line {{line}}",
+    "The line numbers of the {{year}} form are not verified; use the section names.": "The line numbers of the {{year}} form are not verified; use the section names.",
+    "The Finanzamt applies the Freigrenzen, the saver's allowance and any loss carry-forward itself; they are not typed in.": "The Finanzamt applies the Freigrenzen, the saver's allowance and any loss carry-forward itself; they are not typed in."
   }
 }
