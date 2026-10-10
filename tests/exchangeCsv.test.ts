@@ -204,6 +204,49 @@ describe('Binance', () => {
     expect(lone?.legs[0].direction).toBe('in');
   });
 
+  it('leaves two same-second trades ungrouped and says so', () => {
+    const h = 'User_ID,UTC_Time,Account,Operation,Coin,Change,Remark\n';
+    const at = '2024-03-11 09:05:00,Spot';
+    const { events, skipped } = binanceCsv.parse(
+      h +
+        `1,${at},Transaction Spend,EUR,-500,\n` +
+        `1,${at},Transaction Buy,BTC,0.01,\n` +
+        `1,${at},Transaction Spend,EUR,-300,\n` +
+        `1,${at},Transaction Buy,ETH,0.1,\n` +
+        `1,${at},Transaction Fee,BTC,-0.00001,\n`,
+    );
+    expect(events.map((e) => e.kind)).toEqual([
+      'transfer',
+      'transfer',
+      'transfer',
+      'transfer',
+      'fee',
+    ]);
+    expect(events.every((e) => e.note?.endsWith('ambiguous trade rows'))).toBe(
+      true,
+    );
+    expect(skipped).toContain(
+      'Skipped ambiguous same-second trade rows'.replace(
+        'Skipped ',
+        'Skipped 5 ',
+      ),
+    );
+  });
+
+  it('still groups same-asset partial fills into one trade', () => {
+    const h = 'User_ID,UTC_Time,Account,Operation,Coin,Change,Remark\n';
+    const at = '2024-03-11 09:05:00,Spot';
+    const { events } = binanceCsv.parse(
+      h +
+        `1,${at},Transaction Spend,EUR,-500,\n` +
+        `1,${at},Transaction Buy,BTC,0.006,\n` +
+        `1,${at},Transaction Buy,BTC,0.004,\n`,
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0].kind).toBe('trade');
+    expect(events[0].legs).toHaveLength(3);
+  });
+
   it('does not pair two trade rows that both move the same way', () => {
     const { events, supersedes } = binanceCsv.parse(
       'User_ID,UTC_Time,Account,Operation,Coin,Change,Remark\n' +
@@ -387,6 +430,21 @@ describe('Coinbase', () => {
       inline.events[0].legs.find((leg) => leg.assetId === 'fiat:eur')?.amount,
     ).toBe('1234.56');
     expect(inline.skipped.join(' ')).toMatch(/unparseable amounts/);
+  });
+
+  it('emits a trade whose unused Total column is garbled', () => {
+    const header =
+      'ID,Timestamp,Transaction Type,Asset,Quantity Transacted,Price Currency,Price at Transaction,Subtotal,Total (inclusive of fees and/or spread),Fees and/or Spread,Notes';
+    const { events } = coinbaseCsv.parse(
+      [
+        'preamble',
+        '',
+        header,
+        't-1,2024-07-01T00:00:00Z,Buy,BTC,1.0,EUR,500,500.00,"5,00,1",1.50,',
+      ].join('\n'),
+    );
+    expect(events.map((e) => e.externalId)).toEqual(['t-1']);
+    expect(events[0].legs).toHaveLength(3);
   });
 
   it('keeps Coinbase’s own id, so a re-import converges', () => {

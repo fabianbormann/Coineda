@@ -182,13 +182,8 @@ export const parse = (input: string): ParseResult => {
         : plain;
     };
     const subtotal = money(at(row, 'subtotal'));
-    const total = money(at(row, 'total (inclusive of fees and/or spread)'));
     const charged = money(fees);
-    if (
-      subtotal === undefined ||
-      total === undefined ||
-      charged === undefined
-    ) {
+    if (subtotal === undefined || charged === undefined) {
       skipped.note(`unparseable amounts in ${asset}`);
       return;
     }

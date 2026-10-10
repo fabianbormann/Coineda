@@ -323,6 +323,17 @@ export const parse = (input: string): ParseResult => {
   for (const [key, bucket] of buckets) {
     const members = bucket.rows;
     const principals = members.filter(({ leg }) => leg.role !== 'fee');
+    const distinct = new Set(principals.map(({ leg }) => leg.assetId));
+    if (distinct.size > 2) {
+      // Two trades in one second: grouping would fuse their legs and lose
+      // each price. Left as movements, and said so.
+      skipped.note('ambiguous same-second trade rows');
+      for (const { event, leg } of members) {
+        event.kind = leg.role === 'fee' ? 'fee' : 'transfer';
+        event.note = `${event.note}: ambiguous trade rows`;
+      }
+      continue;
+    }
     const pairs =
       members.length >= 2 &&
       principals.some(({ leg }) => leg.direction === 'in') &&
