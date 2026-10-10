@@ -128,7 +128,7 @@ describe('importing the zip end to end', () => {
     const fromZip = await importFile(
       await textFromFile(asFile(ZIP, 'kraken.zip')),
     );
-    expect(fromZip.inserted).toBe(5); // the shipped fixture: two rows of one trade are one event
+    expect(fromZip.inserted).toBe(6); // the shipped fixture: two rows of one trade are one event
     // Sorted: getAllEvents returns IndexedDB key order, and the keys are
     // random uuids - so an unsorted comparison fails on a shuffle rather
     // than on a difference.

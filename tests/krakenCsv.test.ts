@@ -104,8 +104,14 @@ describe('Kraken asset codes', () => {
 
   it('reports a code it cannot name rather than guessing', () => {
     // Kraken lists 855 assets.
-    expect(assetIdForCode('XXDG')).toBeNull();
+    expect(assetIdForCode('NOSUCHCODE')).toBeNull();
     expect(assetIdForCode('')).toBeNull();
+  });
+
+  it("resolves both of Kraken's Dogecoin codes", () => {
+    expect(assetIdForCode('XXDG')).toBe(assetIdForCode('DOGE'));
+    expect(assetIdForCode('XDG')).toBe(assetIdForCode('DOGE'));
+    expect(assetIdForCode('DOGE')).not.toBeNull();
   });
 
   it('scales whole units into base units', () => {
@@ -182,12 +188,41 @@ describe('parsing the ledger', () => {
   const parsed = () => krakenCsv.parse(LEDGER);
 
   it('emits one event per readable row, and one per trade or transfer', () => {
-    // Nine rows: two are skipped (an asset with no id, a type with no
-    // mapping), leaving seven. The two rows of the one trade share a refid
-    // and become one event, as do the two rows of the spot-to-staking
-    // transfer, leaving five.
+    // Ten rows: one is skipped (a type with no mapping), leaving nine. The
+    // two rows of each of the two trades share a refid and become one event
+    // each, as do the two rows of the spot-to-staking transfer, leaving six.
     const { events } = parsed();
-    expect(events).toHaveLength(5);
+    expect(events).toHaveLength(6);
+  });
+
+  it('books the Dogecoin trade as two legs with a euro fee', () => {
+    const doge = parsed().events.find(
+      (event) => event.externalId === 'RDOG01-EEEEE-FFFFF',
+    );
+    expect(doge?.kind).toBe('trade');
+    expect(doge?.legs).toEqual([
+      {
+        assetId: expect.stringMatching(/doge/i),
+        amount: expect.stringMatching(/^\d+$/),
+        direction: 'in',
+        venue: 'spot / main',
+        role: 'principal',
+      },
+      {
+        assetId: 'fiat:eur',
+        amount: '100',
+        direction: 'out',
+        venue: 'spot / main',
+        role: 'principal',
+      },
+      {
+        assetId: 'fiat:eur',
+        amount: '0.26',
+        direction: 'out',
+        venue: 'spot / main',
+        role: 'fee',
+      },
+    ]);
   });
 
   it('groups the rows of a trade by refid, with the fee on the quote row', () => {
@@ -298,9 +333,9 @@ describe('parsing the ledger', () => {
     // An export can carry hundreds of rows in the same unsupported asset,
     // and three hundred identical sentences is not a report anybody reads.
     const { skipped } = parsed();
-    expect(skipped.join(' ')).toMatch(/XXDG/);
+    expect(skipped.join(' ')).not.toMatch(/XXDG/);
     expect(skipped.join(' ')).toMatch(/mysterytype/);
-    expect(skipped).toHaveLength(2);
+    expect(skipped).toHaveLength(1);
   });
 
   it('groups the two rows of a transfer between its own wallets by refid', () => {
@@ -342,6 +377,8 @@ describe('parsing the ledger', () => {
       'LPCNTQ-7NAFX-UAHD2X',
       'LSTKNG-A1B2C-D3E4F5',
       'LSTKNG-F6G7H-I8J9K0',
+      'LDOGE1-33333-44444',
+      'LDOGE2-33333-44445',
     ]);
   });
 
@@ -369,7 +406,7 @@ describe('importing into the ledger', () => {
   it('creates a source and writes what the file held', async () => {
     const outcome = await importFile(LEDGER);
     expect(outcome.module.manifest.id).toBe('kraken-csv');
-    expect(outcome.inserted).toBe(5);
+    expect(outcome.inserted).toBe(6);
     expect(outcome.updated).toBe(0);
 
     const sources = await getSources();
@@ -386,11 +423,11 @@ describe('importing into the ledger', () => {
     const again = await importFile(LEDGER);
 
     expect(again.inserted).toBe(0);
-    expect(again.updated).toBe(5);
+    expect(again.updated).toBe(6);
     expect(await getSources()).toHaveLength(1);
 
     const events = await getAllEvents();
-    expect(events).toHaveLength(5);
+    expect(events).toHaveLength(6);
   });
 
   it('refuses a file it does not recognise, naming nothing it cannot read', async () => {
@@ -412,7 +449,7 @@ describe('importing into the ledger', () => {
     const after = (await getSources()).find((row) => row.id === source.id);
     expect(after?.lastError).toBeUndefined();
     // And it did not delete what the import wrote.
-    expect(await getAllEvents()).toHaveLength(5);
+    expect(await getAllEvents()).toHaveLength(6);
   });
 
   it('removes the per-row events an earlier import wrote for a grouped trade', async () => {
@@ -466,13 +503,13 @@ describe('importing into the ledger', () => {
         ],
       },
     ]);
-    expect(await getAllEvents()).toHaveLength(7);
+    expect(await getAllEvents()).toHaveLength(8);
 
     const again = await importFile(LEDGER);
     expect(again.superseded).toBe(2);
-    expect(again.updated).toBe(5);
+    expect(again.updated).toBe(6);
     expect(again.inserted).toBe(0);
-    expect(await getAllEvents()).toHaveLength(5);
+    expect(await getAllEvents()).toHaveLength(6);
   });
 });
 

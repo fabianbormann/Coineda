@@ -38,6 +38,8 @@ export const KRAKEN_ALIASES: Record<string, string> = {
   XLTC: 'LTC',
   XXMR: 'XMR',
   XETC: 'ETC',
+  XXDG: 'DOGE',
+  XDG: 'DOGE',
   ZEUR: 'EUR',
   ZUSD: 'USD',
   ZGBP: 'GBP',

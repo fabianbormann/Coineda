@@ -153,28 +153,65 @@ describe('Binance', () => {
     );
   });
 
-  it('takes the direction from the sign Binance writes', () => {
-    const { events } = binanceCsv.parse(BINANCE);
-    const spend = events.find((event) => event.note?.includes('spend'));
-    expect(spend?.legs[0]).toMatchObject({
-      assetId: 'fiat:eur',
-      amount: '500',
-      direction: 'out',
-    });
-    const bought = events.find((event) => event.note?.includes('buy'));
-    expect(bought?.legs[0]).toMatchObject({
-      assetId: 'bitcoin:native',
-      amount: '1000000',
-      direction: 'in',
-    });
+  it('pairs the Spend, Buy and Fee rows of one trade into a single event', () => {
+    // Three rows share a timestamp and account: one trade, not three
+    // one-legged events.
+    const { events, supersedes } = binanceCsv.parse(BINANCE);
+    const trade = events.find((event) => event.kind === 'trade');
+    expect(trade?.externalId).toBe('2024-03-11 09:05:00#Spot#trade');
+    expect(trade?.timestamp).toBe(Date.UTC(2024, 2, 11, 9, 5));
+    expect(trade?.legs).toEqual([
+      {
+        assetId: 'fiat:eur',
+        amount: '500',
+        direction: 'out',
+        venue: 'Spot',
+        role: 'principal',
+      },
+      {
+        assetId: 'bitcoin:native',
+        amount: '1000000',
+        direction: 'in',
+        venue: 'Spot',
+        role: 'principal',
+      },
+      {
+        assetId: 'bitcoin:native',
+        amount: '1000',
+        direction: 'out',
+        venue: 'Spot',
+        role: 'fee',
+      },
+    ]);
+    expect(events.filter((event) => event.kind === 'trade')).toHaveLength(1);
+    // The per-row ids the old parser wrote for the three rows (row index 1,
+    // 2 and 3 of the data).
+    expect(supersedes).toEqual([
+      `${Date.UTC(2024, 2, 11, 9, 5)}#1#EUR`,
+      `${Date.UTC(2024, 2, 11, 9, 5)}#2#BTC`,
+      `${Date.UTC(2024, 2, 11, 9, 5)}#3#BTC`,
+    ]);
   });
 
-  it('marks a fee operation as a FEE leg, not a disposal', () => {
-    // A jurisdiction's internal-transfer test deliberately ignores fee
-    // legs, so mislabelling one turns a transfer into a disposal.
+  it('books a trade row with no counterparty as a transfer, not a one-legged trade', () => {
     const { events } = binanceCsv.parse(BINANCE);
-    const fee = events.find((event) => event.note?.includes('fee'));
-    expect(fee?.legs[0]).toMatchObject({ role: 'fee', direction: 'out' });
+    const lone = events.find((event) =>
+      event.legs.some((leg) => leg.assetId.toLowerCase().includes('doge')),
+    );
+    expect(lone?.kind).toBe('transfer');
+    expect(lone?.note?.endsWith('unpaired trade row')).toBe(true);
+    expect(lone?.legs).toHaveLength(1);
+    expect(lone?.legs[0].direction).toBe('in');
+  });
+
+  it('does not pair two trade rows that both move the same way', () => {
+    const { events, supersedes } = binanceCsv.parse(
+      'User_ID,UTC_Time,Account,Operation,Coin,Change,Remark\n' +
+        '1,2024-03-11 09:05:00,Spot,Transaction Buy,BTC,0.01,\n' +
+        '1,2024-03-11 09:05:00,Spot,Transaction Buy,ETH,0.5,\n',
+    );
+    expect(events.map((event) => event.kind)).toEqual(['transfer', 'transfer']);
+    expect(supersedes ?? []).toEqual([]);
   });
 
   it('skips an operation it has no rule for rather than guessing', () => {
@@ -331,6 +368,25 @@ describe('Coinbase', () => {
       (leg) => leg.assetId === 'fiat:eur' && leg.role === 'principal',
     );
     expect(paid?.amount).toBe('500'); // not 501.50
+  });
+
+  it('scales a thousands-grouped subtotal and skips a decimal-comma one', () => {
+    const header =
+      'ID,Timestamp,Transaction Type,Asset,Quantity Transacted,Price Currency,Price at Transaction,Subtotal,Total (inclusive of fees and/or spread),Fees and/or Spread,Notes';
+    const inline = coinbaseCsv.parse(
+      [
+        'preamble',
+        '',
+        header,
+        'g-1,2024-07-01T00:00:00Z,Buy,BTC,1.0,EUR,1234.56,"1,234.56","1,236.06",1.50,',
+        'g-2,2024-07-02T00:00:00Z,Buy,BTC,1.0,EUR,1234.56,"1.234,56","1.236,06","1,50",',
+      ].join('\n'),
+    );
+    expect(inline.events.map((e) => e.externalId)).toEqual(['g-1']);
+    expect(
+      inline.events[0].legs.find((leg) => leg.assetId === 'fiat:eur')?.amount,
+    ).toBe('1234.56');
+    expect(inline.skipped.join(' ')).toMatch(/unparseable amounts/);
   });
 
   it('keeps Coinbase’s own id, so a re-import converges', () => {

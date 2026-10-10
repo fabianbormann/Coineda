@@ -21,10 +21,10 @@ import type {
  *
  * Shaped like Kraken's ledger and unlike Coinbase's: one row per ASSET
  * CHANGE, with a signed `Change` column, so a trade appears as two or three
- * rows sharing a timestamp and operation. They are emitted as separate
- * events rather than paired up, because pairing would be guessing - the
- * ledger folds the legs correctly either way, and one operation can produce
- * more than two rows.
+ * rows sharing a timestamp and account (Spend, Buy, Fee). Those rows are
+ * GROUPED into one `trade` event: emitted alone each is a one-legged trade,
+ * which no jurisdiction can price. A trade-family row with no counterparty
+ * in the file is booked as a `transfer` instead, noted as unpaired.
  *
  * Binance uses plain tickers (BTC, ETH, ADA, EUR), with none of Kraken's X
  * and Z prefixes.
@@ -173,6 +173,11 @@ export const parse = (input: string): ParseResult => {
   const skipped = makeSkipLog();
   /** Wallet-transfer events still waiting for their other half. */
   const pending = new Map<string, DerivedEvent[]>();
+  /** Trade-family rows (Spend, Buy, Fee ...) by timestamp and account. */
+  const buckets = new Map<
+    string,
+    { rows: { event: DerivedEvent; leg: Leg }[] }
+  >();
 
   rows.forEach((row, index) => {
     const operation = cell(row, 'operation').toLowerCase();
@@ -282,6 +287,15 @@ export const parse = (input: string): ParseResult => {
     };
     events.push(event);
 
+    // Rows of a trade, and its fee rows, are paired after the loop.
+    if (kind === 'trade') {
+      const key = `${cell(row, 'utc_time')}#${account}`;
+      const bucket = buckets.get(key) ?? { rows: [] };
+      bucket.rows.push({ event, leg: legs[0] });
+      buckets.set(key, bucket);
+      return;
+    }
+
     // The spot and futures halves of one wallet transfer are two rows with
     // the same timestamp, coin and absolute amount and opposite signs.
     // Grouped into one event they net to zero between two owned venues, as
@@ -305,5 +319,45 @@ export const parse = (input: string): ParseResult => {
     }
   });
 
-  return { events, skipped: skipped.lines() };
+  const supersedes: string[] = [];
+  for (const [key, bucket] of buckets) {
+    const members = bucket.rows;
+    const principals = members.filter(({ leg }) => leg.role !== 'fee');
+    const pairs =
+      members.length >= 2 &&
+      principals.some(({ leg }) => leg.direction === 'in') &&
+      principals.some(({ leg }) => leg.direction === 'out');
+    if (!pairs) {
+      // No counterparty in the file: the row is a movement, not a trade.
+      for (const { event } of members) {
+        event.kind = 'transfer';
+        event.note = `${event.note}: unpaired trade row`;
+      }
+      continue;
+    }
+    const first = members[0].event;
+    const grouped: DerivedEvent = {
+      // Unlike the per-row ids this carries no row position, so a re-export
+      // with rows inserted earlier still converges on the same trade.
+      externalId: `${key}#trade`,
+      timestamp: first.timestamp,
+      kind: 'trade',
+      origin: 'derived',
+      legs: [
+        ...principals.map(({ leg }) => leg),
+        ...members
+          .filter(({ leg }) => leg.role === 'fee')
+          .map(({ leg }) => leg),
+      ],
+      note: 'Binance trade',
+    };
+    supersedes.push(...members.map(({ event }) => event.externalId));
+    const at = events.indexOf(first);
+    events[at] = grouped;
+    for (const { event } of members.slice(1)) {
+      events.splice(events.indexOf(event), 1);
+    }
+  }
+
+  return { events, skipped: skipped.lines(), supersedes };
 };

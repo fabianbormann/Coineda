@@ -25,14 +25,6 @@ const fixtureOf = (id: string): string => {
   return readFileSync(join(dir, file), 'utf8');
 };
 
-// KNOWN DEFECT (reported, not fixed here): binance-csv emits each
-// Transaction Spend/Buy/Fee row as its own one-legged 'trade' event, which
-// fails checkDerivedEvent's "a trade needs an in and an out principal leg"
-// rule. Modules listed here are exempt from that one rule in the parse test
-// below, and the skipped test after it holds the real assertion.
-const UNPAIRED_TRADES = new Set(['binance-csv']);
-const PAIRING_ERROR = /needs both an in and an out/;
-
 describe('every module in the file registry', () => {
   it('is registered at all, so this gate is not vacuous', () => {
     expect(fileRegistry.length).toBeGreaterThan(0);
@@ -73,16 +65,7 @@ describe('every module in the file registry', () => {
         expect(events.length).toBeGreaterThan(0);
         const seen = new Set<string>();
         for (const event of events) {
-          try {
-            checkDerivedEvent(event, manifest);
-          } catch (error) {
-            if (
-              !UNPAIRED_TRADES.has(id) ||
-              !PAIRING_ERROR.test((error as Error).message)
-            ) {
-              throw error;
-            }
-          }
+          checkDerivedEvent(event, manifest);
           expect(event.origin).toBe('derived');
           expect(Number.isFinite(event.timestamp)).toBe(true);
           for (const leg of event.legs) {
@@ -95,16 +78,13 @@ describe('every module in the file registry', () => {
         }
       });
 
-      (UNPAIRED_TRADES.has(id) ? it.skip : it)(
-        'emits trades with both an in and an out principal leg',
-        () => {
-          for (const event of module.parse(fixtureOf(id)).events) {
-            if (event.kind === 'trade') {
-              checkDerivedEvent(event, manifest);
-            }
+      it('emits trades with both an in and an out principal leg', () => {
+        for (const event of module.parse(fixtureOf(id)).events) {
+          if (event.kind === 'trade') {
+            checkDerivedEvent(event, manifest);
           }
-        },
-      );
+        }
+      });
 
       it('is the only module whose sniff accepts its fixture', () => {
         const text = fixtureOf(id);

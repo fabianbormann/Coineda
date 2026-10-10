@@ -164,6 +164,35 @@ export const parse = (input: string): ParseResult => {
       throw error;
     }
 
+    // The money columns are validated BEFORE anything is emitted, so one
+    // unreadable figure skips the whole row rather than booking a buy with
+    // no cost. Currency symbols are dropped, then commas must be thousands
+    // groups: "1.234,56" is refused, never stripped into a thousandfold sum.
+    const currency =
+      at(row, 'price currency') || at(row, 'spot price currency');
+    const counterAsset = coinbaseAssetId(currency) ?? undefined;
+    const fees = at(row, 'fees and/or spread') || at(row, 'fees');
+    const money = (value: string): string | undefined => {
+      if (value === '') {
+        return '';
+      }
+      const plain = stripThousands(value.replace(/[^0-9.,-]/g, ''));
+      return plain === undefined || !/^-?\d*\.?\d+$/.test(plain)
+        ? undefined
+        : plain;
+    };
+    const subtotal = money(at(row, 'subtotal'));
+    const total = money(at(row, 'total (inclusive of fees and/or spread)'));
+    const charged = money(fees);
+    if (
+      subtotal === undefined ||
+      total === undefined ||
+      charged === undefined
+    ) {
+      skipped.note(`unparseable amounts in ${asset}`);
+      return;
+    }
+
     const legs: Leg[] = [
       {
         assetId,
@@ -179,13 +208,9 @@ export const parse = (input: string): ParseResult => {
     // and the tax engine has no cost basis to match a later disposal
     // against. The subtotal excludes fees and is the amount that actually
     // bought the asset; `Total` includes them.
-    const currency =
-      at(row, 'price currency') || at(row, 'spot price currency');
-    const subtotal = at(row, 'subtotal');
-    const counterAsset = coinbaseAssetId(currency) ?? undefined;
-    if (movement.kind === 'trade' && counterAsset && subtotal !== '') {
-      try {
-        const paid = new Big(subtotal.replace(/[^0-9.-]/g, ''));
+    try {
+      if (movement.kind === 'trade' && counterAsset && subtotal !== '') {
+        const paid = new Big(subtotal);
         if (paid.gt(0)) {
           legs.push({
             assetId: counterAsset,
@@ -195,31 +220,25 @@ export const parse = (input: string): ParseResult => {
             role: 'principal',
           });
         }
-      } catch {
-        skipped.note('rows with an unreadable subtotal');
       }
-    }
-
-    const fees = at(row, 'fees and/or spread') || at(row, 'fees');
-    if (fees !== '' && counterAsset) {
-      try {
-        const charged = new Big(fees.replace(/[^0-9.-]/g, ''));
-        if (charged.gt(0)) {
+      if (charged !== '' && counterAsset) {
+        const fee = new Big(charged);
+        if (fee.gt(0)) {
           legs.push({
             assetId: counterAsset,
-            amount: toBaseUnits(
-              'coinbase-csv',
-              charged.toString(),
-              counterAsset,
-            ),
+            amount: toBaseUnits('coinbase-csv', fee.toString(), counterAsset),
             direction: 'out',
             venue: 'coinbase',
             role: 'fee',
           });
         }
-      } catch {
-        skipped.note('rows with an unreadable fee');
       }
+    } catch (error) {
+      if (error instanceof UnscalableAmountError) {
+        skipped.note(`unparseable amounts in ${asset}`);
+        return;
+      }
+      throw error;
     }
 
     const id = at(row, 'id');
