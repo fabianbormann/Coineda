@@ -4,11 +4,14 @@ import userEvent from '@testing-library/user-event';
 import 'fake-indexeddb/auto';
 import App from '../src/App';
 import i18n from '../src/i18n';
+import { resetRouteAnnounce } from '@/a11y/useRouteAnnounce';
 import { DEFAULT_LEDGER_NAME, openLedger, setActiveLedger } from '@/ledger/db';
 import { setOnboarded } from '@/settings/settingsStore';
 
 beforeEach(async () => {
   localStorage.clear();
+  resetRouteAnnounce();
+  (document.activeElement as HTMLElement | null)?.blur();
   window.location.hash = '#/';
   await i18n.changeLanguage('en');
   vi.stubGlobal(
@@ -56,11 +59,13 @@ describe('page identity and focus', () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText('Data sources');
-    (document.activeElement as HTMLElement | null)?.blur();
+    expect(document.activeElement).toBe(document.body);
     await user.tab();
     const skip = screen.getByRole('link', { name: 'Skip to content' });
     expect(document.activeElement).toBe(skip);
+    const hash = window.location.hash;
     await user.keyboard('{Enter}');
+    expect(window.location.hash).toBe(hash);
     expect(document.activeElement).toBe(document.getElementById('main'));
   });
 
