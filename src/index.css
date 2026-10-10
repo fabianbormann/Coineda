@@ -271,6 +271,10 @@
    `.dark` is overridden too: a print must not depend on which theme the
    person happened to be using.
    --------------------------------------------------------------------- */
+@page {
+  margin-bottom: 18mm;
+}
+
 @media print {
   :root,
   :root.dark {
@@ -404,6 +408,12 @@
     ) !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
+  }
+
+  [data-print='page-footer'] {
+    font-size: 8pt;
+    color: #333;
+    text-align: center;
   }
 
   [data-print='colophon'] {

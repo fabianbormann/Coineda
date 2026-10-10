@@ -13,6 +13,8 @@ import * as settingsStore from '@/settings/settingsStore';
 import type { Settings } from '@/settings/settingsStore';
 import { getSettings, putSettings } from '@/settings/settingsStore';
 import type { LedgerEvent } from '@/ledger/types';
+import { ClientProvider } from '@/clients/ClientContext';
+import type { ClientRecord } from '@/clients/registry';
 import { flatRange } from './priceRangeStub';
 import type {
   AssessInput,
@@ -2611,5 +2613,136 @@ describe('the filing aid', () => {
 
     expect(screen.queryByTestId('filing-aid')).toBeNull();
     expect(screen.queryByText(/filing aid/i)).toBeNull();
+  });
+});
+
+describe('the client on the screen and the printout', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const record = (over: Partial<ClientRecord> = {}): ClientRecord => ({
+    id: 'c-1',
+    label: 'Müller GmbH',
+    dbName: 'db-1',
+    kind: 'client',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    ...over,
+  });
+  const reviewRecord = record({
+    kind: 'review',
+    review: {
+      fingerprint: 'abcdef0123456789abcdef',
+      omittedEventCount: 0,
+      file: 'mueller.coineda',
+      verdict: 'match',
+    },
+  });
+
+  const renderFor = (client: ClientRecord) =>
+    render(
+      <MemoryRouter>
+        <ClientProvider client={client} onChange={vi.fn()}>
+          <TaxReportScreen />
+        </ClientProvider>
+      </MemoryRouter>,
+    );
+
+  it('disables the persisted inputs, never writes settings, and still runs', async () => {
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+    await putSettings({
+      taxpayer: { name: 'Hans Müller', taxNumber: '12/345' },
+    });
+    const spy = vi.spyOn(settingsStore, 'putSettings');
+    renderFor(reviewRecord);
+    await userEvent.click(
+      await screen.findByRole('button', { name: /testland/i }),
+    );
+    const name = await screen.findByLabelText(/your name/i);
+    await waitFor(() => expect(name).toHaveValue('Hans Müller'));
+    expect(name).toBeDisabled();
+    expect(screen.getByLabelText(/^tax number/i)).toBeDisabled();
+    expect(screen.getByLabelText(/^tax number/i)).toHaveValue('12/345');
+    const key = screen.getByLabelText(/coingecko api key/i);
+    expect(key).not.toBeDisabled();
+    await userEvent.type(key, 'secret-key');
+    const yearInput = await screen.findByLabelText(/tax year/i);
+    await userEvent.clear(yearInput);
+    await userEvent.type(yearInput, '2025');
+    await userEvent.click(
+      await screen.findByRole('button', { name: /run report/i }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByText(/running your tax report/i)).toBeNull(),
+    );
+    expect(screen.getByTestId('report-header')).toBeInTheDocument();
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('disables the carry-forward inputs showing the restored values', async () => {
+    taxRegistry.push(makeModule({ supportsCarryForward: true }));
+    await putSettings({
+      lossCarryForward: { '2025': { privateSales: '12.50', capital: '7' } },
+    });
+    const spy = vi.spyOn(settingsStore, 'putSettings');
+    renderFor(reviewRecord);
+    await userEvent.click(
+      await screen.findByRole('button', { name: /testland/i }),
+    );
+    const yearInput = await screen.findByLabelText(/tax year/i);
+    await userEvent.clear(yearInput);
+    await userEvent.type(yearInput, '2025');
+    const priv = await screen.findByLabelText(/§23 EStG/);
+    expect(priv).toBeDisabled();
+    await waitFor(() => expect(priv).toHaveValue('12.50'));
+    expect(screen.getByLabelText(/§20 EStG/)).toBeDisabled();
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('prints a client line when the label differs from the taxpayer', async () => {
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+    await putSettings({ taxpayer: { name: 'Hans Müller', taxNumber: '' } });
+    renderFor(record());
+    await runReport('2025');
+    const header = await screen.findByTestId('report-header');
+    await waitFor(() => expect(header).toHaveTextContent('Hans Müller'));
+    expect(header).toHaveTextContent('Client: Müller GmbH');
+  });
+
+  it('omits the client line when the label is the taxpayer name', async () => {
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+    await putSettings({ taxpayer: { name: 'Hans Müller', taxNumber: '' } });
+    renderFor(record({ label: 'Hans Müller' }));
+    await runReport('2025');
+    const header = await screen.findByTestId('report-header');
+    await waitFor(() => expect(header).toHaveTextContent('Hans Müller'));
+    expect(header).not.toHaveTextContent('Client:');
+  });
+
+  it('puts the client, the year and the short fingerprint in the page footer', async () => {
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+    const { container } = renderFor(reviewRecord);
+    await runReport('2025');
+    const footer = container.querySelector('[data-print="page-footer"]');
+    expect(footer).not.toBeNull();
+    expect(footer).toHaveClass('print:block');
+    expect(footer).toHaveTextContent('Müller GmbH');
+    expect(footer).toHaveTextContent('2025');
+    expect(footer).toHaveTextContent('abcdef012345');
+    expect(footer).not.toHaveTextContent('abcdef0123456789');
+  });
+
+  it('still renders without a client provider', async () => {
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+    const { container } = renderScreen();
+    await runReport('2025');
+    expect(
+      container.querySelector('[data-print="page-footer"]'),
+    ).not.toBeNull();
   });
 });

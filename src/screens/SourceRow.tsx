@@ -107,6 +107,8 @@ type Props = {
    * fields at all.
    */
   fileBased?: boolean;
+  /** A review client: only the event log is offered. */
+  readOnly?: boolean;
   /** Opens EditSourceDialog for this source. Gated by the same `busy` flag
    *  as Refresh/Resync/Remove - a sync that began before an edit opens must
    *  not race the record a save would write back. */
@@ -131,6 +133,7 @@ export const SourceRow = ({
   summary,
   currency,
   fileBased = false,
+  readOnly = false,
   busy,
   syncing,
   onRefresh,
@@ -231,7 +234,7 @@ export const SourceRow = ({
           >
             <List aria-hidden="true" />
           </Button>
-          {fileBased ? null : syncing ? (
+          {readOnly || fileBased ? null : syncing ? (
             <Button
               type="button"
               variant="outline"
@@ -258,7 +261,7 @@ export const SourceRow = ({
               />
             </Button>
           )}
-          {!fileBased && (
+          {!readOnly && !fileBased && (
             <>
               <Button
                 type="button"
@@ -284,16 +287,18 @@ export const SourceRow = ({
               </Button>
             </>
           )}
-          <Button
-            type="button"
-            variant="outline"
-            size="icon-sm"
-            disabled={busy}
-            onClick={onRemove}
-            aria-label={t('Remove {{label}}', { label: source.label })}
-          >
-            <Trash2 aria-hidden="true" />
-          </Button>
+          {!readOnly && (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              disabled={busy}
+              onClick={onRemove}
+              aria-label={t('Remove {{label}}', { label: source.label })}
+            >
+              <Trash2 aria-hidden="true" />
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

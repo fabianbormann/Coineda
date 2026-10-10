@@ -1,6 +1,10 @@
 import markOnDark from '@/assets/logo/coineda-mark-on-dark.svg';
 import markOnLight from '@/assets/logo/coineda-mark-on-light.svg';
+import { useContext } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { ClientContext } from '@/clients/ClientContext';
+import { shortFingerprint } from '@/clients/shortFingerprint';
 import { ClientMenu } from '@/clients/ClientMenu';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 
@@ -31,33 +35,48 @@ import { ThemeToggle } from '@/components/theme/ThemeToggle';
  * `aria-hidden` on both: the mark says "Coineda" and so does the heading
  * beside it, so announcing it would read the name twice.
  */
-export const AppHeader = () => (
-  <header className="glass-chrome rim-b sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 px-4 print:hidden">
-    {/* The mark and the wordmark are ONE link, the way a site's masthead
+export const AppHeader = () => {
+  const ctx = useContext(ClientContext);
+  const { t } = useTranslation();
+  const review = ctx?.readOnly ? ctx.client.review : undefined;
+  return (
+    <>
+      <header className="glass-chrome rim-b sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 px-4 print:hidden">
+        {/* The mark and the wordmark are ONE link, the way a site's masthead
         conventionally is: the whole thing is the way home, not a small
         image beside a title that is not. Its accessible name comes from
         the heading inside it, which is why the marks stay aria-hidden -
         otherwise the link would announce the name twice. */}
-    <Link
-      to="/"
-      className="flex min-w-0 items-center gap-2 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      <img
-        src={markOnLight}
-        alt=""
-        aria-hidden="true"
-        className="h-6 w-auto dark:hidden"
-      />
-      <img
-        src={markOnDark}
-        alt=""
-        aria-hidden="true"
-        className="hidden h-6 w-auto dark:block"
-      />
-      <h1 className="truncate font-serif text-lg">Coineda</h1>
-    </Link>
-    <div className="flex-1" />
-    <ClientMenu />
-    <ThemeToggle />
-  </header>
-);
+        <Link
+          to="/"
+          className="flex min-w-0 items-center gap-2 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <img
+            src={markOnLight}
+            alt=""
+            aria-hidden="true"
+            className="h-6 w-auto dark:hidden"
+          />
+          <img
+            src={markOnDark}
+            alt=""
+            aria-hidden="true"
+            className="hidden h-6 w-auto dark:block"
+          />
+          <h1 className="truncate font-serif text-lg">Coineda</h1>
+        </Link>
+        <div className="flex-1" />
+        <ClientMenu />
+        <ThemeToggle />
+      </header>
+      {ctx?.readOnly && (
+        <p role="status" className="bg-muted px-4 py-1 text-sm print:hidden">
+          {t('Review of {{file}} — read-only', {
+            file: review?.file ?? ctx.client.label,
+          })}
+          {review?.fingerprint && ` · ${shortFingerprint(review.fingerprint)}`}
+        </p>
+      )}
+    </>
+  );
+};

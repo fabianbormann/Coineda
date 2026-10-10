@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -19,6 +26,7 @@ import { getSettings } from '@/settings/settingsStore';
 import { resetDevice } from '@/settings/resetDevice';
 import { useConfirm } from '@/components/confirm/ConfirmProvider';
 import { notify } from '@/lib/notify';
+import { ClientContext } from '@/clients/ClientContext';
 import { ExportCheckpointDialog } from '@/checkpoint/ExportCheckpointDialog';
 import type { LedgerEvent, SourceRecord } from '@/ledger/types';
 import { BalanceHeader } from './BalanceHeader';
@@ -56,6 +64,7 @@ type Props = {
 };
 
 export const MainScreen = ({ onReset }: Props) => {
+  const readOnly = useContext(ClientContext)?.readOnly ?? false;
   const { t } = useTranslation();
   const navigate = useNavigate();
   const confirm = useConfirm();
@@ -719,13 +728,15 @@ export const MainScreen = ({ onReset }: Props) => {
             screen - so the two things a person comes here to do, a tax
             report and a checkpoint, were the hardest to reach. */}
         <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setExportDialogOpen(true)}
-          >
-            {t('Create checkpoint')}
-          </Button>
+          {!readOnly && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setExportDialogOpen(true)}
+            >
+              {t('Create checkpoint')}
+            </Button>
+          )}
           <Button
             type="button"
             variant="outline"
@@ -768,6 +779,7 @@ export const MainScreen = ({ onReset }: Props) => {
           onEditOne={handleOpenEdit}
           onShowEvents={setEventsSource}
           onAddSource={() => setAddDialogOpen(true)}
+          readOnly={readOnly}
         />
         <AddSourceDialog
           open={addDialogOpen}
@@ -814,22 +826,24 @@ export const MainScreen = ({ onReset }: Props) => {
             for something else. The sentence is not decoration - someone
             who reads only the button has no idea a checkpoint is the one
             thing that would have saved them. */}
-        <div className="flex flex-col items-start gap-2 pt-2">
-          <p className="text-sm text-muted-foreground">
-            {t(
-              'Deleting everything on this device starts it over at the welcome screen. Create a checkpoint first if you want any of it back.',
-            )}
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            className="text-destructive"
-            onClick={handleReset}
-            disabled={resetting}
-          >
-            {t('Reset this device')}
-          </Button>
-        </div>
+        {!readOnly && (
+          <div className="flex flex-col items-start gap-2 pt-2">
+            <p className="text-sm text-muted-foreground">
+              {t(
+                'Deleting everything on this device starts it over at the welcome screen. Create a checkpoint first if you want any of it back.',
+              )}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="text-destructive"
+              onClick={handleReset}
+              disabled={resetting}
+            >
+              {t('Reset this device')}
+            </Button>
+          </div>
+        )}
         <ReviewTransfersDialog
           open={transfersDialogOpen}
           onOpenChange={setTransfersDialogOpen}

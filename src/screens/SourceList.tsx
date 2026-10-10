@@ -43,6 +43,8 @@ type Props = {
    *  per-row action it is not gated by `busyIds`. */
   onShowEvents: (source: SourceRecord) => void;
   onAddSource: () => void;
+  /** A review client: no sync, add or remove controls. */
+  readOnly?: boolean;
 };
 
 /**
@@ -76,6 +78,7 @@ export const SourceList = ({
   onEditOne,
   onShowEvents,
   onAddSource,
+  readOnly = false,
 }: Props) => {
   const { t } = useTranslation();
 
@@ -84,7 +87,7 @@ export const SourceList = ({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">{t('Data sources')}</h2>
         <div className="flex gap-2">
-          {sources.length > 0 && (
+          {!readOnly && sources.length > 0 && (
             <Button
               type="button"
               variant="outline"
@@ -98,9 +101,11 @@ export const SourceList = ({
               {t('Sync all')}
             </Button>
           )}
-          <Button type="button" onClick={onAddSource}>
-            {t('Add a data source')}
-          </Button>
+          {!readOnly && (
+            <Button type="button" onClick={onAddSource}>
+              {t('Add a data source')}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -124,6 +129,7 @@ export const SourceList = ({
                 key={source.id}
                 source={source}
                 fileBased={fileModule !== undefined}
+                readOnly={readOnly}
                 moduleLabel={label ? t(label) : source.moduleId}
                 summary={perSource.get(source.id)}
                 currency={currency}

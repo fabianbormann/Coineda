@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TriangleAlertIcon, Loader2Icon } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -18,6 +18,8 @@ import { REWARD_KIND_LABELS } from '@/tax/rewardKinds';
 import { DERIVATIVE_KIND_LABELS } from '@/tax/derivativeKinds';
 import { buildDisclaimer, type Disclaimer } from '@/tax/disclaimer';
 import { getSettings, putSettings } from '@/settings/settingsStore';
+import { ClientContext } from '@/clients/ClientContext';
+import { shortFingerprint } from '@/clients/shortFingerprint';
 import { getAllEvents, getSources } from '@/ledger/db';
 import {
   buildSourceDirectory,
@@ -213,6 +215,11 @@ const UnresolvedGroups = ({
  */
 export const TaxReportScreen = () => {
   const { t, i18n } = useTranslation();
+  // Optional: the screen is also rendered without a provider in isolation.
+  const clientCtx = useContext(ClientContext);
+  const readOnly = clientCtx?.readOnly ?? false;
+  const clientLabel = clientCtx?.client.label ?? '';
+  const clientFingerprint = clientCtx?.client.review?.fingerprint;
   const navigate = useNavigate();
   /**
    * Whether to hide unresolved items dated outside the tax year.
@@ -358,7 +365,7 @@ export const TaxReportScreen = () => {
   /** Written on blur, merging rather than replacing: the two fields have
    *  separate inputs and a write of one must not erase the other. */
   const persistTaxpayer = () => {
-    if (!taxpayerLoaded) {
+    if (readOnly || !taxpayerLoaded) {
       return;
     }
     void putSettings({
@@ -385,7 +392,7 @@ export const TaxReportScreen = () => {
    *  come back as the seeded value next time; the field keeps showing it,
    *  with the error, until it is corrected. */
   const persistCarry = () => {
-    if (!taxpayerLoaded || !CARRY_YEAR.test(year.trim())) {
+    if (readOnly || !taxpayerLoaded || !CARRY_YEAR.test(year.trim())) {
       return;
     }
     const key = year.trim();
@@ -496,9 +503,14 @@ export const TaxReportScreen = () => {
           // reads the key from settings, so a write still in flight would
           // be a race the first run of a new key loses. An empty input
           // clears the stored key rather than storing ''.
-          await putSettings({
-            coingeckoApiKey: request.apiKey === '' ? undefined : request.apiKey,
-          });
+          // A review client's ledger is someone else's restored data: the
+          // key stays in component state for this run and is not stored.
+          if (!readOnly) {
+            await putSettings({
+              coingeckoApiKey:
+                request.apiKey === '' ? undefined : request.apiKey,
+            });
+          }
           if (cancelled) {
             return;
           }
@@ -546,7 +558,7 @@ export const TaxReportScreen = () => {
     return () => {
       cancelled = true;
     };
-  }, [request]);
+  }, [request, readOnly]);
 
   /**
    * Hands the report to the browser's print dialog, which is also where
@@ -806,6 +818,12 @@ export const TaxReportScreen = () => {
                     <span className="font-medium">{t('Tax number')}: </span>
                     {taxNumber || t('not stated')}
                   </p>
+                  {clientLabel && clientLabel !== taxpayerName && (
+                    <p>
+                      <span className="font-medium">{t('Client')}: </span>
+                      {clientLabel}
+                    </p>
+                  )}
                   <p className="text-sm">
                     {t('Tax year')}: {assessment.year} ·{' '}
                     {t('Created on {{date}}', {
@@ -985,7 +1003,7 @@ export const TaxReportScreen = () => {
                             invalidateReport();
                           }}
                           onBlur={persistCarry}
-                          disabled={status === 'loading'}
+                          disabled={status === 'loading' || readOnly}
                         />
                       </div>
                       <div className="flex flex-col gap-2">
@@ -1005,7 +1023,7 @@ export const TaxReportScreen = () => {
                             invalidateReport();
                           }}
                           onBlur={persistCarry}
-                          disabled={status === 'loading'}
+                          disabled={status === 'loading' || readOnly}
                         />
                         <p className="text-sm text-muted-foreground">
                           {t(
@@ -1029,7 +1047,7 @@ export const TaxReportScreen = () => {
                       value={taxpayerName}
                       onChange={(event) => setTaxpayerName(event.target.value)}
                       onBlur={persistTaxpayer}
-                      disabled={status === 'loading'}
+                      disabled={status === 'loading' || readOnly}
                     />
                     <p className="text-sm text-muted-foreground">
                       {t(
@@ -1046,7 +1064,7 @@ export const TaxReportScreen = () => {
                       value={taxNumber}
                       onChange={(event) => setTaxNumber(event.target.value)}
                       onBlur={persistTaxpayer}
-                      disabled={status === 'loading'}
+                      disabled={status === 'loading' || readOnly}
                     />
                   </div>
                 </div>
@@ -2176,6 +2194,22 @@ export const TaxReportScreen = () => {
                       )}
                     </div>
                   </div>
+                )}
+              </div>
+            )}
+
+            {/* Repeats on every printed page (position: fixed), so a loose
+                sheet still says whose figures it shows. The @page bottom
+                margin in index.css keeps it clear of the content. */}
+            {step === 'report' && assessment && (
+              <div
+                data-print="page-footer"
+                className="hidden text-xs print:fixed print:right-0 print:bottom-0 print:left-0 print:block"
+              >
+                {clientLabel && <span>{clientLabel} · </span>}
+                {t('Tax year')}: {assessment.year}
+                {clientFingerprint && (
+                  <span> · {shortFingerprint(clientFingerprint)}</span>
                 )}
               </div>
             )}

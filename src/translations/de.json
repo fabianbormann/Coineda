@@ -602,6 +602,7 @@
     "Close review": "Prüfung beenden",
     "Review of {{file}} — read-only": "Prüfung von {{file}} — nur lesen",
     "Client": "Mandant",
+    "Client": "Mandant",
     "This permanently deletes {{label}} and all its data from this device. Type the label to confirm": "Dadurch wird {{label}} mit allen Daten unwiderruflich von diesem Gerät gelöscht. Gib zur Bestätigung die Bezeichnung ein"
   }
 }

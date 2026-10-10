@@ -9,6 +9,9 @@ import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 import { MemoryRouter } from 'react-router-dom';
 import { MainScreen } from '@/screens/MainScreen';
+import { AppHeader } from '@/components/layout/AppHeader';
+import { ClientProvider } from '@/clients/ClientContext';
+import type { ClientRecord } from '@/clients/registry';
 import { openLedger, putSource, putEvents } from '@/ledger/db';
 import * as ledgerDb from '@/ledger/db';
 import { putSettings } from '@/settings/settingsStore';
@@ -1009,6 +1012,76 @@ describe('a failed sync that reports a translation key', () => {
       await screen.findByText(
         /cardano: listing transactions failed with status 404/,
       ),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('for a review client', () => {
+  const reviewRecord: ClientRecord = {
+    id: 'rev-1',
+    label: 'Review: Müller GmbH',
+    dbName: 'rev-db',
+    kind: 'review',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    review: {
+      fingerprint: 'abcdef0123456789abcdef',
+      omittedEventCount: 0,
+      file: 'mueller.coineda',
+      verdict: 'match',
+    },
+  };
+
+  const renderReview = () =>
+    render(
+      <ThemeProvider>
+        <ConfirmProvider>
+          <MemoryRouter>
+            <ClientProvider client={reviewRecord} onChange={vi.fn()}>
+              <AppHeader />
+              <MainScreen onReset={vi.fn()} />
+            </ClientProvider>
+          </MemoryRouter>
+        </ConfirmProvider>
+      </ThemeProvider>,
+    );
+
+  it('hides every control that writes and shows the review banner', async () => {
+    await putSource({
+      id: 'cfg-r',
+      moduleId: 'test-exchange',
+      label: 'Restored',
+      config: {},
+    });
+    renderReview();
+    expect(await screen.findByText('Restored')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /sync all/i })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /add a data source/i }),
+    ).toBeNull();
+    expect(screen.queryByRole('button', { name: /^remove/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^refresh/i })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /reset this device/i }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /create checkpoint/i }),
+    ).toBeNull();
+    expect(
+      screen.getByRole('button', { name: /create tax report/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Review of mueller\.coineda — read-only/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/abcdef012345/)).toBeInTheDocument();
+  });
+
+  it('keeps the controls for an ordinary client', async () => {
+    renderScreen();
+    expect(
+      await screen.findByRole('button', { name: /add a data source/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /reset this device/i }),
     ).toBeInTheDocument();
   });
 });

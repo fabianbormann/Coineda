@@ -602,6 +602,7 @@
     "Close review": "Close review",
     "Review of {{file}} — read-only": "Review of {{file}} — read-only",
     "Client": "Client",
+    "Client": "Client",
     "This permanently deletes {{label}} and all its data from this device. Type the label to confirm": "This permanently deletes {{label}} and all its data from this device. Type the label to confirm"
   }
 }
