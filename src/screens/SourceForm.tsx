@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ExternalLink } from '@/components/ExternalLink';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -150,14 +151,12 @@ export const SourceForm = ({
             </ul>
           </div>
         )}
-      <a
+      <ExternalLink
         href={module.manifest.docsUrl}
-        target="_blank"
-        rel="noreferrer"
         className="text-sm text-primary underline-offset-4 hover:underline"
       >
         {t('View docs')}
-      </a>
+      </ExternalLink>
     </>
   );
 };

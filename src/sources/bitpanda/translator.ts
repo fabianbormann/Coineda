@@ -99,14 +99,34 @@ const request = async (
   return { status: response.status, body: await response.text() };
 };
 
+const escapeRegExp = (text: string): string =>
+  text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Replaces a secret (raw or URL-encoded, any case) with [redacted], so a
+ *  response body echoed into an error can never carry the API key. */
+export const redactSecret = (text: string, secret: string): string => {
+  if (secret === '') return text;
+  const variants = [secret, encodeURIComponent(secret)]
+    .filter((v, i, all) => v !== '' && all.indexOf(v) === i)
+    .sort((a, b) => b.length - a.length);
+  return text.replace(
+    new RegExp(variants.map(escapeRegExp).join('|'), 'gi'),
+    '[redacted]',
+  );
+};
+
 /** Parses a response body, naming what arrived when it is not JSON at all -
  *  which is what a Cloudflare interstitial looks like. */
-const asJson = (fetched: Fetched, what: string): unknown => {
+export const asJson = (
+  fetched: Fetched,
+  what: string,
+  apiKey: string,
+): unknown => {
   try {
     return JSON.parse(fetched.body);
   } catch {
     throw new Error(
-      `bitpanda: ${what} did not return JSON (HTTP ${fetched.status}): ${fetched.body.slice(0, 120)}`,
+      `bitpanda: ${what} did not return JSON (HTTP ${fetched.status}): ${redactSecret(fetched.body.slice(0, 120), apiKey)}`,
     );
   }
 };
@@ -522,7 +542,7 @@ const page = async (
     );
   }
 
-  const body = asJson(fetched, `the ${what} list`) as {
+  const body = asJson(fetched, `the ${what} list`, apiKey) as {
     data?: unknown;
     links?: { next?: unknown };
   };

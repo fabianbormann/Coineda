@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { APP_VERSION } from '@/global/version';
+import { ExternalLink } from '@/components/ExternalLink';
 import { AppHeader } from './AppHeader';
 
 /**
@@ -24,22 +25,18 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
       <AppHeader />
       <main className="flex min-h-0 flex-1 flex-col">{children}</main>
       <footer className="glass-1 rim-t flex shrink-0 items-center gap-3 px-4 py-2 print:hidden">
-        <a
+        <ExternalLink
           href={`https://github.com/fabianbormann/Coineda/releases/tag/v${APP_VERSION}`}
-          target="_blank"
-          rel="noreferrer"
           className="text-xs text-muted-foreground hover:text-foreground"
         >
           {`v${APP_VERSION}`}
-        </a>
-        <a
+        </ExternalLink>
+        <ExternalLink
           href="https://github.com/fabianbormann/Coineda/blob/main/LICENSE"
-          target="_blank"
-          rel="noreferrer"
           className="text-xs text-muted-foreground hover:text-foreground"
         >
           {t('GPLv3 License')}
-        </a>
+        </ExternalLink>
       </footer>
     </div>
   );

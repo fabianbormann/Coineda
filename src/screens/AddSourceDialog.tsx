@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ExternalLink } from '@/components/ExternalLink';
 import {
   Dialog,
   DialogContent,
@@ -315,14 +316,12 @@ export const AddSourceDialog = ({
                   {t(fileModule.manifest.help)}
                 </p>
                 <FileDropArea onFile={handleFile} disabled={importing} />
-                <a
+                <ExternalLink
                   href={fileModule.manifest.docsUrl}
-                  target="_blank"
-                  rel="noreferrer"
                   className="w-fit text-sm text-muted-foreground underline hover:text-foreground"
                 >
                   {t('How to export it')}
-                </a>
+                </ExternalLink>
                 {formError && (
                   <p className="text-sm text-destructive" role="alert">
                     {formError}
