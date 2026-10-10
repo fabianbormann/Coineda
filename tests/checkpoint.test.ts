@@ -9,7 +9,7 @@ import {
   putEvents,
   putSource,
 } from '@/ledger/db';
-import { fingerprintEvents } from '@/ledger/fingerprint';
+import { fingerprintLedger } from '@/ledger/fingerprint';
 import {
   buildCheckpoint,
   chooseChannel,
@@ -146,11 +146,17 @@ describe('what the checkpoint carries', () => {
 
     const backup = await buildCheckpoint('backup');
     expect(backup.fingerprint).toBe(
-      await fingerprintEvents(await getAllEvents()),
+      await fingerprintLedger({
+        events: await getAllEvents(),
+        links: backup.transferLinks ?? [],
+      }),
     );
     const handover = await buildCheckpoint('handover');
     expect(handover.fingerprint).toBe(
-      await fingerprintEvents(handover.authoredEvents),
+      await fingerprintLedger({
+        events: handover.authoredEvents,
+        links: handover.transferLinks ?? [],
+      }),
     );
     expect(handover.fingerprint).not.toBe(backup.fingerprint);
 

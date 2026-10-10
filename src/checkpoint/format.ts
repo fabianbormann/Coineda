@@ -32,7 +32,7 @@ import {
   manualLinkRow,
   type ManualTransferLink,
 } from '@/ledger/manualLinks';
-import { fingerprintEvents } from '@/ledger/fingerprint';
+import { fingerprintLedger } from '@/ledger/fingerprint';
 import type { LedgerEvent, SourceRecord } from '@/ledger/types';
 import {
   getSettings,
@@ -116,7 +116,7 @@ export type Checkpoint = {
    */
   transferLinks?: ManualTransferLink[];
   /**
-   * SHA-256 over exactly the events this checkpoint carries: authored plus
+   * SHA-256 over exactly the events and manual transfer links this checkpoint carries: authored plus
    * derived for a backup, authored only for a handover. Optional for the
    * same reason as `transferLinks`: older checkpoints have none, and the
    * version stays 1.
@@ -172,9 +172,10 @@ export const buildCheckpoint = async (
   }
   const derived = events.filter((event) => event.origin === 'derived');
   const authored = events.filter((event) => event.origin === 'authored');
-  const fingerprint = await fingerprintEvents(
-    scope === 'backup' ? [...authored, ...derived] : authored,
-  );
+  const fingerprint = await fingerprintLedger({
+    events: scope === 'backup' ? [...authored, ...derived] : authored,
+    links: transferLinks,
+  });
   return {
     v: CURRENT_VERSION,
     settings,

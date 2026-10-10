@@ -1,11 +1,12 @@
-import { getLinkedEvents } from '@/ledger/manualLinks';
-import { fingerprintEvents } from '@/ledger/fingerprint';
+import { getLinkedEvents, getManualLinks } from '@/ledger/manualLinks';
+import { fingerprintLedger } from '@/ledger/fingerprint';
 import {
   foldDisposals,
   isInternalTransfer,
   netPrincipalLegs,
   ownedVenuesOf,
 } from '@/ledger/balances';
+import { getAllEvents } from '@/ledger/db';
 import type { LedgerEvent } from '@/ledger/types';
 import {
   intraEventLotMoves,
@@ -182,6 +183,12 @@ export const runTaxReport = async (
     );
   }
 
+  // Read once, with the events, so the fingerprint describes what this run
+  // read even if the ledger changes while prices are being fetched.
+  const [rawEvents, manualLinks] = await Promise.all([
+    getAllEvents(),
+    getManualLinks(),
+  ]);
   const allEvents = await getLinkedEvents();
   const ownedVenues = ownedVenuesOf(allEvents);
   // Transfers between the user's own venues, in BOTH shapes.
@@ -543,7 +550,12 @@ export const runTaxReport = async (
     // what fetchHistory actually tries, in the order it tries them.
     priceSources: ['DefiLlama', 'ECB', 'CoinGecko'],
     appVersion: APP_VERSION,
-    fingerprint: await fingerprintEvents(allEvents),
+    // Raw events plus the links, exactly what a checkpoint stores - NOT
+    // the linked events, so the two can be compared.
+    fingerprint: await fingerprintLedger({
+      events: rawEvents,
+      links: manualLinks,
+    }),
     rulesVersion: module.manifest.rulesVersion,
     eventsConsidered: survivors.length,
     internalTransfersNetted: allEvents.length - survivors.length,

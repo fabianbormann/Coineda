@@ -358,16 +358,13 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
       notify.success(i18n.t('Checkpoint restored. Welcome back!'));
       const missing = checkpoint.omittedEventCount ?? 0;
       const restoredFingerprint = checkpoint.fingerprint ?? '';
-      if (missing > 0) {
+      // The card is shown whenever there is something on it to read at
+      // leisure: what was left behind, or the fingerprint to compare.
+      if (missing > 0 || restoredFingerprint !== '') {
         setOmitted(missing);
         setFingerprint(restoredFingerprint);
         setStep('restored');
         return;
-      }
-      if (restoredFingerprint !== '') {
-        notify.info(
-          `${i18n.t('Fingerprint')}: ${shortFingerprint(restoredFingerprint)}`,
-        );
       }
       onComplete();
     } catch (error) {
@@ -381,7 +378,11 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
     return (
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>{t('Almost everything is here')}</CardTitle>
+          <CardTitle>
+            {omitted > 0
+              ? t('Almost everything is here')
+              : t('Checkpoint restored')}
+          </CardTitle>
           <CardDescription>
             {t(
               'Your settings, your data sources and anything you entered yourself came across.',
@@ -389,33 +390,41 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 text-sm">
-          <p>
-            {t(
-              'What did not fit the code: {{count}} recorded transactions. There are two ways to get them here.',
-              { count: omitted },
-            )}
-          </p>
           {fingerprint !== '' && (
             <p className="text-muted-foreground">
               {t('Fingerprint')}: {shortFingerprint(fingerprint)}
             </p>
           )}
-          <div className="flex flex-col gap-1">
-            <h3 className="font-medium">{t('Let your sources refetch it')}</h3>
-            <p className="text-muted-foreground">
-              {t(
-                'Your data sources came across with their credentials, so a sync on this device fetches the history again by itself. This is the ordinary way, and it needs nothing from your other device.',
-              )}
-            </p>
-          </div>
-          <div className="flex flex-col gap-1">
-            <h3 className="font-medium">{t('Or bring a backup file over')}</h3>
-            <p className="text-muted-foreground">
-              {t(
-                'For a source that cannot be synced any more - an exchange that closed, an API key that is gone, a file import - create a checkpoint on your other device, download it as a file, and import that file here. It carries every recorded transaction.',
-              )}
-            </p>
-          </div>
+          {omitted > 0 && (
+            <>
+              <p>
+                {t(
+                  'What did not fit the code: {{count}} recorded transactions. There are two ways to get them here.',
+                  { count: omitted },
+                )}
+              </p>
+              <div className="flex flex-col gap-1">
+                <h3 className="font-medium">
+                  {t('Let your sources refetch it')}
+                </h3>
+                <p className="text-muted-foreground">
+                  {t(
+                    'Your data sources came across with their credentials, so a sync on this device fetches the history again by itself. This is the ordinary way, and it needs nothing from your other device.',
+                  )}
+                </p>
+              </div>
+              <div className="flex flex-col gap-1">
+                <h3 className="font-medium">
+                  {t('Or bring a backup file over')}
+                </h3>
+                <p className="text-muted-foreground">
+                  {t(
+                    'For a source that cannot be synced any more - an exchange that closed, an API key that is gone, a file import - create a checkpoint on your other device, download it as a file, and import that file here. It carries every recorded transaction.',
+                  )}
+                </p>
+              </div>
+            </>
+          )}
         </CardContent>
         <CardFooter>
           <Button type="button" onClick={onComplete}>

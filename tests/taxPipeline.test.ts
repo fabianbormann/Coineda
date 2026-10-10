@@ -3,7 +3,9 @@ import 'fake-indexeddb/auto';
 import { APP_VERSION } from '@/global/version';
 import { runTaxReport, taxYearOf } from '@/tax/runTaxReport';
 import { getAllEvents, openLedger, putEvents } from '@/ledger/db';
-import { fingerprintEvents } from '@/ledger/fingerprint';
+import { fingerprintLedger } from '@/ledger/fingerprint';
+import { getManualLinks, putManualLink } from '@/ledger/manualLinks';
+import { buildCheckpoint } from '@/checkpoint/format';
 import austrianTax from '@/tax/jurisdictions/at';
 import type { LedgerEvent } from '@/ledger/types';
 import type { TaxModule, TaxEvent } from '@/tax/types';
@@ -755,8 +757,50 @@ describe('the method sheet', () => {
       baseCurrency: 'eur',
     });
     expect(report.method.fingerprint).toBe(
-      await fingerprintEvents(await getAllEvents()),
+      await fingerprintLedger({
+        events: await getAllEvents(),
+        links: await getManualLinks(),
+      }),
     );
+  });
+
+  it('gives the report and a backup the same fingerprint, manual link included', async () => {
+    await putEvents([
+      ledgerEvent({
+        id: 'buy',
+        externalId: 'buy',
+        timestamp: Date.UTC(2025, 0, 1),
+        legs: [
+          {
+            assetId: 'fiat:eur',
+            amount: '400',
+            direction: 'in',
+            venue: 'wallet-a',
+            role: 'principal',
+          },
+        ],
+      }),
+    ]);
+    const options = { year: 2025, baseCurrency: 'eur' };
+    const db = await openLedger();
+    await db.clear('transferLinks');
+    const without = await runTaxReport(stubModule, options);
+    expect((await buildCheckpoint('backup')).fingerprint).toBe(
+      without.method.fingerprint,
+    );
+
+    const stored = (await getAllEvents())[0];
+    await putManualLink({
+      sourceId: stored.sourceId,
+      externalId: stored.externalId,
+      txHash: '0xabc',
+    });
+    const withLink = await runTaxReport(stubModule, options);
+    expect((await buildCheckpoint('backup')).fingerprint).toBe(
+      withLink.method.fingerprint,
+    );
+    expect(withLink.method.fingerprint).not.toBe(without.method.fingerprint);
+    await db.clear('transferLinks');
   });
 
   it('reports the matching method actually used, not the module default', async () => {
