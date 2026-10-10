@@ -12,6 +12,7 @@ import markBlack from '@/assets/logo/coineda-mark-black.svg';
 import { findModule } from '@/sources/registry';
 import { taxRegistry } from '@/tax/registry';
 import { runTaxReport } from '@/tax/runTaxReport';
+import { registerFilename, registerToCsv, reportToJson } from '@/tax/register';
 import { REWARD_KIND_LABELS } from '@/tax/rewardKinds';
 import { DERIVATIVE_KIND_LABELS } from '@/tax/derivativeKinds';
 import { buildDisclaimer, type Disclaimer } from '@/tax/disclaimer';
@@ -562,6 +563,39 @@ export const TaxReportScreen = () => {
     if (typeof window.print === 'function') {
       window.print();
     }
+  };
+
+  /** Hands a text file to the browser, the way the checkpoint dialog does. */
+  const download = (content: string, filename: string, type: string) => {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadRegister = () => {
+    if (!assessment) {
+      return;
+    }
+    download(
+      registerToCsv(assessment.register),
+      registerFilename(assessment.year, assessment.method.fingerprint, 'csv'),
+      'text/csv;charset=utf-8',
+    );
+  };
+
+  const handleDownloadJson = () => {
+    if (!assessment) {
+      return;
+    }
+    download(
+      reportToJson(assessment),
+      registerFilename(assessment.year, assessment.method.fingerprint, 'json'),
+      'application/json',
+    );
   };
 
   /**
@@ -2111,6 +2145,20 @@ export const TaxReportScreen = () => {
                   <Button type="button" variant="outline" onClick={handlePrint}>
                     <Printer aria-hidden="true" />
                     {t('Print or save as PDF')}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleDownloadRegister}
+                  >
+                    {t('Download register (CSV)')}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleDownloadJson}
+                  >
+                    {t('Download report (JSON)')}
                   </Button>
                 </>
               )}

@@ -532,6 +532,41 @@ export type ReportedCapital = {
  * Naming the two separately is what lets the report grow provenance and a
  * method sheet without widening the contract every contributor implements.
  */
+export type RegisterRowKind =
+  | 'acquisition'
+  | 'disposal'
+  | 'income'
+  | 'capital-gain'
+  | 'capital-loss'
+  | 'internal-transfer'
+  | 'unpriced';
+
+/** One line of the year's register: every event the report touched. */
+export type RegisterRow = {
+  /** ISO-8601, UTC. */
+  date: string;
+  kind: RegisterRowKind;
+  sourceEventId: string;
+  txHash?: string;
+  assetId: string;
+  symbol: string;
+  /** Base units. */
+  amount: string;
+  /** Whole units. */
+  amountWhole: string;
+  venue: string;
+  /** Internal transfers: where it went. */
+  counterVenue?: string;
+  value?: string;
+  priceSource?: string;
+  considerationAssetId?: string;
+  considerationAmount?: string;
+  /** Sum of the valued costs attached. */
+  costs?: string;
+  /** A translation key, left untranslated in the file. */
+  note?: string;
+};
+
 export type TaxReport = Omit<TaxAssessment, 'lines' | 'capital'> & {
   lines: ReportedDisposal[];
   /** The valued income events of the year, in date order. */
@@ -554,6 +589,8 @@ export type TaxReport = Omit<TaxAssessment, 'lines' | 'capital'> & {
    * ignore. `totals.omitted === omittedDisposals.length` by construction.
    */
   omittedDisposals: UnresolvedItem[];
+  /** The year's register, built by the host; modules need do nothing. */
+  register: RegisterRow[];
 };
 
 export type AssessInput = {

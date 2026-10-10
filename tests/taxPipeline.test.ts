@@ -299,6 +299,67 @@ describe('runTaxReport', () => {
     expect(report.unresolved).toHaveLength(0);
   });
 
+  it('builds the register for the year: buy, sell, reward, internal transfer', async () => {
+    const leg = (direction: 'in' | 'out', venue: string, amount = '10') => ({
+      assetId: 'cardano:lovelace',
+      amount,
+      direction,
+      venue,
+      role: 'principal' as const,
+    });
+    await putEvents([
+      ledgerEvent({
+        id: 'buy',
+        externalId: 'buy',
+        timestamp: Date.UTC(2025, 0, 1),
+        legs: [leg('in', 'wallet-a')],
+      }),
+      ledgerEvent({
+        id: 'reward',
+        externalId: 'reward',
+        kind: 'reward',
+        timestamp: Date.UTC(2025, 0, 2),
+        legs: [leg('in', 'wallet-a', '2')],
+      }),
+      ledgerEvent({
+        id: 'move',
+        externalId: 'move',
+        timestamp: Date.UTC(2025, 0, 3),
+        legs: [leg('out', 'wallet-a', '4'), leg('in', 'wallet-b', '4')],
+      }),
+      ledgerEvent({
+        id: 'sell',
+        externalId: 'sell',
+        timestamp: Date.UTC(2025, 0, 4),
+        legs: [leg('out', 'wallet-a', '5')],
+      }),
+      ledgerEvent({
+        id: 'other-year',
+        externalId: 'other-year',
+        timestamp: Date.UTC(2026, 0, 4),
+        legs: [leg('in', 'wallet-a')],
+      }),
+    ]);
+
+    const report = await runTaxReport(stubModule, {
+      year: 2025,
+      baseCurrency: 'eur',
+    });
+
+    expect(report.register.map((r) => r.kind)).toEqual([
+      'acquisition',
+      'acquisition',
+      'internal-transfer',
+      'disposal',
+    ]);
+    expect(report.register.map((r) => r.sourceEventId)).not.toContain(
+      'other-year:0',
+    );
+    const moved = report.register.find((r) => r.kind === 'internal-transfer');
+    expect(moved?.counterVenue).toBe('wallet-b');
+    expect(moved?.value).toBeUndefined();
+  });
+
   it('produces different cost bases under fifo vs moving-average for the same disposal', async () => {
     // The brief's original version of this test only asserted
     // `report.year === 2025`, which `runTaxReport` returns regardless of

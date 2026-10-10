@@ -193,6 +193,53 @@ const runReport = async (year: string) => {
   );
 };
 
+describe('downloading the register', () => {
+  it('offers the register and the report as files, inside the print-hidden bar', async () => {
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+    const blobs: Blob[] = [];
+    const createObjectURL = vi.fn((blob: Blob) => {
+      blobs.push(blob);
+      return 'blob:test';
+    });
+    vi.stubGlobal(
+      'URL',
+      Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }),
+    );
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    renderScreen();
+    await runReport('2025');
+
+    const csvButton = await screen.findByRole('button', {
+      name: /download register \(csv\)/i,
+    });
+    const jsonButton = screen.getByRole('button', {
+      name: /download report \(json\)/i,
+    });
+    expect(csvButton.closest('.print\\:hidden')).not.toBeNull();
+    expect(jsonButton.closest('.print\\:hidden')).not.toBeNull();
+
+    await userEvent.click(csvButton);
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    const bytes = new Uint8Array(await readBlob(blobs[0]));
+    expect(Array.from(bytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
+
+    await userEvent.click(jsonButton);
+    expect(createObjectURL).toHaveBeenCalledTimes(2);
+    const json = JSON.parse(new TextDecoder().decode(await readBlob(blobs[1])));
+    expect(json.register.length).toBeGreaterThan(0);
+  });
+});
+
+const readBlob = (blob: Blob): Promise<ArrayBuffer> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(blob);
+  });
+
 describe('running a report', () => {
   it('runs a report and renders the totals', async () => {
     taxRegistry.push(makeModule());

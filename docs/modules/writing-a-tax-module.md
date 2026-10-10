@@ -236,6 +236,15 @@ difference between a real assertion and a tautological one just by reading
 the code, so the break-and-revert proof is the only true verification you
 can hand them.
 
+
+## The register is host-built
+
+The year's register (every acquisition, disposal, income, capital and
+internal-transfer row, plus the items that could not be priced) and its CSV
+and JSON exports are built by the host from what `classify` returned and from
+the ledger. A module does not produce, return or format any of it; there is
+nothing to implement.
+
 ## Checklist before opening the PR
 
 - [ ] `manifest.contributor`, `manifest.rulesCheckedOn`, `manifest.references`,

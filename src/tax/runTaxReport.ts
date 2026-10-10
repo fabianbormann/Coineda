@@ -15,6 +15,13 @@ import {
   residualTransferEvents,
 } from '@/ledger/transfers';
 import { match } from './matching';
+import {
+  FEE_RESIDUAL_SUFFIX,
+  PAID_RESIDUAL_SUFFIX,
+  PAID_ORIGIN_KEY,
+  RESIDUAL_ORIGIN_KEY,
+} from './residualOrigin';
+import { buildRegister } from './register';
 import { resolveValues } from './resolveValues';
 import { rewardKindOf } from '@/tax/rewardKinds';
 import { APP_VERSION } from '@/global/version';
@@ -68,28 +75,7 @@ export const HOST_REASON_KEYS = [
   'No acquisition is on record for this disposal.',
 ] as const;
 
-/**
- * What a report line says when it is the coins a transfer between the
- * user's own venues consumed (see residualTransferEvents). Without it the
- * printed report shows an unexplained few satoshi leaving an exchange, and
- * a reader cannot tie the method sheet's count to any line. Exported, like
- * HOST_REASON_KEYS, so the conformance gate can check it is keyed in every
- * locale.
- */
-export const RESIDUAL_ORIGIN_KEY =
-  'Network fee on a transfer between your own wallets, disposed of at market value and not deducted.';
-
-/**
- * What a report line says when it is coins paid to somebody else in a
- * transaction that also moved coins between the user's own venues (the
- * `:residual-paid-out` events of residualTransferEvents). A payment, not a
- * fee, so it must not be labelled or counted as one.
- */
-export const PAID_ORIGIN_KEY =
-  'Sent to someone else in a transaction that also moved coins between your own wallets.';
-
-const FEE_RESIDUAL_SUFFIX = ':residual-out';
-const PAID_RESIDUAL_SUFFIX = ':residual-paid-out';
+export { RESIDUAL_ORIGIN_KEY, PAID_ORIGIN_KEY };
 
 /** A ledger event the module's `classify` produced nothing for. Recorded
  *  so a new `EventKind` the module has not been taught about cannot vanish
@@ -567,6 +553,20 @@ export const runTaxReport = async (
     ).length,
   };
 
+  // The events dropped as internal transfers: the single-event shape and
+  // both halves of every linked pair.
+  const keptIds = new Set(survivors.map((event) => event.id));
+  const register = buildRegister({
+    year: options.year,
+    valued,
+    internalTransfers: allEvents.filter((event) => !keptIds.has(event.id)),
+    residuals,
+    unresolved: unresolved.filter(
+      (item) => taxYearOf(item.timestamp) === options.year,
+    ),
+    eventById,
+  });
+
   const { capital: capitalResult, ...assessed } = assessment;
 
   return {
@@ -578,6 +578,7 @@ export const runTaxReport = async (
     method,
     unresolved: [...assessment.unresolved, ...unresolved],
     omittedDisposals,
+    register,
     totals: {
       ...assessment.totals,
       omitted: omittedDisposals.length,
