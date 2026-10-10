@@ -42,7 +42,8 @@ export const CATEGORY_ELEMENTS: Record<string, CarfCategory> = {
   rrpt: 'rrpt',
 };
 
-const DECIMAL = /^-?\d+(\.\d+)?$/;
+// Amounts and units in a CARF block are non-negative by the schema.
+const DECIMAL = /^\d+(\.\d+)?$/;
 const COUNT = /^\d+$/;
 const DATE = /^(\d{4})-\d{2}-\d{2}/;
 
@@ -136,6 +137,14 @@ const partyOf = (id: Element | undefined): Element | undefined =>
 
 const readBlock = (el: Element, category: CarfCategory): CarfBlock => {
   const amountEl = childNamed(el, 'amount');
+  const amount = decimal(amountEl?.textContent ?? undefined, 'Amount');
+  // Without its currency an amount cannot be compared with anything.
+  const currency = clean(amountEl?.getAttribute('currCode') ?? null);
+  if (!currency) {
+    throw new CarfParseError('The CARF message has no {{element}}.', {
+      element: 'Amount@currCode',
+    });
+  }
   const type = textOf(el, ['exchangetype']) ?? textOf(el, ['transfertype']);
   const altValuation = textOf(el, ['altvaluation']);
   // Keys in a fixed order, optional ones only when present.
@@ -150,8 +159,8 @@ const readBlock = (el: Element, category: CarfCategory): CarfBlock => {
             'NumberofTransactions',
           ),
         }),
-    amount: decimal(amountEl?.textContent ?? undefined, 'Amount'),
-    currency: clean(amountEl?.getAttribute('currCode') ?? null),
+    amount,
+    currency,
     units: decimal(textOf(el, ['numberofunits']), 'NumberofUnits'),
     ...(altValuation ? { altValuation } : {}),
   };

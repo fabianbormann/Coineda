@@ -25,6 +25,12 @@ const sources: SourceRecord[] = [
     label: 'My Cardano wallet',
     config: {},
   },
+  {
+    id: 's-ledger',
+    moduleId: 'ledger-live-csv',
+    label: 'My Ledger',
+    config: {},
+  },
 ];
 
 const entry = (
@@ -46,6 +52,7 @@ const directory: SourceDirectoryEntry[] = [
   entry('s-bitpanda', 'bitpanda', 'Bitpanda', ['bitpanda']),
   entry('s-kraken', 'kraken-csv', 'Kraken', ['kraken']),
   entry('s-wallet', 'cardano-blockfrost', 'My Cardano wallet', ['addr1own']),
+  entry('s-ledger', 'ledger-live-csv', 'My Ledger', ['ledger:ada']),
 ];
 
 const events: LedgerEvent[] = [
@@ -85,7 +92,11 @@ beforeEach(async () => {
 });
 
 const renderDialog = (
-  props: Partial<{ taxYear: number; taxNumber: string }> = {},
+  props: Partial<{
+    taxYear: number;
+    taxNumber: string;
+    events: LedgerEvent[];
+  }> = {},
 ) =>
   render(
     <CarfReconcileDialog
@@ -95,7 +106,7 @@ const renderDialog = (
       baseCurrency="eur"
       sources={sources}
       directory={directory}
-      events={events}
+      events={props.events ?? events}
       valueOf={() => undefined}
       taxNumber={props.taxNumber}
       onReconciled={onReconciled}
@@ -140,18 +151,112 @@ describe('CarfReconcileDialog', () => {
     const result = onReconciled.mock.calls[0][0];
     expect(result.rows.length).toBeGreaterThan(0);
     expect(result.sourceIds).toEqual(['s-bitpanda']);
-    expect(result.user.name).toBe('Erika Mustermann');
+    expect(result.user?.name).toBe('Erika Mustermann');
     expect(result.fileHash).toMatch(/^[0-9a-f]{64}$/);
     expect(result.rows.some((row) => row.symbol === 'BTC')).toBe(true);
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it('preselects the user whose TIN matches, not merely the first', async () => {
+  it('preselects the user whose TIN matches, not merely the first, and still compares the first', async () => {
     renderDialog({ taxNumber: '99 / 999 / 99999' });
     const box = await drop(xmlFile(fixture('plain.xml')));
     expect(
       await within(box).findByRole('radio', { name: /beispiel ug/i }),
     ).toBeChecked();
+    const erika = within(box).getByRole('radio', { name: /erika mustermann/i });
+    expect(erika).toBeEnabled();
+    await userEvent.click(erika);
+    expect(erika).toBeChecked();
+    await userEvent.click(within(box).getByRole('button', { name: 'Compare' }));
+    await waitFor(() => expect(onReconciled).toHaveBeenCalledTimes(1));
+    expect(onReconciled.mock.calls[0][0].user?.name).toBe('Erika Mustermann');
+  });
+
+  it('compares a message that reports nothing about any user', async () => {
+    renderDialog();
+    const box = await drop(xmlFile(fixture('nothing-to-report.xml')));
+    expect(
+      await within(box).findByText(
+        'This provider reported nothing about any user for 2026.',
+      ),
+    ).toBeInTheDocument();
+    expect(within(box).queryByRole('radio')).toBeNull();
+    const compare = within(box).getByRole('button', { name: 'Compare' });
+    expect(compare).toBeEnabled();
+    await userEvent.click(
+      within(box).getByRole('checkbox', { name: /bitpanda/i }),
+    );
+    expect(compare).toBeDisabled();
+    await userEvent.click(
+      within(box).getByRole('checkbox', { name: /bitpanda/i }),
+    );
+    await userEvent.click(compare);
+    await waitFor(() => expect(onReconciled).toHaveBeenCalledTimes(1));
+    const result = onReconciled.mock.calls[0][0];
+    expect(result.user).toBeUndefined();
+    expect(result.rows.length).toBeGreaterThan(0);
+    expect(result.rows.every((row) => row.verdict === 'not-reported')).toBe(
+      true,
+    );
+  });
+
+  it('counts as wallet transfers only withdrawals not received at another provider', async () => {
+    const leg = (
+      assetId: string,
+      amount: string,
+      direction: 'in' | 'out',
+      venue: string,
+    ) => ({ assetId, amount, direction, venue, role: 'principal' as const });
+    const transfer = (
+      id: string,
+      sourceId: string,
+      txHash: string,
+      legs: LedgerEvent['legs'],
+    ): LedgerEvent => ({
+      id,
+      sourceId,
+      externalId: id,
+      timestamp: Date.UTC(2026, 5, 1),
+      kind: 'transfer',
+      origin: 'derived',
+      txHash,
+      legs,
+    });
+    const ada = 'cardano:lovelace';
+    renderDialog({
+      events: [
+        // Bitpanda → Kraken: stays with a provider.
+        transfer('w1', 's-bitpanda', 'h1', [
+          leg(ada, '100000000', 'out', 'bitpanda'),
+        ]),
+        transfer('r1', 's-kraken', 'h1', [
+          leg(ada, '100000000', 'in', 'kraken'),
+        ]),
+        // Bitpanda → the Ledger wallet: a wallet transfer.
+        transfer('w2', 's-bitpanda', 'h2', [
+          leg(ada, '200000000', 'out', 'bitpanda'),
+        ]),
+        transfer('r2', 's-ledger', 'h2', [
+          leg(ada, '200000000', 'in', 'ledger:ada'),
+        ]),
+      ],
+    });
+    const box = await drop(xmlFile(fixture('plain.xml')));
+    await within(box).findByRole('radio', { name: /erika mustermann/i });
+    // A wallet export is not offered as a provider source.
+    expect(
+      within(box).queryByRole('checkbox', { name: /my ledger/i }),
+    ).toBeNull();
+    await userEvent.click(within(box).getByRole('button', { name: 'Compare' }));
+    await waitFor(() => expect(onReconciled).toHaveBeenCalledTimes(1));
+    const rows = onReconciled.mock.calls[0][0].rows;
+    const ofAda = (category: string) =>
+      rows.find((row) => row.symbol === 'ADA' && row.category === category);
+    expect(ofAda('transfer-out')?.own?.transactions).toBe(2);
+    expect(ofAda('wallet')?.own).toMatchObject({
+      transactions: 1,
+      units: '200',
+    });
   });
 
   it('disables Compare while no source is selected', async () => {

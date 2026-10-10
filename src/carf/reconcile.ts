@@ -1,7 +1,7 @@
 import Big from 'big.js';
 import { symbolOf, toWholeUnits } from '@/components/money/asset';
 import type { OwnCategory, OwnFigures } from './aggregate';
-import { resolveCarfAsset } from './assets';
+import { isCarfFiat, resolveCarfAsset } from './assets';
 import type {
   CarfAssetReport,
   CarfBlock,
@@ -69,7 +69,8 @@ export type CarfReconciliation = {
   year: number;
   timestamp: string;
   provider: string;
-  user: {
+  /** Undefined when the message names no user (CARF703). */
+  user?: {
     name: string;
     tins: CarfTin[];
     docRefId: string;
@@ -81,6 +82,8 @@ export type CarfReconciliation = {
   baseCurrency: string;
   rows: ReconciliationRow[];
   unrecognised: CarfAssetReport[];
+  /** Fiat currencies the provider listed as crypto-assets: not compared. */
+  fiat: CarfAssetReport[];
   summary: Record<Verdict | 'not-recognised', number>;
 };
 
@@ -177,13 +180,14 @@ const verdictOf = (
   if (category === 'rrpt') return 'not-compared';
   if (!own) return 'missing-own';
   if (!reported || notReported) return 'not-reported';
-  if (reported.currency.toLowerCase() !== baseCurrency.toLowerCase()) {
-    return 'not-compared';
-  }
   const countsAgree =
     reported.transactions === undefined ||
     reported.transactions === own.transactions;
   const unitsAgree = new Big(reported.units).eq(own.units);
+  if (reported.currency.toLowerCase() !== baseCurrency.toLowerCase()) {
+    // The amounts cannot be compared, but counts and units still can.
+    return countsAgree && unitsAgree ? 'not-compared' : 'differs';
+  }
   if (own.amount === undefined) {
     return countsAgree && unitsAgree ? 'unpriced' : 'differs';
   }
@@ -209,14 +213,16 @@ const deltaOf = (
 
 export const reconcile = (input: {
   message: CarfMessage;
-  user: CarfUser;
+  /** The client in the message; absent when it names no user (CARF703),
+   *  which makes every own row "not reported". */
+  user?: CarfUser;
   own: OwnFigures;
   baseCurrency: string;
   fileHash: string;
   sources: { id: string; label: string }[];
 }): CarfReconciliation => {
   const { message, user, own, baseCurrency } = input;
-  const notReported = message.messageTypeIndic === 'CARF703';
+  const notReported = message.messageTypeIndic === 'CARF703' || !user;
 
   // assetId → names reported under, and blocks per category.
   const reportedAssets = new Map<
@@ -224,10 +230,11 @@ export const reconcile = (input: {
     { names: string[]; blocks: Map<CarfCategory, CarfBlock[]> }
   >();
   const unrecognised: CarfAssetReport[] = [];
-  for (const asset of user.assets) {
+  const fiat: CarfAssetReport[] = [];
+  for (const asset of user?.assets ?? []) {
     const entry = resolveCarfAsset(asset.name);
     if (!entry) {
-      unrecognised.push(asset);
+      (isCarfFiat(asset.name) ? fiat : unrecognised).push(asset);
       continue;
     }
     const slot = reportedAssets.get(entry.id) ?? {
@@ -280,6 +287,22 @@ export const reconcile = (input: {
         delta.amount = plain(new Big(ownRow.amount).minus(reported.amount));
       }
       const several = slot && slot.names.length > 1 && blocks;
+      const foreign =
+        reported &&
+        ownRow &&
+        reported.currency !== '' &&
+        reported.currency.toLowerCase() !== baseCurrency.toLowerCase();
+      const note: Pick<ReconciliationRow, 'note' | 'noteParams'> = several
+        ? {
+            note: 'Reported under several names: {{names}}',
+            noteParams: { names: slot.names.join(', ') },
+          }
+        : foreign
+          ? {
+              note: 'Reported in {{currency}}',
+              noteParams: { currency: reported.currency },
+            }
+          : {};
       return {
         assetId,
         symbol: symbolOf(assetId),
@@ -288,16 +311,13 @@ export const reconcile = (input: {
         ...(ownRow ? { own: ownRow } : {}),
         delta,
         verdict,
-        ...(several
-          ? {
-              note: 'Reported under several names: {{names}}',
-              noteParams: { names: slot.names.join(', ') },
-            }
-          : {}),
+        ...note,
       };
     },
   );
 
+  // Symbol first; two assets can share a symbol (eth:native and a bridged
+  // token), so the asset id breaks the tie before the category order.
   rows.sort(
     (a, b) =>
       a.symbol.toLowerCase().localeCompare(b.symbol.toLowerCase()) ||
@@ -323,18 +343,23 @@ export const reconcile = (input: {
     year: message.year,
     timestamp: message.timestamp,
     provider: message.provider.name,
-    user: {
-      name: user.name,
-      tins: user.tins,
-      docRefId: user.docRefId,
-      docTypeIndic: user.docTypeIndic,
-    },
+    ...(user
+      ? {
+          user: {
+            name: user.name,
+            tins: user.tins,
+            docRefId: user.docRefId,
+            docTypeIndic: user.docTypeIndic,
+          },
+        }
+      : {}),
     sourceIds: input.sources.map((s) => s.id),
     sourceLabels: input.sources.map((s) => s.label),
     fileHash: input.fileHash,
     baseCurrency,
     rows,
     unrecognised,
+    fiat,
     summary,
   };
 };
@@ -359,6 +384,7 @@ const HEADER = [
   'ownUnits',
   'ownAmount',
   'ownFees',
+  'ownFiatFees',
   'deltaTransactions',
   'deltaUnits',
   'deltaAmount',
@@ -366,10 +392,17 @@ const HEADER = [
   'messageRefId',
   'reportingPeriod',
   'fileHash',
+  'baseCurrency',
 ];
 
 export const reconciliationToCsv = (r: CarfReconciliation): string => {
-  const tail = [r.provider, r.messageRefId, r.reportingPeriod, r.fileHash];
+  const tail = [
+    r.provider,
+    r.messageRefId,
+    r.reportingPeriod,
+    r.fileHash,
+    r.baseCurrency.toUpperCase(),
+  ];
   const line = (cells: (string | number | undefined)[]): string =>
     [
       ...cells,
@@ -378,6 +411,24 @@ export const reconciliationToCsv = (r: CarfReconciliation): string => {
     ]
       .map(cell)
       .join(',');
+  // An asset without blocks still gets a line (empty category), so every
+  // listed name reaches the spreadsheet.
+  const listed = (assets: CarfAssetReport[], verdict: string): string[] =>
+    assets.flatMap((asset) =>
+      asset.blocks.length === 0
+        ? [line([asset.name, '', verdict])]
+        : asset.blocks.map((b) =>
+            line([
+              asset.name,
+              b.category,
+              verdict,
+              b.transactions,
+              b.units,
+              b.amount,
+              b.currency,
+            ]),
+          ),
+    );
   const lines = [
     HEADER.join(','),
     ...r.rows.map((row) =>
@@ -393,24 +444,14 @@ export const reconciliationToCsv = (r: CarfReconciliation): string => {
         row.own?.units,
         row.own?.amount,
         row.own?.fees,
+        row.own?.fiatFees,
         row.delta.transactions,
         row.delta.units,
         row.delta.amount,
       ]),
     ),
-    ...r.unrecognised.flatMap((asset) =>
-      asset.blocks.map((b) =>
-        line([
-          asset.name,
-          b.category,
-          'not-recognised',
-          b.transactions,
-          b.units,
-          b.amount,
-          b.currency,
-        ]),
-      ),
-    ),
+    ...listed(r.unrecognised, 'not-recognised'),
+    ...listed(r.fiat, 'not-crypto'),
   ];
   return `${lines.join('\r\n')}\r\n`;
 };

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { OwnCategory, OwnFigures } from '@/carf/aggregate';
+import {
+  aggregateLedger,
+  type OwnCategory,
+  type OwnFigures,
+} from '@/carf/aggregate';
 import { sha256Hex } from '@/carf/hash';
 import { reconcile, reconciliationToCsv } from '@/carf/reconcile';
 import type {
@@ -10,6 +14,7 @@ import type {
   CarfUser,
 } from '@/carf/types';
 import { NIGHT_ASSET_ID } from '@/assets/ids';
+import { ledgerEvent } from './helpers/ledger';
 
 const BTC = 'bitcoin:native';
 const ETH = 'eth:native';
@@ -144,6 +149,24 @@ describe('reconcile verdicts', () => {
     expect(row.delta.units).toBe('0');
     expect(row.delta.transactions).toBe(0);
     expect(row.delta.amount).toBeUndefined();
+    expect(row.note).toBe('Reported in {{currency}}');
+    expect(row.noteParams).toEqual({ currency: 'USD' });
+  });
+
+  it('differs in another currency when counts or units disagree', () => {
+    const count = one(
+      block('fiat-in', { currency: 'USD' }),
+      own({ transactions: 1 }),
+    );
+    expect(count.verdict).toBe('differs');
+    expect(count.note).toBe('Reported in {{currency}}');
+    expect(count.noteParams).toEqual({ currency: 'USD' });
+    expect(count.delta.amount).toBeUndefined();
+    const units = one(
+      block('fiat-in', { currency: 'USD' }),
+      own({ units: '1' }),
+    );
+    expect(units.verdict).toBe('differs');
   });
 
   it('treats a missing reported currency as not comparable', () => {
@@ -197,6 +220,27 @@ describe('reconcile verdicts', () => {
       'not-reported',
       'not-reported',
     ]);
+  });
+
+  it('marks every own row not-reported when the message names no user', () => {
+    const message = messageOf(userOf([]), {
+      messageTypeIndic: 'CARF703',
+      users: [],
+    });
+    const r = reconcile({
+      message,
+      own: { [BTC]: { 'fiat-in': own(), 'transfer-out': own() } },
+      baseCurrency: 'eur',
+      fileHash: 'h',
+      sources: [{ id: 's1', label: 'Bitpanda' }],
+    });
+    expect(r.user).toBeUndefined();
+    expect(r.rows.map((x) => x.verdict)).toEqual([
+      'not-reported',
+      'not-reported',
+    ]);
+    expect(r.unrecognised).toEqual([]);
+    expect(r.summary['not-reported']).toBe(2);
   });
 
   it('ignores a missing reported transaction count', () => {
@@ -272,6 +316,15 @@ describe('reconcile structure', () => {
     expect(r.summary['not-recognised']).toBe(1);
   });
 
+  it('lists a reported fiat currency apart, not as unrecognised', () => {
+    const eur: CarfAssetReport = { name: 'EUR', blocks: [block('fiat-in')] };
+    const r = run([eur, { name: 'BTC', blocks: [block('fiat-in')] }], {});
+    expect(r.fiat).toEqual([eur]);
+    expect(r.unrecognised).toEqual([]);
+    expect(r.summary['not-recognised']).toBe(0);
+    expect(r.rows.map((x) => x.symbol)).toEqual(['BTC']);
+  });
+
   it('counts verdicts in the summary', () => {
     const r = run(
       [
@@ -340,7 +393,7 @@ describe('reconcile structure', () => {
 });
 
 const HEADER =
-  'asset,category,verdict,reportedTransactions,reportedUnits,reportedAmount,reportedCurrency,ownTransactions,ownUnits,ownAmount,ownFees,deltaTransactions,deltaUnits,deltaAmount,provider,messageRefId,reportingPeriod,fileHash';
+  'asset,category,verdict,reportedTransactions,reportedUnits,reportedAmount,reportedCurrency,ownTransactions,ownUnits,ownAmount,ownFees,ownFiatFees,deltaTransactions,deltaUnits,deltaAmount,provider,messageRefId,reportingPeriod,fileHash,baseCurrency';
 
 const linesOf = (csv: string): string[] => {
   const lines = csv.split('\r\n');
@@ -358,7 +411,7 @@ describe('reconciliationToCsv', () => {
           blocks: [block('wallet', { transactions: undefined })],
         },
       ],
-      { [BTC]: { 'fiat-in': own({ fees: '10000' }) } },
+      { [BTC]: { 'fiat-in': own({ fees: '10000', fiatFees: '2.5' }) } },
     );
     const lines = linesOf(reconciliationToCsv(r));
     expect(lines[0]).toBe(HEADER);
@@ -374,6 +427,7 @@ describe('reconciliationToCsv', () => {
       '0.25',
       '15000',
       '0.0001',
+      '2.5',
       '1',
       '0',
       '0',
@@ -381,6 +435,7 @@ describe('reconciliationToCsv', () => {
       'M1',
       '2026-12-31',
       'abc123',
+      'EUR',
     ]);
     expect(lines[2].split(',')).toEqual([
       'NIGHT',
@@ -397,12 +452,37 @@ describe('reconciliationToCsv', () => {
       '',
       '',
       '',
+      '',
       'Bitpanda GmbH',
       'M1',
       '2026-12-31',
       'abc123',
+      'EUR',
     ]);
     expect(lines).toHaveLength(3);
+  });
+
+  it('writes one line for an unrecognised asset without blocks, and the fiat listed', () => {
+    const r = run(
+      [
+        { name: 'MYSTERY', blocks: [] },
+        { name: 'USD', blocks: [block('fiat-in', { currency: 'USD' })] },
+      ],
+      {},
+    );
+    const lines = linesOf(reconciliationToCsv(r));
+    expect(lines).toHaveLength(3);
+    expect(lines[1].split(',').slice(0, 4)).toEqual([
+      'MYSTERY',
+      '',
+      'not-recognised',
+      '',
+    ]);
+    expect(lines[2].split(',').slice(0, 3)).toEqual([
+      'USD',
+      'fiat-in',
+      'not-crypto',
+    ]);
   });
 
   it('quotes commas and quotes and ends lines with CRLF', () => {
@@ -421,6 +501,74 @@ describe('reconciliationToCsv', () => {
     expect(csv).toContain('"Acme, ""Ltd"""');
     expect(csv.endsWith('\r\n')).toBe(true);
     expect(csv.split('\r\n')[0]).toBe(HEADER);
+  });
+});
+
+describe('aggregate and reconcile together', () => {
+  it('compares the disposed side of a swap whose acquired side has no value', () => {
+    const ADA = 'cardano:lovelace';
+    const swap = ledgerEvent({
+      id: 'swap',
+      externalId: 'swap',
+      timestamp: Date.UTC(2026, 4, 1, 12),
+      kind: 'trade',
+      legs: [
+        {
+          assetId: BTC,
+          amount: '1000000',
+          direction: 'out',
+          venue: 'bitpanda',
+          role: 'principal',
+        },
+        {
+          assetId: ADA,
+          amount: '1000000000',
+          direction: 'in',
+          venue: 'bitpanda',
+          role: 'principal',
+        },
+      ],
+    });
+    const figures = aggregateLedger([swap], {
+      year: 2026,
+      providerVenues: new Set(['bitpanda']),
+      exchangeVenues: new Set(['bitpanda']),
+      baseCurrency: 'eur',
+      valueOf: (id, assetId) =>
+        id === 'swap' && assetId === BTC ? '600' : undefined,
+    });
+    const r = run(
+      [
+        {
+          name: 'ADA',
+          blocks: [
+            block('crypto-in', {
+              transactions: 1,
+              units: '1000.000000',
+              amount: '600.00',
+            }),
+          ],
+        },
+        {
+          name: 'BTC',
+          blocks: [
+            block('crypto-out', {
+              transactions: 1,
+              units: '0.010000',
+              amount: '600.00',
+            }),
+          ],
+        },
+      ],
+      figures,
+    );
+    const byKey = Object.fromEntries(
+      r.rows.map((row) => [`${row.symbol}/${row.category}`, row]),
+    );
+    expect(byKey['ADA/crypto-in'].verdict).toBe('unpriced');
+    expect(byKey['ADA/crypto-in'].own?.amount).toBeUndefined();
+    expect(byKey['BTC/crypto-out'].verdict).toBe('match');
+    expect(byKey['BTC/crypto-out'].delta.amount).toBe('0');
   });
 });
 

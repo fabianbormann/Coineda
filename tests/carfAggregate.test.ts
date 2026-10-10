@@ -36,8 +36,8 @@ const options = (
 ): AggregateOptions => ({
   year: 2026,
   providerVenues: new Set(['bitpanda']),
-  ownedVenues: new Set(['bitpanda', 'kraken', 'stake1own']),
-  walletVenues: new Set(['stake1own']),
+  exchangeVenues: new Set(['bitpanda', 'kraken']),
+  baseCurrency: 'eur',
   valueOf: () => undefined,
   ...overrides,
 });
@@ -221,18 +221,34 @@ describe('aggregateLedger', () => {
     ]);
   });
 
-  const withdrawal = (to: string) =>
+  const withdrawal = (to: string, txHash?: string) =>
     event({
       kind: 'transfer',
+      ...(txHash ? { txHash } : {}),
       legs: [
         leg(ADA, '500000000', 'out'),
-        leg(ADA, '500000000', 'in', to),
+        ...(to ? [leg(ADA, '500000000', 'in', to)] : []),
         leg(ADA, '1000000', 'out', 'bitpanda', 'fee'),
       ],
     });
 
-  it('(f) books a withdrawal to the own wallet under transfer-out and wallet', () => {
-    const figures = aggregateLedger([withdrawal('stake1own')], options());
+  /** The receiving side of a cross-source move: its own event, tied to the
+   *  withdrawal only by the transaction hash. */
+  const receipt = (venue: string, txHash: string) =>
+    event({
+      kind: 'transfer',
+      txHash,
+      legs: [
+        leg(ADA, '500000000', 'out', 'addr1provider'),
+        leg(ADA, '500000000', 'in', venue),
+      ],
+    });
+
+  it('(f) counts a withdrawal received by the own chain wallet as a wallet transfer', () => {
+    const figures = aggregateLedger(
+      [withdrawal('', 'h-own'), receipt('stake1own', 'h-own')],
+      options(),
+    );
     expect(figures[ADA]?.['transfer-out']).toMatchObject({
       transactions: 1,
       units: '500000000',
@@ -245,25 +261,139 @@ describe('aggregateLedger', () => {
     expect(figures[ADA]?.wallet).toMatchObject({
       transactions: 1,
       units: '500000000',
+      fees: '1000000',
     });
     expect(figures[ADA]?.['transfer-in']).toBeUndefined();
   });
 
-  it('(g) books a withdrawal to an unknown address under transfer-out only', () => {
-    const figures = aggregateLedger([withdrawal('addr1unknown')], options());
+  it('(g) counts a withdrawal with no linked receipt as a wallet transfer', () => {
+    const figures = aggregateLedger([withdrawal('')], options());
     expect(figures[ADA]?.['transfer-out']?.transactions).toBe(1);
-    expect(figures[ADA]?.wallet).toBeUndefined();
+    expect(figures[ADA]?.wallet?.transactions).toBe(1);
   });
 
-  it('(h) books a move to another owned exchange under transfer-out only', () => {
-    const figures = aggregateLedger([withdrawal('kraken')], options());
-    expect(figures[ADA]?.['transfer-out']?.transactions).toBe(1);
-    expect(figures[ADA]?.wallet).toBeUndefined();
+  it('(h) does not count a move received at another provider as a wallet transfer', () => {
+    const linked = aggregateLedger(
+      [withdrawal('', 'h-kraken'), receipt('kraken', 'h-kraken')],
+      options(),
+    );
+    expect(linked[ADA]?.['transfer-out']?.transactions).toBe(1);
+    expect(linked[ADA]?.wallet).toBeUndefined();
+    // The receipt is linked even when it lies in another year.
+    const early = receipt('kraken', 'h-late');
+    early.timestamp = Date.UTC(2025, 11, 31, 23);
+    const acrossYears = aggregateLedger(
+      [withdrawal('', 'h-late'), early],
+      options(),
+    );
+    expect(acrossYears[ADA]?.wallet).toBeUndefined();
+    // One event carrying both sides.
+    const fused = aggregateLedger([withdrawal('kraken')], options());
+    expect(fused[ADA]?.['transfer-out']?.transactions).toBe(1);
+    expect(fused[ADA]?.wallet).toBeUndefined();
+  });
+
+  it('counts a withdrawal whose hash matches only a wallet receipt as a wallet transfer', () => {
+    const figures = aggregateLedger(
+      [withdrawal('addr1unknown', 'h-x'), receipt('addr1unknown', 'h-x')],
+      options(),
+    );
+    expect(figures[ADA]?.wallet?.transactions).toBe(1);
   });
 
   it('ignores a provider-internal move', () => {
     const figures = aggregateLedger([withdrawal('bitpanda')], options());
     expect(figures).toEqual({});
+  });
+
+  it('counts an event at exactly 2026-01-01T00:00:00Z in 2026', () => {
+    const figures = aggregateLedger(
+      [
+        event({
+          kind: 'reward',
+          rewardKind: 'staking',
+          timestamp: Date.UTC(2026, 0, 1, 0, 0, 0),
+          legs: [leg(ADA, '7500000', 'in')],
+        }),
+      ],
+      options(),
+    );
+    expect(figures[ADA]?.['transfer-in']?.transactions).toBe(1);
+  });
+
+  it('leaves unpriced rewards unpriced in the total and per type', () => {
+    const figures = aggregateLedger(rewards(), options());
+    const cat = figures[ADA]?.['transfer-in'];
+    expect(cat?.transactions).toBe(12);
+    expect(cat?.amount).toBeUndefined();
+    expect(cat?.byType.CARF502?.transactions).toBe(12);
+    expect(cat?.byType.CARF502?.amount).toBeUndefined();
+  });
+
+  it('sums fiat only in the base currency; another fiat currency leaves the amount unpriced', () => {
+    const USD = 'fiat:usd';
+    const figures = aggregateLedger(
+      [
+        event({
+          kind: 'trade',
+          legs: [leg(BTC, '10000000', 'in'), leg(USD, '10000', 'out')],
+        }),
+        event({
+          kind: 'trade',
+          legs: [
+            leg(BTC, '5000000', 'in'),
+            leg(EUR, '4600', 'out'),
+            leg(EUR, '5', 'out', 'bitpanda', 'fee'),
+          ],
+        }),
+      ],
+      options(),
+    );
+    const cat = figures[BTC]?.['fiat-in'];
+    expect(cat?.transactions).toBe(2);
+    expect(cat?.units).toBe('15000000');
+    expect(cat?.amount).toBeUndefined();
+
+    const eurOnly = aggregateLedger(
+      [
+        event({
+          kind: 'trade',
+          legs: [
+            leg(BTC, '5000000', 'in'),
+            leg(EUR, '4600', 'out'),
+            leg(EUR, '5', 'out', 'bitpanda', 'fee'),
+          ],
+        }),
+      ],
+      options({ baseCurrency: 'EUR', valueOf: () => undefined }),
+    );
+    expect(eurOnly[BTC]?.['fiat-in']).toMatchObject({
+      amount: '4600',
+      fiatFees: '5',
+    });
+  });
+
+  it('leaves the fiat amount and fees unknown when the crypto side holds two assets', () => {
+    const figures = aggregateLedger(
+      [
+        event({
+          kind: 'trade',
+          legs: [
+            leg(BTC, '1000000', 'in'),
+            leg(ADA, '10000000', 'in'),
+            leg(EUR, '700', 'out'),
+            leg(EUR, '2', 'out', 'bitpanda', 'fee'),
+          ],
+        }),
+      ],
+      options(),
+    );
+    for (const assetId of [BTC, ADA]) {
+      const cat = figures[assetId]?.['fiat-in'];
+      expect(cat?.transactions).toBe(1);
+      expect(cat?.amount).toBeUndefined();
+      expect(cat?.fiatFees).toBeUndefined();
+    }
   });
 
   it('(i) ignores events outside the year or away from the provider', () => {

@@ -18,7 +18,6 @@ import { CarfParseError, parseCarf } from '@/carf/parse';
 import { reconcile, type CarfReconciliation } from '@/carf/reconcile';
 import type { CarfMessage, CarfUser } from '@/carf/types';
 import type { LedgerEvent, SourceRecord } from '@/ledger/types';
-import { findModule } from '@/sources/registry';
 import type { SourceDirectoryEntry } from '@/tax/sourceDirectory';
 
 type Props = {
@@ -187,14 +186,16 @@ export const CarfReconcileDialog = ({
     );
 
   const user = message && userIndex >= 0 ? message.users[userIndex] : null;
+  // A message that names no user (CARF703) compares against nothing: every
+  // own figure is then "not reported".
+  const noUsers = message !== null && message.users.length === 0;
   const canCompare =
     !busy &&
-    user !== null &&
-    user.docTypeIndic !== DELETED &&
-    selected.length > 0;
+    selected.length > 0 &&
+    (noUsers || (user !== null && user.docTypeIndic !== DELETED));
 
   const compare = async () => {
-    if (!message || !user || !canCompare) {
+    if (!message || !canCompare) {
       return;
     }
     setBusy(true);
@@ -210,28 +211,29 @@ export const CarfReconcileDialog = ({
           )
           .flatMap((entry) => entry.venues),
       );
-      const ownedVenues = new Set(directory.flatMap((entry) => entry.venues));
-      const walletVenues = new Set(
+      // Every provider-like source of the client (exchange and file sources,
+      // not wallet exports): a transfer received there stayed with a provider.
+      const exchangeVenues = new Set(
         directory
           .filter(
             (entry) =>
               entry.moduleId !== null &&
-              findModule(entry.moduleId)?.manifest.kind === 'chain',
+              isProviderSource({ moduleId: entry.moduleId }),
           )
           .flatMap((entry) => entry.venues),
       );
       const own = aggregateLedger(events, {
         year: taxYear,
         providerVenues,
-        ownedVenues,
-        walletVenues,
+        exchangeVenues,
+        baseCurrency,
         valueOf,
       });
       const fileHash = await sha256Hex(text);
       onReconciled(
         reconcile({
           message,
-          user,
+          ...(user ? { user } : {}),
           own,
           baseCurrency,
           fileHash,
@@ -292,9 +294,12 @@ export const CarfReconcileDialog = ({
               <legend className="text-sm font-medium">
                 {t('Who in this report is the client?')}
               </legend>
-              {message.users.length === 0 && (
+              {noUsers && (
                 <p className="text-sm text-muted-foreground">
-                  {t('This message lists no user.')}
+                  {t(
+                    'This provider reported nothing about any user for {{year}}.',
+                    { year: message.year },
+                  )}
                 </p>
               )}
               {message.users.map((candidate, index) => {

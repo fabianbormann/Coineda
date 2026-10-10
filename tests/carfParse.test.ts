@@ -245,6 +245,29 @@ describe('parseCarf: refusals', () => {
     );
     expect(parseError(count).params?.element).toBe('NumberofTransactions');
   });
+
+  it('refuses a negative number of units', () => {
+    const negative = fixture('plain.xml').replace(
+      '<carf:NumberofUnits>0.250000</carf:NumberofUnits>',
+      '<carf:NumberofUnits>-0.250000</carf:NumberofUnits>',
+    );
+    const error = parseError(negative);
+    expect(error.key).toBe('Invalid number in {{element}}');
+    expect(error.params).toEqual({
+      element: 'NumberofUnits',
+      value: '-0.250000',
+    });
+  });
+
+  it('refuses an amount without a currency code', () => {
+    const missing = fixture('plain.xml').replace(
+      '<carf:Amount currCode="EUR">15000.00</carf:Amount>',
+      '<carf:Amount>15000.00</carf:Amount>',
+    );
+    const error = parseError(missing);
+    expect(error.key).toBe('The CARF message has no {{element}}.');
+    expect(error.params).toEqual({ element: 'Amount@currCode' });
+  });
 });
 
 describe('CARF codes', () => {

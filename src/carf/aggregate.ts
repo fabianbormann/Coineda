@@ -17,7 +17,8 @@ export type OwnTyped = { transactions: number; units: string; amount?: string };
 
 /** A category's totals across types, its fee legs in the category asset at
  *  the provider (base units), for the two fiat categories the fee legs in
- *  fiat (`fiatFees`), and for the transfer categories the split by CARF
+ *  the base currency (`fiatFees`; undefined when a fee was in another fiat
+ *  currency or the fiat side was shared by two assets), and for the transfer categories the split by CARF
  *  transfer type (`byType`, keyed by the CARF code). */
 export type OwnCategory = OwnTyped & {
   fees: string;
@@ -36,11 +37,13 @@ export type AggregateOptions = {
   year: number;
   /** The venues of the sources the report's provider stands for. */
   providerVenues: Set<string>;
-  /** Every venue the client owns (carried for the caller; the categories
-   *  below need only the provider and wallet venues). */
-  ownedVenues: Set<string>;
-  /** The owned venues of chain sources: the client's own wallets. */
-  walletVenues: Set<string>;
+  /** The venues of every provider-like source the client has (exchange and
+   *  file sources, not wallet exports): a transfer that arrives at one of
+   *  them stayed with a provider and is not a CARF TransferWallet. */
+  exchangeVenues: Set<string>;
+  /** The report's base currency (any case): fiat amounts are summed only in
+   *  `fiat:<baseCurrency>`. */
+  baseCurrency: string;
   /** The value of an event's leg in an asset, in the base currency. */
   valueOf: (sourceEventId: string, assetId: string) => string | undefined;
 };
@@ -70,7 +73,8 @@ type Entry = {
   units: string;
   amount: string | null;
   fees?: string;
-  fiatFees?: string;
+  /** `null`: the fiat fees cannot be stated in the base currency. */
+  fiatFees?: string | null;
 };
 
 const addTyped = (target: OwnTyped, entry: Entry): void => {
@@ -95,6 +99,36 @@ export const aggregateLedger = (
 ): OwnFigures => {
   const figures: OwnFigures = {};
   const atProvider = (leg: Leg) => options.providerVenues.has(leg.venue);
+  const baseFiat = `fiat:${options.baseCurrency.toLowerCase()}`;
+  const atExchange = (leg: Leg) => options.exchangeVenues.has(leg.venue);
+
+  // A cross-source move is two events, the withdrawal and the receipt, tied
+  // only by `txHash` (see ledger/transfers.ts). Hash → ids of the events
+  // (any year) with a principal in-leg at an exchange venue.
+  const exchangeArrivals = new Map<string, string[]>();
+  for (const event of events) {
+    if (!event.txHash) continue;
+    const arrives = event.legs.some(
+      (leg) =>
+        leg.role === 'principal' && leg.direction === 'in' && atExchange(leg),
+    );
+    if (arrives) {
+      const ids = exchangeArrivals.get(event.txHash) ?? [];
+      ids.push(event.id);
+      exchangeArrivals.set(event.txHash, ids);
+    }
+  }
+  /** CARF TransferWallet: a transfer out of the provider to a wallet not
+   *  known to belong to a provider. Without a hash link to a receipt at an
+   *  exchange venue (or an in-leg at one in the event itself), that is what
+   *  it is: the user's own wallet or anybody else's. */
+  const toProvider = (event: LedgerEvent): boolean =>
+    event.legs.some((leg) => leg.direction === 'in' && atExchange(leg)) ||
+    (event.txHash !== undefined &&
+      (exchangeArrivals.get(event.txHash) ?? []).some((id) => id !== event.id));
+
+  // Fiat categories whose fees cannot be stated in the base currency.
+  const unknownFiatFees = new WeakSet<OwnCategory>();
 
   const book = (
     assetId: string,
@@ -112,7 +146,10 @@ export const aggregateLedger = (
     });
     addTyped(cat, entry);
     if (entry.fees) cat.fees = addAmounts(cat.fees, entry.fees);
-    if (fiat && entry.fiatFees) {
+    if (fiat && entry.fiatFees === null) {
+      unknownFiatFees.add(cat);
+      cat.fiatFees = undefined;
+    } else if (fiat && entry.fiatFees && !unknownFiatFees.has(cat)) {
       cat.fiatFees = addAmounts(cat.fiatFees ?? '0', entry.fiatFees);
     }
     if (type) addTyped((cat.byType[type] ??= emptyTyped()), entry);
@@ -136,10 +173,14 @@ export const aggregateLedger = (
       );
     const fees = here.filter((leg) => leg.role === 'fee');
     const feesIn = (assetId: string) => sumOf(fees, assetId);
+    /** Sum of fiat legs, or null when one is not in the base currency
+     *  (adding USD to EUR would state a figure that does not exist). */
+    const baseSum = (legs: Leg[]): string | null =>
+      legs.every((leg) => leg.assetId === baseFiat)
+        ? sumAmounts(legs.map((leg) => leg.amount))
+        : null;
     const fiatFees = () =>
-      sumAmounts(
-        fees.filter((leg) => isFiatAsset(leg.assetId)).map((l) => l.amount),
-      );
+      baseSum(fees.filter((leg) => isFiatAsset(leg.assetId)));
     const assetsOf = (legs: Leg[]) => [
       ...new Set(legs.map((leg) => leg.assetId).filter(isCrypto)),
     ];
@@ -152,24 +193,29 @@ export const aggregateLedger = (
       const cryptoOut = assetsOf(outs);
       const fiatOut = outs.filter((leg) => isFiatAsset(leg.assetId));
       const fiatIn = ins.filter((leg) => isFiatAsset(leg.assetId));
+      // The fiat side belongs to one crypto asset only when there is exactly
+      // one: with two, how the fiat splits between them is unknown, so the
+      // amount and the fiat fees stay unknown instead of being booked twice.
       if (fiatOut.length > 0 && cryptoIn.length > 0) {
-        const amount = sumAmounts(fiatOut.map((leg) => leg.amount));
+        const single = cryptoIn.length === 1;
+        const amount = single ? baseSum(fiatOut) : null;
         for (const assetId of cryptoIn) {
           book(assetId, 'fiat-in', {
             units: sumOf(ins, assetId),
             amount,
             fees: feesIn(assetId),
-            fiatFees: fiatFees(),
+            fiatFees: single ? fiatFees() : null,
           });
         }
       } else if (fiatIn.length > 0 && cryptoOut.length > 0) {
-        const amount = sumAmounts(fiatIn.map((leg) => leg.amount));
+        const single = cryptoOut.length === 1;
+        const amount = single ? baseSum(fiatIn) : null;
         for (const assetId of cryptoOut) {
           book(assetId, 'fiat-out', {
             units: sumOf(outs, assetId),
             amount,
             fees: feesIn(assetId),
-            fiatFees: fiatFees(),
+            fiatFees: single ? fiatFees() : null,
           });
         }
       } else if (cryptoIn.length > 0 && cryptoOut.length > 0) {
@@ -217,10 +263,7 @@ export const aggregateLedger = (
           );
         }
       } else if (outs.length > 0 && ins.length === 0) {
-        const toWallet = event.legs.some(
-          (leg) =>
-            leg.direction === 'in' && options.walletVenues.has(leg.venue),
-        );
+        const toWallet = !toProvider(event);
         for (const assetId of assetsOf(outs)) {
           const entry: Entry = {
             units: sumOf(outs, assetId),

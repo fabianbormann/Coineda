@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveCarfAsset } from '../src/carf/assets';
+import { isCarfFiat, resolveCarfAsset } from '../src/carf/assets';
 import {
   guessProviderSources,
   isProviderSource,
@@ -25,6 +25,18 @@ describe('resolveCarfAsset', () => {
 
   it.each(['NIGHT', 'EUR', 'USD', 'XYZNOPE', ''])('%s is undefined', (n) => {
     expect(resolveCarfAsset(n)).toBeUndefined();
+  });
+
+  it('refuses an exact fiat asset id', () => {
+    expect(resolveCarfAsset('fiat:eur')).toBeUndefined();
+  });
+
+  it('tells a listed fiat currency apart from an unknown name', () => {
+    expect(isCarfFiat('EUR')).toBe(true);
+    expect(isCarfFiat('fiat:usd')).toBe(true);
+    expect(isCarfFiat('BTC')).toBe(false);
+    expect(isCarfFiat('XYZNOPE')).toBe(false);
+    expect(isCarfFiat('NIGHT')).toBe(false);
   });
 });
 
@@ -60,6 +72,10 @@ describe('isProviderSource', () => {
     expect(isProviderSource(rec('bitpanda'))).toBe(true);
     expect(isProviderSource(rec('kraken-csv'))).toBe(true);
     expect(isProviderSource(rec('cardano-yaci'))).toBe(false);
+    expect(isProviderSource(rec('bitcoin-esplora'))).toBe(false);
     expect(isProviderSource(rec('nope'))).toBe(false);
+  });
+  it('is false for a Ledger Live export: that is a wallet, not a provider', () => {
+    expect(isProviderSource(rec('ledger-live-csv'))).toBe(false);
   });
 });

@@ -26,15 +26,20 @@ export const guessProviderSources = (
     .map((s) => s.id);
 };
 
+/** File modules that export a self-custody wallet, not a provider account. */
+const WALLET_FILE_MODULES = new Set(['ledger-live-csv']);
+
 /**
  * True for sources of an exchange or file module (what a CARF provider can
- * have reported on); false for chain modules and unknown module ids. Looks
- * the module up in both registries, so no field callback is needed.
+ * have reported on); false for chain modules, wallet exports such as Ledger
+ * Live and unknown module ids. Looks the module up in both registries, so no
+ * field callback is needed.
  */
 export const isProviderSource = (
   source: Pick<SourceRecord, 'moduleId'>,
 ): boolean => {
   const pull = findModule(source.moduleId);
   if (pull) return pull.manifest.kind === 'exchange';
+  if (WALLET_FILE_MODULES.has(source.moduleId)) return false;
   return findFileModule(source.moduleId) !== undefined;
 };

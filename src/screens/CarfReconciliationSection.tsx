@@ -18,7 +18,7 @@ export const CATEGORY_LABELS: Record<CarfCategory, string> = {
   'crypto-out': 'Disposals against crypto',
   'transfer-in': 'Transfers in',
   'transfer-out': 'Transfers out',
-  wallet: 'Transfers to own wallets',
+  wallet: 'Transfers to wallets outside providers',
   rrpt: 'Retail payments',
 };
 
@@ -208,21 +208,29 @@ export const CarfReconciliationSection = ({
           </p>
           <p>
             <span className="font-medium">{t('User')}: </span>
-            {r.user.name}
-            {r.user.tins.length > 0 && (
+            {r.user ? (
               <>
+                {r.user.name}
+                {r.user.tins.length > 0 && (
+                  <>
+                    {' · '}
+                    <span className="font-medium">{t('TIN')}: </span>
+                    {r.user.tins
+                      .map((tin) =>
+                        tin.issuedBy
+                          ? `${tin.value} (${tin.issuedBy})`
+                          : tin.value,
+                      )
+                      .join(', ')}
+                  </>
+                )}
                 {' · '}
-                <span className="font-medium">{t('TIN')}: </span>
-                {r.user.tins
-                  .map((tin) =>
-                    tin.issuedBy ? `${tin.value} (${tin.issuedBy})` : tin.value,
-                  )
-                  .join(', ')}
+                <span className="font-medium">DocRefId: </span>
+                {r.user.docRefId}
               </>
+            ) : (
+              t('No user reported')
             )}
-            {' · '}
-            <span className="font-medium">DocRefId: </span>
-            {r.user.docRefId}
           </p>
           <p>
             <span className="font-medium">{t('Compared with')}: </span>
