@@ -90,6 +90,7 @@
       "build/**/*",
       "node_modules/**/*",
       "public/electron.js",
+      "public/csp.json",
       "public/icons/**/*",
       "LICENSE"
     ],

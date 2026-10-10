@@ -1,6 +1,15 @@
-const { app, BrowserWindow, nativeImage, protocol, net } = require('electron');
+const {
+  app,
+  BrowserWindow,
+  nativeImage,
+  protocol,
+  net,
+  shell,
+} = require('electron');
 const path = require('path');
 const url = require('url');
+// The one Content-Security-Policy, shared with the PWA (see vite.config.ts).
+const { policy } = require('./csp.json');
 
 // This file lives at "public/electron.js" both in the repo and inside the
 // packaged app (electron-builder's `files` config keeps that path, see
@@ -46,8 +55,30 @@ function createWindow() {
     icon: image,
     webPreferences: {
       devTools: isDev,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
     },
   });
+
+  // External links open in the user's browser, never in an app window.
+  mainWindow.webContents.setWindowOpenHandler(({ url: target }) => {
+    try {
+      const { protocol: proto } = new URL(target);
+      if (['http:', 'https:'].includes(proto)) shell.openExternal(target);
+    } catch {
+      // not a URL: deny silently
+    }
+    return { action: 'deny' };
+  });
+  mainWindow.webContents.on('will-navigate', (event, target) => {
+    const allowed = isDev ? 'http://localhost:3000' : `${APP_SCHEME}://app/`;
+    if (!target.startsWith(allowed)) event.preventDefault();
+  });
+  mainWindow.webContents.on('will-attach-webview', (event) =>
+    event.preventDefault(),
+  );
 
   mainWindow.setMenu(null);
   mainWindow.loadURL(
@@ -57,7 +88,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  protocol.handle(APP_SCHEME, (request) => {
+  protocol.handle(APP_SCHEME, async (request) => {
     const { host, pathname } = new URL(request.url);
 
     // The host is the "app" in coineda://app/index.html. Without this check
@@ -98,7 +129,10 @@ app.whenReady().then(() => {
       return new Response('Forbidden', { status: 403 });
     }
 
-    return net.fetch(url.pathToFileURL(pathToServe).toString());
+    const response = await net.fetch(url.pathToFileURL(pathToServe).toString());
+    const headers = new Headers(response.headers);
+    headers.set('Content-Security-Policy', policy);
+    return new Response(response.body, { status: response.status, headers });
   });
 
   createWindow();

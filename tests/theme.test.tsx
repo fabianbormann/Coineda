@@ -113,30 +113,31 @@ describe('pre-paint theme script', () => {
     path.join(__dirname, '..', 'index.html'),
     'utf8',
   );
+  const script = fs.readFileSync(
+    path.join(__dirname, '..', 'public', 'theme-init.js'),
+    'utf8',
+  );
 
-  it('runs inline, before the module bundle', () => {
-    const inlineAt = html.indexOf('coineda.theme');
+  it('loads as a file (CSP forbids inline), before the module bundle', () => {
+    const initAt = html.indexOf('src="./theme-init.js"');
     const moduleAt = html.indexOf('src="/src/index.tsx"');
-    expect(inlineAt).toBeGreaterThan(-1);
+    expect(initAt).toBeGreaterThan(-1);
     expect(moduleAt).toBeGreaterThan(-1);
-    expect(inlineAt).toBeLessThan(moduleAt);
+    expect(initAt).toBeLessThan(moduleAt);
   });
 
   it('uses the same storage key as ThemeProvider', () => {
-    expect(html).toContain(THEME_STORAGE_KEY);
+    expect(script).toContain(THEME_STORAGE_KEY);
   });
 });
 
 describe('pre-paint theme script logic', () => {
   // Extracted rather than re-implemented, so this test exercises the exact
-  // code index.html ships, not a copy that could drift from it. The first
-  // bare `<script>` tag is the inline IIFE; the module script tag carries
-  // a `type="module"` attribute, so it does not match this pattern.
-  const html = fs.readFileSync(
-    path.join(__dirname, '..', 'index.html'),
+  // code the app ships (public/theme-init.js), not a copy that could drift.
+  const scriptBody = fs.readFileSync(
+    path.join(__dirname, '..', 'public', 'theme-init.js'),
     'utf8',
   );
-  const scriptBody = html.match(/<script>([\s\S]*?)<\/script>/)?.[1] ?? '';
 
   const mockMatchMedia = (matches: boolean) => {
     vi.stubGlobal(
