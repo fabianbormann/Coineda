@@ -423,12 +423,11 @@ export const parseMapped = (
     }
 
     if (row.counterAmount !== '') {
-      // Zero would book a disposal for nothing (a fabricated loss of the
-      // whole cost basis); a negative counter contradicts the row.
-      if (
-        isNegative(row.counterAmount) ||
-        !safeBig(row.counterAmount, m).gt(0)
-      ) {
+      // Taken by magnitude: sign-based files carry the counter with the
+      // opposite sign to the principal, and its direction is always the
+      // principal's opposite anyway. Only zero is refused: it would book a
+      // disposal for nothing (a fabricated loss of the whole cost basis).
+      if (!safeBig(absOf(row.counterAmount), m).gt(0)) {
         throw new AmountError(row.counterAmount);
       }
       const counter = leg(counterId, row.counterAmount, direction, 'principal');

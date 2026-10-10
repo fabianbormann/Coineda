@@ -564,25 +564,39 @@ describe('fix wave', () => {
     });
   });
 
-  it.each(['0', '-100', '0.00'])(
+  const countered = (qty: string, amount: string) =>
+    parseMapped(
+      `time,symbol,qty,cc,ca\n2024-05-02T10:00:00Z,BTC,${qty},EUR,${amount}\n`,
+      {
+        ...plain,
+        columns: {
+          ...plain.columns,
+          counterAsset: 'cc',
+          counterAmount: 'ca',
+        },
+        kinds: { '*': 'trade' },
+      },
+    );
+
+  it.each(['0', '0.00', '-0'])(
     'skips a row whose counter amount is %s',
     (amount) => {
-      const r = parseMapped(
-        `time,symbol,qty,cc,ca\n2024-05-02T10:00:00Z,BTC,0.1,EUR,${amount}\n`,
-        {
-          ...plain,
-          columns: {
-            ...plain.columns,
-            counterAsset: 'cc',
-            counterAmount: 'ca',
-          },
-          kinds: { '*': 'trade' },
-        },
-      );
+      const r = countered('0.1', amount);
       expect(r.events).toHaveLength(0);
       expect(r.skipped.join('\n')).toMatch(/unparseable amounts/);
     },
   );
+
+  it('takes a signed counter amount by magnitude, opposite the principal', () => {
+    expect(shape(countered('0.1', '-4500').events[0].legs)).toEqual([
+      ['bitcoin:native', '10000000', 'in', 'principal'],
+      ['fiat:eur', '4500', 'out', 'principal'],
+    ]);
+    expect(shape(countered('-0.1', '+4500').events[0].legs)).toEqual([
+      ['bitcoin:native', '10000000', 'out', 'principal'],
+      ['fiat:eur', '4500', 'in', 'principal'],
+    ]);
+  });
 
   it('skips a row whose price times amount rounds to no fiat at all', () => {
     const r = parseMapped(
