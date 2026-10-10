@@ -227,6 +227,11 @@ describe('downloading the register', () => {
     });
     expect(csvButton.closest('.print\\:hidden')).not.toBeNull();
     expect(jsonButton.closest('.print\\:hidden')).not.toBeNull();
+    expect(
+      screen
+        .getByText(/in excel, open the csv via data → from text\/csv/i)
+        .closest('.print\\:hidden'),
+    ).not.toBeNull();
 
     await userEvent.click(csvButton);
     expect(createObjectURL).toHaveBeenCalledTimes(1);
@@ -1443,6 +1448,44 @@ describe('where the figures come from', () => {
     expect(directory.textContent).toMatch(/addresses and keys/i);
     expect(directory.textContent).toContain('addr1qpublicidentity');
     expect(directory.textContent).not.toContain('proj-secret-value');
+  });
+
+  it('warns that an xpub reveals every address, only when one is printed', async () => {
+    await putSource({
+      id: 's1',
+      moduleId: 'bitcoin-esplora',
+      label: 'My bitcoin',
+      config: { xpub: 'zpub6publickey' },
+    });
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+
+    const directory = await screen.findByTestId('source-directory');
+    expect(directory.textContent).toContain('zpub6publickey');
+    expect(directory.textContent).toMatch(
+      /an extended public key reveals every address of the wallet/i,
+    );
+  });
+
+  it('gives no xpub warning for a plain address', async () => {
+    await putSource({
+      id: 's1',
+      moduleId: 'cardano-blockfrost',
+      label: 'My wallet',
+      config: { projectId: 'p', address: 'addr1qpublicidentity' },
+    });
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+
+    const directory = await screen.findByTestId('source-directory');
+    expect(directory.textContent).toContain('addr1qpublicidentity');
+    expect(directory.textContent).not.toMatch(/extended public key/i);
   });
 
   it('prints no identities line for a CSV source', async () => {

@@ -59,14 +59,27 @@ const costsOf = (event: TaxEvent): string | undefined => {
  * guess; an unknown source id gives an empty label. The currency rides
  * along so every row names the unit its `value` and `costs` are in.
  */
-type RowContext = { sourceLabelById: Map<string, string>; currency: string };
+type RowContext = {
+  year: number;
+  fingerprint: string;
+  sourceLabelById: Map<string, string>;
+  currency: string;
+};
 
-type RowOrigin = { externalId?: string; source: string; currency: string };
+type RowOrigin = {
+  year: number;
+  fingerprint: string;
+  externalId?: string;
+  source: string;
+  currency: string;
+};
 
 const provenance = (
   event: LedgerEvent | undefined,
   context: RowContext,
 ): RowOrigin => ({
+  year: context.year,
+  fingerprint: context.fingerprint,
   ...(event === undefined ? {} : { externalId: event.externalId }),
   source:
     event === undefined
@@ -102,8 +115,12 @@ const internalTransferRows = (
   events: LedgerEvent[],
   context: RowContext,
 ): RegisterRow[] => {
-  const sends = (event: LedgerEvent) =>
-    event.legs.some((leg) => leg.direction === 'out');
+  // Principal legs only: a receipt that paid a network fee has an `out`
+  // leg too, and counting it as a sender would print the one movement
+  // twice.
+  const isPrincipalOut = (leg: LedgerEvent['legs'][number]) =>
+    leg.direction === 'out' && leg.role === 'principal';
+  const sends = (event: LedgerEvent) => event.legs.some(isPrincipalOut);
   const senderHashes = new Set(
     events
       .filter((event) => sends(event) && event.txHash !== undefined)
@@ -118,12 +135,7 @@ const internalTransferRows = (
     ) {
       continue;
     }
-    const out =
-      event.legs.find(
-        (leg) => leg.direction === 'out' && leg.role === 'principal',
-      ) ??
-      event.legs.find((leg) => leg.direction === 'out') ??
-      event.legs[0];
+    const out = event.legs.find(isPrincipalOut) ?? event.legs[0];
     if (out === undefined) {
       continue;
     }
@@ -176,8 +188,12 @@ export const buildRegister = (input: {
   sourceLabelById: Map<string, string>;
   /** The report's base currency; written upper-case on every row. */
   currency: string;
+  /** The ledger fingerprint the report was built from; on every row. */
+  fingerprint: string;
 }): RegisterRow[] => {
   const context: RowContext = {
+    year: input.year,
+    fingerprint: input.fingerprint,
     sourceLabelById: input.sourceLabelById,
     currency: input.currency.toUpperCase(),
   };
@@ -271,6 +287,10 @@ export const buildRegister = (input: {
 };
 
 const COLUMNS: { key: keyof RegisterRow; header: string }[] = [
+  // First, and on every row: a file renamed or a row pasted elsewhere still
+  // names the year and the exact ledger it belongs to.
+  { key: 'year', header: 'year' },
+  { key: 'fingerprint', header: 'fingerprint' },
   { key: 'date', header: 'date' },
   { key: 'kind', header: 'kind' },
   { key: 'sourceEventId', header: 'sourceEventId' },
@@ -318,7 +338,10 @@ export const registerToCsv = (rows: RegisterRow[]): string => {
   const lines = [
     COLUMNS.map((column) => column.header).join(','),
     ...rows.map((row) =>
-      COLUMNS.map((column) => cell(row[column.key])).join(','),
+      COLUMNS.map((column) => {
+        const value = row[column.key];
+        return cell(value === undefined ? undefined : String(value));
+      }).join(','),
     ),
   ];
   return `${BOM}${lines.join('\r\n')}\r\n`;
@@ -364,6 +387,7 @@ export const reportToJson = (
               moduleId: entry.moduleId,
               venues: entry.venues,
               identities: entry.identities,
+              hasXpub: entry.hasXpub,
               eventCount: entry.eventCount,
               ...(entry.firstAt === undefined
                 ? {}

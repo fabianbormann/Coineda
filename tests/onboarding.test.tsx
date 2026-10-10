@@ -231,6 +231,38 @@ describe('importing a checkpoint', () => {
     expect(onComplete).toHaveBeenCalled();
   });
 
+  it('names the restored fingerprint as the events of the checkpoint', async () => {
+    renderFlow();
+    const secret = generateTransferSecret();
+    const sealed = await sealCheckpoint(
+      { ...emptyCheckpoint, fingerprint: 'ab'.repeat(32) },
+      secret,
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /have a checkpoint/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /from a file/i }),
+    );
+    await userEvent.upload(
+      await screen.findByLabelText(/checkpoint file/i),
+      sealedToFile(sealed, 'checkpoint.coineda'),
+    );
+    await userEvent.type(
+      await screen.findByLabelText(/transfer secret/i),
+      secret,
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /restore/i }),
+    );
+
+    expect(
+      await screen.findByText(
+        /fingerprint of the events in this checkpoint: abababababab/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('applies the restored language, instead of storing it and staying in English', async () => {
     // Nothing reads settings.language back on boot, and this milestone
     // ships no settings screen, so a restore that only STORED the language

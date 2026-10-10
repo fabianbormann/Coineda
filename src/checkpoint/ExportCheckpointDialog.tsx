@@ -301,7 +301,8 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
               {ready.fingerprint !== '' && (
                 <details className="text-sm text-muted-foreground">
                   <summary className="cursor-pointer">
-                    {t('Fingerprint')}: {shortFingerprint(ready.fingerprint)}
+                    {t('Fingerprint of the events in this checkpoint')}:{' '}
+                    {shortFingerprint(ready.fingerprint)}
                   </summary>
                   <p className="mt-1 font-mono text-xs break-all select-all">
                     {ready.fingerprint}

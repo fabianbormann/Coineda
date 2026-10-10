@@ -23,6 +23,9 @@ export type SourceDirectoryEntry = {
   /** Public wallet identities (addresses, an xpub) from the source's
    *  config; see `publicIdentities`. Empty for orphans and file sources. */
   identities: string[];
+  /** One of `identities` is an extended public key, which reveals every
+   *  address of the wallet; the report says so beside it. */
+  hasXpub: boolean;
   eventCount: number;
   firstAt?: number;
   lastAt?: number;
@@ -58,16 +61,19 @@ const absorb = (into: Accumulated, event: LedgerEvent): void => {
 
 /**
  * The public wallet identities in a source's config, and nothing else.
- * An allow-list by field type: an unknown or missing manifest yields [].
+ * An allow-list by field type: an unknown or missing manifest yields none.
+ * Each identity once, in field order, however often it was entered; and
+ * whether one of them was an xpub, which discloses far more than an address.
  */
 export const publicIdentities = (
   config: Record<string, string>,
   fields: ManifestField[] | undefined,
-): string[] => {
+): { identities: string[]; hasXpub: boolean } => {
   if (!fields) {
-    return [];
+    return { identities: [], hasXpub: false };
   }
   const found: string[] = [];
+  let hasXpub = false;
   for (const field of fields) {
     const value = config[field.name];
     if (typeof value !== 'string') {
@@ -80,10 +86,13 @@ export const publicIdentities = (
         if (line.trim()) found.push(line.trim());
       }
     } else if (field.type === 'text' && field.name === 'xpub') {
-      if (value.trim()) found.push(value.trim());
+      if (value.trim()) {
+        found.push(value.trim());
+        hasXpub = true;
+      }
     }
   }
-  return found;
+  return { identities: [...new Set(found)], hasXpub };
 };
 
 /**
@@ -135,7 +144,7 @@ export const buildSourceDirectory = (
       label: source.label,
       moduleId: source.moduleId,
       venues: [...accumulated.venues].sort(),
-      identities: publicIdentities(source.config, fieldsOf(source.moduleId)),
+      ...publicIdentities(source.config, fieldsOf(source.moduleId)),
       eventCount: accumulated.eventCount,
       firstAt: accumulated.firstAt,
       lastAt: accumulated.lastAt,
@@ -149,6 +158,7 @@ export const buildSourceDirectory = (
       moduleId: null,
       venues: [...orphans.venues].sort(),
       identities: [],
+      hasXpub: false,
       eventCount: orphans.eventCount,
       firstAt: orphans.firstAt,
       lastAt: orphans.lastAt,

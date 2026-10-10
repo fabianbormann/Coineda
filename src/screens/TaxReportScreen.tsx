@@ -1142,7 +1142,7 @@ export const TaxReportScreen = () => {
                       </p>
                       <p className="text-muted-foreground">
                         {t(
-                          'SHA-256 over every recorded event this report read. A checkpoint exported from the same ledger carries the same fingerprint.',
+                          'SHA-256 over every recorded event and confirmed transfer link this report read. A backup file exported from the same ledger carries the same fingerprint.',
                         )}
                       </p>
                       <p className="text-muted-foreground">
@@ -1215,6 +1215,13 @@ export const TaxReportScreen = () => {
                                   </span>
                                 </span>
                               ))}
+                            </p>
+                          )}
+                          {entry.hasXpub && (
+                            <p className="text-xs text-muted-foreground">
+                              {t(
+                                'An extended public key reveals every address of the wallet; hand this report only to those who should know them.',
+                              )}
                             </p>
                           )}
                           <p className="text-muted-foreground">
@@ -2167,6 +2174,11 @@ export const TaxReportScreen = () => {
                   >
                     {t('Download report (JSON)')}
                   </Button>
+                  <span className="text-xs text-muted-foreground">
+                    {t(
+                      'In Excel, open the CSV via Data → From Text/CSV and choose the comma as separator.',
+                    )}
+                  </span>
                 </>
               )}
               <div className="flex-1" />

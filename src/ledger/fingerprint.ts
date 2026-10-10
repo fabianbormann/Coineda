@@ -11,6 +11,12 @@
  * none of which change what happened. A restored checkpoint rewrites the
  * first two, so including them would make a faithful restore look like a
  * different ledger.
+ *
+ * `note` IS included, on purpose: it is part of the recorded event, not of
+ * how it is stored. The cost is that a re-derivation which only rewords
+ * notes changes the fingerprint - the conservative reading, since a
+ * fingerprint that stayed put while recorded text changed would claim two
+ * different records were the same.
  */
 import type { ManualTransferLink } from './manualLinks';
 import type { LedgerEvent } from './types';

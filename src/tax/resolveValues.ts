@@ -36,6 +36,8 @@ const utcDay = (timestamp: number): string =>
   new Date(timestamp).toISOString().slice(0, 10);
 
 const BASE_SOURCE = 'base currency';
+/** Nobody priced it: a zero amount is zero in any currency. */
+const ZERO_SOURCE = 'none (zero amount)';
 
 const pairKey = (assetId: string, date: string): string => `${assetId}|${date}`;
 
@@ -256,7 +258,7 @@ export const resolveValues = async (
     // Nothing is worth nothing on any day: a hard fork's zero cost basis
     // must not need a price source.
     if (isZeroAmount(amount)) {
-      return { value: '0', source: BASE_SOURCE };
+      return { value: '0', source: ZERO_SOURCE };
     }
     if (assetId === baseFiatAssetId) {
       return { value: normaliseAmount(amount), source: BASE_SOURCE };

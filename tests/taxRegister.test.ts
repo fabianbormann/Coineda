@@ -67,6 +67,7 @@ const unpriced: UnresolvedItem = {
   resolutions: [],
 };
 
+const FP = 'cd'.repeat(32);
 const LABELS = new Map([['s', 'Kraken CSV']]);
 
 const build = () =>
@@ -91,6 +92,7 @@ const build = () =>
     unresolved: [unpriced],
     sourceLabelById: LABELS,
     currency: 'eur',
+    fingerprint: FP,
   });
 
 describe('buildRegister', () => {
@@ -136,6 +138,7 @@ describe('unresolved rows', () => {
       unresolved: [item],
       sourceLabelById: LABELS,
       currency: 'eur',
+      fingerprint: FP,
     })[0];
 
   it('says which kind of gap it is and on which tax event', () => {
@@ -190,6 +193,7 @@ describe('tracing a row to its provider', () => {
       unresolved: [{ ...unpriced, sourceEventId: 'gone' }],
       sourceLabelById: LABELS,
       currency: 'eur',
+      fingerprint: FP,
       eventById: new Map([['buy', ledgerEvent('buy', 'kraken-TX1')]]),
     });
     const byKind = new Map(rows.map((row) => [row.kind, row]));
@@ -211,6 +215,7 @@ describe('tracing a row to its provider', () => {
       unresolved: [],
       sourceLabelById: LABELS,
       currency: 'eur',
+      fingerprint: FP,
     });
     expect(rows[0].source).toBe('');
   });
@@ -227,6 +232,7 @@ describe('tracing a row to its provider', () => {
       unresolved: [],
       sourceLabelById: LABELS,
       currency: 'eur',
+      fingerprint: FP,
       eventById: new Map([
         ['a', ledgerEvent('a', 'z-later')],
         ['b', ledgerEvent('b', 'y-earlier')],
@@ -262,7 +268,37 @@ describe('a transfer straddling New Year', () => {
       unresolved: [],
       sourceLabelById: LABELS,
       currency: 'eur',
+      fingerprint: FP,
     });
+
+  it('does not count a receipt with a fee out leg as a second sender', () => {
+    const feePaying: LedgerEvent = {
+      ...receipt,
+      timestamp: Date.UTC(2025, 11, 31, 23, 30),
+      legs: [
+        ...receipt.legs,
+        {
+          assetId: ADA,
+          amount: '170000',
+          direction: 'out',
+          venue: 'wallet-b',
+          role: 'fee',
+        },
+      ],
+    };
+    const rows = buildRegister({
+      year: 2025,
+      valued: [],
+      internalTransfers: [sender, feePaying],
+      residuals: [],
+      unresolved: [],
+      sourceLabelById: LABELS,
+      currency: 'eur',
+      fingerprint: FP,
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].sourceEventId).toBe('send');
+  });
 
   it('is one row in the sender year and none in the receiver year', () => {
     const rows = forYear(2025);
@@ -279,6 +315,8 @@ describe('registerToCsv', () => {
     expect(csv.startsWith(BOM)).toBe(true);
     const { header, rows } = readCsv(csv);
     expect(header).toEqual([
+      'year',
+      'fingerprint',
       'date',
       'kind',
       'sourceEventId',
@@ -302,6 +340,12 @@ describe('registerToCsv', () => {
       'note',
     ]);
     expect(rows).toHaveLength(0);
+  });
+
+  it('ties every row to its year and fingerprint, so a renamed file still says', () => {
+    const { rows } = readCsv(registerToCsv(build()));
+    expect(rows.map((row) => row.year)).toEqual(rows.map(() => '2025'));
+    expect(rows.map((row) => row.fingerprint)).toEqual(rows.map(() => FP));
   });
 
   it('names the currency on every row, upper-case', () => {
@@ -338,6 +382,7 @@ describe('a token name that looks like a formula', () => {
       unresolved: [],
       sourceLabelById: LABELS,
       currency: 'eur',
+      fingerprint: FP,
     });
     expect(rows[0].symbol).toBe(name);
     const csv = registerToCsv(rows);
@@ -389,6 +434,7 @@ describe('reportToJson and filenames', () => {
         moduleId: 'kraken-csv',
         venues: ['kraken'],
         identities: ['addr1qxyz'],
+        hasXpub: false,
         eventCount: 3,
       },
     ];

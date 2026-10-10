@@ -392,7 +392,8 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
         <CardContent className="flex flex-col gap-4 text-sm">
           {fingerprint !== '' && (
             <p className="text-muted-foreground">
-              {t('Fingerprint')}: {shortFingerprint(fingerprint)}
+              {t('Fingerprint of the events in this checkpoint')}:{' '}
+              {shortFingerprint(fingerprint)}
             </p>
           )}
           {omitted > 0 && (

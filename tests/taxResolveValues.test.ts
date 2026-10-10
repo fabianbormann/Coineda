@@ -348,6 +348,12 @@ describe('a zero amount', () => {
     expect(valued.map((e) => e.value)).toEqual(['0', '0']);
     expect(unpriced).toHaveLength(0);
     expect(fetchMock).not.toHaveBeenCalled();
+    // Nobody priced it, and the label says so rather than crediting the
+    // base currency with a figure it did not supply.
+    expect(valued.map((e) => e.priceSource)).toEqual([
+      'consideration · none (zero amount)',
+      'none (zero amount)',
+    ]);
   });
 
   it('still values a non-zero cost on a zero-amount event', async () => {

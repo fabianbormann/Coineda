@@ -463,7 +463,8 @@ export type ReportMethod = {
   valuation: 'utc-day';
   priceSources: string[];
   appVersion: string;
-  /** SHA-256 over every ledger event this report read (src/ledger/fingerprint.ts). */
+  /** SHA-256 over every ledger event and manual transfer link this report
+   *  read (src/ledger/fingerprint.ts). */
   fingerprint: string;
   /** The jurisdiction's rule-set version this report was produced under. */
   rulesVersion: string;
@@ -544,6 +545,10 @@ export type RegisterRowKind =
 
 /** One line of the year's register: every event the report touched. */
 export type RegisterRow = {
+  /** The tax year of the report the row belongs to. */
+  year: number;
+  /** The ledger fingerprint of that report (`ReportMethod.fingerprint`). */
+  fingerprint: string;
   /** ISO-8601, UTC. */
   date: string;
   kind: RegisterRowKind;

@@ -154,16 +154,34 @@ describe('publicIdentities', () => {
   };
 
   it('keeps only addresses, address lists and an xpub', () => {
-    expect(publicIdentities(config, fields)).toEqual([
-      'xpub6abc',
-      'addr1abc',
-      'addr1x',
-      'addr1y',
-    ]);
+    expect(publicIdentities(config, fields)).toEqual({
+      identities: ['xpub6abc', 'addr1abc', 'addr1x', 'addr1y'],
+      hasXpub: true,
+    });
   });
 
   it('yields nothing without a field list', () => {
-    expect(publicIdentities(config, undefined)).toEqual([]);
+    expect(publicIdentities(config, undefined)).toEqual({
+      identities: [],
+      hasXpub: false,
+    });
+  });
+
+  it('names an address given twice only once', () => {
+    const { identities } = publicIdentities(
+      { address: 'addr1abc', more: 'addr1x\naddr1abc\naddr1x' },
+      fields,
+    );
+    expect(identities).toEqual(['addr1abc', 'addr1x']);
+  });
+
+  it('says whether an xpub was among them, and not for a blank one', () => {
+    expect(publicIdentities({ address: 'addr1abc' }, fields).hasXpub).toBe(
+      false,
+    );
+    expect(
+      publicIdentities({ xpub: '   ', address: 'addr1abc' }, fields).hasXpub,
+    ).toBe(false);
   });
 
   it('carries identities on directory entries, none on orphans', () => {
@@ -173,6 +191,8 @@ describe('publicIdentities', () => {
       (id) => (id === 'm' ? fields : undefined),
     );
     expect(entries[0].identities).toContain('addr1abc');
+    expect(entries[0].hasXpub).toBe(true);
+    expect(entries[1].hasXpub).toBe(false);
     expect(JSON.stringify(entries)).not.toContain('secret');
     expect(entries[1].identities).toEqual([]);
   });

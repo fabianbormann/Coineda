@@ -208,6 +208,23 @@ describe('downloading a checkpoint', () => {
  * as a degraded version of the other hid that difference - and hid, in
  * particular, that scanning the code leaves the history behind.
  */
+describe('the fingerprint line', () => {
+  it('names the events of the backup, beside the backup, and only once', async () => {
+    openDialog();
+    await screen.findByAltText(/checkpoint qr code/i);
+    // Once: a handover's fingerprint never matches a report's, so the QR
+    // block offers none.
+    const labels = screen.getAllByText(
+      /fingerprint of the events in this checkpoint/i,
+    );
+    expect(labels).toHaveLength(1);
+    const backupBlock = screen.getByRole('button', {
+      name: /download checkpoint/i,
+    }).parentElement;
+    expect(backupBlock).toContainElement(labels[0]);
+  });
+});
+
 describe('handover beside backup', () => {
   /** A synced event: the kind a handover leaves behind. */
   const syncedEvent = (n: number): LedgerEvent => ({
