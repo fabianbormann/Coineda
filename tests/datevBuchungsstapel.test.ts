@@ -85,6 +85,26 @@ const meta = {
   appVersion: '1.0.0',
 };
 
+describe('postingsFromReport income costs', () => {
+  const withCosts = (value: string, costs?: string): TaxReport => {
+    const base = report([]);
+    return {
+      ...base,
+      income: [{ ...base.income[0], value, ...(costs ? { costs } : {}) }],
+    } as TaxReport;
+  };
+
+  it('posts an income net of the costs deducted from it', () => {
+    const p = postingsFromReport(withCosts('12.3', '2.3'), datev);
+    expect(p).toHaveLength(1);
+    expect(p[0].umsatz).toBe('10,00');
+  });
+
+  it('posts nothing when the costs swallow the income', () => {
+    expect(postingsFromReport(withCosts('2', '2'), datev)).toHaveLength(0);
+  });
+});
+
 describe('postingsFromReport', () => {
   it('posts gains, losses and income, nothing else', () => {
     const p = postingsFromReport(full, datev);

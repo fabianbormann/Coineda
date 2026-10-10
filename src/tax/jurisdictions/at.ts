@@ -7,6 +7,7 @@ import {
 } from '@/ledger/amount';
 import { isFiatAsset } from '@/ledger/balances';
 import { fiatConsiderationOf } from '@/tax/consideration';
+import { FORK_ORIGIN_KEY } from '@/tax/residualOrigin';
 import { rewardKindOf } from '@/tax/rewardKinds';
 import type { Leg, LedgerEvent, RewardKind } from '@/ledger/types';
 import type {
@@ -139,7 +140,11 @@ const classifyReward = (event: LedgerEvent): TaxEvent[] => {
   if (kind === 'fork') {
     // Coins from a fork have no acquisition cost.
     return [
-      { ...acquisition, consideration: { assetId: leg.assetId, amount: '0' } },
+      {
+        ...acquisition,
+        consideration: { assetId: leg.assetId, amount: '0' },
+        origin: { key: FORK_ORIGIN_KEY },
+      },
       ...feeDisposals,
     ];
   }

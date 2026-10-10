@@ -347,7 +347,7 @@ export const resolveValues = async (
     const costs: TaxCost[] = taxEvent.costs.map((cost) => {
       const priced = valueAt(cost.assetId, cost.amount, taxEvent.timestamp);
       if ('value' in priced) {
-        return { ...cost, value: priced.value };
+        return { ...cost, value: priced.value, priceSource: priced.source };
       }
       // The event is still valued and returned; only the deduction is
       // missing. No `taxEventKind`, because a fee is not a disposal missing

@@ -340,6 +340,7 @@ describe('registerToCsv', () => {
       'unresolvedKind',
       'taxEventKind',
       'note',
+      'costsPriceSource',
     ]);
     expect(rows).toHaveLength(0);
   });
@@ -397,6 +398,34 @@ describe('a token name that looks like a formula', () => {
   });
 });
 
+describe('costsPriceSource', () => {
+  it('joins the distinct sources of the cost legs, in order', () => {
+    const rows = buildRegister({
+      year: 2025,
+      valued: [
+        taxEvent({
+          sourceEventId: 'sell',
+          kind: 'disposal',
+          costs: [
+            { assetId: ADA, amount: '1', value: '1', priceSource: 'ECB' },
+            { assetId: ADA, amount: '1', value: '2', priceSource: 'DefiLlama' },
+            { assetId: ADA, amount: '1', value: '3', priceSource: 'ECB' },
+          ],
+        }),
+      ],
+      internalTransfers: [],
+      residuals: [],
+      unresolved: [],
+      sourceLabelById: LABELS,
+      currency: 'eur',
+      fingerprint: FP,
+    });
+    const { rows: parsed } = readCsv(registerToCsv(rows));
+    expect(parsed[0].costsPriceSource).toBe('ECB · DefiLlama');
+    expect(parsed[0].costs).toBe('6');
+  });
+});
+
 describe('reportToJson and filenames', () => {
   const report = (register: RegisterRow[]) =>
     ({
@@ -417,6 +446,7 @@ describe('reportToJson and filenames', () => {
   it('is self-describing JSON: year, jurisdiction, when, and the gaps', () => {
     const register = build();
     const parsed = JSON.parse(reportToJson(report(register), { generatedAt }));
+    expect(parsed.formatVersion).toBe(2);
     expect(parsed.fingerprint).toBe('ab'.repeat(32));
     expect(parsed.year).toBe(2025);
     expect(parsed.jurisdiction).toBe('de');

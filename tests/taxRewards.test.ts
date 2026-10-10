@@ -102,6 +102,18 @@ describe('reward kinds end to end', () => {
     expect(report.unresolved).toEqual([]);
   });
 
+  it('marks the lot of a fork as acquired at zero, and notes the register row', async () => {
+    await putEvents([reward('fork', 'fork', 100, 2), sale('sell', 100, 8)]);
+
+    const report = await runGermany();
+
+    expect(report.lines[0].consumed[0].origin?.key).toBe('fork-at-zero');
+    const row = report.register.find(
+      (entry) => entry.sourceEventId === 'fork' && entry.kind === 'acquisition',
+    );
+    expect(row?.note).toBe('Hard fork — acquired at 0 (BMF 06.03.2025)');
+  });
+
   it('gives a fork of a token with no price source a zero cost basis', async () => {
     // Nothing can price this token, and nothing needs to: the fork's zero
     // consideration values the acquisition and the sale's euro leg values

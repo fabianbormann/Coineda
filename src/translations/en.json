@@ -504,6 +504,7 @@
     "Network fee on a transfer between your own wallets, disposed of at market value and not deducted.": "Network fee on a transfer between your own wallets, disposed of at market value and not deducted.",
     "Sent to someone else in a transaction that also moved coins between your own wallets.": "Sent to someone else in a transaction that also moved coins between your own wallets.",
     "Acquired {{date}}": "Acquired {{date}}",
+    "Hard fork — acquired at 0 (BMF 06.03.2025)": "Hard fork — acquired at 0 (BMF 06.03.2025)",
     "cost": "cost",
     "held {{days}} days": "held {{days}} days",
     "From pooled cost; an averaged holding has no single acquisition date.": "From pooled cost; an averaged holding has no single acquisition date.",

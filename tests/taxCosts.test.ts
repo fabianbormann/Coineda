@@ -88,6 +88,10 @@ describe('trade fees reach the gain', () => {
     expect(report.lines).toHaveLength(1);
     expect(report.lines[0].proceeds).toBe('99');
     expect(report.lines[0].costs).toBe('1');
+    expect(report.lines[0].costSources).toEqual(['base currency']);
+    expect(
+      report.register.find((row) => row.kind === 'disposal')?.costsPriceSource,
+    ).toBe('base currency');
     expect(report.lines[0].costBasis).toBe('100');
     expect(report.lines[0].gain).toBe('-1');
     expect(report.unresolved).toHaveLength(0);

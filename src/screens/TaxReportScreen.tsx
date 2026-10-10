@@ -32,6 +32,7 @@ import { findModule } from '@/sources/registry';
 import { migrateAddressConfig } from '@/sources/addresses';
 import { taxRegistry } from '@/tax/registry';
 import { runTaxReport } from '@/tax/runTaxReport';
+import { lotOriginLabel } from '@/tax/residualOrigin';
 import { registerFilename, registerToCsv, reportToJson } from '@/tax/register';
 import { describePriceSource } from '@/components/money/priceSource';
 import { REWARD_KIND_LABELS } from '@/tax/rewardKinds';
@@ -2192,6 +2193,9 @@ export const TaxReportScreen = () => {
                                   {t('Acquired {{date}}', {
                                     date: formatDate(lot.acquiredAt),
                                   })}{' '}
+                                  {lot.origin !== undefined && (
+                                    <>({t(lotOriginLabel(lot.origin.key))}) </>
+                                  )}
                                   ·{' '}
                                   <CryptoAmount
                                     value={lot.amount}

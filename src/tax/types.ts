@@ -47,6 +47,9 @@ export type TaxCost = {
   amount: string;
   /** Base-currency value as a decimal string, filled by the host. */
   value?: string;
+  /** Who priced `value`: set by the host alongside it, never empty on a
+   *  valued cost. */
+  priceSource?: string;
 };
 
 export type TaxEvent = {
@@ -79,6 +82,12 @@ export type TaxEvent = {
   consideration?: Consideration;
   /** Why the module emitted this, for the audit trail. Display only. */
   note?: string;
+  /**
+   * On an acquisition: a translation key saying why its lot looks the way
+   * it does (a hard fork's zero cost basis), carried onto the lot it
+   * creates so the report can explain it.
+   */
+  origin?: { key: string };
   /**
    * On a `capital-loss`: `false` when the jurisdiction records the loss but
    * does not deduct it (Germany: a margin rollover fee, which §20 Abs. 9
@@ -123,6 +132,8 @@ export type ConsumedLot = {
   costBasis: string;
   acquiredAt: number;
   heldDays: number;
+  /** Why the lot looks the way it does, from its acquisition's `origin`. */
+  origin?: { key: string };
 };
 
 export type MatchedDisposal = {
@@ -465,6 +476,8 @@ export type TaxAssessment = {
 export type ReportedDisposal = AssessedDisposal & {
   /** From the matcher, see MatchedDisposal.costs. */
   costs: string;
+  /** Distinct price sources of the valued costs, in first-seen order. */
+  costSources?: string[];
   /** Who priced the disposal, from its valued tax event. */
   priceSource?: string;
   /** How much of the asset left, in its own units. */
@@ -567,6 +580,8 @@ export type ReportedIncome = {
    * none could be valued.
    */
   costs?: string;
+  /** Distinct price sources of the valued costs. */
+  costSources?: string[];
   note?: string;
   /** From the ledger event, when the host can find it. */
   rewardKind?: RewardKind;
@@ -646,6 +661,8 @@ export type RegisterRow = {
   considerationAmount?: string;
   /** Sum of the valued costs attached. */
   costs?: string;
+  /** Distinct price sources of the valued costs, joined by ' · '. */
+  costsPriceSource?: string;
   /** Unresolved rows: which kind of gap - a missing price, a missing
    *  acquisition, or an event the jurisdiction has no rule for. */
   unresolvedKind?: UnresolvedItem['kind'];

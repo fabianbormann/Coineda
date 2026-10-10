@@ -12,6 +12,7 @@ import { isFiatAsset } from '@/ledger/balances';
 import { fiatConsiderationOf } from '@/tax/consideration';
 import { linesFor } from '@/tax/jurisdictions/de.forms';
 import { costsOf } from '@/tax/matching';
+import { FORK_ORIGIN_KEY } from '@/tax/residualOrigin';
 import { rewardKindOf } from '@/tax/rewardKinds';
 import type { Leg, LedgerEvent, RewardKind } from '@/ledger/types';
 import type {
@@ -272,7 +273,11 @@ const classifyReward = (event: LedgerEvent): TaxEvent[] => {
     // which is the shorter holding period and so the conservative side.
     // No income to deduct a fee from, but its coins still left.
     return [
-      { ...acquisition, consideration: { assetId: leg.assetId, amount: '0' } },
+      {
+        ...acquisition,
+        consideration: { assetId: leg.assetId, amount: '0' },
+        origin: { key: FORK_ORIGIN_KEY },
+      },
       ...feeDisposals,
     ];
   }

@@ -396,7 +396,12 @@ describe('transaction costs', () => {
 
     expect(valued[0].value).toBe('100');
     expect(valued[0].costs).toEqual([
-      { assetId: 'fiat:eur', amount: '1.5', value: '1.5' },
+      {
+        assetId: 'fiat:eur',
+        amount: '1.5',
+        value: '1.5',
+        priceSource: 'base currency',
+      },
     ]);
     expect(unpriced).toHaveLength(0);
     expect(fetchMock).not.toHaveBeenCalled();

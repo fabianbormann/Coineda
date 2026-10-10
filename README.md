@@ -101,7 +101,7 @@ A German report ends with a filing aid for Anlage SO and Anlage KAP, in form ord
 verified for 2025 and section names only for other years.
 
 The German report can also be downloaded as a DATEV Buchungsstapel (EXTF, format version 700) for your
-tax advisor: one posting per taxable §23 result and one per §22 Nr. 3 receipt. The advisor supplies the
+tax advisor: one posting per taxable §23 result and one per §22 Nr. 3 receipt, booked net of any fee paid to receive it (Werbungskosten). The advisor supplies the
 account numbers in the settings, and there are no defaults. The postings are the figures before the
 Freigrenzen and any loss carry-forward; those are applied in the tax return, not in the file. Derivatives
 under §20 are not included. The file has not been verified against a DATEV installation, so have your

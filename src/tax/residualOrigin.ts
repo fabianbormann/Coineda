@@ -28,3 +28,14 @@ export const residualOriginKey = (id: string): string | undefined =>
     : id.endsWith(PAID_RESIDUAL_SUFFIX)
       ? PAID_ORIGIN_KEY
       : undefined;
+
+/** The `origin.key` a hard fork's zero-cost acquisition carries. */
+export const FORK_ORIGIN_KEY = 'fork-at-zero';
+
+/** The English label for a fork lot. The CODE above is what travels; this is
+ *  what a file or the page prints, the page through t(). */
+export const FORK_ORIGIN_LABEL = 'Hard fork — acquired at 0 (BMF 06.03.2025)';
+
+/** The label for a lot-origin code; anything else is returned as it came. */
+export const lotOriginLabel = (key: string): string =>
+  key === FORK_ORIGIN_KEY ? FORK_ORIGIN_LABEL : key;

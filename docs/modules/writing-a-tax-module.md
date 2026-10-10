@@ -215,7 +215,14 @@ page prints the section names and says the lines were not verified, rather
 than printing a number that might be a line off.
 
 The DATEV Buchungsstapel download is host-side too: it reads only the finished report,
-so a module needs nothing extra to be exported.
+so a module needs nothing extra to be exported. It books an income posting net of
+`ReportedIncome.costs`, and skips one the costs cancel out.
+
+Two provenance fields are filled by the host or threaded through for you: the host stamps
+every valued `TaxCost` with the `priceSource` that priced it (the register's
+`costsPriceSource` column), and an acquisition `TaxEvent` may carry
+`origin: { key }` (Germany and Austria set `'fork-at-zero'` on a hard fork) which the
+matcher copies onto the `ConsumedLot` so the report can explain the lot.
 
 ## Unresolved items are how you decline to guess
 

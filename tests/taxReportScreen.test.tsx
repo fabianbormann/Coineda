@@ -1365,6 +1365,26 @@ describe('the lots behind a disposal', () => {
     expect(screen.getByText(/30 days/)).toBeInTheDocument();
   });
 
+  it('labels a fork lot so a cost basis of 0 is explained', async () => {
+    taxRegistry.push({
+      ...makeModule(),
+      classify: (event, ...rest) =>
+        classify(event, ...rest).map((taxEvent) =>
+          taxEvent.kind === 'acquisition'
+            ? { ...taxEvent, origin: { key: 'fork-at-zero' } }
+            : taxEvent,
+        ),
+    });
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+
+    expect(
+      await screen.findByText(/Hard fork — acquired at 0 \(BMF 06\.03\.2025\)/),
+    ).toBeInTheDocument();
+  });
+
   it('never prints an acquisition date for an averaged pool', async () => {
     // matchMovingAverage gives its synthetic lot the DISPOSAL's own
     // timestamp as acquiredAt and heldDays 0, because an averaged pool has

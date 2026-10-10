@@ -160,7 +160,11 @@ export const postingsFromReport = (
   }
 
   for (const income of report.income) {
-    const umsatz = amountDe(income.value);
+    // Booked net of the fee paid to receive the reward (Werbungskosten):
+    // the figure the return takes, not the gross.
+    const net = new Big(income.value).minus(new Big(income.costs ?? '0'));
+    if (net.lte(0)) continue;
+    const umsatz = amountDe(net.toString());
     if (umsatz === null) continue;
     const label = income.rewardKind ? capitalise(income.rewardKind) : 'Ertrag';
     postings.push({

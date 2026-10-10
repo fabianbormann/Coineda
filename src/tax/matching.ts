@@ -61,6 +61,7 @@ type FifoLot = {
   amount: string;
   costBasis: string;
   acquiredAt: number;
+  origin?: { key: string };
 };
 
 type AveragePool = {
@@ -245,6 +246,7 @@ const matchFifo = (
           amount: take,
           costBasis: takenCost,
           acquiredAt: lot.acquiredAt,
+          ...(lot.origin === undefined ? {} : { origin: lot.origin }),
         });
 
         lot.amount = subtractAmounts(lot.amount, take);
@@ -277,6 +279,7 @@ const matchFifo = (
         // cost, so it comes back out of a later gain.
         costBasis: addAmounts(event.value, costsOf(event)),
         acquiredAt: event.timestamp,
+        ...(event.origin === undefined ? {} : { origin: event.origin }),
       });
       continue;
     }
@@ -308,6 +311,7 @@ const matchFifo = (
         costBasis: takenCost,
         acquiredAt: lot.acquiredAt,
         heldDays: Math.floor((event.timestamp - lot.acquiredAt) / MS_PER_DAY),
+        ...(lot.origin === undefined ? {} : { origin: lot.origin }),
       });
 
       lot.amount = subtractAmounts(lot.amount, takeAmount);

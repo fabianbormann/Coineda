@@ -2,6 +2,7 @@ import Big from 'big.js';
 import type { LedgerEvent } from '@/ledger/types';
 import { symbolOf, toWholeUnits } from '@/components/money/asset';
 import {
+  lotOriginLabel,
   PAID_ORIGIN_KEY,
   RESIDUAL_ORIGIN_KEY,
   residualOriginKey,
@@ -41,6 +42,17 @@ const iso = (timestamp: number): string => new Date(timestamp).toISOString();
 const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 /** The sum of the costs the host managed to value; absent when none were. */
+/** The distinct sources that priced an event's costs, first-seen order. */
+export const costSourcesOf = (event: TaxEvent): string[] => [
+  ...new Set(
+    (event.costs ?? []).flatMap((cost) =>
+      cost.value !== undefined && cost.priceSource !== undefined
+        ? [cost.priceSource]
+        : [],
+    ),
+  ),
+];
+
 const costsOf = (event: TaxEvent): string | undefined => {
   const valued = (event.costs ?? []).filter((cost) => cost.value !== undefined);
   if (valued.length === 0) {
@@ -212,8 +224,12 @@ export const buildRegister = (input: {
     }
     const txHash = hashOf(event.sourceEventId);
     const costs = costsOf(event);
+    const costSources = costSourcesOf(event);
     const note =
       event.note ??
+      (event.origin === undefined
+        ? undefined
+        : lotOriginLabel(event.origin.key)) ??
       (residualIds.has(event.sourceEventId)
         ? residualOriginKey(event.sourceEventId)
         : undefined);
@@ -239,6 +255,9 @@ export const buildRegister = (input: {
             considerationAmount: event.consideration.amount,
           }),
       ...(costs === undefined ? {} : { costs }),
+      ...(costSources.length === 0
+        ? {}
+        : { costsPriceSource: costSources.join(' · ') }),
       ...(note === undefined ? {} : { note }),
     });
   }
@@ -312,6 +331,8 @@ const COLUMNS: { key: keyof RegisterRow; header: string }[] = [
   { key: 'unresolvedKind', header: 'unresolvedKind' },
   { key: 'taxEventKind', header: 'taxEventKind' },
   { key: 'note', header: 'note' },
+  // Last, so a reader's existing column positions do not move.
+  { key: 'costsPriceSource', header: 'costsPriceSource' },
 ];
 
 /**
@@ -363,7 +384,7 @@ export const reportToJson = (
   JSON.stringify(
     {
       format: 'coineda-tax-report',
-      formatVersion: 1,
+      formatVersion: 2,
       year: report.year,
       jurisdiction: report.jurisdiction,
       generatedAt: options.generatedAt,

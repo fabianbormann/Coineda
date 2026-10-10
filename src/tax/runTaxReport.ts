@@ -22,7 +22,7 @@ import {
   PAID_ORIGIN_KEY,
   RESIDUAL_ORIGIN_KEY,
 } from './residualOrigin';
-import { buildRegister } from './register';
+import { buildRegister, costSourcesOf } from './register';
 import { resolveValues } from './resolveValues';
 import { egressMode, type Endpoints } from '@/config/endpoints';
 import { activeEndpoints, endpointHosts } from '@/config/egress';
@@ -371,6 +371,9 @@ export const runTaxReport = async (
         ...((event.costs ?? []).some((cost) => cost.value !== undefined)
           ? { costs: costsOf(event) }
           : {}),
+        ...(costSourcesOf(event).length === 0
+          ? {}
+          : { costSources: costSourcesOf(event) }),
         ...(event.note === undefined ? {} : { note: event.note }),
         ...(rewardKind === undefined ? {} : { rewardKind }),
       };
@@ -529,6 +532,14 @@ export const runTaxReport = async (
     }
   }
 
+  const costSourcesByDisposal = new Map<string, string[]>();
+  for (const event of valued) {
+    const key = `${event.sourceEventId}|${event.assetId}`;
+    if (event.kind === 'disposal' && !costSourcesByDisposal.has(key)) {
+      costSourcesByDisposal.set(key, costSourcesOf(event));
+    }
+  }
+
   const lines: ReportedDisposal[] = assessment.lines.map((line) => {
     const queue = byDisposalId.get(line.disposalEventId);
     // Narrowed by assetId first, because a module's line carries one and a
@@ -551,6 +562,9 @@ export const runTaxReport = async (
     const priceSource = priceSourceByDisposal.get(
       `${line.disposalEventId}|${line.assetId}`,
     );
+    const costSources =
+      costSourcesByDisposal.get(`${line.disposalEventId}|${line.assetId}`) ??
+      [];
     const reported: ReportedDisposal = {
       ...line,
       ...(priceSource === undefined ? {} : { priceSource }),
@@ -558,6 +572,7 @@ export const runTaxReport = async (
       venue: disposal.venue,
       consumed: disposal.consumed,
       costs: disposal.costs,
+      ...(costSources.length === 0 ? {} : { costSources }),
     };
     const originKey = originKeyById.get(line.disposalEventId);
     if (originKey === undefined) {
