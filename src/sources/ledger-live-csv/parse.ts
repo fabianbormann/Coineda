@@ -5,7 +5,7 @@ import {
   normaliseDecimal,
   toBaseUnits,
 } from '@/sources/csv/ledgerShape';
-import { ASSET_CATALOGUE, resolveSymbol } from '@/assets/catalogue';
+import { resolveSymbol } from '@/assets/catalogue';
 import type { ParseResult } from '@/sources/csv/types';
 import type { DerivedEvent } from '@/sources/types';
 import type { Leg } from '@/ledger/types';
@@ -106,12 +106,19 @@ export const parse = (input: string): ParseResult => {
 
   const events: DerivedEvent[] = [];
   const skipped = makeSkipLog();
+  const seen = new Map<string, number>();
 
   for (const row of rows) {
     const cell = (name: string): string => (row[name] ?? '').trim();
     const type = cell('Operation Type').toUpperCase();
     const ticker = cell('Currency Ticker');
-    const xpub = cell('Account xpub');
+    const xpub =
+      cell('Account xpub') ||
+      (cell('Account Name') ? `name:${cell('Account Name')}` : '');
+    if (xpub === '') {
+      skipped.note('rows without an account');
+      continue;
+    }
     const hash = cell('Operation Hash');
     const failed = cell('Status').toLowerCase() === 'failed';
 
@@ -174,14 +181,11 @@ export const parse = (input: string): ParseResult => {
       role,
     });
 
-    // Gas is paid in the chain's own coin, whatever the token moved.
-    const nativeId =
-      entry.kind === 'native'
-        ? entry.id
-        : ASSET_CATALOGUE.find(
-            (candidate) =>
-              candidate.kind === 'native' && candidate.chain === entry.chain,
-          )?.id;
+    // Gas is paid in the chain's own coin and sits on the PARENT account's
+    // row with the same hash. A token row never books a fee of its own, even
+    // when its fee column is filled: that would count the gas twice.
+    const isToken = entry.kind === 'token';
+    const nativeId = entry.kind === 'native' ? entry.id : undefined;
 
     const legs: Leg[] = [];
     let kind: DerivedEvent['kind'];
@@ -196,6 +200,9 @@ export const parse = (input: string): ParseResult => {
       legs.push(leg(nativeId, paid, 'out', 'fee'));
       kind = 'fee';
     } else if (isAction) {
+      if (isToken) {
+        continue;
+      }
       if (nativeId === undefined) {
         skipped.note(`fees in ${ticker}`);
         continue;
@@ -224,8 +231,11 @@ export const parse = (input: string): ParseResult => {
       kind = legs.some((l) => l.role === 'principal') ? 'transfer' : 'fee';
     }
 
+    const key = `${hash}|${type}|${ticker}|${amount}|${xpub}`;
+    const occurrence = seen.get(key) ?? 0;
+    seen.set(key, occurrence + 1);
     events.push({
-      externalId: identity(`${hash}|${type}|${ticker}|${amount}|${xpub}`),
+      externalId: identity(key + (occurrence === 0 ? '' : `|${occurrence}`)),
       timestamp: when,
       kind,
       origin: 'derived',

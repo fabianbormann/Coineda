@@ -179,3 +179,54 @@ describe('Ledger Live import', () => {
     expect(await getAllEvents()).toHaveLength(9);
   });
 });
+
+describe('Ledger Live fix round 1', () => {
+  const HEAD = FIXTURE_HEAD();
+  function FIXTURE_HEAD() {
+    return 'Operation Date,Status,Currency Ticker,Operation Type,Operation Amount,Operation Fees,Operation Hash,Account Name,Account xpub,Countervalue Ticker,Countervalue at Operation Date,Countervalue at CSV Export\r\n';
+  }
+  const ETH = '0xAbCdEf0123456789AbCdEf0123456789AbCdEf01';
+  const run = (...rows: string[]) =>
+    ledgerLiveCsv.parse(HEAD + rows.join('\r\n') + '\r\n');
+
+  it('never books a fee leg on a token row', () => {
+    const { events } = run(
+      `2025-03-05T12:00:00.000Z,Confirmed,USDT,OUT,250,0.002,t1,Tether,${ETH},EUR,0,0`,
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0].legs).toHaveLength(1);
+    expect(events[0].legs[0].role).toBe('principal');
+  });
+
+  it('keeps identical flattened rows apart, stably', () => {
+    const row = `2025-03-05T12:00:00.000Z,Confirmed,ETH,IN,1,0,h1,Ethereum 1,${ETH},EUR,0,0`;
+    const a = run(row, row).events.map((e) => e.externalId);
+    expect(a).toHaveLength(2);
+    expect(a[0]).not.toBe(a[1]);
+    expect(run(row, row).events.map((e) => e.externalId)).toEqual(a);
+    expect(run(row).events[0].externalId).toBe(a[0]);
+  });
+
+  it('falls back to the account name, then skips', () => {
+    const named = run(
+      '2025-03-05T12:00:00.000Z,Confirmed,BTC,IN,1,0,h2,Bitcoin 1,,EUR,0,0',
+    );
+    expect(named.events[0].legs[0].venue).toBe('ledger-live:name:Bitcoin 1');
+    const none = run(
+      '2025-03-05T12:00:00.000Z,Confirmed,BTC,IN,1,0,h3,,,EUR,0,0',
+    );
+    expect(none.events).toHaveLength(0);
+    expect(none.skipped.some((s) => /rows without an account/.test(s))).toBe(
+      true,
+    );
+  });
+
+  it('books the fee of a REDELEGATE', () => {
+    const { events } = run(
+      '2025-03-05T12:00:00.000Z,Confirmed,DOT,REDELEGATE,0,0.01,h4,Polkadot 1,1Dot,EUR,0,0',
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0].kind).toBe('fee');
+    expect(events[0].legs[0].amount).toBe('100000000');
+  });
+});
