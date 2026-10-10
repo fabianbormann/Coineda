@@ -47,29 +47,35 @@ export const DatevSettingsCard = () => {
     let active = true;
     void getSettings()
       .then((settings) => {
-        if (active && settings?.datev) {
+        if (!active) {
+          return;
+        }
+        if (settings?.datev) {
           setDatev(settings.datev);
         }
+        setLoaded(true);
       })
-      .catch(() => {})
-      .finally(() => {
-        if (active) {
-          setLoaded(true);
-        }
+      .catch((error: unknown) => {
+        // Stay disabled: a card showing empty defaults over a stored
+        // configuration would overwrite it on the next blur.
+        console.error('Could not read the DATEV settings', error);
       });
     return () => {
       active = false;
     };
   }, []);
 
+  const disabled = readOnly || !loaded;
   const issues = validateDatevSettings(datev);
 
   const leave = (field: string) => {
     setTouched((previous) => new Set(previous).add(field));
-    if (readOnly || !loaded) {
+    if (disabled) {
       return;
     }
-    void putSettings({ datev });
+    putSettings({ datev }).catch((error: unknown) => {
+      console.error('Could not save the DATEV settings', error);
+    });
   };
 
   const message = (field: string) => {
@@ -102,9 +108,9 @@ export const DatevSettingsCard = () => {
         value={value}
         onChange={(event) => onChange(event.target.value)}
         onBlur={() => leave(field)}
-        disabled={readOnly}
+        disabled={disabled}
         aria-invalid={touched.has(field) && message(field) !== null}
-        aria-describedby={`datev-${field}-error`}
+        aria-describedby={message(field) ? `datev-${field}-error` : undefined}
       />
       {message(field)}
     </div>
@@ -146,7 +152,13 @@ export const DatevSettingsCard = () => {
               })
             }
             onBlur={() => leave('sachkontenlaenge')}
-            disabled={readOnly}
+            disabled={disabled}
+            aria-invalid={message('sachkontenlaenge') !== null}
+            aria-describedby={
+              message('sachkontenlaenge')
+                ? 'datev-sachkontenlaenge-error'
+                : undefined
+            }
           >
             {LENGTHS.map((length) => (
               <option key={length} value={String(length)}>

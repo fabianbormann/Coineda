@@ -2802,6 +2802,13 @@ describe('the DATEV settings card', () => {
     await userEvent.click(await screen.findByRole('button', { name }));
   };
 
+  /** The card's inputs stay disabled until the stored values are read. */
+  const openGermanyReady = async () => {
+    await openModule(germanTax, /germany/i);
+    const advisor = await screen.findByLabelText(/^advisor number/i);
+    await waitFor(() => expect(advisor).toBeEnabled());
+  };
+
   const labels = [
     /^advisor number/i,
     /^client number/i,
@@ -2830,7 +2837,7 @@ describe('the DATEV settings card', () => {
   });
 
   it('writes the whole object on each blur', async () => {
-    await openModule(germanTax, /germany/i);
+    await openGermanyReady();
     const spy = vi.spyOn(settingsStore, 'putSettings');
     await userEvent.type(
       await screen.findByLabelText(/^advisor number/i),
@@ -2873,7 +2880,7 @@ describe('the DATEV settings card', () => {
   });
 
   it('flags an account of the wrong length once the field is left', async () => {
-    await openModule(germanTax, /germany/i);
+    await openGermanyReady();
     const field = await screen.findByLabelText(/^clearing account/i);
     await userEvent.type(field, '12');
     expect(screen.queryByText('Must be 4 digits')).toBeNull();
@@ -2928,5 +2935,70 @@ describe('the DATEV settings card', () => {
       expect(screen.getByLabelText(label)).toBeDisabled();
     }
     expect(spy).not.toHaveBeenCalled();
+  });
+
+  const stored = {
+    beraternummer: '99',
+    mandantennummer: '00123',
+    sachkontenlaenge: 5,
+    konten: {
+      verrechnung: '12000',
+      gewinn23: '23000',
+      verlust23: '23100',
+      einkuenfte22: '23200',
+    },
+  };
+
+  it('loads the stored values into the inputs', async () => {
+    await putSettings({ datev: stored });
+    await openGermanyReady();
+    expect(screen.getByLabelText(/^advisor number/i)).toHaveValue('99');
+    expect(screen.getByLabelText(/^account number length/i)).toHaveValue('5');
+    expect(screen.getByLabelText(/^clearing account/i)).toHaveValue('12000');
+  });
+
+  it('keeps a leading zero all the way to the payload', async () => {
+    await putSettings({ datev: stored });
+    await openGermanyReady();
+    const spy = vi.spyOn(settingsStore, 'putSettings');
+    await userEvent.click(screen.getByLabelText(/^client number/i));
+    await userEvent.tab();
+    expect(spy.mock.calls.at(-1)?.[0]?.datev?.mandantennummer).toBe('00123');
+  });
+
+  it('persists a changed account length as a number', async () => {
+    await openGermanyReady();
+    const spy = vi.spyOn(settingsStore, 'putSettings');
+    await userEvent.selectOptions(
+      screen.getByLabelText(/^account number length/i),
+      '6',
+    );
+    await userEvent.tab();
+    expect(spy.mock.calls.at(-1)?.[0]?.datev?.sachkontenlaenge).toBe(6);
+  });
+
+  it('keeps the card disabled when the stored values cannot be read', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(settingsStore, 'getSettings')
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new Error('x'));
+    await openModule(germanTax, /germany/i);
+    expect(await screen.findByLabelText(/^advisor number/i)).toBeDisabled();
+  });
+
+  it('shows the messages in German', async () => {
+    await i18n.changeLanguage('de');
+    try {
+      await openModule(germanTax, /deutschland/i);
+      const field = await screen.findByLabelText(/^verrechnungskonto/i);
+      await waitFor(() => expect(field).toBeEnabled());
+      await userEvent.type(field, '12');
+      await userEvent.tab();
+      expect(
+        await screen.findByText('Muss 4 Ziffern haben'),
+      ).toBeInTheDocument();
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });
