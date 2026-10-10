@@ -557,6 +557,25 @@
     "Remaining loss carry-forward under §23 EStG as at 31 Dec {{prevYear}} (Verlustfeststellungsbescheid)": "Remaining loss carry-forward under §23 EStG as at 31 Dec {{prevYear}} (Verlustfeststellungsbescheid)",
     "Remaining loss carry-forward under §20 EStG as at 31 Dec {{prevYear}}, excluding losses from selling shares (§20 Abs. 6 S. 4)": "Remaining loss carry-forward under §20 EStG as at 31 Dec {{prevYear}}, excluding losses from selling shares (§20 Abs. 6 S. 4)",
     "Rule set {{jurisdiction}} {{version}}, checked on {{date}}": "Rule set {{jurisdiction}} {{version}}, checked on {{date}}",
-    "Rule set {{jurisdiction}} {{version}}": "Rule set {{jurisdiction}} {{version}}"
+    "Rule set {{jurisdiction}} {{version}}": "Rule set {{jurisdiction}} {{version}}",
+    "Private sales - crypto assets": "Private sales - crypto assets",
+    "Other income (§22 Nr. 3 EStG)": "Other income (§22 Nr. 3 EStG)",
+    "Derivatives (Anlage KAP)": "Derivatives (Anlage KAP)",
+    "Kind of private sale": "Kind of private sale",
+    "Description of the asset": "Description of the asset",
+    "Period of the sales": "Period of the sales",
+    "Total proceeds": "Total proceeds",
+    "Acquisition costs": "Acquisition costs",
+    "Expenses": "Expenses",
+    "Result of the private sales": "Result of the private sales",
+    "Carried over to the tax return": "Carried over to the tax return",
+    "Kind of other income": "Kind of other income",
+    "Type of the other income": "Type of the other income",
+    "Sum of the receipts": "Sum of the receipts",
+    "Expenses related to the receipts": "Expenses related to the receipts",
+    "Result of the other income": "Result of the other income",
+    "Gains from derivatives": "Gains from derivatives",
+    "Losses from derivatives": "Losses from derivatives",
+    "The Freigrenzen, the saver's allowance and any loss carry-forward are applied by the Finanzamt itself; they are not typed in.": "The Freigrenzen, the saver's allowance and any loss carry-forward are applied by the Finanzamt itself; they are not typed in."
   }
 }

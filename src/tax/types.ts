@@ -265,6 +265,14 @@ export type AssessedDisposal = {
   exempt: string;
   /** The remainder, which the threshold is then tested against. */
   taxable: string;
+  /**
+   * The proceeds and cost basis of the consumed lots that were held one
+   * year or less, for a jurisdiction whose filing form asks for the
+   * taxable side's proceeds and acquisition costs. Optional: a module with
+   * no such form omits them.
+   */
+  taxableProceeds?: string;
+  taxableCostBasis?: string;
   /** Why, for the audit trail: a key into every locale file, with the
    *  computed figures as parameters. Display only, never parsed. */
   reason: TaxReason;
@@ -350,8 +358,43 @@ export type CapitalResult = {
   note: string;
 };
 
+export type FormReference = {
+  form: 'Anlage SO' | 'Anlage KAP';
+  line: number;
+  field?: string;
+};
+
+export type FilingEntry = {
+  /** Translation key. */
+  label: string;
+  /** Decimal string; absent for indicator and description entries. */
+  amount?: string;
+  /** E.g. the period "01.01.2025 – 31.12.2025" or "Kryptowerte". */
+  text?: string;
+  /** Absent when the year's form lines are not verified. */
+  reference?: FormReference;
+  /** Translation key. */
+  note?: string;
+};
+
+export type FilingSection = {
+  /** Translation key. */
+  title: string;
+  form: FormReference['form'];
+  entries: FilingEntry[];
+};
+
+/** The figures a user types into the tax form, in the form's order. */
+export type FilingFigures = {
+  year: number;
+  /** False: the page says the line numbers were not verified. */
+  linesVerified: boolean;
+  sections: FilingSection[];
+};
+
 export type TaxAssessment = {
   year: number;
+  filing?: FilingFigures;
   capital?: CapitalResult;
   /** Present only when a non-zero carry-forward was declared. */
   carryForward?: {

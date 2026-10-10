@@ -1306,3 +1306,190 @@ describe('german loss carry-forward', () => {
     expect(austrianTax.manifest.supportsCarryForward).toBeUndefined();
   });
 });
+
+describe('german filing figures', () => {
+  const at = Date.UTC(2025, 5, 1);
+  const lotOf = (id: string, heldDays: number) => ({
+    acquisitionEventId: id,
+    amount: '5',
+    costBasis: '200',
+    acquiredAt: at - heldDays * 86_400_000,
+    heldDays,
+  });
+  // Lot A held 400 days (exempt), lot B 10 days (taxable): proceeds 1000
+  // over 10 units, 500 each side, cost 200 each.
+  const split = (
+    overrides: Partial<MatchedDisposal> = {},
+  ): MatchedDisposal => ({
+    disposalEventId: 'd-filing',
+    assetId: 'cardano:lovelace',
+    venue: 'wallet-a',
+    partition: 'wallet-a',
+    amount: '10',
+    proceeds: '1000',
+    timestamp: at,
+    costBasis: '400',
+    gain: '600',
+    costs: '0',
+    consumed: [lotOf('a', 400), lotOf('b', 10)],
+    ...overrides,
+  });
+  const incomeEvent = (value: string): TaxEvent => ({
+    sourceEventId: 'r1',
+    kind: 'income',
+    assetId: 'cardano:lovelace',
+    amount: '1',
+    timestamp: at,
+    venue: 'stake1',
+    value,
+  });
+  const capitalEvent = (
+    kind: 'capital-gain' | 'capital-loss',
+    value: string,
+    deductible?: boolean,
+  ): TaxEvent => ({
+    sourceEventId: `c-${kind}-${value}`,
+    kind,
+    assetId: 'fiat:eur',
+    amount: value,
+    timestamp: at,
+    venue: 'ex',
+    value,
+    ...(deductible === undefined ? {} : { deductible }),
+  });
+  const entry = (
+    report: ReturnType<typeof germanTax.assess>,
+    section: number,
+    line: number,
+  ) =>
+    report.filing?.sections[section].entries.find(
+      (e) => e.reference?.line === line,
+    );
+
+  it('reports the taxable side of a split disposal', () => {
+    const [line] = germanTax.assess({
+      year: 2025,
+      matched: [split()],
+      income: [],
+      capital: [],
+    }).lines;
+    expect(line.taxableProceeds).toBe('500');
+    expect(line.taxableCostBasis).toBe('200');
+  });
+
+  it('builds the 2025 figures with their form lines', () => {
+    const report = germanTax.assess({
+      year: 2025,
+      matched: [split({ costs: '3' })],
+      income: [incomeEvent('300')],
+      capital: [
+        capitalEvent('capital-gain', '500'),
+        capitalEvent('capital-loss', '205'),
+        capitalEvent('capital-loss', '9', false),
+      ],
+    });
+    expect(report.filing?.year).toBe(2025);
+    expect(report.filing?.linesVerified).toBe(true);
+    expect(report.filing?.sections.map((s) => s.form)).toEqual([
+      'Anlage SO',
+      'Anlage SO',
+      'Anlage KAP',
+    ]);
+
+    // MatchedDisposal.proceeds is already NET of the costs, so the gross
+    // the form asks for adds the taxable-side share back: 500 + 1.5. The
+    // result is then the taxable gain, 501.5 - 200 - 1.5 = 300.
+    expect(entry(report, 0, 48)?.amount).toBe('501.5');
+    expect(entry(report, 0, 49)?.amount).toBe('200');
+    expect(entry(report, 0, 50)?.amount).toBe('1.5');
+    expect(entry(report, 0, 51)?.amount).toBe('300');
+    expect(entry(report, 0, 58)?.amount).toBe('300');
+    expect(entry(report, 0, 51)?.reference?.form).toBe('Anlage SO');
+    expect(entry(report, 0, 47)?.text).toBe('01.01.2025 – 31.12.2025');
+    expect(entry(report, 0, 45)?.text).toBe('Kryptowerte');
+
+    expect(entry(report, 1, 14)?.text).toBe('Kryptowerte');
+    expect(entry(report, 1, 15)?.text).toBe(
+      'Staking, Lending, Airdrops (Kryptowerte)',
+    );
+    expect(entry(report, 1, 18)?.amount).toBe('300');
+    expect(entry(report, 1, 19)?.amount).toBe('0');
+    expect(entry(report, 1, 20)?.amount).toBe('300');
+
+    // Gross deductible losses only; the not-deducted loss never appears.
+    expect(entry(report, 2, 19)?.amount).toBe('500');
+    expect(entry(report, 2, 22)?.amount).toBe('205');
+    expect(entry(report, 2, 19)?.reference?.form).toBe('Anlage KAP');
+  });
+
+  it('prints a fully taxable disposal with its full costs', () => {
+    const report = germanTax.assess({
+      year: 2025,
+      matched: [
+        split({
+          costs: '4',
+          proceeds: '996',
+          costBasis: '400',
+          consumed: [lotOf('a', 10), lotOf('b', 10)],
+        }),
+      ],
+      income: [],
+      capital: [],
+    });
+    expect(entry(report, 0, 50)?.amount).toBe('4');
+    expect(entry(report, 0, 48)?.amount).toBe('1000');
+  });
+
+  it('leaves the line references off a year whose lines are unverified', () => {
+    const report = germanTax.assess({
+      year: 2024,
+      matched: [split()],
+      income: [incomeEvent('300')],
+      capital: [capitalEvent('capital-gain', '5')],
+    });
+    expect(report.filing?.linesVerified).toBe(false);
+    const entries = report.filing?.sections.flatMap((s) => s.entries) ?? [];
+    expect(entries.length).toBeGreaterThan(0);
+    expect(entries.every((e) => e.reference === undefined)).toBe(true);
+    expect(entries.find((e) => e.amount === '300')).toBeDefined();
+  });
+
+  it('has no private-sales section when only exempt lots were sold', () => {
+    const report = germanTax.assess({
+      year: 2025,
+      matched: [split({ consumed: [lotOf('a', 400), lotOf('b', 500)] })],
+      income: [],
+      capital: [],
+    });
+    expect(report.filing).toBeUndefined();
+  });
+
+  it('carries a negative result for a loss year', () => {
+    const report = germanTax.assess({
+      year: 2025,
+      matched: [
+        split({
+          proceeds: '100',
+          costBasis: '400',
+          gain: '-300',
+          consumed: [lotOf('a', 10), lotOf('b', 10)],
+        }),
+      ],
+      income: [],
+      capital: [],
+    });
+    expect(entry(report, 0, 51)?.amount).toBe('-300');
+    expect(entry(report, 0, 58)?.amount).toBe('-300');
+  });
+
+  it('gives Austria no filing figures', () => {
+    expect(
+      austrianTax.assess({
+        year: 2025,
+        matched: [split()],
+        income: [],
+        capital: [],
+      }).filing,
+    ).toBeUndefined();
+  });
+});

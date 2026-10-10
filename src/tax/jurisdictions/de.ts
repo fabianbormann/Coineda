@@ -10,6 +10,7 @@ import {
 } from '@/ledger/amount';
 import { isFiatAsset } from '@/ledger/balances';
 import { fiatConsiderationOf } from '@/tax/consideration';
+import { linesFor } from '@/tax/jurisdictions/de.forms';
 import { rewardKindOf } from '@/tax/rewardKinds';
 import type { Leg, LedgerEvent, RewardKind } from '@/ledger/types';
 import type {
@@ -18,6 +19,9 @@ import type {
   CapitalResult,
   CarryForwardOutcome,
   MatchedDisposal,
+  FilingEntry,
+  FilingFigures,
+  FilingSection,
   TaxAssessment,
   TaxEvent,
   TaxModule,
@@ -390,6 +394,8 @@ const assessDisposal = (disposal: MatchedDisposal): AssessedDisposal => {
   let exempt = '0';
   let taxable = '0';
   let allocatedProceeds = '0';
+  let taxableProceeds = '0';
+  let taxableCostBasis = '0';
 
   disposal.consumed.forEach((lot, index) => {
     const isLast = index === disposal.consumed.length - 1;
@@ -405,6 +411,8 @@ const assessDisposal = (disposal: MatchedDisposal): AssessedDisposal => {
       exempt = addAmounts(exempt, lotGain);
     } else {
       taxable = addAmounts(taxable, lotGain);
+      taxableProceeds = addAmounts(taxableProceeds, lotProceeds);
+      taxableCostBasis = addAmounts(taxableCostBasis, lot.costBasis);
     }
   });
 
@@ -417,8 +425,202 @@ const assessDisposal = (disposal: MatchedDisposal): AssessedDisposal => {
     gain: disposal.gain,
     exempt,
     taxable,
+    taxableProceeds,
+    taxableCostBasis,
     reason: describeHoldingPeriod(exempt, taxable),
   };
+};
+
+const FILING_TITLE_SALES = 'Private sales - crypto assets';
+const FILING_TITLE_INCOME = 'Other income (§22 Nr. 3 EStG)';
+const FILING_TITLE_KAP = 'Derivatives (Anlage KAP)';
+const FILING_OFFICE_NOTE =
+  "The Freigrenzen, the saver's allowance and any loss carry-forward are applied by the Finanzamt itself; they are not typed in.";
+const KRYPTO = 'Kryptowerte';
+const INCOME_TYPE_TEXT = 'Staking, Lending, Airdrops (Kryptowerte)';
+
+/**
+ * The taxable-side share of a disposal's valued costs. A fully taxable
+ * disposal contributes its full `costs`; a split one the share of its
+ * amount that sits in lots held one year or less. Zero when no lot is.
+ */
+const taxableCosts = (disposal: MatchedDisposal): string => {
+  let taxableAmount = '0';
+  for (const lot of disposal.consumed) {
+    if (!heldMoreThanOneYear(lot.acquiredAt, disposal.timestamp)) {
+      taxableAmount = addAmounts(taxableAmount, lot.amount);
+    }
+  }
+  if (isZeroAmount(taxableAmount)) {
+    return '0';
+  }
+  if (compareAmounts(taxableAmount, disposal.amount) >= 0) {
+    return disposal.costs;
+  }
+  return proportion(disposal.costs, taxableAmount, disposal.amount);
+};
+
+/**
+ * The figures the user types into Mein ELSTER: PRE-threshold sums, taxable
+ * side only. The Freigrenzen, the saver's allowance and any carry-forward
+ * are the Finanzamt's, so none is applied here.
+ *
+ * `MatchedDisposal.proceeds` is already net of the disposal's valued costs,
+ * but the form wants the gross price and the expenses separately, so the
+ * taxable-side costs are added back to the proceeds and shown as expenses.
+ * The result is then still exactly the taxable-side gain.
+ */
+const buildFiling = (
+  input: AssessInput,
+  lines: AssessedDisposal[],
+  capital: CapitalResult | undefined,
+): FilingFigures | undefined => {
+  const forms = linesFor(input.year);
+  const ref = (
+    form: 'Anlage SO' | 'Anlage KAP',
+    line: number | undefined,
+  ): Pick<FilingEntry, 'reference'> =>
+    forms === undefined || line === undefined
+      ? {}
+      : { reference: { form, line } };
+  const sections: FilingSection[] = [];
+
+  // A disposal with no taxable-side lot has nothing to declare. The lots
+  // decide, not the sums: a worthless taxable lot has zero proceeds too.
+  const pairs = lines
+    .map((line, index) => ({ line, matched: input.matched[index] }))
+    .filter(({ matched }) =>
+      matched.consumed.some(
+        (lot) => !heldMoreThanOneYear(lot.acquiredAt, matched.timestamp),
+      ),
+    );
+  if (pairs.length > 0) {
+    const assessed = pairs.map(({ line }) => line);
+    const expenses = sumAmounts(
+      pairs.map(({ matched }) => taxableCosts(matched)),
+    );
+    const proceeds = addAmounts(
+      sumAmounts(assessed.map((line) => line.taxableProceeds ?? '0')),
+      expenses,
+    );
+    const acquisition = sumAmounts(
+      assessed.map((line) => line.taxableCostBasis ?? '0'),
+    );
+    const result = subtractAmounts(
+      subtractAmounts(proceeds, acquisition),
+      expenses,
+    );
+    const so = forms?.so;
+    sections.push({
+      title: FILING_TITLE_SALES,
+      form: 'Anlage SO',
+      entries: [
+        {
+          label: 'Kind of private sale',
+          text: KRYPTO,
+          ...ref('Anlage SO', so?.indicator),
+        },
+        {
+          label: 'Description of the asset',
+          text: KRYPTO,
+          ...ref('Anlage SO', so?.description),
+        },
+        {
+          label: 'Period of the sales',
+          text: `01.01.${input.year} – 31.12.${input.year}`,
+          ...ref('Anlage SO', so?.period),
+        },
+        {
+          label: 'Total proceeds',
+          amount: proceeds,
+          ...ref('Anlage SO', so?.proceeds),
+        },
+        {
+          label: 'Acquisition costs',
+          amount: acquisition,
+          ...ref('Anlage SO', so?.acquisitionCosts),
+        },
+        {
+          label: 'Expenses',
+          amount: expenses,
+          ...ref('Anlage SO', so?.expenses),
+        },
+        {
+          label: 'Result of the private sales',
+          amount: result,
+          note: FILING_OFFICE_NOTE,
+          ...ref('Anlage SO', so?.result),
+        },
+        {
+          label: 'Carried over to the tax return',
+          amount: result,
+          ...ref('Anlage SO', so?.carryOver),
+        },
+      ],
+    });
+  }
+
+  if (input.income.length > 0) {
+    const sum = sumAmounts(input.income.map((event) => event.value ?? '0'));
+    const income = forms?.income;
+    sections.push({
+      title: FILING_TITLE_INCOME,
+      form: 'Anlage SO',
+      entries: [
+        {
+          label: 'Kind of other income',
+          text: KRYPTO,
+          ...ref('Anlage SO', income?.indicator),
+        },
+        {
+          label: 'Type of the other income',
+          text: INCOME_TYPE_TEXT,
+          ...ref('Anlage SO', income?.type),
+        },
+        {
+          label: 'Sum of the receipts',
+          amount: sum,
+          ...ref('Anlage SO', income?.sum),
+        },
+        {
+          label: 'Expenses related to the receipts',
+          amount: '0',
+          ...ref('Anlage SO', income?.expenses),
+        },
+        {
+          label: 'Result of the other income',
+          amount: sum,
+          note: FILING_OFFICE_NOTE,
+          ...ref('Anlage SO', income?.result),
+        },
+      ],
+    });
+  }
+
+  if (capital !== undefined) {
+    sections.push({
+      title: FILING_TITLE_KAP,
+      form: 'Anlage KAP',
+      entries: [
+        {
+          label: 'Gains from derivatives',
+          amount: capital.gains,
+          ...ref('Anlage KAP', forms?.kap.gains),
+        },
+        {
+          label: 'Losses from derivatives',
+          amount: capital.losses,
+          note: FILING_OFFICE_NOTE,
+          ...ref('Anlage KAP', forms?.kap.losses),
+        },
+      ],
+    });
+  }
+
+  if (sections.length === 0) {
+    return undefined;
+  }
+  return { year: input.year, linesVerified: forms !== undefined, sections };
 };
 
 /**
@@ -594,8 +796,11 @@ const assess = (input: AssessInput): TaxAssessment => {
     estimatedLiability = normaliseAmount(tax.toString());
   }
 
+  const filing = buildFiling(input, lines, capital);
+
   return {
     year: input.year,
+    ...(filing === undefined ? {} : { filing }),
     lines,
     totals: {
       taxableGain,

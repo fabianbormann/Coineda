@@ -413,6 +413,39 @@ describe.each(taxRegistry.map((m) => [m.manifest.id, m] as const))(
       }
     });
 
+    it('keys every filing title, label and note it can emit', () => {
+      // A filing aid is printed beside a tax form, so an untranslated
+      // label is as bad as an untranslated reason. Every section a module
+      // can build is reached: private sales, other income, derivatives.
+      const income = sampleEvents
+        .flatMap((event) => module.classify(event))
+        .filter((e) => e.kind === 'income')
+        .map((e) => ({ ...e, value: e.amount }));
+      const keys = new Set<string>();
+      for (const year of [2024, 2025]) {
+        const assessed = module.assess({
+          year,
+          matched: [reasonFixtures[1]],
+          income,
+          capital: capitalOf(module),
+        });
+        for (const section of assessed.filing?.sections ?? []) {
+          keys.add(section.title);
+          for (const entry of section.entries) {
+            keys.add(entry.label);
+            if (entry.note !== undefined) {
+              keys.add(entry.note);
+            }
+          }
+        }
+      }
+
+      for (const key of keys) {
+        expect(en[key], `missing from en.json: ${key}`).toBeDefined();
+        expect(de[key], `missing from de.json: ${key}`).toBeDefined();
+      }
+    });
+
     it('offers a liability note exactly when it offers a liability', () => {
       // A figure with no note is the state this milestone replaced; a note
       // with no figure would render beside nothing.

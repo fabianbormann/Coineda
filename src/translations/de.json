@@ -557,6 +557,25 @@
     "Remaining loss carry-forward under §23 EStG as at 31 Dec {{prevYear}} (Verlustfeststellungsbescheid)": "Verbleibender Verlustvortrag nach §23 EStG zum 31.12.{{prevYear}} (laut Verlustfeststellungsbescheid)",
     "Remaining loss carry-forward under §20 EStG as at 31 Dec {{prevYear}}, excluding losses from selling shares (§20 Abs. 6 S. 4)": "Verbleibender Verlustvortrag nach §20 EStG zum 31.12.{{prevYear}}, ohne Aktienverluste (§20 Abs. 6 S. 4)",
     "Rule set {{jurisdiction}} {{version}}, checked on {{date}}": "Regelwerk {{jurisdiction}} {{version}}, geprüft am {{date}}",
-    "Rule set {{jurisdiction}} {{version}}": "Regelwerk {{jurisdiction}} {{version}}"
+    "Rule set {{jurisdiction}} {{version}}": "Regelwerk {{jurisdiction}} {{version}}",
+    "Private sales - crypto assets": "Private Veräußerungsgeschäfte — Kryptowerte",
+    "Other income (§22 Nr. 3 EStG)": "Sonstige Leistungen (§22 Nr. 3 EStG)",
+    "Derivatives (Anlage KAP)": "Termingeschäfte (Anlage KAP)",
+    "Kind of private sale": "Art des Geschäfts",
+    "Description of the asset": "Bezeichnung des Wirtschaftsguts",
+    "Period of the sales": "Zeitraum der Veräußerungen",
+    "Total proceeds": "Veräußerungspreis insgesamt",
+    "Acquisition costs": "Anschaffungskosten",
+    "Expenses": "Werbungskosten",
+    "Result of the private sales": "Gewinn oder Verlust aus den Veräußerungen",
+    "Carried over to the tax return": "Übertrag in deine Steuererklärung",
+    "Kind of other income": "Art der Einkünfte",
+    "Type of the other income": "Bezeichnung der Leistung",
+    "Sum of the receipts": "Summe der Einnahmen",
+    "Expenses related to the receipts": "Werbungskosten zu den Einnahmen",
+    "Result of the other income": "Ergebnis der sonstigen Leistungen",
+    "Gains from derivatives": "Gewinne aus Termingeschäften",
+    "Losses from derivatives": "Verluste aus Termingeschäften",
+    "The Freigrenzen, the saver's allowance and any loss carry-forward are applied by the Finanzamt itself; they are not typed in.": "Freigrenzen, Sparer-Pauschbetrag und Verlustvortrag wendet das Finanzamt selbst an; du trägst sie nicht ein."
   }
 }
