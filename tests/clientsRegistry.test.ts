@@ -14,9 +14,12 @@ import {
   setActiveClient,
   updateReviewMeta,
 } from '@/clients/registry';
+import { putManualLink } from '@/ledger/manualLinks';
 import {
   DEFAULT_LEDGER_NAME,
+  LedgerReadOnlyError,
   activeLedgerName,
+  isLedgerReadOnly,
   openLedger,
   putSource,
   setActiveLedger,
@@ -131,5 +134,18 @@ describe('client registry', () => {
     await setActiveClient(c.id);
     expect(activeLedgerName()).toBe(c.dbName);
     expect(activeClient().id).toBe(c.id);
+  });
+
+  it('makes a review client read-only at the store, and a client writable again', async () => {
+    const r = createReviewClient('r.coineda', review);
+    await setActiveClient(r.id);
+    expect(isLedgerReadOnly()).toBe(true);
+    await expect(
+      putManualLink({ sourceId: 's', externalId: 'x', txHash: 'ab' }),
+    ).rejects.toBeInstanceOf(LedgerReadOnlyError);
+    const c = listClients().find((x) => x.kind === 'client')!;
+    await setActiveClient(c.id);
+    expect(isLedgerReadOnly()).toBe(false);
+    await removeClient(r.id);
   });
 });

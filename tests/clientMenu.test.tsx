@@ -124,8 +124,10 @@ describe('ClientMenu', () => {
       file: 'x.coineda',
       verdict: 'none',
     });
-    await setActiveClient(review.id);
+    // Seeded like a finished restore: written first, then made read-only.
+    await setActiveLedger(review.dbName);
     await setOnboarded();
+    await setActiveClient(review.id);
     render(<App />);
     await openMenu();
     await userEvent.click(

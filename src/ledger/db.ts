@@ -102,7 +102,46 @@ export class LedgerSwitchedError extends Error {
   }
 }
 
+export class LedgerReadOnlyError extends Error {
+  constructor(name: string) {
+    super(`ledger ${name} is read-only; the write was refused`);
+    this.name = 'LedgerReadOnlyError';
+  }
+}
+
 export const activeLedgerName = (): string => activeName;
+
+/**
+ * Whether the active ledger refuses writes. Set by `setActiveClient` for a
+ * review client and cleared by every `setActiveLedger`, so the store itself
+ * - not just the screens that hide their buttons - keeps a review copy as
+ * it was restored.
+ */
+let readOnly = false;
+
+export const setLedgerReadOnly = (flag: boolean): void => {
+  readOnly = flag;
+};
+
+export const isLedgerReadOnly = (): boolean => readOnly;
+
+/**
+ * Options every write helper takes. A long-running flow (a sync drain, the
+ * tax run) captures `activeLedgerName()` ONCE when it starts and passes it
+ * as `ledger` to each write, so a write that resolves after the user
+ * switched clients is refused instead of landing in the other client's
+ * database. A helper capturing the name itself could never notice: nothing
+ * can switch between its own read and its own open.
+ */
+export type WriteOptions = { ledger?: string };
+
+/** The connection for a write: refused when read-only or switched. */
+export const openLedgerForWrite = (
+  options?: WriteOptions,
+): Promise<IDBPDatabase<LedgerSchema>> => {
+  if (readOnly) return Promise.reject(new LedgerReadOnlyError(activeName));
+  return openLedger(options?.ledger);
+};
 
 /**
  * The connection for the active database. A write that captured
@@ -116,54 +155,71 @@ export const openLedger = (
     return Promise.reject(new LedgerSwitchedError(expected, activeName));
   }
   if (!connection) {
-    connection = openDB<LedgerSchema>(activeName, DB_VERSION, {
-      upgrade(db, oldVersion) {
-        // Guarded on oldVersion: a user who installed after Task 3 already
-        // has version 1 and must upgrade in place rather than hit "object
-        // store already exists" or start over.
-        if (oldVersion < 1) {
-          const events = db.createObjectStore('events', { keyPath: 'id' });
-          events.createIndex('identity', ['sourceId', 'externalId'], {
-            unique: true,
-          });
-          events.createIndex('sourceId', 'sourceId');
-          events.createIndex('timestamp', 'timestamp');
-          db.createObjectStore('sources', { keyPath: 'id' });
-          db.createObjectStore('cursors', { keyPath: 'sourceId' });
-        }
-        if (oldVersion < 2) {
-          db.createObjectStore('prices', { keyPath: 'key' });
-        }
-        if (oldVersion < 3) {
-          db.createObjectStore('settings', { keyPath: 'key' });
-        }
-        if (oldVersion < 4) {
-          db.createObjectStore('tokenMeta', { keyPath: 'subject' });
-        }
-        if (oldVersion < 5) {
-          // Rebuilt rather than migrated. TokenMeta gained a measured
-          // `logoLuminance`, and rows cached without it would render a
-          // dark logo untreated until their 30-day TTL ran out. This store
-          // is a cache of something re-fetchable, so dropping it costs one
-          // request per token and nothing else.
-          db.deleteObjectStore('tokenMeta');
-          db.createObjectStore('tokenMeta', { keyPath: 'subject' });
-        }
-        if (oldVersion < 6) {
-          const links = db.createObjectStore('transferLinks', {
-            keyPath: 'key',
-          });
-          // Indexed by source so removing a source can drop its links in
-          // the same transaction - a link to an event that no longer
-          // exists would quietly re-apply itself if that source were
-          // added back with different data.
-          links.createIndex('sourceId', 'sourceId');
-        }
-      },
+    const opening = openPromise(activeName);
+    connection = opening;
+    // A rejected open is not memoised: the next call tries again rather
+    // than replaying the same failure until the next switch.
+    opening.catch(() => {
+      if (connection === opening) connection = null;
     });
   }
   return connection;
 };
+
+const openPromise = (name: string): Promise<IDBPDatabase<LedgerSchema>> => {
+  try {
+    return openDatabase(name);
+  } catch (error) {
+    return Promise.reject(error);
+  }
+};
+
+const openDatabase = (name: string): Promise<IDBPDatabase<LedgerSchema>> =>
+  openDB<LedgerSchema>(name, DB_VERSION, {
+    upgrade(db, oldVersion) {
+      // Guarded on oldVersion: a user who installed after Task 3 already
+      // has version 1 and must upgrade in place rather than hit "object
+      // store already exists" or start over.
+      if (oldVersion < 1) {
+        const events = db.createObjectStore('events', { keyPath: 'id' });
+        events.createIndex('identity', ['sourceId', 'externalId'], {
+          unique: true,
+        });
+        events.createIndex('sourceId', 'sourceId');
+        events.createIndex('timestamp', 'timestamp');
+        db.createObjectStore('sources', { keyPath: 'id' });
+        db.createObjectStore('cursors', { keyPath: 'sourceId' });
+      }
+      if (oldVersion < 2) {
+        db.createObjectStore('prices', { keyPath: 'key' });
+      }
+      if (oldVersion < 3) {
+        db.createObjectStore('settings', { keyPath: 'key' });
+      }
+      if (oldVersion < 4) {
+        db.createObjectStore('tokenMeta', { keyPath: 'subject' });
+      }
+      if (oldVersion < 5) {
+        // Rebuilt rather than migrated. TokenMeta gained a measured
+        // `logoLuminance`, and rows cached without it would render a
+        // dark logo untreated until their 30-day TTL ran out. This store
+        // is a cache of something re-fetchable, so dropping it costs one
+        // request per token and nothing else.
+        db.deleteObjectStore('tokenMeta');
+        db.createObjectStore('tokenMeta', { keyPath: 'subject' });
+      }
+      if (oldVersion < 6) {
+        const links = db.createObjectStore('transferLinks', {
+          keyPath: 'key',
+        });
+        // Indexed by source so removing a source can drop its links in
+        // the same transaction - a link to an event that no longer
+        // exists would quietly re-apply itself if that source were
+        // added back with different data.
+        links.createIndex('sourceId', 'sourceId');
+      }
+    },
+  });
 
 const closeConnection = async (
   open: Promise<IDBPDatabase<LedgerSchema>> | null,
@@ -183,6 +239,10 @@ export const closeLedger = async (): Promise<void> => {
 };
 
 export const setActiveLedger = async (dbName: string): Promise<void> => {
+  // Cleared on every switch, even to the same name: whoever activates a
+  // ledger decides afresh whether it is read-only (setActiveClient, the
+  // Gate), and a restore into a fresh review database runs before that.
+  readOnly = false;
   if (dbName === activeName && connection) return;
   // Swap synchronously: an openLedger() during the close below must see the
   // new name and open the new database, not re-memoise the old one.
@@ -226,13 +286,13 @@ export const assertValidEvent = (event: LedgerEvent): void => {
  */
 export const putEvents = async (
   events: LedgerEvent[],
+  options?: WriteOptions,
 ): Promise<{ inserted: number; updated: number }> => {
-  const name = activeLedgerName();
   for (const event of events) {
     assertValidEvent(event);
   }
 
-  const db = await openLedger(name);
+  const db = await openLedgerForWrite(options);
   const tx = db.transaction('events', 'readwrite');
   const index = tx.store.index('identity');
   // Operation counts, not distinct-row counts: if a batch carries two events
@@ -283,13 +343,13 @@ export const putEvents = async (
 export const putEventsIfSourceExists = async (
   sourceId: string,
   events: LedgerEvent[],
+  options?: WriteOptions,
 ): Promise<{ written: boolean; inserted: number; updated: number }> => {
-  const name = activeLedgerName();
   for (const event of events) {
     assertValidEvent(event);
   }
 
-  const db = await openLedger(name);
+  const db = await openLedgerForWrite(options);
   const tx = db.transaction(['sources', 'events'], 'readwrite');
   const existing = await tx.objectStore('sources').get(sourceId);
   if (!existing) {
@@ -331,8 +391,9 @@ export const getEventsBySource = async (
  *  survive: they have no source to reload them from. */
 export const deleteDerivedEvents = async (
   sourceId: string,
+  options?: WriteOptions,
 ): Promise<number> => {
-  const db = await openLedger();
+  const db = await openLedgerForWrite(options);
   const tx = db.transaction('events', 'readwrite');
   const rows = await tx.store.index('sourceId').getAll(sourceId);
   let removed = 0;
@@ -355,8 +416,9 @@ export const deleteDerivedEvents = async (
 export const deleteEventsByIdentity = async (
   sourceId: string,
   externalIds: string[],
+  options?: WriteOptions,
 ): Promise<number> => {
-  const db = await openLedger();
+  const db = await openLedgerForWrite(options);
   const tx = db.transaction('events', 'readwrite');
   const index = tx.store.index('identity');
   let removed = 0;
@@ -371,8 +433,11 @@ export const deleteEventsByIdentity = async (
   return removed;
 };
 
-export const putSource = async (source: SourceRecord): Promise<void> => {
-  await (await openLedger()).put('sources', source);
+export const putSource = async (
+  source: SourceRecord,
+  options?: WriteOptions,
+): Promise<void> => {
+  await (await openLedgerForWrite(options)).put('sources', source);
 };
 
 export const getSources = async (): Promise<SourceRecord[]> =>
@@ -406,8 +471,9 @@ export const getSources = async (): Promise<SourceRecord[]> =>
 export const putSourceStatus = async (
   sourceId: string,
   status: { lastSyncedAt?: number; lastError?: string | undefined },
+  options?: WriteOptions,
 ): Promise<boolean> => {
-  const db = await openLedger();
+  const db = await openLedgerForWrite(options);
   const tx = db.transaction('sources', 'readwrite');
   const existing = await tx.store.get(sourceId);
   if (!existing) {
@@ -419,8 +485,11 @@ export const putSourceStatus = async (
   return true;
 };
 
-export const deleteSource = async (id: string): Promise<void> => {
-  await (await openLedger()).delete('sources', id);
+export const deleteSource = async (
+  id: string,
+  options?: WriteOptions,
+): Promise<void> => {
+  await (await openLedgerForWrite(options)).delete('sources', id);
 };
 
 /**
@@ -443,8 +512,11 @@ export const deleteSource = async (id: string): Promise<void> => {
  * Authored rows survive, exactly as `deleteDerivedEvents` already
  * guarantees - they have no source to reload them from.
  */
-export const deleteSourceCascade = async (sourceId: string): Promise<void> => {
-  const db = await openLedger();
+export const deleteSourceCascade = async (
+  sourceId: string,
+  options?: WriteOptions,
+): Promise<void> => {
+  const db = await openLedgerForWrite(options);
   const tx = db.transaction(
     ['events', 'cursors', 'sources', 'transferLinks'],
     'readwrite',
@@ -481,14 +553,24 @@ export const deleteSourceCascade = async (sourceId: string): Promise<void> => {
   }
 };
 
-export const getCursor = async (sourceId: string): Promise<Cursor> =>
-  (await (await openLedger()).get('cursors', sourceId))?.cursor ?? null;
+export const getCursor = async (
+  sourceId: string,
+  options?: WriteOptions,
+): Promise<Cursor> =>
+  (await (await openLedger(options?.ledger)).get('cursors', sourceId))
+    ?.cursor ?? null;
 
 export const putCursor = async (
   sourceId: string,
   cursor: Cursor,
+  options?: WriteOptions,
 ): Promise<void> => {
-  await (await openLedger()).put('cursors', { sourceId, cursor });
+  await (
+    await openLedgerForWrite(options)
+  ).put('cursors', {
+    sourceId,
+    cursor,
+  });
 };
 
 /**
@@ -502,9 +584,9 @@ export const putCursor = async (
 export const putCursorIfSourceExists = async (
   sourceId: string,
   cursor: Cursor,
+  options?: WriteOptions,
 ): Promise<boolean> => {
-  const name = activeLedgerName();
-  const db = await openLedger(name);
+  const db = await openLedgerForWrite(options);
   const tx = db.transaction(['sources', 'cursors'], 'readwrite');
   const existing = await tx.objectStore('sources').get(sourceId);
   if (existing) {

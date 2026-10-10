@@ -24,7 +24,7 @@ import {
   assertValidEvent,
   getAllEvents,
   getSources,
-  openLedger,
+  openLedgerForWrite,
 } from '@/ledger/db';
 import {
   assertValidManualLink,
@@ -296,7 +296,9 @@ export const restoreCheckpoint = async (
     assertValidManualLink(link);
   }
 
-  const db = await openLedger();
+  // Refused on a read-only (review) ledger. openForReview restores into its
+  // fresh database before setActiveClient turns the flag on.
+  const db = await openLedgerForWrite();
   const tx = db.transaction(
     ['settings', 'sources', 'events', 'transferLinks'],
     'readwrite',

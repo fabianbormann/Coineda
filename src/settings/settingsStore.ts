@@ -1,4 +1,4 @@
-import { activeLedgerName, openLedger } from '@/ledger/db';
+import { openLedger, openLedgerForWrite, type WriteOptions } from '@/ledger/db';
 import type { CarryForward } from '@/tax/types';
 
 /**
@@ -83,9 +83,9 @@ export const getSettings = async (): Promise<Settings | null> => {
 
 export const putSettings = async (
   partial: Partial<Settings>,
+  options?: WriteOptions,
 ): Promise<void> => {
-  const name = activeLedgerName();
-  const db = await openLedger(name);
+  const db = await openLedgerForWrite(options);
   const existing = await db.get('settings', SETTINGS_KEY);
   const merged = {
     ...(existing?.value as Partial<Settings> | undefined),
@@ -103,7 +103,7 @@ export const isOnboarded = async (): Promise<boolean> => {
   return row?.value === true;
 };
 
-export const setOnboarded = async (): Promise<void> => {
-  const db = await openLedger();
+export const setOnboarded = async (options?: WriteOptions): Promise<void> => {
+  const db = await openLedgerForWrite(options);
   await db.put('settings', { key: ONBOARDED_KEY, value: true });
 };

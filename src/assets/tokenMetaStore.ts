@@ -1,4 +1,4 @@
-import { openLedger } from '@/ledger/db';
+import { openLedger, type WriteOptions } from '@/ledger/db';
 import { fetchTokenMeta, subjectsOf, type TokenMeta } from './tokenRegistry';
 import { parseCardanoAsset } from './cardanoAsset';
 import { measureLogoLuminance } from './logoLuminance';
@@ -57,8 +57,10 @@ export const writeCached = async (
   subjects: string[],
   fetched: Map<string, TokenMeta>,
   now: number = Date.now(),
+  options?: WriteOptions,
 ): Promise<void> => {
-  const db = await openLedger();
+  // A cache: allowed in a read-only review, refused after a switch.
+  const db = await openLedger(options?.ledger);
   const tx = db.transaction('tokenMeta', 'readwrite');
   for (const subject of subjects) {
     const meta = fetched.get(subject);

@@ -2,6 +2,7 @@ import {
   DEFAULT_LEDGER_NAME,
   deleteLedgerDatabase,
   setActiveLedger,
+  setLedgerReadOnly,
 } from '@/ledger/db';
 
 export type ClientKind = 'client' | 'review';
@@ -146,6 +147,9 @@ export const setActiveClient = async (id: string): Promise<void> => {
   if (!record) return;
   writeRaw(ACTIVE_CLIENT_KEY, record.id);
   await setActiveLedger(record.dbName);
+  // After the switch, which clears it: the store itself refuses writes to
+  // a review copy, whatever a screen forgets to hide.
+  setLedgerReadOnly(record.kind === 'review');
 };
 
 export const removeClient = async (id: string): Promise<void> => {

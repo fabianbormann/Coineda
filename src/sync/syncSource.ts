@@ -3,6 +3,8 @@ import { findModule } from '@/sources/registry';
 import { findFileModule } from '@/sources/csv/registry';
 import type { DerivedEvent } from '@/sources/types';
 import {
+  LedgerSwitchedError,
+  activeLedgerName,
   deleteDerivedEvents,
   getCursor,
   putCursor,
@@ -79,7 +81,31 @@ export const syncSource = async (
     updated: 0,
     pages: 0,
   };
+  // Captured ONCE, before the first await, and handed to every read and
+  // write below. A drain can run for minutes; if the user switches client
+  // meanwhile, the next write is refused with LedgerSwitchedError instead
+  // of landing in the other client's database - which may well hold a
+  // source with this same id (a client set up from this one's checkpoint,
+  // or its backup opened for review). A switch ends the run like a stop:
+  // nothing is written anywhere, the other client included.
+  const ledger = { ledger: activeLedgerName() };
+  try {
+    return await drain(source, report, ledger, options);
+  } catch (error) {
+    if (error instanceof LedgerSwitchedError) {
+      report.cancelled = true;
+      return report;
+    }
+    throw error;
+  }
+};
 
+const drain = async (
+  source: SourceRecord,
+  report: SyncReport,
+  ledger: { ledger: string },
+  options?: { full?: boolean; signal?: AbortSignal },
+): Promise<SyncReport> => {
   // Checked before anything is read or written: a stop pressed while a
   // previous sync was still finishing must not kick off a fresh drain.
   if (options?.signal?.aborted) {
@@ -108,25 +134,27 @@ export const syncSource = async (
     // clobber the edit. See putSourceStatus's own doc comment in
     // src/ledger/db.ts for why the check has to live there and not just in
     // a caller's "is this busy" guard.
-    await putSourceStatus(source.id, { lastError: report.error });
+    await putSourceStatus(source.id, { lastError: report.error }, ledger);
     return report;
   }
 
   if (options?.full) {
-    await deleteDerivedEvents(source.id);
+    await deleteDerivedEvents(source.id, ledger);
     // Persist the reset, not just the local variable below: if the first
     // page then throws, an un-persisted reset leaves this source with no
     // events on disk and a stale mid-history cursor that an ordinary sync
     // afterward would resume from, silently never looking behind it again.
     // Stored state has to be coherent at every point in between, not only
     // once the whole resync has succeeded.
-    await putCursor(source.id, null);
+    await putCursor(source.id, null, ledger);
   }
 
   // getCursor cannot distinguish "never synced" from "explicitly reset" -
   // both return null - so a full resync and a first sync both simply start
   // at null; there is no third state to branch on.
-  let cursor: Cursor = options?.full ? null : await getCursor(source.id);
+  let cursor: Cursor = options?.full
+    ? null
+    : await getCursor(source.id, ledger);
 
   for (let page = 0; page < MAX_PAGES; page += 1) {
     // Between pages as well as inside a request: a stop arriving just after
@@ -153,7 +181,7 @@ export const syncSource = async (
       // responsible, and is why that budget can afford to be generous.
       if (result.cursor !== null && result.cursor === requestedCursor) {
         report.error = `${module.manifest.id}: fetchEvents returned the same cursor '${result.cursor}' it was given - the module is not making progress`;
-        await putSourceStatus(source.id, { lastError: report.error });
+        await putSourceStatus(source.id, { lastError: report.error }, ledger);
         return report;
       }
 
@@ -167,6 +195,7 @@ export const syncSource = async (
       const { written, inserted, updated } = await putEventsIfSourceExists(
         source.id,
         stamped,
+        ledger,
       );
       if (!written) {
         // The source is gone. Not an error - nobody is left to show one to,
@@ -183,7 +212,7 @@ export const syncSource = async (
       // cursor on disk is still the one we just wrote here - the last page
       // that truly committed - never one that points past a page that failed.
       cursor = result.cursor;
-      if (!(await putCursorIfSourceExists(source.id, cursor))) {
+      if (!(await putCursorIfSourceExists(source.id, cursor, ledger))) {
         // Same race, same answer: a recreated cursor row for a deleted
         // source would be resumed from by whatever is next configured
         // under that id.
@@ -191,10 +220,11 @@ export const syncSource = async (
       }
 
       if (cursor === null) {
-        await putSourceStatus(source.id, {
-          lastSyncedAt: Date.now(),
-          lastError: undefined,
-        });
+        await putSourceStatus(
+          source.id,
+          { lastSyncedAt: Date.now(), lastError: undefined },
+          ledger,
+        );
         return report;
       }
     } catch (error) {
@@ -203,18 +233,23 @@ export const syncSource = async (
       // never advances past itself and its events are retried, not skipped.
       // That is also what makes a stop lossless: whatever committed stays
       // committed, and the next run resumes from it.
+      if (error instanceof LedgerSwitchedError) {
+        // Not a provider failure: the catch-all below would try to record
+        // it on a source in a ledger that is no longer active.
+        throw error;
+      }
       if (isAbort(error) || options?.signal?.aborted) {
         report.cancelled = true;
         return report;
       }
       report.error = messageOf(error);
-      await putSourceStatus(source.id, { lastError: report.error });
+      await putSourceStatus(source.id, { lastError: report.error }, ledger);
       return report;
     }
   }
 
   report.error = `exceeded the maximum of ${MAX_PAGES} pages while syncing`;
-  await putSourceStatus(source.id, { lastError: report.error });
+  await putSourceStatus(source.id, { lastError: report.error }, ledger);
   return report;
 };
 

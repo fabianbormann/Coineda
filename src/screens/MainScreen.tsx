@@ -757,7 +757,7 @@ export const MainScreen = ({ onReset }: Props) => {
           >
             {t('Create journey video')}
           </Button>
-          {transferProposals.length > 0 && (
+          {!readOnly && transferProposals.length > 0 && (
             <Button
               type="button"
               variant="outline"
@@ -850,8 +850,9 @@ export const MainScreen = ({ onReset }: Props) => {
             </Button>
           </div>
         )}
+        {/* Confirming a pair writes a manual link: a review never offers it. */}
         <ReviewTransfersDialog
-          open={transfersDialogOpen}
+          open={!readOnly && transfersDialogOpen}
           onOpenChange={setTransfersDialogOpen}
           events={events}
           sources={sources}

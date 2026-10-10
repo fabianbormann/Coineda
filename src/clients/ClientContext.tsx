@@ -36,15 +36,19 @@ export const ClientProvider = ({
   const [, setTick] = useState(0);
   const refresh = useCallback(() => setTick((n) => n + 1), []);
   const current = listClients().find((r) => r.id === client.id) ?? client;
+  const switchTo = useCallback(
+    async (id: string) => {
+      await onChange(id);
+    },
+    [onChange],
+  );
   return (
     <ClientContext.Provider
       value={{
         client: current,
         readOnly: current.kind === 'review',
         refresh,
-        switchTo: async (id) => {
-          await onChange(id);
-        },
+        switchTo,
       }}
     >
       {children}

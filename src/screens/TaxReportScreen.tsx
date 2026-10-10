@@ -20,7 +20,7 @@ import { buildDisclaimer, type Disclaimer } from '@/tax/disclaimer';
 import { getSettings, putSettings } from '@/settings/settingsStore';
 import { ClientContext } from '@/clients/ClientContext';
 import { shortFingerprint } from '@/ledger/fingerprint';
-import { getAllEvents, getSources } from '@/ledger/db';
+import { activeLedgerName, getAllEvents, getSources } from '@/ledger/db';
 import {
   buildSourceDirectory,
   type SourceDirectoryEntry,
@@ -494,6 +494,9 @@ export const TaxReportScreen = () => {
       return;
     }
     let cancelled = false;
+    // Captured when the run starts: a key write that resolves after a
+    // client switch is refused rather than stored in the other client.
+    const ledger = activeLedgerName();
 
     (async () => {
       try {
@@ -505,10 +508,13 @@ export const TaxReportScreen = () => {
           // A review client's ledger is someone else's restored data: the
           // key stays in component state for this run and is not stored.
           if (!readOnly) {
-            await putSettings({
-              coingeckoApiKey:
-                request.apiKey === '' ? undefined : request.apiKey,
-            });
+            await putSettings(
+              {
+                coingeckoApiKey:
+                  request.apiKey === '' ? undefined : request.apiKey,
+              },
+              { ledger },
+            );
           }
           if (cancelled) {
             return;

@@ -1,4 +1,4 @@
-import { openLedger } from '@/ledger/db';
+import { openLedger, type WriteOptions } from '@/ledger/db';
 // Also configures Big.NE/Big.PE (the exponential-notation guard) as a side
 // effect, process-wide: that is what keeps a Big's toString() - here, and
 // inside ./scale's valueOf - from ever producing exponential form, even
@@ -36,8 +36,12 @@ export const putCachedPrice = async (
   key: PriceKey,
   price: string,
   source?: string,
+  options?: WriteOptions,
 ): Promise<void> => {
-  const db = await openLedger();
+  // A cache, not the client's data: written in a read-only review too
+  // (the report there still has to price its events), but never into a
+  // ledger the caller did not start in.
+  const db = await openLedger(options?.ledger);
   await db.put('prices', {
     key: cacheKey(key),
     price,

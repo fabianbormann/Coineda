@@ -12,6 +12,8 @@ import { getManualLinks } from '@/ledger/manualLinks';
 import { putSettings } from '@/settings/settingsStore';
 import { registry } from '@/sources/registry';
 import type { LedgerEvent } from '@/ledger/types';
+import { ClientProvider } from '@/clients/ClientContext';
+import type { ClientRecord } from '@/clients/registry';
 
 /**
  * Confirming a transfer whose exchange side reports no chain transaction.
@@ -153,6 +155,35 @@ describe('confirming a transfer by hand', () => {
     await putEvents([walletSpend]);
     renderScreen();
 
+    await screen.findByText('My Wallet');
+    expect(
+      screen.queryByRole('button', { name: /possible transfer/i }),
+    ).toBeNull();
+  });
+
+  it('offers nothing to confirm in a review client', async () => {
+    // Confirming writes a link into the restored ledger, which would change
+    // the very fingerprint the reviewer is checking.
+    await putEvents([krakenDeposit, walletSpend]);
+    const review: ClientRecord = {
+      id: 'rev-t',
+      label: 'r.coineda',
+      dbName: 'rev-t-db',
+      kind: 'review',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      review: { omittedEventCount: 0, file: 'r.coineda', verdict: 'none' },
+    };
+    render(
+      <ThemeProvider>
+        <ConfirmProvider>
+          <MemoryRouter>
+            <ClientProvider client={review} onChange={vi.fn()}>
+              <MainScreen onReset={vi.fn()} />
+            </ClientProvider>
+          </MemoryRouter>
+        </ConfirmProvider>
+      </ThemeProvider>,
+    );
     await screen.findByText('My Wallet');
     expect(
       screen.queryByRole('button', { name: /possible transfer/i }),

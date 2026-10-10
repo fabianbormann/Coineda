@@ -10,7 +10,12 @@ import {
   putSource,
   setActiveLedger,
 } from '@/ledger/db';
-import { createClient, listClients } from '@/clients/registry';
+import {
+  ACTIVE_CLIENT_KEY,
+  createClient,
+  createReviewClient,
+  listClients,
+} from '@/clients/registry';
 import { isOnboarded, setOnboarded } from '@/settings/settingsStore';
 
 beforeEach(async () => {
@@ -104,6 +109,35 @@ describe('App', () => {
     // against it and shows the welcome flow, and A's marker is gone.
     expect(await screen.findByText(/welcome to coineda/i)).toBeInTheDocument();
     expect(screen.queryByText('Marker of client A')).not.toBeInTheDocument();
+  });
+
+  it('removes a review client whose ledger never finished restoring', async () => {
+    // A tab closed mid-restore leaves a review entry over an empty
+    // database. Onboarding inside it would write into a read-only ledger,
+    // so the gate drops it and goes back to a real client instead.
+    listClients();
+    await putSource({
+      id: 'cfg-a',
+      moduleId: 'test-exchange',
+      label: 'Marker of client A',
+      config: {},
+    });
+    const broken = createReviewClient('half.coineda', {
+      omittedEventCount: 0,
+      file: 'half.coineda',
+      verdict: 'none',
+    });
+    localStorage.setItem(ACTIVE_CLIENT_KEY, broken.id);
+
+    render(<App />);
+    expect(
+      await screen.findByText(
+        'The review ledger was incomplete and has been removed.',
+      ),
+    ).toBeInTheDocument();
+    expect(await screen.findByText('Marker of client A')).toBeInTheDocument();
+    expect(screen.queryByText(/welcome to coineda/i)).not.toBeInTheDocument();
+    expect(listClients().some((c) => c.kind === 'review')).toBe(false);
   });
 
   it('mounts a Toaster subscribed to notify.*, unconditionally rather than nested inside a route', async () => {

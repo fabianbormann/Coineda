@@ -2,7 +2,12 @@
 // relative path resolves to a SECOND module instance under Vite's
 // resolution, each with its own memoised `openLedger` promise - so two
 // connections race the same `openDB` upgrade, and one of them blocks.
-import { getAllEvents, openLedger } from '@/ledger/db';
+import {
+  getAllEvents,
+  openLedger,
+  openLedgerForWrite,
+  type WriteOptions,
+} from '@/ledger/db';
 import type { LedgerEvent } from './types';
 
 /**
@@ -82,9 +87,10 @@ export const getManualLinks = async (): Promise<ManualTransferLink[]> =>
 export const putManualLink = async (
   link: Omit<ManualTransferLink, 'confirmedAt'> &
     Partial<Pick<ManualTransferLink, 'confirmedAt'>>,
+  options?: WriteOptions,
 ): Promise<void> => {
   await (
-    await openLedger()
+    await openLedgerForWrite(options)
   ).put(
     'transferLinks',
     manualLinkRow({ ...link, confirmedAt: link.confirmedAt ?? Date.now() }),
@@ -94,9 +100,10 @@ export const putManualLink = async (
 export const deleteManualLink = async (
   sourceId: string,
   externalId: string,
+  options?: WriteOptions,
 ): Promise<void> => {
   await (
-    await openLedger()
+    await openLedgerForWrite(options)
   ).delete('transferLinks', keyOf(sourceId, externalId));
 };
 

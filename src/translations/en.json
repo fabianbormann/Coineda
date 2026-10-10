@@ -606,6 +606,7 @@
     "does NOT match": "does NOT match",
     "no fingerprint stored": "no fingerprint stored",
     "Review of {{file}} — read-only — fingerprint {{fingerprint}} ({{verdict}})": "Review of {{file}} — read-only — fingerprint {{fingerprint}} ({{verdict}})",
-    "This permanently deletes {{label}} and all its data from this device. Type the label to confirm": "This permanently deletes {{label}} and all its data from this device. Type the label to confirm"
+    "This permanently deletes {{label}} and all its data from this device. Type the label to confirm": "This permanently deletes {{label}} and all its data from this device. Type the label to confirm",
+    "The review ledger was incomplete and has been removed.": "The review ledger was incomplete and has been removed."
   }
 }
