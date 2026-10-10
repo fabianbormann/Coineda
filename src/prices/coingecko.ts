@@ -1,4 +1,4 @@
-import { NIGHT_ASSET_ID, USDC_ASSET_ID, USDT_ASSET_ID } from './scale';
+import { ASSET_CATALOGUE } from '@/assets/catalogue';
 
 /**
  * CoinGecko is the only price provider. Native `fetch` only - `axios` was
@@ -13,17 +13,14 @@ import { NIGHT_ASSET_ID, USDC_ASSET_ID, USDT_ASSET_ID } from './scale';
  * mapping for flows through to `totalValue`'s `missing` list instead of
  * silently being priced at nothing.
  */
-export const COINGECKO_IDS: Record<string, string> = {
-  'cardano:lovelace': 'cardano',
-  'bitcoin:native': 'bitcoin',
-  'eth:native': 'ethereum',
-  // 'midnight-3', NOT 'midnight'. Both carry the symbol NIGHT on CoinGecko
-  // and they are different coins at wildly different prices; see the note on
-  // NIGHT_ASSET_ID in src/prices/scale.ts.
-  [NIGHT_ASSET_ID]: 'midnight-3',
-  [USDT_ASSET_ID]: 'tether',
-  [USDC_ASSET_ID]: 'usd-coin',
-};
+export const COINGECKO_IDS: Record<string, string> = Object.fromEntries(
+  ASSET_CATALOGUE.flatMap((e) =>
+    e.coingeckoId ? [[e.id, e.coingeckoId]] : [],
+  ),
+);
+// NIGHT maps to 'midnight-3', NOT 'midnight'. Both carry the symbol NIGHT on
+// CoinGecko and they are different coins at wildly different prices; see the
+// note on NIGHT_ASSET_ID in src/assets/ids.ts.
 
 const SIMPLE_PRICE_URL = 'https://api.coingecko.com/api/v3/simple/price';
 const HISTORY_URL = 'https://api.coingecko.com/api/v3/coins';

@@ -3,6 +3,8 @@ import Big from 'big.js';
 // effect, process-wide: that is what keeps the toString() below from ever
 // producing exponential form.
 import { normaliseAmount } from '@/ledger/amount';
+import { ASSET_CATALOGUE } from '@/assets/catalogue';
+import { NIGHT_ASSET_ID, USDC_ASSET_ID, USDT_ASSET_ID } from '@/assets/ids';
 
 /**
  * How many decimals an asset's ledger amount carries, i.e. how many base
@@ -44,35 +46,25 @@ import { normaliseAmount } from '@/ledger/amount';
  * disagree. A real Ethereum chain module would report wei already and must
  * not scale again.
  */
+export { NIGHT_ASSET_ID, USDT_ASSET_ID, USDC_ASSET_ID };
+
 /**
- * NIGHT, the Midnight token, identified by its Cardano policy id plus asset
- * name in hex - never by its ticker.
+ * Derived from ASSET_CATALOGUE (src/assets/catalogue.ts), which carries each
+ * row's provenance; fiat is excluded because it has no base-unit scale here.
  *
- * The ticker is the trap: CoinGecko lists TWO coins with the symbol NIGHT,
- * and the other one ('midnight') trades at about EUR 0.0000089 against this
- * one's EUR 0.040. Resolving a holding by symbol would have priced the
- * owner's 2136 NIGHT at about two cents instead of EUR 86 - a 4,500-fold
- * error with nothing downstream able to see it.
+ * Notes that used to sit beside the literal entries: NIGHT (Midnight), a
+ * Cardano native token, has 6 decimals per CoinGecko's detail_platforms for
+ * the Cardano platform, and Bitpanda reports it in whole NIGHT, so
+ * `baseUnits` scales by this on the way in. USDT and USDC are ERC-20 tokens
+ * with 6 decimals, so an exchange export's `12.5` matches an on-chain holding
+ * of the same token.
  */
-export const NIGHT_ASSET_ID =
-  'cardano:0691b2fecca1ac4f53cb6dfb00b7013e561d1f34403b957cbb5af1fa4e49474854';
-
-export const USDT_ASSET_ID = 'eth:0xdac17f958d2ee523a2206206994597c13d831ec7';
-export const USDC_ASSET_ID = 'eth:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48';
-
-export const ASSET_DECIMALS: Record<string, number> = {
-  'cardano:lovelace': 6,
-  'bitcoin:native': 8,
-  'eth:native': 18,
-  // NIGHT (Midnight), a Cardano native token. 6 decimals per CoinGecko's
-  // detail_platforms for the Cardano platform. Bitpanda reports it in whole
-  // NIGHT, so `baseUnits` scales by this on the way in.
-  [NIGHT_ASSET_ID]: 6,
-  // USDT and USDC as ERC-20 tokens, both 6 decimals, so an exchange export's
-  // `12.5` matches an on-chain holding of the same token.
-  [USDT_ASSET_ID]: 6,
-  [USDC_ASSET_ID]: 6,
-};
+export const ASSET_DECIMALS: Record<string, number> = Object.fromEntries(
+  ASSET_CATALOGUE.filter((e) => e.kind !== 'fiat').map((e) => [
+    e.id,
+    e.decimals,
+  ]),
+);
 
 export const decimalsOf = (assetId: string): number =>
   ASSET_DECIMALS[assetId] ?? 0;

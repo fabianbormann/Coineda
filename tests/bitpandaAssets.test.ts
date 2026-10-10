@@ -55,7 +55,7 @@ describe('baseUnits', () => {
     // right at the pricing boundary and a silent corruption here: 0.5 would
     // be stored as though it were already in base units, and nothing
     // downstream could tell it was a hundred-million-fold understatement.
-    expect(() => baseUnits('0.5', 'solana:native')).toThrow(
+    expect(() => baseUnits('0.5', 'unlisted:native')).toThrow(
       UnscalableAmountError,
     );
   });
