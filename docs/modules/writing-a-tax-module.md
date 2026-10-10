@@ -188,6 +188,31 @@ your manifest sets `supportsCarryForward: true`; leave it unset and
   report the allowance threshold on the net AFTER it, so the threshold card
   and the derivatives card agree.
 
+## A filing aid is optional, and line numbers are never guessed
+
+`TaxAssessment.filing?: FilingFigures` lets a module print the figures a user
+types into the tax form, in the form's order. Germany supplies it (Anlage SO
+and Anlage KAP); Austria does not, and a module without a filing aid simply
+omits the field. The shape is sections of entries:
+
+```ts
+FilingFigures = { year; linesVerified: boolean; sections: FilingSection[] }
+FilingSection = { title; form; entries: FilingEntry[] }   // title: translation key
+FilingEntry   = { label; amount?; text?; reference?; note? }
+```
+
+Each entry carries a translation-key `label`, an optional form `reference`
+(form, line, optional field) and either a decimal-string `amount` or a literal
+`text` such as a period or "Kryptowerte". The figures are the pre-threshold
+sums the form asks for, taxable side only: Freigrenzen, the saver's allowance
+and loss carry-forward are applied by the tax office, not by the report. Line
+numbers come from a per-year data table with provenance, never from code or
+memory: Germany's is `FORM_LINES_DE` in `src/tax/jurisdictions/de.forms.ts`,
+each year carrying `verified: { source, checkedOn }`. A year with no verified
+table supplies no `reference` at all and sets `linesVerified: false`, so the
+page prints the section names and says the lines were not verified, rather
+than printing a number that might be a line off.
+
 ## Unresolved items are how you decline to guess
 
 `UnresolvedItem.kind` is `'needs-cost-basis' | 'needs-price' | 'unclassified'`.

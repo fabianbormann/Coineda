@@ -77,6 +77,9 @@ source module runs beside your exchange keys, and that is not a place for code n
 Every report prints who contributed the rules, when they were last checked against the law, and the
 references used. Rules unchecked for more than a year are flagged as stale on the report itself.
 
+A German report ends with a filing aid for Anlage SO and Anlage KAP, in form order, with line numbers
+verified for 2025 and section names only for other years.
+
 > **Coineda gives no tax, legal or accounting advice.** The rules are a community contribution,
 > written to the best of the contributors' knowledge, and may be wrong for your situation or
 > incomplete for your country. Verify a report against the cited references, or with a professional,
