@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import 'fake-indexeddb/auto';
 import '@/i18n';
 import { MapCsvDialog } from '@/screens/MapCsvDialog';
-import { putSource } from '@/ledger/db';
+import { putEvents, putSource } from '@/ledger/db';
 import type { CsvMapping } from '@/sources/mapped-csv/types';
 
 const FIXTURE_A = `Datum;Typ;Coin;Menge;Gebühr;Preis
@@ -45,10 +45,19 @@ const MAPPING_A: CsvMapping = {
   fiatCounter: true,
 };
 
+const KEEP = { replaceExisting: false };
+
 const file = () => new File([FIXTURE_A], 'bison.csv', { type: 'text/csv' });
 
 const onImport =
-  vi.fn<(t: string, m: CsvMapping, n: string) => Promise<void>>();
+  vi.fn<
+    (
+      t: string,
+      m: CsvMapping,
+      n: string,
+      o: { replaceExisting: boolean },
+    ) => Promise<void>
+  >();
 const onOpenChange = vi.fn();
 
 beforeEach(() => {
@@ -133,7 +142,12 @@ describe('the mapping dialog', () => {
     ).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Import' }));
     await waitFor(() => expect(onImport).toHaveBeenCalledTimes(1));
-    expect(onImport).toHaveBeenCalledWith(FIXTURE_A, MAPPING_A, 'bison.csv');
+    expect(onImport).toHaveBeenCalledWith(
+      FIXTURE_A,
+      MAPPING_A,
+      'bison.csv',
+      KEEP,
+    );
   });
 
   it('refuses to continue without a venue label', async () => {
@@ -348,7 +362,7 @@ describe('the mapping dialog', () => {
       ).toBeInTheDocument();
       await user.click(within(dialog).getByRole('button', { name: 'Import' }));
       await waitFor(() =>
-        expect(onImport).toHaveBeenCalledWith(PLAIN, base, 'plain.csv'),
+        expect(onImport).toHaveBeenCalledWith(PLAIN, base, 'plain.csv', KEEP),
       );
     });
 
@@ -367,8 +381,128 @@ describe('the mapping dialog', () => {
           PLAIN,
           { ...base, timeZone: 'America/New_York' },
           'plain.csv',
+          KEEP,
         ),
       );
+    });
+  });
+
+  describe('a venue that already has events', () => {
+    const seed = async () => {
+      await putSource({
+        id: 's-replace',
+        moduleId: 'mapped-csv',
+        label: 'Again',
+        config: {
+          mapping: JSON.stringify({ ...MAPPING_A, venueLabel: 'Again' }),
+          fileName: 'old.csv',
+        },
+      });
+      const leg = {
+        assetId: 'bitcoin:native',
+        amount: '1',
+        direction: 'in' as const,
+        venue: 'csv:Again',
+        role: 'principal' as const,
+      };
+      await putEvents(
+        ['e1', 'e2', 'e3'].map((id) => ({
+          id,
+          sourceId: 's-replace',
+          externalId: id,
+          timestamp: 1,
+          kind: 'transfer' as const,
+          origin: 'derived' as const,
+          legs: [leg],
+        })),
+      );
+    };
+
+    const toPreview = async (user: User) => {
+      render(
+        <MapCsvDialog
+          open
+          onOpenChange={onOpenChange}
+          file={file()}
+          label="Again"
+          onImport={onImport}
+        />,
+      );
+      const dialog = await screen.findByRole('dialog');
+      await waitFor(() =>
+        expect(
+          within(dialog).getByRole('button', { name: 'Continue' }),
+        ).toBeEnabled(),
+      );
+      await user.click(
+        within(dialog).getByRole('button', { name: 'Continue' }),
+      );
+      await waitFor(() =>
+        expect(field(dialog, 'Date column').value).toBe('Datum'),
+      );
+      await user.click(within(dialog).getByRole('button', { name: 'Preview' }));
+      return dialog;
+    };
+
+    it('offers replacing its events, off by default', async () => {
+      await seed();
+      const user = userEvent.setup();
+      const dialog = await toPreview(user);
+      const box = within(dialog).getByRole('checkbox', {
+        name: "Replace this venue's existing events (3)",
+      });
+      expect(box).not.toBeChecked();
+      await user.click(within(dialog).getByRole('button', { name: 'Import' }));
+      await waitFor(() =>
+        expect(onImport).toHaveBeenCalledWith(
+          FIXTURE_A,
+          { ...MAPPING_A, venueLabel: 'Again' },
+          'bison.csv',
+          KEEP,
+        ),
+      );
+    });
+
+    it('replaces them only when ticked', async () => {
+      await seed();
+      const user = userEvent.setup();
+      const dialog = await toPreview(user);
+      await user.click(
+        within(dialog).getByRole('checkbox', {
+          name: "Replace this venue's existing events (3)",
+        }),
+      );
+      await user.click(within(dialog).getByRole('button', { name: 'Import' }));
+      await waitFor(() =>
+        expect(onImport).toHaveBeenCalledWith(
+          FIXTURE_A,
+          { ...MAPPING_A, venueLabel: 'Again' },
+          'bison.csv',
+          { replaceExisting: true },
+        ),
+      );
+    });
+
+    it('offers nothing for a new venue', async () => {
+      const user = userEvent.setup();
+      render(
+        <MapCsvDialog
+          open
+          onOpenChange={onOpenChange}
+          file={file()}
+          onImport={onImport}
+        />,
+      );
+      const dialog = await screen.findByRole('dialog');
+      await user.type(within(dialog).getByLabelText('Venue label'), 'Fresh');
+      await user.click(
+        within(dialog).getByRole('button', { name: 'Continue' }),
+      );
+      await fillMapping(user, dialog);
+      await user.click(within(dialog).getByRole('button', { name: 'Preview' }));
+      expect(
+        within(dialog).queryByRole('checkbox', { name: /Replace this venue/ }),
+      ).toBeNull();
     });
   });
 
@@ -415,7 +549,12 @@ describe('the mapping dialog', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Preview' }));
     await user.click(within(dialog).getByRole('button', { name: 'Import' }));
     await waitFor(() =>
-      expect(onImport).toHaveBeenCalledWith(FIXTURE_A, MAPPING_A, 'bison.csv'),
+      expect(onImport).toHaveBeenCalledWith(
+        FIXTURE_A,
+        MAPPING_A,
+        'bison.csv',
+        KEEP,
+      ),
     );
   });
 });

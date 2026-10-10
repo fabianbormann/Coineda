@@ -674,6 +674,8 @@
     "{{kind}} on {{date}}: {{legs}}": "{{kind}} on {{date}}: {{legs}}",
     "Column {{name}} is not in the file": "Column {{name}} is not in the file",
     "No outgoing rows: check the direction setting": "No outgoing rows: check the direction setting",
-    "No incoming rows: check the direction setting": "No incoming rows: check the direction setting"
+    "No incoming rows: check the direction setting": "No incoming rows: check the direction setting",
+    "Replace this venue's existing events ({{count}})": "Replace this venue's existing events ({{count}})",
+    "Replaced {{removed}} and imported {{inserted}} events": "Replaced {{removed}} and imported {{inserted}} events"
   }
 }

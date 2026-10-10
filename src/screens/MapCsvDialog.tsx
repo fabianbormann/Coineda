@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FileDropArea } from '@/components/files/FileDropArea';
-import { getSources } from '@/ledger/db';
+import { getEventsBySource, getSources } from '@/ledger/db';
 import type { EventKind } from '@/ledger/types';
 import { textFromFile } from '@/sources/csv/importFile';
 import { readCsv, sniffDelimiter } from '@/sources/csv/readCsv';
@@ -31,6 +31,7 @@ type Props = {
     text: string,
     mapping: CsvMapping,
     fileName: string,
+    options: { replaceExisting: boolean },
   ) => Promise<void>;
   /** A file already in hand; otherwise step 1 shows a drop area. */
   file?: File | null;
@@ -156,7 +157,13 @@ export const MapCsvDialog = ({
   const [text, setText] = useState('');
   const [label, setLabel] = useState(initialLabel);
   const [draft, setDraft] = useState<Draft>(EMPTY);
-  const [saved, setSaved] = useState<Record<string, CsvMapping>>({});
+  // Saved mappings by venue label, with how many events that venue holds.
+  const [saved, setSaved] = useState<
+    Record<string, { mapping: CsvMapping; count: number }>
+  >({});
+  // Off by default: replacing deletes the venue's earlier events, which only
+  // the person can decide.
+  const [replaceExisting, setReplaceExisting] = useState(false);
   const [appliedFor, setAppliedFor] = useState<string | null>(null);
   // Set by the first edit to any control: a saved mapping that loads late
   // must not overwrite what the person has already changed.
@@ -177,6 +184,7 @@ export const MapCsvDialog = ({
       setDraft(EMPTY);
       setAppliedFor(null);
       setTouched(false);
+      setReplaceExisting(false);
       setBusy(false);
       setError(null);
     }
@@ -188,23 +196,30 @@ export const MapCsvDialog = ({
       return;
     }
     let cancelled = false;
-    void getSources().then((sources) => {
-      if (cancelled) {
-        return;
-      }
-      const found: Record<string, CsvMapping> = {};
+    void (async () => {
+      const sources = await getSources();
+      const found: Record<string, { mapping: CsvMapping; count: number }> = {};
       for (const source of sources) {
         if (source.moduleId !== 'mapped-csv' || !source.config.mapping) {
           continue;
         }
+        let mapping: CsvMapping;
         try {
-          found[source.label] = JSON.parse(source.config.mapping);
+          mapping = JSON.parse(source.config.mapping);
         } catch {
           // A mapping that no longer parses is simply not offered.
+          continue;
         }
+        const events = await getEventsBySource(source.id);
+        found[source.label] = {
+          mapping,
+          count: events.filter((event) => event.origin === 'derived').length,
+        };
       }
-      setSaved(found);
-    });
+      if (!cancelled) {
+        setSaved(found);
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -236,11 +251,11 @@ export const MapCsvDialog = ({
   }, [file]);
 
   // Pre-fill from a saved source of this label, once per label.
-  const savedMapping = saved[label.trim()];
-  if (savedMapping && appliedFor !== label.trim()) {
+  const savedVenue = saved[label.trim()];
+  if (savedVenue && appliedFor !== label.trim()) {
     setAppliedFor(label.trim());
     if (!touched) {
-      setDraft(draftFrom(savedMapping));
+      setDraft(draftFrom(savedVenue.mapping));
     }
   }
 
@@ -389,7 +404,9 @@ export const MapCsvDialog = ({
     setBusy(true);
     setError(null);
     try {
-      await onImport(text, mapping, file.name);
+      await onImport(text, mapping, file.name, {
+        replaceExisting: savedVenue !== undefined && replaceExisting,
+      });
       onOpenChange(false);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure));
@@ -741,6 +758,18 @@ export const MapCsvDialog = ({
                   tickers: preview.unresolved.join(', '),
                 })}
               </p>
+            )}
+            {savedVenue && (
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={replaceExisting}
+                  onChange={(event) => setReplaceExisting(event.target.checked)}
+                />
+                {t("Replace this venue's existing events ({{count}})", {
+                  count: savedVenue.count,
+                })}
+              </label>
             )}
             <ul className="flex flex-col gap-1 text-xs">
               {preview.sample.slice(0, 3).map((event, index) => (

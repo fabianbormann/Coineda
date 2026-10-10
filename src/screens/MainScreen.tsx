@@ -373,15 +373,30 @@ export const MainScreen = ({ onReset }: Props) => {
   /** Imports a CSV through the mapping the person just built, then reloads.
    *  Rejections surface in the mapping dialog, as for `handleImportFile`. */
   const handleImportMapped = useCallback(
-    async (text: string, mapping: CsvMapping, fileName: string) => {
-      const outcome = await importMappedFile(text, mapping, fileName);
+    async (
+      text: string,
+      mapping: CsvMapping,
+      fileName: string,
+      options: { replaceExisting: boolean },
+    ) => {
+      const outcome = await importMappedFile(text, mapping, fileName, {
+        replaceExisting: options.replaceExisting,
+      });
       await load();
       notify.success(
-        t('Imported {{inserted}} new and {{updated}} updated from {{label}}', {
-          inserted: outcome.inserted,
-          updated: outcome.updated,
-          label: mapping.venueLabel,
-        }),
+        options.replaceExisting
+          ? t('Replaced {{removed}} and imported {{inserted}} events', {
+              removed: outcome.superseded,
+              inserted: outcome.inserted,
+            })
+          : t(
+              'Imported {{inserted}} new and {{updated}} updated from {{label}}',
+              {
+                inserted: outcome.inserted,
+                updated: outcome.updated,
+                label: mapping.venueLabel,
+              },
+            ),
       );
       for (const skipped of outcome.skipped) {
         notify.info(skipped);

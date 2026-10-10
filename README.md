@@ -82,8 +82,9 @@ and transaction hash, plus the date format, time zone, decimal separator, how di
 sign, or by tagged type values) and what kind of event each type value is. Nothing is guessed. A row
 that does not fit the mapping is skipped and counted under its reason, tickers that cannot be
 resolved are listed, and a mapping that only covers one direction of a sign convention raises a
-warning. The mapping is saved per venue label and pre-filled the next time; saving a changed mapping
-replaces that venue's events. Binance trades are also paired now: Buy, Spend and Fee rows from the
+warning. The mapping is saved per venue label and pre-filled the next time. A later file from the same venue
+adds to its events; they are replaced only if you tick "Replace this venue's existing events", and
+then in one step, so a failed import leaves them as they were. Binance trades are also paired now: Buy, Spend and Fee rows from the
 same second become one trade.
 
 ## Tax jurisdictions

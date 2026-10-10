@@ -43,6 +43,7 @@ type Props = {
     text: string,
     mapping: CsvMapping,
     fileName: string,
+    options: { replaceExisting: boolean },
   ) => Promise<void>;
 };
 

@@ -13,7 +13,14 @@ import {
 } from '@/sources/mapped-csv/parse';
 import { importMappedFile } from '@/sources/mapped-csv/importMapped';
 import { detectFileModule } from '@/sources/csv/registry';
-import { getAllEvents, getSources, openLedger } from '@/ledger/db';
+import {
+  getAllEvents,
+  getEventsBySource,
+  getSources,
+  openLedger,
+  replaceSourceEvents,
+} from '@/ledger/db';
+import type { LedgerEvent } from '@/ledger/types';
 
 const A = `Datum;Typ;Coin;Menge;Gebühr;Preis
 07.03.2024 10:00:00;Kauf;BTC;0,5;2,50;40000,00
@@ -250,7 +257,7 @@ describe('mapped-csv module and import', () => {
   });
 
   it('keeps one source per label and converges on re-import', async () => {
-    const first = await importMappedFile(A, mappingA, 'a.csv', 1);
+    const first = await importMappedFile(A, mappingA, 'a.csv', { now: 1 });
     expect(first.inserted).toBe(4);
     expect(first.source.moduleId).toBe('mapped-csv');
     expect(first.source.label).toBe('Bison');
@@ -258,7 +265,7 @@ describe('mapped-csv module and import', () => {
       mapping: JSON.stringify(mappingA),
       fileName: 'a.csv',
     });
-    const second = await importMappedFile(A, mappingA, 'a.csv', 2);
+    const second = await importMappedFile(A, mappingA, 'a.csv', { now: 2 });
     expect(second.inserted).toBe(0);
     expect(second.updated).toBe(4);
     expect(second.source.id).toBe(first.source.id);
@@ -267,7 +274,7 @@ describe('mapped-csv module and import', () => {
       A,
       { ...mappingA, venueLabel: 'Bitvavo' },
       'a.csv',
-      3,
+      { now: 3 },
     );
     expect(other.source.id).not.toBe(first.source.id);
     expect(await getSources()).toHaveLength(2);
@@ -353,21 +360,93 @@ describe('fix round 1', () => {
     expect(r.events).toHaveLength(0);
     expect(r.skipped.join('\n')).toMatch(/unparseable amounts/);
   });
+});
 
-  it('replaces a venue’s events when its mapping changes', async () => {
+describe('a second file from the same venue', () => {
+  // A later export of the same venue: a type value is missing and the order
+  // of first appearance differs, so the dialog's mapping is not identical.
+  const A2 = `Datum;Typ;Coin;Menge;Gebühr;Preis
+05.01.2025 10:00:00;Verkauf;BTC;0,1;;50000,00
+06.01.2025 10:00:00;Kauf;ETH;1,0;;3000,00
+`;
+  const mappingA2: CsvMapping = {
+    ...mappingA,
+    direction: { mode: 'type', in: ['Kauf'], out: ['Verkauf'] },
+    kinds: { Verkauf: 'trade', Kauf: 'trade' },
+  };
+
+  beforeEach(async () => {
     const db = await openLedger();
     for (const store of ['events', 'sources', 'cursors'] as const) {
       await db.clear(store);
     }
-    const first = await importMappedFile(A, mappingA, 'a.csv', 1);
-    const m2: CsvMapping = { ...mappingA, timeZone: 'UTC' };
-    const second = await importMappedFile(A, m2, 'a.csv', 2);
+  });
+
+  it('keeps the earlier file’s events when not asked to replace them', async () => {
+    const first = await importMappedFile(A, mappingA, 'a.csv', { now: 1 });
+    const second = await importMappedFile(A2, mappingA2, 'a2.csv', { now: 2 });
+    expect(second.source.id).toBe(first.source.id);
+    expect(second.superseded).toBe(0);
+    expect(second.inserted).toBe(2);
+    expect(await getAllEvents()).toHaveLength(6);
+  });
+
+  it('replaces only this venue’s events when asked, and saves the mapping', async () => {
+    const first = await importMappedFile(A, mappingA, 'a.csv', { now: 1 });
+    const other = await importMappedFile(
+      A,
+      { ...mappingA, venueLabel: 'Bitvavo' },
+      'a.csv',
+      { now: 1 },
+    );
+    const second = await importMappedFile(A2, mappingA2, 'a2.csv', {
+      now: 2,
+      replaceExisting: true,
+    });
     expect(second.source.id).toBe(first.source.id);
     expect(second.superseded).toBe(4);
-    expect(second.inserted).toBe(4);
-    expect(await getAllEvents()).toHaveLength(4);
-    const third = await importMappedFile(A, m2, 'a.csv', 3);
-    expect(third.superseded).toBe(0);
-    expect(third.updated).toBe(4);
+    expect(second.inserted).toBe(2);
+    const bison = await getEventsBySource(first.source.id);
+    expect(bison.map((e) => e.externalId).sort()).toEqual(
+      parseMapped(A2, mappingA2)
+        .events.map((e) => e.externalId)
+        .sort(),
+    );
+    expect(await getEventsBySource(other.source.id)).toHaveLength(4);
+    const saved = (await getSources()).find((s) => s.id === first.source.id)!;
+    expect(saved.config.mapping).toBe(JSON.stringify(mappingA2));
+    expect(saved.config.fileName).toBe('a2.csv');
+  });
+
+  it('replaceSourceEvents leaves the old events untouched when a write fails', async () => {
+    const first = await importMappedFile(A, mappingA, 'a.csv', { now: 1 });
+    const before = await getEventsBySource(first.source.id);
+    const good: LedgerEvent = { ...before[0], id: 'new-1', externalId: 'n1' };
+    // A function cannot be stored: the put throws inside the transaction,
+    // after the deletes were issued.
+    const bad = {
+      ...before[1],
+      id: 'new-2',
+      externalId: 'n2',
+      poison: () => 1,
+    } as unknown as LedgerEvent;
+    await expect(
+      replaceSourceEvents(first.source.id, [good, bad]),
+    ).rejects.toThrow();
+    const after = await getEventsBySource(first.source.id);
+    expect(after.map((e) => e.id).sort()).toEqual(
+      before.map((e) => e.id).sort(),
+    );
+  });
+
+  it('replaceSourceEvents refuses rows of another source', async () => {
+    const first = await importMappedFile(A, mappingA, 'a.csv', { now: 1 });
+    const [row] = await getEventsBySource(first.source.id);
+    await expect(
+      replaceSourceEvents(first.source.id, [
+        { ...row, id: 'x', sourceId: 'someone-else' },
+      ]),
+    ).rejects.toThrow();
+    expect(await getEventsBySource(first.source.id)).toHaveLength(4);
   });
 });

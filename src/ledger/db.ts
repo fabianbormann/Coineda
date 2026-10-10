@@ -408,6 +408,70 @@ export const deleteDerivedEvents = async (
 };
 
 /**
+ * Replaces one source's derived rows with `events`, all or nothing.
+ *
+ * The delete and the writes share ONE readwrite transaction over 'sources'
+ * and 'events': if any write fails the transaction is aborted and the old
+ * rows are all still there, so a failed replacement can never leave the
+ * venue empty or half-replaced. Strictly scoped: only rows indexed under
+ * `sourceId` are removed, authored rows survive (as in
+ * `deleteDerivedEvents`), and an event belonging to another source is
+ * refused before anything is touched. Like `putEventsIfSourceExists`, a
+ * source that is already gone makes this a no-op (`written: false`).
+ */
+export const replaceSourceEvents = async (
+  sourceId: string,
+  events: LedgerEvent[],
+  options?: WriteOptions,
+): Promise<{ written: boolean; removed: number; inserted: number }> => {
+  for (const event of events) {
+    if (event.sourceId !== sourceId) {
+      throw new Error(
+        `event ${event.externalId} belongs to ${event.sourceId}, not ${sourceId}`,
+      );
+    }
+    assertValidEvent(event);
+  }
+
+  const db = await openLedgerForWrite(options);
+  const tx = db.transaction(['sources', 'events'], 'readwrite');
+  try {
+    const source = await tx.objectStore('sources').get(sourceId);
+    if (!source) {
+      await tx.done;
+      return { written: false, removed: 0, inserted: 0 };
+    }
+    const store = tx.objectStore('events');
+    const rows = await store.index('sourceId').getAll(sourceId);
+    let removed = 0;
+    for (const row of rows) {
+      if (row.origin === 'derived') {
+        await store.delete(row.id);
+        removed += 1;
+      }
+    }
+    const index = store.index('identity');
+    let inserted = 0;
+    for (const event of events) {
+      // An authored row of the same identity keeps its id, as in putEvents.
+      const row = await index.get([event.sourceId, event.externalId]);
+      await store.put(row ? { ...event, id: row.id } : event);
+      if (!row) inserted += 1;
+    }
+    await tx.done;
+    return { written: true, removed, inserted };
+  } catch (error) {
+    try {
+      tx.abort();
+    } catch {
+      // Already aborted by the failing request.
+    }
+    await tx.done.catch(() => undefined);
+    throw error;
+  }
+};
+
+/**
  * Removes the rows a source once wrote under these external ids - the
  * per-row shape an earlier parser emitted for what is now one grouped
  * event - so a re-import converges instead of keeping both. An id with no
