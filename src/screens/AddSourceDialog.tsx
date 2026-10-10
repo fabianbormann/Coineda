@@ -19,6 +19,8 @@ import type { FileSourceModule } from '@/sources/csv/types';
 import { FileDropArea } from '@/components/files/FileDropArea';
 import type { SourceModule } from '@/sources/types';
 import { SourceForm } from './SourceForm';
+import { MapCsvDialog } from './MapCsvDialog';
+import type { CsvMapping } from '@/sources/mapped-csv/types';
 
 type Props = {
   open: boolean;
@@ -35,6 +37,13 @@ type Props = {
    *  this screen, and that is where a complaint about the wrong one
    *  belongs. */
   onImportFile: (file: File) => Promise<void>;
+  /** Reads one CSV through a column mapping the person supplied. Rejects
+   *  with a message the mapping dialog shows in place. */
+  onImportMapped: (
+    text: string,
+    mapping: CsvMapping,
+    fileName: string,
+  ) => Promise<void>;
 };
 
 /**
@@ -50,6 +59,7 @@ export const AddSourceDialog = ({
   onOpenChange,
   onCreated,
   onImportFile,
+  onImportMapped,
 }: Props) => {
   const { t } = useTranslation();
   const confirm = useConfirm();
@@ -65,6 +75,9 @@ export const AddSourceDialog = ({
    */
   const [fileModule, setFileModule] = useState<FileSourceModule | null>(null);
   const [importing, setImporting] = useState(false);
+  /** The column-mapping dialog, which replaces this one while it is open:
+   *  it has steps of its own, and two stacked modals trap focus badly. */
+  const [mapOpen, setMapOpen] = useState(false);
   const [label, setLabel] = useState('');
   const [config, setConfig] = useState<Record<string, string>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({});
@@ -83,6 +96,7 @@ export const AddSourceDialog = ({
     if (open) {
       setModule(null);
       setFileModule(null);
+      setMapOpen(false);
       setImporting(false);
       setLabel('');
       setConfig({});
@@ -93,6 +107,12 @@ export const AddSourceDialog = ({
   }
 
   const chooseFileModule = (next: FileSourceModule) => {
+    // Never auto-detected, so it has no plain drop path: it goes to the
+    // mapping dialog, which asks what the columns mean first.
+    if (next.manifest.id === 'mapped-csv') {
+      setMapOpen(true);
+      return;
+    }
     setFileModule(next);
     setFormError(null);
   };
@@ -198,155 +218,167 @@ export const AddSourceDialog = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        {!module && !fileModule ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>{t('Add a data source')}</DialogTitle>
-              <DialogDescription>
-                {t('Choose a data source type')}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex flex-col gap-4">
-              {/* Two routes in, named for what they ARE rather than for how
+    <>
+      <MapCsvDialog
+        open={open && mapOpen}
+        onOpenChange={(next) => {
+          setMapOpen(next);
+          if (!next) {
+            onOpenChange(false);
+          }
+        }}
+        onImport={onImportMapped}
+      />
+      <Dialog open={open && !mapOpen} onOpenChange={onOpenChange}>
+        <DialogContent>
+          {!module && !fileModule ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>{t('Add a data source')}</DialogTitle>
+                <DialogDescription>
+                  {t('Choose a data source type')}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col gap-4">
+                {/* Two routes in, named for what they ARE rather than for how
                   they are built. A person looking for Kraken does not know
                   or care that it arrives by file while Bitpanda arrives by
                   API; they know only that one of them will ask for a
                   download. Hiding the importers behind a separate button
                   elsewhere meant looking for Kraken in the list, not
                   finding it, and concluding it was unsupported. */}
-              <div className="flex flex-col gap-2">
-                <p className="text-sm font-medium">
-                  {t('Connect automatically')}
-                </p>
-                {registry.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    {t(
-                      'No source types are available yet. Check back after an update adds one.',
-                    )}
-                  </p>
-                ) : (
-                  registry.map((candidate) => (
-                    <Button
-                      key={candidate.manifest.id}
-                      type="button"
-                      variant="outline"
-                      className="justify-start"
-                      onClick={() => chooseModule(candidate)}
-                    >
-                      {t(candidate.manifest.label)}
-                    </Button>
-                  ))
-                )}
-              </div>
-
-              {fileRegistry.length > 0 && (
                 <div className="flex flex-col gap-2">
                   <p className="text-sm font-medium">
-                    {t('Import an export file')}
+                    {t('Connect automatically')}
                   </p>
-                  <p className="text-sm text-muted-foreground">
-                    {t(
-                      'These refuse a browser outright, so Coineda reads a file you export instead. No API key, and nothing leaves this device.',
-                    )}
-                  </p>
-                  {fileRegistry.map((candidate) => (
-                    <Button
-                      key={candidate.manifest.id}
-                      type="button"
-                      variant="outline"
-                      className="justify-start"
-                      onClick={() => chooseFileModule(candidate)}
-                    >
-                      {t(candidate.manifest.label)}
-                    </Button>
-                  ))}
+                  {registry.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t(
+                        'No source types are available yet. Check back after an update adds one.',
+                      )}
+                    </p>
+                  ) : (
+                    registry.map((candidate) => (
+                      <Button
+                        key={candidate.manifest.id}
+                        type="button"
+                        variant="outline"
+                        className="justify-start"
+                        onClick={() => chooseModule(candidate)}
+                      >
+                        {t(candidate.manifest.label)}
+                      </Button>
+                    ))
+                  )}
                 </div>
-              )}
-            </div>
-          </>
-        ) : fileModule ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>{t(fileModule.manifest.label)}</DialogTitle>
-              <DialogDescription>
-                {t('Export the file, then drop it here')}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex flex-col gap-4">
-              {/* The instructions sit NEXT to the drop area rather than
+
+                {fileRegistry.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-sm font-medium">
+                      {t('Import an export file')}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {t(
+                        'These refuse a browser outright, so Coineda reads a file you export instead. No API key, and nothing leaves this device.',
+                      )}
+                    </p>
+                    {fileRegistry.map((candidate) => (
+                      <Button
+                        key={candidate.manifest.id}
+                        type="button"
+                        variant="outline"
+                        className="justify-start"
+                        onClick={() => chooseFileModule(candidate)}
+                      >
+                        {t(candidate.manifest.label)}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : fileModule ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>{t(fileModule.manifest.label)}</DialogTitle>
+                <DialogDescription>
+                  {t('Export the file, then drop it here')}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col gap-4">
+                {/* The instructions sit NEXT to the drop area rather than
                   behind a link: which export to pick is the one thing that
                   goes wrong, and for Kraken picking the wrong one produces
                   a balance that looks right and is not. */}
-              <p className="text-sm text-muted-foreground">
-                {t(fileModule.manifest.help)}
-              </p>
-              <FileDropArea onFile={handleFile} disabled={importing} />
-              <a
-                href={fileModule.manifest.docsUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="w-fit text-sm text-muted-foreground underline hover:text-foreground"
-              >
-                {t('How to export it')}
-              </a>
-              {formError && (
-                <p className="text-sm text-destructive" role="alert">
-                  {formError}
+                <p className="text-sm text-muted-foreground">
+                  {t(fileModule.manifest.help)}
                 </p>
-              )}
-            </div>
-            <DialogFooter className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setFileModule(null)}
-                disabled={importing}
-              >
-                {t('Back')}
-              </Button>
-            </DialogFooter>
-          </>
-        ) : module ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>{t(module.manifest.label)}</DialogTitle>
-            </DialogHeader>
-            <div className="flex flex-col gap-4">
-              <SourceForm
-                module={module}
-                label={label}
-                config={config}
-                fieldErrors={fieldErrors}
-                secretsOptional={false}
-                onLabelChange={setLabel}
-                onConfigChange={(name, value) =>
-                  setConfig((prev) => ({ ...prev, [name]: value }))
-                }
-              />
-              {formError && (
-                <p className="text-sm text-destructive" role="alert">
-                  {formError}
-                </p>
-              )}
-            </div>
-            <DialogFooter className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setModule(null)}
-                disabled={saving}
-              >
-                {t('Back')}
-              </Button>
-              <Button type="button" onClick={handleSave} disabled={saving}>
-                {t('Save')}
-              </Button>
-            </DialogFooter>
-          </>
-        ) : null}
-      </DialogContent>
-    </Dialog>
+                <FileDropArea onFile={handleFile} disabled={importing} />
+                <a
+                  href={fileModule.manifest.docsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-fit text-sm text-muted-foreground underline hover:text-foreground"
+                >
+                  {t('How to export it')}
+                </a>
+                {formError && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {formError}
+                  </p>
+                )}
+              </div>
+              <DialogFooter className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setFileModule(null)}
+                  disabled={importing}
+                >
+                  {t('Back')}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : module ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>{t(module.manifest.label)}</DialogTitle>
+              </DialogHeader>
+              <div className="flex flex-col gap-4">
+                <SourceForm
+                  module={module}
+                  label={label}
+                  config={config}
+                  fieldErrors={fieldErrors}
+                  secretsOptional={false}
+                  onLabelChange={setLabel}
+                  onConfigChange={(name, value) =>
+                    setConfig((prev) => ({ ...prev, [name]: value }))
+                  }
+                />
+                {formError && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {formError}
+                  </p>
+                )}
+              </div>
+              <DialogFooter className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setModule(null)}
+                  disabled={saving}
+                >
+                  {t('Back')}
+                </Button>
+                <Button type="button" onClick={handleSave} disabled={saving}>
+                  {t('Save')}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };

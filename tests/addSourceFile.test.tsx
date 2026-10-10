@@ -30,6 +30,7 @@ const renderDialog = () =>
         onOpenChange={onOpenChange}
         onCreated={onCreated}
         onImportFile={onImportFile}
+        onImportMapped={vi.fn()}
       />
     </ConfirmProvider>,
   );

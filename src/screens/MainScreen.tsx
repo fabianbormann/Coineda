@@ -45,6 +45,8 @@ import {
   UnknownFileFormatError,
 } from '@/sources/csv/importFile';
 import { fileRegistry } from '@/sources/csv/registry';
+import { importMappedFile } from '@/sources/mapped-csv/importMapped';
+import type { CsvMapping } from '@/sources/mapped-csv/types';
 
 const DEFAULT_CURRENCY = 'eur';
 
@@ -362,6 +364,26 @@ export const MainScreen = ({ onReset }: Props) => {
       for (const skipped of outcome.skipped) {
         // Surfaced, not swallowed: a user whose balance looks short needs
         // to know which rows were left out and why.
+        notify.info(skipped);
+      }
+    },
+    [load, t],
+  );
+
+  /** Imports a CSV through the mapping the person just built, then reloads.
+   *  Rejections surface in the mapping dialog, as for `handleImportFile`. */
+  const handleImportMapped = useCallback(
+    async (text: string, mapping: CsvMapping, fileName: string) => {
+      const outcome = await importMappedFile(text, mapping, fileName);
+      await load();
+      notify.success(
+        t('Imported {{inserted}} new and {{updated}} updated from {{label}}', {
+          inserted: outcome.inserted,
+          updated: outcome.updated,
+          label: mapping.venueLabel,
+        }),
+      );
+      for (const skipped of outcome.skipped) {
         notify.info(skipped);
       }
     },
@@ -791,6 +813,7 @@ export const MainScreen = ({ onReset }: Props) => {
           open={addDialogOpen}
           onOpenChange={setAddDialogOpen}
           onImportFile={handleImportFile}
+          onImportMapped={handleImportMapped}
           onCreated={async (created) => {
             setAddDialogOpen(false);
             await load();
