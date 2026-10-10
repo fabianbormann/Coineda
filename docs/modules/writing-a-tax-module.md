@@ -214,6 +214,9 @@ table supplies no `reference` at all and sets `linesVerified: false`, so the
 page prints the section names and says the lines were not verified, rather
 than printing a number that might be a line off.
 
+The DATEV Buchungsstapel download is host-side too: it reads only the finished report,
+so a module needs nothing extra to be exported.
+
 ## Unresolved items are how you decline to guess
 
 `UnresolvedItem.kind` is `'needs-cost-basis' | 'needs-price' | 'unclassified'`.
