@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Loader2Icon, TriangleAlertIcon, DownloadIcon } from 'lucide-react';
+import {
+  Loader2Icon,
+  TriangleAlertIcon,
+  DownloadIcon,
+  PauseIcon,
+  PlayIcon,
+} from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -86,6 +92,7 @@ export const JourneyDialog = ({ open, onOpenChange }: Props) => {
   const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
   const [mode, setMode] = useState<JourneyMode>('relative');
   const [recording, setRecording] = useState(false);
+  const [paused, setPaused] = useState(false);
   // Bumped by "Try again" to re-run the build effect below without closing
   // and reopening the dialog first - the same shape
   // ExportCheckpointDialog's `attempt` uses.
@@ -108,6 +115,7 @@ export const JourneyDialog = ({ open, onOpenChange }: Props) => {
       setSeries(null);
       setMode('relative');
       setRecording(false);
+      setPaused(false);
     }
   }
 
@@ -156,7 +164,7 @@ export const JourneyDialog = ({ open, onOpenChange }: Props) => {
   // the export's own single sweep (in handleRecord) is the only thing
   // drawing to the canvas while MediaRecorder is capturing it.
   useEffect(() => {
-    if (status !== 'ready' || !series || recording) {
+    if (status !== 'ready' || !series || recording || paused) {
       return;
     }
     const canvas = canvasRef.current;
@@ -194,7 +202,7 @@ export const JourneyDialog = ({ open, onOpenChange }: Props) => {
         previewFrameRef.current = null;
       }
     };
-  }, [status, series, mode, recording, currency, i18n.language, t]);
+  }, [status, series, mode, recording, paused, currency, i18n.language, t]);
 
   const handleRecord = async () => {
     const canvas = canvasRef.current;
@@ -333,8 +341,28 @@ export const JourneyDialog = ({ open, onOpenChange }: Props) => {
               ref={canvasRef}
               width={CANVAS_WIDTH}
               height={CANVAS_HEIGHT}
+              aria-label={t('A short animation of your holdings over time.')}
               className="w-full rounded-md border bg-black"
             />
+            <p className="text-sm text-muted-foreground">
+              {t('A short animation of your holdings over time.')}
+            </p>
+            <div>
+              <Button
+                type="button"
+                variant="outline"
+                aria-pressed={paused}
+                onClick={() => setPaused((p) => !p)}
+                disabled={recording}
+              >
+                {paused ? (
+                  <PlayIcon className="size-4" aria-hidden="true" />
+                ) : (
+                  <PauseIcon className="size-4" aria-hidden="true" />
+                )}
+                {paused ? t('Play') : t('Pause')}
+              </Button>
+            </div>
             {recordError && (
               <p className="text-sm text-destructive" role="alert">
                 {t('Could not record your video: {{detail}}', {

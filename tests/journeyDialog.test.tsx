@@ -127,6 +127,30 @@ describe('JourneyDialog', () => {
     );
   });
 
+  it('can be paused and played, and has a text alternative', async () => {
+    const cancel = vi.spyOn(globalThis, 'cancelAnimationFrame');
+    const user = userEvent.setup();
+    render(<JourneyDialog open={true} onOpenChange={() => {}} />);
+
+    const pause = await screen.findByRole('button', { name: 'Pause' });
+    expect(pause).toHaveAttribute('aria-pressed', 'false');
+    expect(
+      screen.getByText('A short animation of your holdings over time.'),
+    ).toBeInTheDocument();
+
+    cancel.mockClear();
+    await user.click(pause);
+    const play = screen.getByRole('button', { name: 'Play' });
+    expect(play).toHaveAttribute('aria-pressed', 'true');
+    expect(cancel).toHaveBeenCalled();
+
+    await user.click(play);
+    expect(screen.getByRole('button', { name: 'Pause' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
   it('keeps the dialog open and shows the message when the series fails to build', async () => {
     buildJourneySeriesMock.mockReset();
     buildJourneySeriesMock.mockRejectedValue(

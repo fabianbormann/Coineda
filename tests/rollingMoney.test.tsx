@@ -136,3 +136,22 @@ describe('a balance arriving', () => {
     expect(screen.getByTestId('rolling-value').textContent).toContain('28');
   });
 });
+
+describe('the live region', () => {
+  const region = () =>
+    screen.getByTestId('rolling-value').closest('[aria-live]');
+
+  it('announces politely and atomically once settled', () => {
+    render(<RollingMoney value={28491.37} currency="eur" />);
+    expect(region()).toHaveAttribute('aria-live', 'polite');
+    expect(region()).toHaveAttribute('aria-atomic', 'true');
+  });
+
+  it('keeps announcing while the digits roll', () => {
+    const { rerender } = render(<RollingMoney value={0} currency="eur" />);
+    rerender(<RollingMoney value={28491.37} currency="eur" />);
+    expect(screen.queryAllByTestId('rolling-digit').length).toBeGreaterThan(0);
+    expect(region()).toHaveAttribute('aria-live', 'polite');
+    expect(region()).toHaveAttribute('aria-atomic', 'true');
+  });
+});

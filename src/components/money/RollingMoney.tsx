@@ -88,13 +88,16 @@ export const RollingMoney = ({
     return () => clearTimeout(settled);
   }, [value]);
 
+  // The same live-region wrapper whether rolling or settled, so what screen
+  // readers are watching is never swapped out underneath them.
   if (!rolling) {
     return (
       <span
-        data-testid="rolling-value"
+        aria-live="polite"
+        aria-atomic="true"
         className={cn('tabular-nums', className)}
       >
-        {formatted}
+        <span data-testid="rolling-value">{formatted}</span>
       </span>
     );
   }
@@ -110,7 +113,11 @@ export const RollingMoney = ({
 
   let column = -1;
   return (
-    <span className={cn('tabular-nums', className)}>
+    <span
+      aria-live="polite"
+      aria-atomic="true"
+      className={cn('tabular-nums', className)}
+    >
       {/* The figure itself, for anything that reads rather than looks. The
           columns below carry every digit of every turn in their text, so
           this is the only place the number can be read back. */}
