@@ -3,6 +3,54 @@
 Coineda targets **WCAG 2.1 level AA**, which is what BITV 2.0 requires. This page records how
 that is checked; it is not a certificate.
 
+## What is in place
+
+- **Language and page names.** `<html lang>` follows the chosen interface language; each route sets
+  `document.title` and renders one `h1`.
+- **Keyboard.** A "Skip to content" link is the first focusable element and targets
+  `<main id="main">`; after a navigation (not on first load) focus moves to the new page's `h1`.
+- **Forms.** One accessible name per control, a `legend` in every `fieldset`, required fields
+  marked once, the file input outside the drop-zone button, and dialog headings below the `h2`
+  that Radix gives `DialogTitle`.
+- **Motion.** `prefers-reduced-motion: reduce` stops the rolling figures and the Tailwind
+  enter/exit animations; the journey video has a pause button and a text alternative.
+- **Announcements.** The balance sits in an `aria-live="polite"` region; sync progress and import
+  results use the toast region.
+- **Contrast.** Measured from the tokens, below.
+
+## The gate
+
+`tests/axe.test.tsx` runs [axe-core](https://github.com/dequelabs/axe-core) over `document.body`
+for every screen and dialog, with the WCAG 2.0 and 2.1 A and AA rules (tags `wcag2a`, `wcag2aa`,
+`wcag21a`, `wcag21aa`), and fails on any violation, printing the rule id, its help text and the
+first offending element. It is part of `npx vitest run`, so it runs in CI with everything else.
+
+Each screen or dialog is a **recipe** in `tests/helpers/recipes.tsx`: a name and an async
+`render()` that prepares a clean device (fake IndexedDB, English, stubbed `matchMedia` and
+`fetch`), renders inside the providers that screen needs, opens the dialog it names and resolves
+once the content is in the DOM. A second test lists `src/**/*Dialog.tsx` and fails if a file's
+base name does not appear in some recipe's name.
+
+**Adding a screen or dialog:** add a recipe whose name contains the component's name (for a
+dialog, the file's base name, e.g. `FooDialog`), reusing the setup from that component's own test.
+Wait for something only the finished state shows (a field in the open step, the result of a
+run), not just the first paint, or axe scans a loading state. If axe then reports a violation, fix
+it in the component; do not disable the rule.
+
+**Rules that are off:**
+
+- `color-contrast`: jsdom does no layout or painting, so axe cannot work out the colours it would
+  compare. Contrast is covered by the measured table below and `tests/contrast.test.ts`.
+
+Nothing else is disabled. axe also reports Radix's focus-guard `span`s (`aria-hidden` with
+`tabindex="0"`) as "needs review" (`aria-hidden-focus`), not as a violation. They are how Radix
+keeps focus inside an open dialog, and focus that lands on one is sent straight back in.
+
+**What it cannot see:** anything that needs a real browser: rendered contrast, visible focus,
+reflow at 400% zoom, text spacing, target size, and how a screen reader actually reads it all.
+Before a procurement or a BITV declaration, have someone audit in a browser with a screen reader
+(NVDA or VoiceOver) and the keyboard alone.
+
 ## Colour contrast
 
 Measured **2026-10-10** from the tokens in `src/styles/lumen.css` and `src/index.css`, in both

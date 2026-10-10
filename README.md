@@ -142,6 +142,10 @@ npm run dist         # desktop installers
 
 Interface languages: English and German.
 
+Accessibility: the test suite gates every screen and dialog against BITV 2.0 / WCAG 2.1 AA with
+axe-core ([docs/accessibility.md](docs/accessibility.md)). A browser-level audit is still
+recommended before procurement.
+
 ## Contributing
 
 The two places that grow are the two places built to be extended by people who have never seen the
