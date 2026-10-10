@@ -130,6 +130,10 @@ export type ConsumedLot = {
   acquisitionEventId: string;
   amount: string;
   costBasis: string;
+  /** The part of `costBasis` that is the acquisition's own fee (already
+   *  inside it; shown, never added again). Always set by the matcher;
+   *  optional only so hand-built lots need not state it. */
+  acquisitionCosts?: string;
   acquiredAt: number;
   heldDays: number;
   /** Why the lot looks the way it does, from its acquisition's `origin`. */

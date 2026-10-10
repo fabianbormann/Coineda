@@ -1385,6 +1385,38 @@ describe('the lots behind a disposal', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows the fee share of a lot, and leaves the gain where it was', async () => {
+    taxRegistry.push({
+      ...makeModule(),
+      classify: (event, ...rest) =>
+        classify(event, ...rest).map((taxEvent) =>
+          taxEvent.kind === 'acquisition'
+            ? {
+                ...taxEvent,
+                costs: [{ assetId: 'fiat:eur', amount: '2' }],
+              }
+            : taxEvent,
+        ),
+    });
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+
+    expect(await screen.findByText(/of which fees/)).toBeInTheDocument();
+  });
+
+  it('prints no fee share for a lot bought without a fee', async () => {
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+
+    expect(await screen.findByText(/Acquired/)).toBeInTheDocument();
+    expect(screen.queryByText(/of which fees/)).not.toBeInTheDocument();
+  });
+
   it('never prints an acquisition date for an averaged pool', async () => {
     // matchMovingAverage gives its synthetic lot the DISPOSAL's own
     // timestamp as acquiredAt and heldDays 0, because an averaged pool has

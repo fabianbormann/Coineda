@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { match } from '@/tax/matching';
+import Big from 'big.js';
 import type { TaxEvent } from '@/tax/types';
 
 const event = (
@@ -741,5 +742,95 @@ describe('capital events', () => {
 
     expect(withCapital.matched).toEqual(without.matched);
     expect(withCapital.shortfalls).toEqual([]);
+  });
+});
+
+describe('the fee share of a consumed lot', () => {
+  const buyWithFee = (fee: string, amount: string, value: string) =>
+    event({
+      sourceEventId: 'buy',
+      kind: 'acquisition',
+      amount,
+      value,
+      timestamp: 1000,
+      costs: [{ assetId: 'fiat:eur', amount: fee, value: fee }],
+    });
+  const sell = (id: string, amount: string, value: string, at: number) =>
+    event({
+      sourceEventId: id,
+      kind: 'disposal',
+      amount,
+      value,
+      timestamp: at,
+    });
+
+  it('gives each of three equal sells a third of the buy fee', () => {
+    const { matched } = match(
+      [
+        buyWithFee('3', '3', '300'),
+        sell('s1', '1', '150', 2000),
+        sell('s2', '1', '150', 3000),
+        sell('s3', '1', '150', 4000),
+      ],
+      'fifo',
+      pooled,
+    );
+
+    expect(matched.map((m) => m.consumed[0].acquisitionCosts)).toEqual([
+      '1',
+      '1',
+      '1',
+    ]);
+    // Nothing moved: the fee was already inside the basis.
+    expect(matched.map((m) => m.consumed[0].costBasis)).toEqual([
+      '101',
+      '101',
+      '101',
+    ]);
+    expect(matched[0].gain).toBe('49');
+  });
+
+  it('sums the shares exactly to the fee when it does not divide', () => {
+    const { matched } = match(
+      [
+        buyWithFee('1', '3', '300'),
+        sell('s1', '1', '150', 2000),
+        sell('s2', '1', '150', 3000),
+        sell('s3', '1', '150', 4000),
+      ],
+      'fifo',
+      pooled,
+    );
+
+    const lots = matched.map((m) => m.consumed[0]);
+    const sum = (pick: (l: (typeof lots)[number]) => string) =>
+      lots.reduce((total, l) => total.plus(pick(l)), new Big(0)).toString();
+    expect(sum((l) => l.acquisitionCosts ?? '0')).toBe('1');
+    expect(sum((l) => l.costBasis)).toBe('301');
+    expect(
+      sum((l) =>
+        new Big(l.costBasis).minus(l.acquisitionCosts ?? '0').toString(),
+      ),
+    ).toBe('300');
+  });
+
+  it('carries the pooled fee share in a moving-average pool', () => {
+    const { matched } = match(
+      [
+        buyWithFee('2', '10', '100'),
+        {
+          ...buyWithFee('4', '10', '300'),
+          sourceEventId: 'buy2',
+          timestamp: 1500,
+        },
+        sell('s1', '10', '400', 2000),
+      ],
+      'moving-average',
+      pooled,
+    );
+
+    // Pool: 20 units, fees 6; half disposed.
+    expect(matched[0].consumed[0].acquisitionCosts).toBe('3');
+    expect(matched[0].consumed[0].costBasis).toBe('203');
   });
 });

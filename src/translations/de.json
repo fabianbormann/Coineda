@@ -504,6 +504,7 @@
     "Network fee on a transfer between your own wallets, disposed of at market value and not deducted.": "Netzwerkgebühr bei einem Transfer zwischen deinen eigenen Wallets, zum Marktwert veräußert und nicht abgezogen.",
     "Sent to someone else in a transaction that also moved coins between your own wallets.": "An jemand anderen gesendet, in einer Transaktion, die auch Coins zwischen deinen eigenen Wallets bewegt hat.",
     "Acquired {{date}}": "Angeschafft am {{date}}",
+    "of which fees {{amount}}": "davon Gebühren {{amount}}",
     "Hard fork — acquired at 0 (BMF 06.03.2025)": "Hard Fork — Anschaffung zu 0 (BMF 06.03.2025)",
     "cost": "Anschaffungskosten",
     "held {{days}} days": "{{days}} Tage gehalten",

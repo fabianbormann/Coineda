@@ -2206,6 +2206,20 @@ export const TaxReportScreen = () => {
                                     value={Number(lot.costBasis)}
                                     currency={baseCurrency}
                                   />{' '}
+                                  {lot.acquisitionCosts !== undefined &&
+                                    !isZeroAmount(lot.acquisitionCosts) && (
+                                      <>
+                                        (
+                                        {t('of which fees {{amount}}', {
+                                          amount: formatFiat(
+                                            Number(lot.acquisitionCosts),
+                                            i18n.language,
+                                            baseCurrency,
+                                          ),
+                                        })}
+                                        ){' '}
+                                      </>
+                                    )}
                                   ·{' '}
                                   {t('held {{days}} days', {
                                     days: lot.heldDays,

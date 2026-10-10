@@ -60,6 +60,8 @@ type FifoLot = {
   acquisitionEventId: string;
   amount: string;
   costBasis: string;
+  /** The fee part of `costBasis`, apportioned exactly as it is. */
+  acquisitionCosts: string;
   acquiredAt: number;
   origin?: { key: string };
 };
@@ -67,6 +69,8 @@ type FifoLot = {
 type AveragePool = {
   amount: string;
   cost: string;
+  /** The fee part of `cost`. */
+  fees: string;
 };
 
 type MatchResult = {
@@ -240,17 +244,23 @@ const matchFifo = (
           compareAmounts(take, lot.amount) === 0
             ? lot.costBasis
             : proportion(lot.costBasis, take, lot.amount);
+        const takenFees =
+          compareAmounts(take, lot.amount) === 0
+            ? lot.acquisitionCosts
+            : proportion(lot.acquisitionCosts, take, lot.amount);
 
         destination.push({
           acquisitionEventId: lot.acquisitionEventId,
           amount: take,
           costBasis: takenCost,
+          acquisitionCosts: takenFees,
           acquiredAt: lot.acquiredAt,
           ...(lot.origin === undefined ? {} : { origin: lot.origin }),
         });
 
         lot.amount = subtractAmounts(lot.amount, take);
         lot.costBasis = subtractAmounts(lot.costBasis, takenCost);
+        lot.acquisitionCosts = subtractAmounts(lot.acquisitionCosts, takenFees);
         remaining = subtractAmounts(remaining, take);
         if (isZeroAmount(lot.amount)) {
           source.shift();
@@ -272,12 +282,14 @@ const matchFifo = (
         // Not a lot: never substitute zero for an unknown cost basis.
         continue;
       }
+      const fees = costsOf(event);
       lots.push({
         acquisitionEventId: event.sourceEventId,
         amount: event.amount,
         // Anschaffungsnebenkosten: a buy's fee is part of what the lot
         // cost, so it comes back out of a later gain.
-        costBasis: addAmounts(event.value, costsOf(event)),
+        costBasis: addAmounts(event.value, fees),
+        acquisitionCosts: fees,
         acquiredAt: event.timestamp,
         ...(event.origin === undefined ? {} : { origin: event.origin }),
       });
@@ -304,11 +316,18 @@ const matchFifo = (
         compareAmounts(takeAmount, lot.amount) === 0
           ? lot.costBasis
           : proportion(lot.costBasis, takeAmount, lot.amount);
+      // The same split, the same remainder rule: over a lot's consumptions
+      // the shares add up exactly to the fee it was bought with.
+      const takenFees =
+        compareAmounts(takeAmount, lot.amount) === 0
+          ? lot.acquisitionCosts
+          : proportion(lot.acquisitionCosts, takeAmount, lot.amount);
 
       consumed.push({
         acquisitionEventId: lot.acquisitionEventId,
         amount: takeAmount,
         costBasis: takenCost,
+        acquisitionCosts: takenFees,
         acquiredAt: lot.acquiredAt,
         heldDays: Math.floor((event.timestamp - lot.acquiredAt) / MS_PER_DAY),
         ...(lot.origin === undefined ? {} : { origin: lot.origin }),
@@ -316,6 +335,7 @@ const matchFifo = (
 
       lot.amount = subtractAmounts(lot.amount, takeAmount);
       lot.costBasis = subtractAmounts(lot.costBasis, takenCost);
+      lot.acquisitionCosts = subtractAmounts(lot.acquisitionCosts, takenFees);
       remainingToSell = subtractAmounts(remainingToSell, takeAmount);
 
       if (isZeroAmount(lot.amount)) {
@@ -379,7 +399,7 @@ const matchMovingAverage = (
     if (existing) {
       return existing;
     }
-    const created: AveragePool = { amount: '0', cost: '0' };
+    const created: AveragePool = { amount: '0', cost: '0', fees: '0' };
     byPartition.set(partition, created);
     return created;
   };
@@ -405,12 +425,18 @@ const matchMovingAverage = (
         compareAmounts(moved, source.amount) === 0
           ? source.cost
           : proportion(source.cost, moved, source.amount);
+      const fees =
+        compareAmounts(moved, source.amount) === 0
+          ? source.fees
+          : proportion(source.fees, moved, source.amount);
 
       source.amount = subtractAmounts(source.amount, moved);
       source.cost = subtractAmounts(source.cost, cost);
+      source.fees = subtractAmounts(source.fees, fees);
       const destination = poolIn(to);
       destination.amount = addAmounts(destination.amount, moved);
       destination.cost = addAmounts(destination.cost, cost);
+      destination.fees = addAmounts(destination.fees, fees);
       continue;
     }
 
@@ -423,10 +449,9 @@ const matchMovingAverage = (
         continue;
       }
       pool.amount = addAmounts(pool.amount, event.amount);
-      pool.cost = addAmounts(
-        pool.cost,
-        addAmounts(event.value, costsOf(event)),
-      );
+      const fees = costsOf(event);
+      pool.cost = addAmounts(pool.cost, addAmounts(event.value, fees));
+      pool.fees = addAmounts(pool.fees, fees);
       continue;
     }
 
@@ -451,8 +476,14 @@ const matchMovingAverage = (
         ? pool.cost
         : proportion(pool.cost, disposedAmount, pool.amount);
 
+    const acquisitionCosts =
+      compareAmounts(disposedAmount, pool.amount) === 0
+        ? pool.fees
+        : proportion(pool.fees, disposedAmount, pool.amount);
+
     pool.amount = subtractAmounts(pool.amount, disposedAmount);
     pool.cost = subtractAmounts(pool.cost, costBasis);
+    pool.fees = subtractAmounts(pool.fees, acquisitionCosts);
 
     const costs = costsOf(event);
     // A fee larger than the sale leaves `netValue` negative: that is a
@@ -475,6 +506,7 @@ const matchMovingAverage = (
           acquisitionEventId: 'pool',
           amount: disposedAmount,
           costBasis,
+          acquisitionCosts,
           acquiredAt: event.timestamp,
           heldDays: 0,
         },

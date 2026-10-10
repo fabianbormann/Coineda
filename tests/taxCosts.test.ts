@@ -127,6 +127,36 @@ describe('trade fees reach the gain', () => {
     expect(report.lines[0].gain).toBe('-2');
   });
 
+  it('exposes the fee share of the consumed lot without moving the gain', async () => {
+    await putEvents([
+      event({
+        id: 'buy-with-fee',
+        externalId: 'buy-with-fee',
+        timestamp: Date.UTC(2025, 0, 1),
+        legs: [
+          leg({ assetId: EUR, amount: '100', direction: 'out' }),
+          leg({ assetId: ADA, amount: ada(100), direction: 'in' }),
+          leg({ assetId: EUR, amount: '3', direction: 'out', role: 'fee' }),
+        ],
+      }),
+      event({
+        id: 'sell',
+        externalId: 'sell',
+        legs: [
+          leg({ assetId: ADA, amount: ada(25), direction: 'out' }),
+          leg({ assetId: EUR, amount: '25', direction: 'in' }),
+        ],
+      }),
+    ]);
+
+    const report = await runGermany(2025);
+
+    // A quarter of the lot: 103 / 4 of basis, 3 / 4 of it fee.
+    expect(report.lines[0].consumed[0].costBasis).toBe('25.75');
+    expect(report.lines[0].consumed[0].acquisitionCosts).toBe('0.75');
+    expect(report.lines[0].gain).toBe('-0.75');
+  });
+
   it('deducts a crypto fee on a swap once, and disposes of the fee coins', async () => {
     // ADA at 1 EUR before 2025 and 2 EUR from then on, so the identity
     // below is proved at a price that moved, not only at a flat one.
