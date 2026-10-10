@@ -631,6 +631,11 @@
     "Must be 1–7 digits": "Must be 1–7 digits",
     "Must be 1–5 digits": "Must be 1–5 digits",
     "Must be 4–8 digits": "Must be 4–8 digits",
-    "Your DATEV advisor and client numbers and the accounts to book §23 results and §22 Nr. 3 income to. Coineda ships no defaults; the export stays disabled until all are set.": "Your DATEV advisor and client numbers and the accounts to book §23 results and §22 Nr. 3 income to. Coineda ships no defaults; the export stays disabled until all are set."
+    "Your DATEV advisor and client numbers and the accounts to book §23 results and §22 Nr. 3 income to. Coineda ships no defaults; the export stays disabled until all are set.": "Your DATEV advisor and client numbers and the accounts to book §23 results and §22 Nr. 3 income to. Coineda ships no defaults; the export stays disabled until all are set.",
+    "Other CSV (map the columns)": "Other CSV (map the columns)",
+    "For an exchange Coineda has no importer for: drop the file, tell Coineda which column holds the date, asset, amount and type, and how dates and decimals are written. Nothing is guessed, the mapping is saved for the next file from that venue, and nothing leaves this device.": "For an exchange Coineda has no importer for: drop the file, tell Coineda which column holds the date, asset, amount and type, and how dates and decimals are written. Nothing is guessed, the mapping is saved for the next file from that venue, and nothing leaves this device.",
+    "Map the date, asset and amount columns": "Map the date, asset and amount columns",
+    "A type value cannot be both incoming and outgoing": "A type value cannot be both incoming and outgoing",
+    "Direction by type needs a type column": "Direction by type needs a type column"
   }
 }

@@ -2,6 +2,7 @@ import binanceCsv from '@/sources/binance-csv';
 import coinbaseCsv from '@/sources/coinbase-csv';
 import krakenCsv from '@/sources/kraken-csv';
 import ledgerLiveCsv from '@/sources/ledger-live-csv';
+import mappedCsv from '@/sources/mapped-csv';
 import type { FileSourceModule } from './types';
 
 /**
@@ -14,6 +15,7 @@ export const fileRegistry: FileSourceModule[] = [
   binanceCsv,
   coinbaseCsv,
   ledgerLiveCsv,
+  mappedCsv,
 ];
 
 export const findFileModule = (id: string): FileSourceModule | undefined =>

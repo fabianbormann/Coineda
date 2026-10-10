@@ -11,6 +11,7 @@ import type { AssetEntry } from '@/assets/catalogue';
 import type { ParseResult } from '@/sources/csv/types';
 import type { DerivedEvent } from '@/sources/types';
 import type { Leg } from '@/ledger/types';
+import { fnv64Hex } from '@/sources/csv/identity';
 
 /**
  * Ledger Live's "Operation history" export.
@@ -78,27 +79,6 @@ export const sniff = (text: string): boolean => {
     return false;
   }
 };
-
-const FNV_OFFSET = 0xcbf29ce484222325n;
-const FNV_PRIME = 0x100000001b3n;
-const MASK = 0xffffffffffffffffn;
-
-const fnv1a64 = (text: string, seed: bigint): string => {
-  let hash = seed;
-  for (const byte of new TextEncoder().encode(text)) {
-    hash = ((hash ^ BigInt(byte)) * FNV_PRIME) & MASK;
-  }
-  return hash.toString(16).padStart(16, '0');
-};
-
-/**
- * A synchronous 128-bit-wide identity (two FNV-1a 64 passes), because
- * `FileSourceModule.parse` is synchronous and Web Crypto is not. It is a
- * dedupe key over a few thousand rows of one user's own file, not a security
- * boundary.
- */
-const identity = (text: string): string =>
-  fnv1a64(text, FNV_OFFSET) + fnv1a64(`|${text}`, FNV_OFFSET ^ 0x9e3779b9n);
 
 /**
  * Which catalogue entry an account's ticker is.
@@ -292,7 +272,7 @@ export const parse = (input: string): ParseResult => {
     const occurrence = seen.get(key) ?? 0;
     seen.set(key, occurrence + 1);
     events.push({
-      externalId: identity(key + (occurrence === 0 ? '' : `|${occurrence}`)),
+      externalId: fnv64Hex(key + (occurrence === 0 ? '' : `|${occurrence}`)),
       timestamp: when,
       kind,
       origin: 'derived',

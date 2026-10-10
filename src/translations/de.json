@@ -631,6 +631,11 @@
     "Must be 1–7 digits": "Muss 1–7 Ziffern haben",
     "Must be 1–5 digits": "Muss 1–5 Ziffern haben",
     "Must be 4–8 digits": "Muss 4–8 Ziffern haben",
-    "Your DATEV advisor and client numbers and the accounts to book §23 results and §22 Nr. 3 income to. Coineda ships no defaults; the export stays disabled until all are set.": "Deine DATEV-Berater- und Mandantennummer und die Konten, auf die §23-Ergebnisse und §22-Nr.-3-Einkünfte gebucht werden. Coineda liefert keine Vorgaben; der Export bleibt deaktiviert, bis alles gesetzt ist."
+    "Your DATEV advisor and client numbers and the accounts to book §23 results and §22 Nr. 3 income to. Coineda ships no defaults; the export stays disabled until all are set.": "Deine DATEV-Berater- und Mandantennummer und die Konten, auf die §23-Ergebnisse und §22-Nr.-3-Einkünfte gebucht werden. Coineda liefert keine Vorgaben; der Export bleibt deaktiviert, bis alles gesetzt ist.",
+    "Other CSV (map the columns)": "Andere CSV (Spalten selbst zuordnen)",
+    "For an exchange Coineda has no importer for: drop the file, tell Coineda which column holds the date, asset, amount and type, and how dates and decimals are written. Nothing is guessed, the mapping is saved for the next file from that venue, and nothing leaves this device.": "Für eine Börse, für die Coineda keinen Importer hat: lege die Datei ab, sag Coineda, welche Spalte Datum, Asset, Menge und Typ enthält und wie Datum und Dezimalzahlen geschrieben sind. Nichts wird geraten, die Zuordnung wird für die nächste Datei dieser Börse gespeichert, und nichts verlässt dieses Gerät.",
+    "Map the date, asset and amount columns": "Ordne die Spalten Datum, Asset und Menge zu",
+    "A type value cannot be both incoming and outgoing": "Ein Typ-Wert kann nicht eingehend und ausgehend zugleich sein",
+    "Direction by type needs a type column": "Richtung nach Typ braucht eine Typspalte"
   }
 }

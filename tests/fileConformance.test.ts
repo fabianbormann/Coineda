@@ -35,65 +35,68 @@ describe('every module in the file registry', () => {
     expect(ids).toEqual([...new Set(ids)]);
   });
 
-  describe.each(fileRegistry.map((m) => [m.manifest.id, m] as const))(
-    '%s',
-    (id, module) => {
-      const { manifest } = module;
+  // The mapped-CSV module has no fixture of its own and is never sniffed: it
+  // parses only with a user mapping, and tests/mappedCsv.test.ts covers it.
+  describe.each(
+    fileRegistry
+      .filter((m) => m.manifest.id !== 'mapped-csv')
+      .map((m) => [m.manifest.id, m] as const),
+  )('%s', (id, module) => {
+    const { manifest } = module;
 
-      it('has a kebab-case id and declares what it emits', () => {
-        expect(manifest.id).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
-        expect(manifest.emits.length).toBeGreaterThan(0);
-      });
+    it('has a kebab-case id and declares what it emits', () => {
+      expect(manifest.id).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+      expect(manifest.emits.length).toBeGreaterThan(0);
+    });
 
-      it('keys its label and help in both locale files', () => {
-        for (const key of [manifest.label, manifest.help]) {
-          expect(enKeys).toContain(key);
-          expect(deKeys).toContain(key);
+    it('keys its label and help in both locale files', () => {
+      for (const key of [manifest.label, manifest.help]) {
+        expect(enKeys).toContain(key);
+        expect(deKeys).toContain(key);
+      }
+    });
+
+    it.each([
+      ['an empty string', ''],
+      ['unrelated CSV', 'garbage,,,\n'],
+      ['control characters', '\u0000\u0001'],
+    ])('refuses %s without throwing', (_name, text) => {
+      expect(module.sniff(text)).toBe(false);
+    });
+
+    it('parses its fixture into well-formed derived events', () => {
+      const { events } = module.parse(fixtureOf(id));
+      expect(events.length).toBeGreaterThan(0);
+      const seen = new Set<string>();
+      for (const event of events) {
+        checkDerivedEvent(event, manifest);
+        expect(event.origin).toBe('derived');
+        expect(Number.isFinite(event.timestamp)).toBe(true);
+        for (const leg of event.legs) {
+          expect(leg.amount).toMatch(
+            leg.assetId.startsWith('fiat:') ? /^\d+(\.\d+)?$/ : /^\d+$/,
+          );
         }
-      });
+        expect(seen.has(event.externalId)).toBe(false);
+        seen.add(event.externalId);
+      }
+    });
 
-      it.each([
-        ['an empty string', ''],
-        ['unrelated CSV', 'garbage,,,\n'],
-        ['control characters', '\u0000\u0001'],
-      ])('refuses %s without throwing', (_name, text) => {
-        expect(module.sniff(text)).toBe(false);
-      });
-
-      it('parses its fixture into well-formed derived events', () => {
-        const { events } = module.parse(fixtureOf(id));
-        expect(events.length).toBeGreaterThan(0);
-        const seen = new Set<string>();
-        for (const event of events) {
+    it('emits trades with both an in and an out principal leg', () => {
+      for (const event of module.parse(fixtureOf(id)).events) {
+        if (event.kind === 'trade') {
           checkDerivedEvent(event, manifest);
-          expect(event.origin).toBe('derived');
-          expect(Number.isFinite(event.timestamp)).toBe(true);
-          for (const leg of event.legs) {
-            expect(leg.amount).toMatch(
-              leg.assetId.startsWith('fiat:') ? /^\d+(\.\d+)?$/ : /^\d+$/,
-            );
-          }
-          expect(seen.has(event.externalId)).toBe(false);
-          seen.add(event.externalId);
         }
-      });
+      }
+    });
 
-      it('emits trades with both an in and an out principal leg', () => {
-        for (const event of module.parse(fixtureOf(id)).events) {
-          if (event.kind === 'trade') {
-            checkDerivedEvent(event, manifest);
-          }
-        }
-      });
-
-      it('is the only module whose sniff accepts its fixture', () => {
-        const text = fixtureOf(id);
-        expect(module.sniff(text)).toBe(true);
-        const claimants = fileRegistry
-          .filter((other) => other !== module && other.sniff(text))
-          .map((other) => other.manifest.id);
-        expect(claimants).toEqual([]);
-      });
-    },
-  );
+    it('is the only module whose sniff accepts its fixture', () => {
+      const text = fixtureOf(id);
+      expect(module.sniff(text)).toBe(true);
+      const claimants = fileRegistry
+        .filter((other) => other !== module && other.sniff(text))
+        .map((other) => other.manifest.id);
+      expect(claimants).toEqual([]);
+    });
+  });
 });
