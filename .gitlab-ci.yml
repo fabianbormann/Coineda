@@ -1,0 +1,25 @@
+# Mirrors .github/workflows/test.yml so a copy of the repository on
+# gitlab.opencode.de gets a pipeline that runs the same checks. GitHub ignores this file.
+image: node:22
+
+stages:
+  - test
+
+cache:
+  key:
+    files:
+      - package-lock.json
+  paths:
+    - .npm/
+
+variables:
+  npm_config_cache: '$CI_PROJECT_DIR/.npm'
+
+test:
+  stage: test
+  script:
+    - npm ci
+    - npm run lint
+    - npm run format:check
+    - npx tsc --noEmit
+    - npx vitest run

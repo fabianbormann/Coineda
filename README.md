@@ -155,6 +155,9 @@ Interface languages: English and German.
 Self-hosting: to run Coineda against your own price and chain services, with no calls to public
 providers, see [docs/operations/self-hosting.md](docs/operations/self-hosting.md).
 
+Public sector: the repository is prepared for a listing on openCode, the federal Public Money, Public Code
+platform; see [docs/operations/opencode.md](docs/operations/opencode.md).
+
 Accessibility: the test suite runs axe-core's WCAG 2.1 A/AA rules (BITV 2.0's baseline) over
 every screen, onboarding step and dialog, in at least one state each, and measures colour contrast
 from the tokens ([docs/accessibility.md](docs/accessibility.md) lists exactly what is covered). That

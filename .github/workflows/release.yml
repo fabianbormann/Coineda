@@ -31,3 +31,4 @@ jobs:
         with:
           release-type: node
           versioning-strategy: always-bump-patch
+          extra-files: publiccode.yml
