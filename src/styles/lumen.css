@@ -4,8 +4,12 @@
 /* The export loaded PT Sans and PT Serif from fonts.googleapis.com. Coineda
    is an offline-first PWA, so a runtime font fetch would fail with no
    network and the text would silently fall back - the faces are installed
-   from @fontsource and imported in src/index.css instead. Nothing else in
-   this file differs from the export. */
+   from @fontsource and imported in src/index.css instead.
+   The one other departure: `--lm-stroke` is more opaque than the export's
+   (0.3 -> 0.5 light, 0.32 -> 0.4 dark). It is the only boundary an input
+   or select has (`--input`), and at the export's alpha it measured 1.96:1
+   and 2.68:1 against the page - under WCAG 1.4.11's 3:1. See
+   docs/accessibility.md and tests/contrast.test.ts. */
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -46,7 +50,7 @@
   --lm-ink: #121318;
   --lm-mute: rgb(18 19 24 / 0.72);
   --lm-faint: rgb(18 19 24 / 0.08);
-  --lm-stroke: rgb(18 19 24 / 0.3);
+  --lm-stroke: rgb(18 19 24 / 0.5);
   --lm-hl: rgb(255 255 255 / 0.95);
   --lm-glass-1: rgb(255 255 255 / 0.35);
   --lm-glass-2: rgb(255 255 255 / 0.55);
@@ -68,7 +72,7 @@
   --lm-ink: #f3f4f8;
   --lm-mute: rgb(243 244 248 / 0.78);
   --lm-faint: rgb(243 244 248 / 0.1);
-  --lm-stroke: rgb(243 244 248 / 0.32);
+  --lm-stroke: rgb(243 244 248 / 0.4);
   --lm-hl: rgb(255 255 255 / 0.2);
   --lm-glass-1: rgb(255 255 255 / 0.05);
   --lm-glass-2: rgb(255 255 255 / 0.09);

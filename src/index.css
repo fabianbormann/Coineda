@@ -117,13 +117,21 @@
 
   /* Semantic colours are NOT the accent, and Lumen's spectrum is decorative
      - blush would read as "pretty" where this has to read as "wrong". The
-     destructive red and the gain/loss pair stay as they were. */
-  --destructive: oklch(0.577 0.245 27.3);
+     destructive red and the gain/loss pair stay as they were.
+     Every pair below is measured in tests/contrast.test.ts
+     (`npm run contrast` prints the table). The destructive red is a step
+     darker than shadcn's 0.577: on Lumen's grey-blue page that one gave
+     4.30:1, under the 4.5:1 text needs. */
+  --destructive: oklch(0.55 0.245 27.3);
   --destructive-foreground: oklch(0.985 0 0);
 
   --border: var(--lm-faint);
   --input: var(--lm-stroke);
-  --ring: var(--lm-g2);
+  /* Lilac, Lumen's g2 hue, but darker than g2 itself: the decorative
+     oklch(0.73 0.22 278) is 2.48:1 on the light page, and a focus ring is a
+     control state that needs 3:1 (WCAG 1.4.11). Dark mode keeps g2, which
+     already clears it (see .dark). */
+  --ring: oklch(0.6 0.22 278);
 
   --gain: oklch(0.52 0.13 163.2);
   --loss: oklch(0.52 0.2 25.3);
@@ -141,7 +149,7 @@
   --sidebar-accent: var(--lm-glass-1);
   --sidebar-accent-foreground: var(--lm-ink);
   --sidebar-border: var(--lm-faint);
-  --sidebar-ring: var(--lm-g2);
+  --sidebar-ring: var(--ring);
 }
 
 .dark {
@@ -155,6 +163,10 @@
      here. Only the colours Lumen has no opinion about are restated. */
   --destructive: oklch(0.704 0.191 22.2);
   --destructive-foreground: oklch(0.21 0.006 285.9);
+
+  /* Lumen's own g2 (0.76 in dark) is 8.9:1 on Noctis - no need for the
+     darker light-mode ring here. */
+  --ring: var(--lm-g2);
 
   --gain: oklch(0.78 0.16 163.2);
   --loss: oklch(0.72 0.19 25.3);
