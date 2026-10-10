@@ -400,7 +400,7 @@ describe('reportToJson and filenames', () => {
     ({
       year: 2025,
       jurisdiction: 'de',
-      method: { fingerprint: 'ab'.repeat(32) },
+      method: { fingerprint: 'ab'.repeat(32), baseCurrency: 'eur' },
       totals: { taxableGain: '1', omitted: 1 },
       thresholds: [],
       lines: [],
@@ -452,6 +452,20 @@ describe('reportToJson and filenames', () => {
     expect(withFiling.filing).toEqual(filing);
     const without = JSON.parse(reportToJson(report(build()), { generatedAt }));
     expect(without.filing).toBeNull();
+    // The German forms take euros: a report in another currency exports no
+    // filing figures, matching the page.
+    const base = report(build());
+    const inUsd = JSON.parse(
+      reportToJson(
+        {
+          ...base,
+          method: { ...base.method, baseCurrency: 'usd' },
+          filing,
+        } as unknown as TaxReport,
+        { generatedAt },
+      ),
+    );
+    expect(inUsd.filing).toBeNull();
   });
 
   it('carries the source directory when the caller supplies it', () => {

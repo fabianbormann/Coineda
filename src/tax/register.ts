@@ -375,7 +375,10 @@ export const reportToJson = (
       income: report.income,
       capital: report.capital,
       capitalResult: report.capitalResult ?? null,
-      filing: report.filing ?? null,
+      // The German forms take euros, so a report in any other currency
+      // exports no filing figures, as the page shows none.
+      filing:
+        report.method.baseCurrency === 'eur' ? (report.filing ?? null) : null,
       omittedDisposals: report.omittedDisposals,
       unresolved: report.unresolved,
       register: report.register,

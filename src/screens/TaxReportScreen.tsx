@@ -1718,16 +1718,14 @@ export const TaxReportScreen = () => {
                             )}
                           </p>
                         )}
-                        {assessment.omittedDisposals.length +
-                          assessment.unresolved.length >
-                          0 && (
+                        {/* This year's gaps only, counted once: omitted
+                            disposals are already in `unresolved`. */}
+                        {unresolvedInYear > 0 && (
                           <p className="text-sm text-destructive">
                             {t(
                               'These figures are incomplete: {{count}} items were omitted or left unresolved (see the Result card). Resolve them before you type anything in.',
                               {
-                                count:
-                                  assessment.omittedDisposals.length +
-                                  assessment.unresolved.length,
+                                count: unresolvedInYear,
                               },
                             )}
                           </p>

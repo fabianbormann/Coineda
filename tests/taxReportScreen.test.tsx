@@ -2515,9 +2515,9 @@ describe('the filing aid', () => {
     ).toBeInTheDocument();
   });
 
-  it('warns that the figures are incomplete when items are unresolved', async () => {
+  const withGapAt = (timestamp: number): TaxModule => {
     const base = filingModule(verified);
-    taxRegistry.push({
+    return {
       ...base,
       assess: (input) => ({
         ...base.assess(input),
@@ -2528,14 +2528,18 @@ describe('the filing aid', () => {
             assetId: 'cardano:lovelace',
             amount: '1',
             venue: 'wallet-a',
-            timestamp: Date.UTC(2025, 3, 1),
+            timestamp,
             reason: { key: 'gap' },
             taxEventKind: 'income',
             resolutions: [],
           },
         ],
       }),
-    });
+    };
+  };
+
+  it('warns that the figures are incomplete when items are unresolved', async () => {
+    taxRegistry.push(withGapAt(Date.UTC(2025, 3, 1)));
     await putEvents([acquisitionEvent, disposalEvent]);
     renderScreen();
     await runReport('2025');
@@ -2548,6 +2552,18 @@ describe('the filing aid', () => {
     ).toBeInTheDocument();
     // The figures are still shown beside the warning.
     expect(within(section).getByText(/line 48/i)).toBeInTheDocument();
+  });
+
+  it('does not count a gap from another year', async () => {
+    taxRegistry.push(withGapAt(Date.UTC(2023, 3, 1)));
+    await putEvents([acquisitionEvent, disposalEvent]);
+    renderScreen();
+    await runReport('2025');
+
+    const section = screen.getByTestId('filing-aid');
+    expect(
+      within(section).queryByText(/these figures are incomplete/i),
+    ).toBeNull();
   });
 
   it('prints no incompleteness warning for a complete report', async () => {
