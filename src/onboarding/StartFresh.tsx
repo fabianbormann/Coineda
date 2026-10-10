@@ -96,7 +96,9 @@ export const StartFresh = ({ onComplete, onBack }: Props) => {
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
-        <CardTitle>{t('Start fresh')}</CardTitle>
+        <CardTitle>
+          <h1 tabIndex={-1}>{t('Start fresh')}</h1>
+        </CardTitle>
         <CardDescription>
           {t(
             'Choose your language and base currency. You can change both later in Settings.',

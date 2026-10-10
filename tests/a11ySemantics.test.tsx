@@ -129,22 +129,15 @@ describe('StartFresh', () => {
 });
 
 describe('heading levels in dialogs', () => {
-  const files = [
-    ...readdirSync('src', { recursive: true, encoding: 'utf8' })
-      .filter((f) => f.endsWith('Dialog.tsx') && !f.startsWith('components'))
-      .map((f) => `src/${f}`),
-    ...readdirSync('src/onboarding')
-      .filter((f) => f.endsWith('.tsx'))
-      .map((f) => `src/onboarding/${f}`),
-  ];
+  const files = readdirSync('src', { recursive: true, encoding: 'utf8' })
+    .filter((f) => f.endsWith('Dialog.tsx') && !f.startsWith('components'))
+    .map((f) => `src/${f}`);
 
-  it('finds the files', () => expect(files.length).toBeGreaterThan(8));
+  it('finds the files', () => expect(files.length).toBeGreaterThan(5));
 
   it.each(files)('%s has no h1/h2 and skips no level', (file) => {
     const source = readFileSync(file, 'utf8');
-    if (file.endsWith('Dialog.tsx')) {
-      expect(source).toContain('DialogTitle');
-    }
+    expect(source).toContain('DialogTitle');
     expect(source).not.toMatch(/<h[12][\s>]/);
     const levels = [...source.matchAll(/<h([3-6])[\s>]/g)].map((m) =>
       Number(m[1]),
@@ -154,4 +147,33 @@ describe('heading levels in dialogs', () => {
       expect(levels).toContain(level - 1);
     }
   });
+});
+
+describe('heading levels in onboarding', () => {
+  // Onboarding is a page, not a dialog: there is no shell around it, so
+  // each step's card title is the page's h1 (one per rendered step) and
+  // anything below it starts at h2.
+  const files = readdirSync('src/onboarding')
+    .filter((f) => f.endsWith('.tsx'))
+    .map((f) => `src/onboarding/${f}`);
+
+  it('finds the files', () => expect(files.length).toBe(3));
+
+  it.each(files)(
+    '%s titles every card with an h1 and skips no level',
+    (file) => {
+      const source = readFileSync(file, 'utf8');
+      const cards = source.match(/<CardTitle>/g) ?? [];
+      const h1s = source.match(/<h1[\s>]/g) ?? [];
+      expect(h1s.length).toBe(cards.length);
+      expect(source).not.toMatch(/<h1(?![^>]*tabIndex=\{-1\})[\s>][^>]*>/);
+      const levels = [...source.matchAll(/<h([1-6])[\s>]/g)].map((m) =>
+        Number(m[1]),
+      );
+      const max = Math.max(0, ...levels);
+      for (let level = 2; level <= max; level++) {
+        expect(levels).toContain(level - 1);
+      }
+    },
+  );
 });

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useStepHeadingFocus } from '@/a11y/useStepHeadingFocus';
 import { useTranslation } from 'react-i18next';
 import jsQR from 'jsqr';
 import {
@@ -103,6 +104,8 @@ const TransferSecretField = ({
 export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
   const { t, i18n } = useTranslation();
   const [step, setStep] = useState<Step>('choice');
+  // Each step is a new card; keep focus off <body> when it swaps.
+  useStepHeadingFocus(step);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [payload, setPayload] = useState<Uint8Array | null>(null);
   const [secret, setSecret] = useState('');
@@ -342,9 +345,11 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>
-            {omitted > 0
-              ? t('Almost everything is here')
-              : t('Checkpoint restored')}
+            <h1 tabIndex={-1}>
+              {omitted > 0
+                ? t('Almost everything is here')
+                : t('Checkpoint restored')}
+            </h1>
           </CardTitle>
           <CardDescription>
             {t(
@@ -368,9 +373,9 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
                 )}
               </p>
               <div className="flex flex-col gap-1">
-                <h3 className="font-medium">
+                <h2 className="font-medium">
                   {t('Let your sources refetch it')}
-                </h3>
+                </h2>
                 <p className="text-muted-foreground">
                   {t(
                     'Your data sources came across with their credentials, so a sync on this device fetches the history again by itself. This is the ordinary way, and it needs nothing from your other device.',
@@ -378,9 +383,9 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
                 </p>
               </div>
               <div className="flex flex-col gap-1">
-                <h3 className="font-medium">
+                <h2 className="font-medium">
                   {t('Or bring a backup file over')}
-                </h3>
+                </h2>
                 <p className="text-muted-foreground">
                   {t(
                     'For a source that cannot be synced any more - an exchange that closed, an API key that is gone, a file import - create a checkpoint on your other device, download it as a file, and import that file here. It carries every recorded transaction.',
@@ -403,7 +408,9 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
     return (
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>{t('Restore a checkpoint')}</CardTitle>
+          <CardTitle>
+            <h1 tabIndex={-1}>{t('Restore a checkpoint')}</h1>
+          </CardTitle>
           {payload ? (
             <CardDescription>
               {t(
@@ -485,7 +492,9 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
     return (
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>{t('Restore a checkpoint')}</CardTitle>
+          <CardTitle>
+            <h1 tabIndex={-1}>{t('Restore a checkpoint')}</h1>
+          </CardTitle>
           <CardDescription>
             {t(
               'Scan the QR code shown on your other device, or choose the checkpoint file it saved instead.',
@@ -532,7 +541,9 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
-        <CardTitle>{t('Restore a checkpoint')}</CardTitle>
+        <CardTitle>
+          <h1 tabIndex={-1}>{t('Restore a checkpoint')}</h1>
+        </CardTitle>
         <CardDescription>
           {t(
             'Scan the QR code shown on your other device, or choose the checkpoint file it saved instead.',

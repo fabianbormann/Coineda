@@ -7,6 +7,18 @@ import i18n from '../src/i18n';
 import { resetRouteAnnounce } from '@/a11y/useRouteAnnounce';
 import { DEFAULT_LEDGER_NAME, openLedger, setActiveLedger } from '@/ledger/db';
 import { setOnboarded } from '@/settings/settingsStore';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+} from '@/components/ui/sheet';
 
 beforeEach(async () => {
   localStorage.clear();
@@ -87,5 +99,98 @@ describe('page identity and focus', () => {
     const h1 = screen.getByRole('heading', { level: 1 });
     expect(h1).toHaveTextContent('Tax report');
     await waitFor(() => expect(document.activeElement).toBe(h1));
+  });
+});
+
+describe('onboarding', () => {
+  const notOnboarded = async () => {
+    const db = await openLedger();
+    await db.clear('settings');
+  };
+
+  it('has a main landmark, one h1 per step and a title', async () => {
+    await notOnboarded();
+    const user = userEvent.setup();
+    render(<App />);
+    const h1 = await screen.findByRole('heading', {
+      level: 1,
+      name: 'Welcome to Coineda',
+    });
+    expect(h1).toHaveAttribute('tabindex', '-1');
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('main')).toHaveAttribute('id', 'main');
+    expect(document.title).toBe('Coineda – Welcome');
+
+    // A step change unmounts the button that was pressed; focus lands on
+    // the new step's heading instead of falling to <body>.
+    await user.click(screen.getByRole('button', { name: 'Start fresh' }));
+    const step = await screen.findByRole('heading', {
+      level: 1,
+      name: 'Start fresh',
+    });
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    await waitFor(() => expect(document.activeElement).toBe(step));
+  });
+
+  it('is titled in German', async () => {
+    await notOnboarded();
+    await i18n.changeLanguage('de');
+    render(<App />);
+    await screen.findByRole('heading', { level: 1 });
+    await waitFor(() => expect(document.title).toBe('Coineda – Willkommen'));
+  });
+
+  it('names the page again after a reset', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Data sources');
+    expect(document.title).toBe('Coineda – Overview');
+    await user.click(
+      await screen.findByRole('button', { name: /reset this device/i }),
+    );
+    await user.click(
+      await screen.findByRole('button', { name: /reset everything/i }),
+    );
+    const h1 = await screen.findByRole('heading', {
+      level: 1,
+      name: 'Welcome to Coineda',
+    });
+    await waitFor(() => expect(document.title).toBe('Coineda – Welcome'));
+    await waitFor(() => expect(document.activeElement).toBe(h1));
+  });
+});
+
+describe('dialog close buttons', () => {
+  it('are named in the interface language', async () => {
+    await i18n.changeLanguage('de');
+    render(
+      <>
+        <Dialog open>
+          <DialogContent>
+            <DialogTitle>Dialog</DialogTitle>
+            <DialogDescription>Beschreibung</DialogDescription>
+          </DialogContent>
+        </Dialog>
+      </>,
+    );
+    expect(
+      await screen.findByRole('button', { name: 'Schließen' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+  });
+
+  it('are named in the interface language on a sheet', async () => {
+    await i18n.changeLanguage('de');
+    render(
+      <Sheet open>
+        <SheetContent>
+          <SheetTitle>Sheet</SheetTitle>
+          <SheetDescription>Beschreibung</SheetDescription>
+        </SheetContent>
+      </Sheet>,
+    );
+    expect(
+      await screen.findByRole('button', { name: 'Schließen' }),
+    ).toBeInTheDocument();
   });
 });

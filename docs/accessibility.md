@@ -6,7 +6,11 @@ that is checked; it is not a certificate.
 ## What is in place
 
 - **Language and page names.** `<html lang>` follows the chosen interface language; each route sets
-  `document.title` and renders one `h1`.
+  `document.title` and renders one `h1`. Onboarding counts as a page: it renders inside its own
+  `<main id="main">`, gives each step one `h1` (`tabIndex={-1}`, focused when the step changes) and
+  titles the document "Coineda – Welcome" / "Coineda – Willkommen", including after a reset.
+- **Translated chrome.** Dialog and sheet close buttons are named "Close" / "Schließen", and the
+  toast region "Notifications" / "Benachrichtigungen", in the interface language.
 - **Keyboard.** A "Skip to content" link is the first focusable element and targets
   `<main id="main">`; after a navigation (not on first load) focus moves to the new page's `h1`.
 - **Forms.** One accessible name per control, a `legend` in every `fieldset`, required fields
@@ -15,7 +19,8 @@ that is checked; it is not a certificate.
 - **Motion.** `prefers-reduced-motion: reduce` stops the rolling figures and the Tailwind
   enter/exit animations; the journey video has a pause button and a text alternative.
 - **Announcements.** The balance sits in an `aria-live="polite"` region; sync progress and import
-  results use the toast region.
+  results use the toast region; the tax report's "Running…" line is a `role="status"`, and
+  choosing a jurisdiction, going back and finishing a run move focus to the step's heading.
 - **Visible focus.** Every button, link, input, select and toggle chip draws a 2px `--ring`
   outline 2px off the control on `:focus-visible` (unlayered rules in `src/index.css`, so they win
   over the components' `outline-none`); the highlighted menu or select item inverts onto
@@ -27,15 +32,29 @@ that is checked; it is not a certificate.
 ## The gate
 
 `tests/axe.test.tsx` runs [axe-core](https://github.com/dequelabs/axe-core) over `document.body`
-for every screen and dialog, with the WCAG 2.0 and 2.1 A and AA rules (tags `wcag2a`, `wcag2aa`,
+for each recipe below, with the WCAG 2.0 and 2.1 A and AA rules (tags `wcag2a`, `wcag2aa`,
 `wcag21a`, `wcag21aa`), and fails on any violation, printing the rule id, its help text and the
 first offending element. It is part of `npx vitest run`, so it runs in CI with everything else.
 
 Each screen or dialog is a **recipe** in `tests/helpers/recipes.tsx`: a name and an async
 `render()` that prepares a clean device (fake IndexedDB, English, stubbed `matchMedia` and
 `fetch`), renders inside the providers that screen needs, opens the dialog it names and resolves
-once the content is in the DOM. A second test lists `src/**/*Dialog.tsx` and fails if a file's
-base name does not appear in some recipe's name.
+once the content is in the DOM. A second test fails if any of these files has no recipe whose name
+contains its base name as a whole word:
+
+- every `src/**/*Dialog.tsx`;
+- every `src/screens/*Screen.tsx` (the overview and the tax report);
+- every `src/onboarding/*.tsx` (the welcome card, Start fresh, the checkpoint restore);
+- any other file that renders a dialog, alert dialog or sheet inline (`<DialogContent`,
+  `<AlertDialogContent`, `<SheetContent`): today `ClientMenu`, `ConfirmProvider` and
+  `TaxReportScreen`.
+
+The tax report is scanned four ways: the setup step and a finished report on a stub
+jurisdiction, and the real German module, run through the stub prices the screen's own tests use,
+with its report body (§23 lines, the Freigrenze, the DATEV block), the DATEV settings card and the
+"Download DATEV (Buchungsstapel)" dialog. A file is covered by at least one state: a dialog with
+several steps is usually scanned in one of them (the recipe names which), and the open dropdown
+menu itself is not scanned.
 
 **Adding a screen or dialog:** add a recipe whose name contains the component's name (for a
 dialog, the file's base name, e.g. `FooDialog`), reusing the setup from that component's own test.
@@ -52,8 +71,8 @@ Nothing else is disabled. axe also reports Radix's focus-guard `span`s (`aria-hi
 `tabindex="0"`) as "needs review" (`aria-hidden-focus`), not as a violation. They are how Radix
 keeps focus inside an open dialog, and focus that lands on one is sent straight back in.
 
-**What it cannot see:** anything that needs a real browser: rendered contrast, visible focus,
-reflow at 400% zoom, text spacing, target size, and how a screen reader actually reads it all.
+**What it cannot see:** anything that needs a real browser: rendered contrast, whether the focus
+outline actually paints (its colours are measured below), reflow at 400% zoom, text spacing, target size, and how a screen reader actually reads it all.
 Before a procurement or a BITV declaration, have someone audit in a browser with a screen reader
 (NVDA or VoiceOver) and the keyboard alone.
 
@@ -190,3 +209,17 @@ its threshold, and also fails if the table below no longer matches what the toke
 | `--lm-highlight` (new) | both | `bg-accent` = glass-2 | `var(--lm-fill)` | Highlighted menu item on popover | 1.02:1 -> 10.67:1 (light), 1.33:1 -> 11.72:1 (dark) |
 
 Hues are unchanged; `--sidebar-ring` now follows `--ring`.
+
+## Divergences from the vendored components
+
+`src/components/ui/` is shadcn CLI output and is otherwise not hand-edited. Two files carry one
+marked edit each, which a `shadcn` regenerate would undo:
+
+- `src/components/ui/dialog.tsx` and `src/components/ui/sheet.tsx` render the close button's
+  `sr-only` label as `{t('Close')}` (via `useTranslation`) instead of the hard-coded English
+  "Close", so a German interface does not announce an English word (WCAG 3.1.2). Each edit is
+  marked `// coineda: translated close label — re-apply after a shadcn regenerate`; after a
+  regenerate, re-apply it (`tests/a11yShell.test.tsx` fails until you do).
+
+Everything else that changes how the vendored components look for accessibility (the focus
+outline, the highlighted menu item) lives in `src/index.css`, not in `ui/`.

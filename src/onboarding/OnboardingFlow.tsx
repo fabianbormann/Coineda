@@ -9,6 +9,8 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
+import { useRouteAnnounce } from '@/a11y/useRouteAnnounce';
+import { useStepHeadingFocus } from '@/a11y/useStepHeadingFocus';
 import { StartFresh } from './StartFresh';
 import { ImportCheckpoint } from './ImportCheckpoint';
 
@@ -26,6 +28,10 @@ type Screen = 'choice' | 'fresh' | 'import';
 export const OnboardingFlow = ({ onComplete }: { onComplete: () => void }) => {
   const { t } = useTranslation();
   const [screen, setScreen] = useState<Screen>('choice');
+  // Onboarding is a page of its own (also the one a reset lands on), so it
+  // names the document and, after a reset, takes focus like a route does.
+  const headingRef = useRouteAnnounce(t('Welcome'));
+  useStepHeadingFocus(screen);
 
   const content = (() => {
     switch (screen) {
@@ -47,7 +53,11 @@ export const OnboardingFlow = ({ onComplete }: { onComplete: () => void }) => {
         return (
           <Card className="w-full max-w-md">
             <CardHeader>
-              <CardTitle>{t('Welcome to Coineda')}</CardTitle>
+              <CardTitle>
+                <h1 ref={headingRef} tabIndex={-1}>
+                  {t('Welcome to Coineda')}
+                </h1>
+              </CardTitle>
               <CardDescription>
                 {t(
                   'Set up this device by restoring a checkpoint from another one, or start fresh.',
@@ -80,7 +90,12 @@ export const OnboardingFlow = ({ onComplete }: { onComplete: () => void }) => {
       <div className="absolute top-4 right-4">
         <ThemeToggle />
       </div>
-      {content}
+      {/* The shell's <main> is not mounted yet, so onboarding brings its
+          own landmark - and the same id, so the skip-link target and
+          useStepHeadingFocus find it. */}
+      <main id="main" className="flex w-full justify-center">
+        {content}
+      </main>
     </div>
   );
 };

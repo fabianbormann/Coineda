@@ -142,9 +142,11 @@ npm run dist         # desktop installers
 
 Interface languages: English and German.
 
-Accessibility: the test suite gates every screen and dialog against BITV 2.0 / WCAG 2.1 AA with
-axe-core ([docs/accessibility.md](docs/accessibility.md)). A browser-level audit is still
-recommended before procurement.
+Accessibility: the test suite runs axe-core's WCAG 2.1 A/AA rules (BITV 2.0's baseline) over
+every screen, onboarding step and dialog, in at least one state each, and measures colour contrast
+from the tokens ([docs/accessibility.md](docs/accessibility.md) lists exactly what is covered). That
+is an automated check, not a conformance claim: a browser-level audit with a screen reader is
+still recommended before procurement or a BITV declaration.
 
 ## Contributing
 

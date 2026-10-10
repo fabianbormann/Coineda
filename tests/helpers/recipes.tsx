@@ -34,6 +34,7 @@ import { taxRegistry } from '@/tax/registry';
 import germanTax from '@/tax/jurisdictions/de';
 import type { LedgerEvent } from '@/ledger/types';
 import type { AssessInput, TaxAssessment, TaxModule } from '@/tax/types';
+import { flatRange } from '../priceRangeStub';
 
 /**
  * Render recipes for the axe gate (tests/axe.test.tsx).
@@ -45,7 +46,9 @@ import type { AssessInput, TaxAssessment, TaxModule } from '@/tax/types';
  * to put the UI on screen.
  *
  * A new screen or dialog adds a recipe here. tests/axe.test.tsx fails if a
- * `src/**\/*Dialog.tsx` file has no recipe naming it.
+ * `src/**\/*Dialog.tsx`, `src/screens/*Screen.tsx` or `src/onboarding/*.tsx`
+ * file, or any file rendering a dialog or sheet inline, has no recipe
+ * naming it.
  */
 export type Recipe = { name: string; render: () => Promise<void> };
 
@@ -350,6 +353,62 @@ const openJurisdiction = async (module: TaxModule, name: RegExp) => {
   await userEvent.click(await screen.findByRole('button', { name }));
 };
 
+/** A buy and a sale against euros in the current year, with a fee: what
+ *  the German module needs to produce a full report body (§23 lines, the
+ *  Freigrenze, the DATEV block). As in tests/taxReportScreen.test.tsx. */
+const germanSale = (): LedgerEvent[] => {
+  const year = new Date().getUTCFullYear();
+  const leg = (
+    assetId: string,
+    amount: string,
+    direction: 'in' | 'out',
+    role: 'principal' | 'fee' = 'principal',
+  ) => ({ assetId, amount, direction, venue: 'wallet-a', role });
+  return [
+    {
+      id: 'buy',
+      sourceId: 's1',
+      externalId: 'buy',
+      timestamp: Date.UTC(year, 0, 2),
+      kind: 'trade',
+      origin: 'derived',
+      legs: [
+        leg('fiat:eur', '100', 'out'),
+        leg('cardano:lovelace', '100000000', 'in'),
+      ],
+    },
+    {
+      id: 'sell',
+      sourceId: 's1',
+      externalId: 'sell',
+      timestamp: Date.UTC(year, 0, 3),
+      kind: 'trade',
+      origin: 'derived',
+      legs: [
+        leg('cardano:lovelace', '100000000', 'out'),
+        leg('fiat:eur', '100', 'in'),
+        leg('fiat:eur', '7', 'out', 'fee'),
+      ],
+    },
+  ];
+};
+
+/** Runs the real German module through the same stub-price setup as the
+ *  screen's own tests, and resolves once the report body is on screen. */
+const runGermanReport = async () => {
+  await putEvents(germanSale());
+  vi.stubGlobal('fetch', flatRange(1));
+  await openJurisdiction(germanTax, /germany/i);
+  await userEvent.click(
+    await screen.findByRole('button', { name: /run report/i }),
+  );
+  return screen.findByRole(
+    'button',
+    { name: /download datev \(buchungsstapel\)/i },
+    { timeout: 5000 },
+  );
+};
+
 // ---- Onboarding ----------------------------------------------------------
 
 const renderOnboarding = async () => {
@@ -420,6 +479,37 @@ export const recipes: Recipe[] = [
         expect(screen.queryByText(/running your tax report/i)).toBeNull(),
       );
       await screen.findAllByText(/test threshold/i);
+    },
+  },
+  {
+    name: 'TaxReportScreen report step (Germany)',
+    render: async () => {
+      await freshDevice();
+      await runGermanReport();
+      await screen.findAllByText(/proceeds after fees/i);
+    },
+  },
+  {
+    name: 'TaxReportScreen DATEV dialog (Germany)',
+    render: async () => {
+      await freshDevice();
+      await putSettings({
+        datev: {
+          beraternummer: '1234567',
+          mandantennummer: '12345',
+          sachkontenlaenge: 4,
+          konten: {
+            verrechnung: '1200',
+            gewinn23: '2300',
+            verlust23: '2310',
+            einkuenfte22: '2320',
+          },
+        },
+      });
+      const button = await runGermanReport();
+      await waitFor(() => expect(button).toBeEnabled());
+      await userEvent.click(button);
+      await within(await dialog()).findByText('1 posting');
     },
   },
   {

@@ -1,13 +1,15 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { readdirSync, statSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { basename, join, relative, sep } from 'node:path';
 import { cleanup } from '@testing-library/react';
 import axe from 'axe-core';
 import { recipes } from './helpers/recipes';
 
 /**
- * The accessibility gate: every screen and dialog, rendered by a recipe in
- * tests/helpers/recipes.tsx, has no axe violation of WCAG 2.0/2.1 A or AA.
+ * The accessibility gate: every screen, onboarding step and dialog (the
+ * coverage test below says exactly which files that is), rendered by a
+ * recipe in tests/helpers/recipes.tsx, has no axe violation of WCAG 2.0/2.1
+ * A or AA.
  *
  * jsdom does no layout or painting, so this catches structure (names,
  * roles, labels, ARIA, landmarks, headings) and not what only a browser
@@ -54,20 +56,69 @@ describe('axe gate', () => {
   }
 });
 
-const dialogFiles = (dir: string): string[] =>
+const walk = (dir: string): string[] =>
   readdirSync(dir).flatMap((entry) => {
     const path = join(dir, entry);
-    if (statSync(path).isDirectory()) return dialogFiles(path);
-    return entry.endsWith('Dialog.tsx') ? [path] : [];
+    return statSync(path).isDirectory() ? walk(path) : [path];
   });
 
+const src = join(__dirname, '..', 'src');
+
+/**
+ * Every file that renders a screen or an overlay, by four rules:
+ * `src/**\/*Dialog.tsx`, `src/screens/*Screen.tsx`, `src/onboarding/*.tsx`,
+ * and any other file that renders a dialog, alert dialog or sheet inline
+ * (`<DialogContent`, `<AlertDialogContent`, `<SheetContent`), such as the
+ * DATEV dialog inside TaxReportScreen. The vendored primitives in
+ * src/components/ui are what those files use, not screens themselves.
+ */
+const coveredFiles = (): string[] =>
+  walk(src).filter((path) => {
+    const rel = relative(src, path).split(sep).join('/');
+    if (!rel.endsWith('.tsx') || rel.startsWith('components/ui/')) return false;
+    return (
+      rel.endsWith('Dialog.tsx') ||
+      /^screens\/[^/]+Screen\.tsx$/.test(rel) ||
+      /^onboarding\/[^/]+\.tsx$/.test(rel) ||
+      /<(Alert)?DialogContent\b|<SheetContent\b/.test(
+        readFileSync(path, 'utf8'),
+      )
+    );
+  });
+
+/** A recipe names a component when its name contains it as a whole word. */
+const names = (recipeName: string, component: string) =>
+  new RegExp(`\\b${component}\\b`).test(recipeName);
+
 describe('recipe coverage', () => {
-  it('has a recipe for every src/**/*Dialog.tsx', () => {
-    const files = dialogFiles(join(__dirname, '..', 'src'));
-    expect(files.length).toBeGreaterThan(0);
+  it('has a recipe for every screen, onboarding step and dialog', () => {
+    const files = coveredFiles();
+    const rel = files.map((file) => relative(src, file).split(sep).join('/'));
+    // The scan is not vacuous: each rule finds what it is meant to.
+    expect(rel).toEqual(
+      expect.arrayContaining([
+        'screens/MainScreen.tsx',
+        'screens/TaxReportScreen.tsx',
+        'onboarding/OnboardingFlow.tsx',
+        'onboarding/StartFresh.tsx',
+        'onboarding/ImportCheckpoint.tsx',
+        'screens/AddSourceDialog.tsx',
+        'clients/ClientMenu.tsx',
+        'components/confirm/ConfirmProvider.tsx',
+      ]),
+    );
     const missing = files
       .map((file) => basename(file, '.tsx'))
-      .filter((name) => !recipes.some((r) => r.name.includes(name)));
+      .filter((name) => !recipes.some((r) => names(r.name, name)));
     expect(missing, `no axe recipe names: ${missing.join(', ')}`).toEqual([]);
+  });
+
+  it('scans the German report and its DATEV dialog, not only the stub module', () => {
+    const recipeNames = recipes.map((r) => r.name);
+    expect(recipeNames).toContain('TaxReportScreen report step (Germany)');
+    expect(recipeNames).toContain('TaxReportScreen DATEV dialog (Germany)');
+    expect(recipeNames).toContain(
+      'DatevSettingsCard within TaxReportScreen setup (Germany)',
+    );
   });
 });
