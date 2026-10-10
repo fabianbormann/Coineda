@@ -168,13 +168,208 @@ describe('the mapping dialog', () => {
     expect(
       within(dialog).getByRole('button', { name: 'Preview' }),
     ).toBeEnabled();
-    // Tagging a value outgoing moves it; both can never be set at once.
+    // Kauf is already incoming; tag it outgoing too.
     await user.click(
       within(dialog).getByRole('button', { name: 'Outgoing: Kauf' }),
     );
     expect(
-      within(dialog).getByRole('button', { name: 'Incoming: Kauf' }),
-    ).toHaveAttribute('aria-pressed', 'false');
+      within(dialog).getByText(
+        'A type value cannot be both incoming and outgoing',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole('button', { name: 'Preview' }),
+    ).toBeDisabled();
+    // Untagging the conflict makes it usable again.
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Outgoing: Kauf' }),
+    );
+    expect(
+      within(dialog).getByRole('button', { name: 'Preview' }),
+    ).toBeEnabled();
+  });
+
+  it('shows a conflicting saved mapping as a conflict', async () => {
+    await putSource({
+      id: 's2',
+      moduleId: 'mapped-csv',
+      label: 'Conflict',
+      config: {
+        mapping: JSON.stringify({
+          ...MAPPING_A,
+          venueLabel: 'Conflict',
+          direction: { mode: 'type', in: ['Kauf'], out: ['Kauf'] },
+        }),
+        fileName: 'old.csv',
+      },
+    });
+    const user = userEvent.setup();
+    render(
+      <MapCsvDialog
+        open
+        onOpenChange={onOpenChange}
+        file={file()}
+        label="Conflict"
+        onImport={onImport}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() =>
+      expect(
+        within(dialog).getByRole('button', { name: 'Continue' }),
+      ).toBeEnabled(),
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Continue' }));
+    await waitFor(() =>
+      expect(
+        within(dialog).getByText(
+          'A type value cannot be both incoming and outgoing',
+        ),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      within(dialog).getByRole('button', { name: 'Preview' }),
+    ).toBeDisabled();
+  });
+
+  it('names a mapped column the file does not have and blocks the preview', async () => {
+    await putSource({
+      id: 's3',
+      moduleId: 'mapped-csv',
+      label: 'Gone',
+      config: {
+        mapping: JSON.stringify({
+          ...MAPPING_A,
+          venueLabel: 'Gone',
+          columns: { ...MAPPING_A.columns, fee: 'Fee' },
+        }),
+        fileName: 'old.csv',
+      },
+    });
+    const user = userEvent.setup();
+    render(
+      <MapCsvDialog
+        open
+        onOpenChange={onOpenChange}
+        file={file()}
+        label="Gone"
+        onImport={onImport}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() =>
+      expect(
+        within(dialog).getByRole('button', { name: 'Continue' }),
+      ).toBeEnabled(),
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Continue' }));
+    await waitFor(() =>
+      expect(
+        within(dialog).getByText('Column Fee is not in the file'),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      within(dialog).getByRole('button', { name: 'Preview' }),
+    ).toBeDisabled();
+  });
+
+  it('shows the failure, stays open and re-enables Import when the import rejects', async () => {
+    onImport.mockRejectedValue(new Error('the store refused it'));
+    const user = userEvent.setup();
+    render(
+      <MapCsvDialog
+        open
+        onOpenChange={onOpenChange}
+        file={file()}
+        onImport={onImport}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Venue label'), 'Bison');
+    await user.click(within(dialog).getByRole('button', { name: 'Continue' }));
+    await fillMapping(user, dialog);
+    await user.click(within(dialog).getByRole('button', { name: 'Preview' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Import' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'the store refused it',
+    );
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    expect(
+      within(dialog).getByRole('button', { name: 'Import' }),
+    ).toBeEnabled();
+  });
+
+  describe('a plain sign-based file', () => {
+    const PLAIN = 'Date,Asset,Amount\n2024-01-01,BTC,1\n2024-01-02,BTC,2\n';
+    const plain = () => new File([PLAIN], 'plain.csv', { type: 'text/csv' });
+
+    const toStepTwo = async (user: User) => {
+      render(
+        <MapCsvDialog
+          open
+          onOpenChange={onOpenChange}
+          file={plain()}
+          onImport={onImport}
+        />,
+      );
+      const dialog = await screen.findByRole('dialog');
+      await user.type(within(dialog).getByLabelText('Venue label'), 'Plain');
+      await user.click(
+        within(dialog).getByRole('button', { name: 'Continue' }),
+      );
+      await user.selectOptions(field(dialog, 'Date column'), 'Date');
+      await user.selectOptions(field(dialog, 'Asset column'), 'Asset');
+      await user.selectOptions(field(dialog, 'Amount column'), 'Amount');
+      await user.selectOptions(field(dialog, 'Kind'), 'transfer');
+      return dialog;
+    };
+
+    const base: CsvMapping = {
+      version: 1,
+      venueLabel: 'Plain',
+      delimiter: ',',
+      columns: { date: 'Date', asset: 'Asset', amount: 'Amount' },
+      dateFormat: 'iso',
+      timeZone: 'UTC',
+      decimal: 'dot',
+      direction: { mode: 'sign' },
+      kinds: { '*': 'transfer' },
+      fiatCounter: false,
+    };
+
+    it('imports the sign-mode mapping and warns that nothing leaves', async () => {
+      const user = userEvent.setup();
+      const dialog = await toStepTwo(user);
+      await user.click(within(dialog).getByRole('button', { name: 'Preview' }));
+      expect(
+        within(dialog).getByText(
+          'No outgoing rows: check the direction setting',
+        ),
+      ).toBeInTheDocument();
+      await user.click(within(dialog).getByRole('button', { name: 'Import' }));
+      await waitFor(() =>
+        expect(onImport).toHaveBeenCalledWith(PLAIN, base, 'plain.csv'),
+      );
+    });
+
+    it('puts a typed "other" time zone into the mapping', async () => {
+      const user = userEvent.setup();
+      const dialog = await toStepTwo(user);
+      await user.selectOptions(field(dialog, 'Time zone'), 'Other');
+      await user.type(
+        within(dialog).getByLabelText('Other time zone'),
+        'America/New_York',
+      );
+      await user.click(within(dialog).getByRole('button', { name: 'Preview' }));
+      await user.click(within(dialog).getByRole('button', { name: 'Import' }));
+      await waitFor(() =>
+        expect(onImport).toHaveBeenCalledWith(
+          PLAIN,
+          { ...base, timeZone: 'America/New_York' },
+          'plain.csv',
+        ),
+      );
+    });
   });
 
   it('pre-fills every control from a saved source of the same label', async () => {

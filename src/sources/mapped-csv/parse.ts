@@ -28,7 +28,10 @@ const EVENT_KINDS: EventKind[] = [
 
 /** Mapped column names that the file's header does not carry. A misspelt
  *  optional column would otherwise read as empty on every row, silently. */
-const missingColumns = (mapping: CsvMapping, header: string[]): string[] => {
+export const missingColumns = (
+  mapping: CsvMapping,
+  header: string[],
+): string[] => {
   const present = new Set(header);
   return Object.values(mapping.columns).filter(
     (name): name is string => !!name && !present.has(name),

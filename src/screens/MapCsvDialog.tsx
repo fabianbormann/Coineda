@@ -16,7 +16,11 @@ import type { EventKind } from '@/ledger/types';
 import { textFromFile } from '@/sources/csv/importFile';
 import { readCsv, sniffDelimiter } from '@/sources/csv/readCsv';
 import { parseMappedDate } from '@/sources/mapped-csv/dates';
-import { previewMapped, validateMapping } from '@/sources/mapped-csv/parse';
+import {
+  missingColumns,
+  previewMapped,
+  validateMapping,
+} from '@/sources/mapped-csv/parse';
 import type { CsvMapping } from '@/sources/mapped-csv/types';
 
 type Props = {
@@ -62,6 +66,16 @@ const DATE_FORMATS: { value: CsvMapping['dateFormat']; label: string }[] = [
 const ZONES = ['UTC', 'Europe/Berlin', 'Europe/Vienna', 'Europe/Zurich'];
 const OTHER_ZONE = '__other__';
 
+const KIND_LABELS: Record<EventKind, string> = {
+  trade: 'Trade',
+  transfer: 'Transfer',
+  reward: 'Reward',
+  fee: 'Fee',
+  'fiat-in': 'Deposit',
+  'fiat-out': 'Withdrawal',
+  derivative: 'Derivative settlement',
+};
+
 const KINDS: EventKind[] = [
   'trade',
   'transfer',
@@ -80,7 +94,9 @@ type Draft = {
   zoneOther: string;
   decimal: CsvMapping['decimal'];
   mode: 'sign' | 'type';
-  tags: Record<string, 'in' | 'out'>;
+  /** Independent flags, so a conflicting saved mapping is shown as the
+   *  conflict it is rather than silently resolved. */
+  tags: Record<string, { in?: boolean; out?: boolean }>;
   kinds: Record<string, EventKind>;
   fiatCounter: boolean;
 };
@@ -101,8 +117,12 @@ const EMPTY: Draft = {
 const draftFrom = (mapping: CsvMapping): Draft => {
   const tags: Draft['tags'] = {};
   if (mapping.direction.mode === 'type') {
-    mapping.direction.in.forEach((value) => (tags[value] = 'in'));
-    mapping.direction.out.forEach((value) => (tags[value] = 'out'));
+    mapping.direction.in.forEach(
+      (value) => (tags[value] = { ...tags[value], in: true }),
+    );
+    mapping.direction.out.forEach(
+      (value) => (tags[value] = { ...tags[value], out: true }),
+    );
   }
   const known = ZONES.includes(mapping.timeZone);
   return {
@@ -138,6 +158,9 @@ export const MapCsvDialog = ({
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [saved, setSaved] = useState<Record<string, CsvMapping>>({});
   const [appliedFor, setAppliedFor] = useState<string | null>(null);
+  // Set by the first edit to any control: a saved mapping that loads late
+  // must not overwrite what the person has already changed.
+  const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -153,6 +176,7 @@ export const MapCsvDialog = ({
       setLabel(initialLabel);
       setDraft(EMPTY);
       setAppliedFor(null);
+      setTouched(false);
       setBusy(false);
       setError(null);
     }
@@ -215,7 +239,9 @@ export const MapCsvDialog = ({
   const savedMapping = saved[label.trim()];
   if (savedMapping && appliedFor !== label.trim()) {
     setAppliedFor(label.trim());
-    setDraft(draftFrom(savedMapping));
+    if (!touched) {
+      setDraft(draftFrom(savedMapping));
+    }
   }
 
   const delimiter = useMemo(
@@ -297,8 +323,8 @@ export const MapCsvDialog = ({
         draft.mode === 'type'
           ? {
               mode: 'type',
-              in: typeValues.filter((value) => draft.tags[value] === 'in'),
-              out: typeValues.filter((value) => draft.tags[value] === 'out'),
+              in: typeValues.filter((value) => draft.tags[value]?.in),
+              out: typeValues.filter((value) => draft.tags[value]?.out),
             }
           : { mode: 'sign' },
       kinds,
@@ -306,17 +332,10 @@ export const MapCsvDialog = ({
     };
   }, [draft, label, delimiter, timeZone, typeValues]);
 
-  // Mapped columns the file does not have (a saved mapping against a changed
-  // export). Checked here rather than via validateMapping(mapping, header),
-  // whose message interpolates the name and so cannot be translated.
-  const missingColumns = Object.values(mapping.columns).filter(
-    (name) => name && !table.header.includes(name),
-  );
+  const missing = missingColumns(mapping, table.header);
   const problems = [
     ...validateMapping(mapping),
-    ...missingColumns.map((name) =>
-      t('Column {{name}} is not in the file', { name }),
-    ),
+    ...missing.map((name) => t('Column {{name}} is not in the file', { name })),
   ];
   const datesOk = useMemo(() => {
     const column = mapping.columns.date;
@@ -344,19 +363,24 @@ export const MapCsvDialog = ({
     [step, text, mapping],
   );
 
-  const patch = (next: Partial<Draft>) =>
+  const patch = (next: Partial<Draft>) => {
+    setTouched(true);
     setDraft((previous) => ({ ...previous, ...next }));
+  };
 
-  const tag = (value: string, direction: 'in' | 'out') =>
+  const tag = (value: string, direction: 'in' | 'out') => {
+    setTouched(true);
     setDraft((previous) => {
-      const tags = { ...previous.tags };
-      if (tags[value] === direction) {
-        delete tags[value];
-      } else {
-        tags[value] = direction;
-      }
-      return { ...previous, tags };
+      const current = previous.tags[value] ?? {};
+      return {
+        ...previous,
+        tags: {
+          ...previous.tags,
+          [value]: { ...current, [direction]: !current[direction] },
+        },
+      };
     });
+  };
 
   const runImport = async () => {
     if (!file) {
@@ -595,9 +619,9 @@ export const MapCsvDialog = ({
                           type="button"
                           size="sm"
                           variant={
-                            draft.tags[value] === 'in' ? 'default' : 'outline'
+                            draft.tags[value]?.in ? 'default' : 'outline'
                           }
-                          aria-pressed={draft.tags[value] === 'in'}
+                          aria-pressed={draft.tags[value]?.in}
                           aria-label={`${t('Incoming')}: ${value}`}
                           onClick={() => tag(value, 'in')}
                         >
@@ -607,9 +631,9 @@ export const MapCsvDialog = ({
                           type="button"
                           size="sm"
                           variant={
-                            draft.tags[value] === 'out' ? 'default' : 'outline'
+                            draft.tags[value]?.out ? 'default' : 'outline'
                           }
-                          aria-pressed={draft.tags[value] === 'out'}
+                          aria-pressed={draft.tags[value]?.out}
                           aria-label={`${t('Outgoing')}: ${value}`}
                           onClick={() => tag(value, 'out')}
                         >
@@ -633,7 +657,7 @@ export const MapCsvDialog = ({
                       <option value="" />
                       {KINDS.map((kind) => (
                         <option key={kind} value={kind}>
-                          {kind}
+                          {t(KIND_LABELS[kind])}
                         </option>
                       ))}
                     </select>
@@ -661,7 +685,7 @@ export const MapCsvDialog = ({
                   <option value="" />
                   {KINDS.map((kind) => (
                     <option key={kind} value={kind}>
-                      {kind}
+                      {t(KIND_LABELS[kind])}
                     </option>
                   ))}
                 </select>
