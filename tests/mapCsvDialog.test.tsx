@@ -69,7 +69,9 @@ beforeEach(() => {
 type User = ReturnType<typeof userEvent.setup>;
 
 const field = (dialog: HTMLElement, name: string) =>
-  within(dialog).getByLabelText(name) as HTMLSelectElement;
+  within(dialog).getByLabelText(
+    new RegExp(`^${name}( \\*)?$`),
+  ) as HTMLSelectElement;
 
 const fillMapping = async (user: User, dialog: HTMLElement) => {
   await user.selectOptions(field(dialog, 'Date column'), 'Datum');

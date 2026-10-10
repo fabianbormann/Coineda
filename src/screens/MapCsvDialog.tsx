@@ -474,7 +474,11 @@ export const MapCsvDialog = ({
                   <thead>
                     <tr>
                       {table.header.map((name) => (
-                        <th key={name} className="px-2 py-1 text-left">
+                        <th
+                          key={name}
+                          scope="col"
+                          className="px-2 py-1 text-left"
+                        >
                           {name}
                         </th>
                       ))}
@@ -510,7 +514,7 @@ export const MapCsvDialog = ({
                   </label>
                   <select
                     id={`map-col-${key}`}
-                    aria-label={t(name)}
+                    aria-required={required || undefined}
                     className={SELECT_CLASS}
                     value={draft.columns[key] ?? ''}
                     onChange={(event) =>
@@ -533,7 +537,7 @@ export const MapCsvDialog = ({
               ))}
             </div>
 
-            <fieldset className="flex flex-col gap-1" role="radiogroup">
+            <fieldset className="flex flex-col gap-1">
               <legend className="text-sm font-medium">
                 {t('Date format')}
               </legend>
@@ -567,7 +571,6 @@ export const MapCsvDialog = ({
                 </label>
                 <select
                   id="map-zone"
-                  aria-label={t('Time zone')}
                   className={SELECT_CLASS}
                   value={draft.zoneChoice}
                   onChange={(event) =>
@@ -593,7 +596,7 @@ export const MapCsvDialog = ({
               )}
             </div>
 
-            <fieldset className="flex flex-col gap-1" role="radiogroup">
+            <fieldset className="flex flex-col gap-1">
               <legend className="text-sm font-medium">
                 {t('Decimal separator')}
               </legend>
@@ -615,7 +618,7 @@ export const MapCsvDialog = ({
               </div>
             </fieldset>
 
-            <fieldset className="flex flex-col gap-1" role="radiogroup">
+            <fieldset className="flex flex-col gap-1">
               <legend className="text-sm font-medium">{t('Direction')}</legend>
               <div className="flex gap-3">
                 {(['sign', 'type'] as const).map((value) => (

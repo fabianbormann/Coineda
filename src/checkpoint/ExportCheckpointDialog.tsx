@@ -180,7 +180,7 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
    */
   const transferSecret = ready && (
     <div className="flex min-w-0 flex-col gap-2">
-      <h4 className="text-sm font-medium">{t('Transfer secret')}</h4>
+      <h3 className="text-sm font-medium">{t('Transfer secret')}</h3>
       <p className="rounded-md bg-muted px-3 py-2 text-center font-mono text-lg tracking-widest select-all">
         {ready.secret}
       </p>

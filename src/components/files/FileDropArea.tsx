@@ -39,37 +39,42 @@ export const FileDropArea = ({
   };
 
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={() => inputRef.current?.click()}
-      onDragEnter={(dragged) => {
-        dragged.preventDefault();
-        setDepth((count) => count + 1);
-      }}
-      onDragLeave={() => setDepth((count) => Math.max(0, count - 1))}
-      onDragOver={(dragged) => {
-        // Without this the browser navigates to the file instead, replacing
-        // the app with a view of the raw CSV.
-        dragged.preventDefault();
-      }}
-      onDrop={(dropped) => {
-        dropped.preventDefault();
-        setDepth(0);
-        take(dropped.dataTransfer.files?.[0]);
-      }}
-      className={cn(
-        'flex w-full flex-col items-center gap-2 rounded-md border border-dashed px-4 py-8 text-sm transition-colors',
-        'focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-        disabled && 'opacity-50',
-        dragging
-          ? 'border-foreground bg-accent'
-          : 'border-stroke text-muted-foreground hover:border-foreground hover:text-foreground',
-      )}
-    >
-      <Upload className="size-5" aria-hidden="true" />
-      <span>{t('Drop the file here, or click to choose one')}</span>
+    <>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => inputRef.current?.click()}
+        onDragEnter={(dragged) => {
+          dragged.preventDefault();
+          setDepth((count) => count + 1);
+        }}
+        onDragLeave={() => setDepth((count) => Math.max(0, count - 1))}
+        onDragOver={(dragged) => {
+          // Without this the browser navigates to the file instead, replacing
+          // the app with a view of the raw CSV.
+          dragged.preventDefault();
+        }}
+        onDrop={(dropped) => {
+          dropped.preventDefault();
+          setDepth(0);
+          take(dropped.dataTransfer.files?.[0]);
+        }}
+        className={cn(
+          'flex w-full flex-col items-center gap-2 rounded-md border border-dashed px-4 py-8 text-sm transition-colors',
+          'focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+          disabled && 'opacity-50',
+          dragging
+            ? 'border-foreground bg-accent'
+            : 'border-stroke text-muted-foreground hover:border-foreground hover:text-foreground',
+        )}
+      >
+        <Upload className="size-5" aria-hidden="true" />
+        <span>{t('Drop the file here, or click to choose one')}</span>
+      </button>
       <input
+        tabIndex={-1}
+        aria-hidden="true"
+        disabled={disabled}
         ref={inputRef}
         type="file"
         accept={accept}
@@ -83,6 +88,6 @@ export const FileDropArea = ({
           take(file);
         }}
       />
-    </button>
+    </>
   );
 };

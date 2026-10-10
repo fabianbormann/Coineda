@@ -126,22 +126,24 @@ describe('choosing a file importer', () => {
     // Kraken hands over a zip. A picker that only offers .csv greys out the
     // very file the instructions above told the person to download.
     const dialog = await openKraken();
-    const input = within(dialog)
-      .getByRole('button', { name: /drop the file here|hier ablegen/i })
-      .querySelector('input[type="file"]') as HTMLInputElement;
+    const input = dialog.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
     expect(input.accept).toMatch(/\.zip/);
     expect(input.accept).toMatch(/\.csv/);
   });
 
   it('hands a dropped file straight to the importer', async () => {
     const dialog = await openKraken();
-    const drop = within(dialog).getByRole('button', {
-      name: /drop the file here|hier ablegen/i,
-    });
+    expect(
+      within(dialog).getByRole('button', {
+        name: /drop the file here|hier ablegen/i,
+      }),
+    ).toBeInTheDocument();
 
     const file = csv();
     await userEvent.upload(
-      drop.querySelector('input[type="file"]') as HTMLInputElement,
+      dialog.querySelector('input[type="file"]') as HTMLInputElement,
       file,
     );
 
@@ -152,9 +154,7 @@ describe('choosing a file importer', () => {
   it('closes once the file is in', async () => {
     const dialog = await openKraken();
     await userEvent.upload(
-      within(dialog)
-        .getByRole('button', { name: /drop the file here|hier ablegen/i })
-        .querySelector('input[type="file"]') as HTMLInputElement,
+      dialog.querySelector('input[type="file"]') as HTMLInputElement,
       csv(),
     );
     expect(onOpenChange).toHaveBeenCalledWith(false);
@@ -167,9 +167,7 @@ describe('choosing a file importer', () => {
     onImportFile.mockRejectedValue(new Error('that is the trades export'));
     const dialog = await openKraken();
     await userEvent.upload(
-      within(dialog)
-        .getByRole('button', { name: /drop the file here|hier ablegen/i })
-        .querySelector('input[type="file"]') as HTMLInputElement,
+      dialog.querySelector('input[type="file"]') as HTMLInputElement,
       csv(),
     );
 

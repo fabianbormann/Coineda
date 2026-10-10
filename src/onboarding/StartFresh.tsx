@@ -112,7 +112,11 @@ export const StartFresh = ({ onComplete, onBack }: Props) => {
             </SelectTrigger>
             <SelectContent>
               {LANGUAGES.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
+                <SelectItem
+                  key={option.value}
+                  value={option.value}
+                  lang={option.value}
+                >
                   {option.label}
                 </SelectItem>
               ))}

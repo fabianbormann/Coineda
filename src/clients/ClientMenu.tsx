@@ -106,7 +106,9 @@ export const ClientMenu = () => {
                 if (c.id !== client.id) void switchTo(c.id);
               }}
             >
-              <span className="w-4">{c.id === client.id ? '✓' : ''}</span>
+              <span className="w-4" aria-hidden="true">
+                {c.id === client.id ? '✓' : ''}
+              </span>
               <span className="truncate">{labelOf(c)}</span>
               {c.kind === 'review' && (
                 <span className="ml-auto rounded bg-muted px-1.5 text-xs text-muted-foreground">
@@ -122,14 +124,13 @@ export const ClientMenu = () => {
           <DropdownMenuItem onSelect={() => open('rename')}>
             {t('Rename')}
           </DropdownMenuItem>
-          <DropdownMenuItem disabled={isLast} onSelect={() => open('delete')}>
+          <DropdownMenuItem
+            disabled={isLast}
+            aria-describedby={isLast ? 'client-last-note' : undefined}
+            onSelect={() => open('delete')}
+          >
             {t('Delete client')}
           </DropdownMenuItem>
-          {isLast && (
-            <p className="px-2 pb-1 text-xs text-muted-foreground">
-              {t('The last client cannot be deleted')}
-            </p>
-          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => setReviewOpen(true)}>
             {t('Open a checkpoint for review')}
@@ -148,6 +149,11 @@ export const ClientMenu = () => {
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+      {isLast && (
+        <span id="client-last-note" className="sr-only">
+          {t('The last client cannot be deleted')}
+        </span>
+      )}
 
       <OpenForReviewDialog open={reviewOpen} onOpenChange={setReviewOpen} />
 
