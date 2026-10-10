@@ -8,10 +8,17 @@ import csp from '../../public/csp.json';
  */
 export const cspFor = (dev: boolean): string =>
   dev
-    ? csp.policy.replace(
-        "connect-src 'self' https:",
-        `connect-src 'self' https: ${csp.devConnectSrcExtra}`,
-      )
+    ? csp.policy
+        .replace(
+          "connect-src 'self' https:",
+          `connect-src 'self' https: ${csp.devConnectSrcExtra}`,
+        )
+        // @vitejs/plugin-react injects an inline React Refresh preamble that
+        // carries no nonce; serve mode only, never in a build.
+        .replace(
+          "script-src 'self'",
+          `script-src 'self' ${csp.devScriptSrcExtra}`,
+        )
     : csp.policy;
 
 export const cspPlugin = (): Plugin => ({

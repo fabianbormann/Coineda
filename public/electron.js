@@ -41,6 +41,14 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
+// frame-ancestors is ignored in a <meta> policy; it is enforced here, by the
+// header (and only documented for the GitHub Pages deployment).
+function withCsp(response) {
+  const headers = new Headers(response.headers);
+  headers.set('Content-Security-Policy', policy);
+  return new Response(response.body, { status: response.status, headers });
+}
+
 function createWindow() {
   const isDev = !app.isPackaged;
 
@@ -73,8 +81,12 @@ function createWindow() {
     return { action: 'deny' };
   });
   mainWindow.webContents.on('will-navigate', (event, target) => {
-    const allowed = isDev ? 'http://localhost:3000' : `${APP_SCHEME}://app/`;
-    if (!target.startsWith(allowed)) event.preventDefault();
+    const allowed = isDev ? 'http://localhost:3000' : `${APP_SCHEME}://app`;
+    try {
+      if (new URL(target).origin !== allowed) event.preventDefault();
+    } catch {
+      event.preventDefault();
+    }
   });
   mainWindow.webContents.on('will-attach-webview', (event) =>
     event.preventDefault(),
@@ -96,7 +108,7 @@ app.whenReady().then(() => {
     // under a different origin, handing the app a second, unrelated
     // IndexedDB/localStorage bucket for free.
     if (host !== 'app') {
-      return new Response('Forbidden', { status: 403 });
+      return withCsp(new Response('Forbidden', { status: 403 }));
     }
 
     // pathname is e.g. "/" (root, wired to index.html), "/index.html" or
@@ -110,7 +122,7 @@ app.whenReady().then(() => {
       // decodeURIComponent throws a URIError on malformed escapes (e.g. a
       // stray "%zz"). Without this, a bad request would reject the handler
       // instead of returning a response.
-      return new Response('Bad Request', { status: 400 });
+      return withCsp(new Response('Bad Request', { status: 400 }));
     }
     // path.join (not path.resolve) — relativePath has a leading "/" from the
     // URL, and path.resolve would treat that as absolute and discard
@@ -126,13 +138,10 @@ app.whenReady().then(() => {
       relativeToRoot === '' ||
       (!relativeToRoot.startsWith('..') && !path.isAbsolute(relativeToRoot));
     if (!isSafe) {
-      return new Response('Forbidden', { status: 403 });
+      return withCsp(new Response('Forbidden', { status: 403 }));
     }
 
-    const response = await net.fetch(url.pathToFileURL(pathToServe).toString());
-    const headers = new Headers(response.headers);
-    headers.set('Content-Security-Policy', policy);
-    return new Response(response.body, { status: response.status, headers });
+    return withCsp(await net.fetch(url.pathToFileURL(pathToServe).toString()));
   });
 
   createWindow();

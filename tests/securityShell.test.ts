@@ -42,6 +42,10 @@ describe('shell security gate', () => {
     expect(read('public/electron.js')).toContain(literal);
   });
 
+  it('precaches the theme script', () => {
+    expect(read('vite.config.ts')).toContain("'theme-init.js'");
+  });
+
   it('electron-builder ships csp.json', () => {
     expect(read('package.json')).toContain('"public/csp.json"');
   });

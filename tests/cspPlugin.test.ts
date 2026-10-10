@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import csp from '../public/csp.json';
-import { cspPlugin } from '../src/security/cspPlugin';
+import { cspFor, cspPlugin } from '../src/security/cspPlugin';
 
 const HTML = '<html><head></head><body></body></html>';
 
@@ -25,5 +25,13 @@ describe('cspPlugin', () => {
     expect(run({})).toContain(
       "connect-src 'self' https: ws: http://localhost:*",
     );
+  });
+});
+
+describe('cspFor', () => {
+  it('relaxes script-src and connect-src in dev only', () => {
+    expect(cspFor(true)).toContain("script-src 'self' 'unsafe-inline'");
+    expect(cspFor(true)).toContain('ws:');
+    expect(cspFor(false)).toBe(csp.policy);
   });
 });

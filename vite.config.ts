@@ -87,7 +87,13 @@ export default defineConfig({
         // are already precached once via includeAssets above. Workbox only
         // tolerated that duplication because both copies happened to share
         // the same revision hash.
-        globPatterns: ['assets/**/*.{js,css,ttf,woff2,svg}', 'index.html'],
+        globPatterns: [
+          'assets/**/*.{js,css,ttf,woff2,svg}',
+          'index.html',
+          // The pre-paint theme script: without it an offline load flashes
+          // the light theme.
+          'theme-init.js',
+        ],
         // Price APIs (CoinGecko, DefiLlama, ECB) are deliberately absent from
         // runtimeCaching. src/prices/priceStore.ts already caches prices in
         // IndexedDB per asset and UTC day. A second cache with different

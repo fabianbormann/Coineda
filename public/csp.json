@@ -1,4 +1,5 @@
 {
   "policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'none'",
-  "devConnectSrcExtra": "ws: http://localhost:*"
+  "devConnectSrcExtra": "ws: http://localhost:*",
+  "devScriptSrcExtra": "'unsafe-inline'"
 }
