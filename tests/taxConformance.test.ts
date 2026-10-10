@@ -440,6 +440,17 @@ describe.each(taxRegistry.map((m) => [m.manifest.id, m] as const))(
         }
       }
 
+      // Non-vacuous for a module that supplies a filing aid: the walk must
+      // have reached a title, a label and a note, or an empty one passes.
+      if (id === 'de') {
+        expect(keys.size).toBeGreaterThan(0);
+        expect(keys.has('Private sales - crypto assets')).toBe(true);
+        expect(keys.has('Total proceeds')).toBe(true);
+        expect([...keys].some((key) => key.startsWith('The Freigrenzen'))).toBe(
+          true,
+        );
+      }
+
       for (const key of keys) {
         expect(en[key], `missing from en.json: ${key}`).toBeDefined();
         expect(de[key], `missing from de.json: ${key}`).toBeDefined();

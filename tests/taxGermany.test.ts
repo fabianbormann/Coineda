@@ -1406,9 +1406,10 @@ describe('german filing figures', () => {
     expect(entry(report, 0, 58)?.amount).toBe('300');
     expect(entry(report, 0, 51)?.reference?.form).toBe('Anlage SO');
     expect(entry(report, 0, 47)?.text).toBe('01.01.2025 – 31.12.2025');
-    expect(entry(report, 0, 45)?.text).toBe('Kryptowerte');
+    expect(entry(report, 0, 45)?.text).toBe('1');
+    expect(entry(report, 0, 46)?.text).toBe('Kryptowerte');
 
-    expect(entry(report, 1, 14)?.text).toBe('Kryptowerte');
+    expect(entry(report, 1, 14)?.text).toBe('1');
     expect(entry(report, 1, 15)?.text).toBe(
       'Staking, Lending, Airdrops (Kryptowerte)',
     );
@@ -1480,6 +1481,35 @@ describe('german filing figures', () => {
     });
     expect(entry(report, 0, 51)?.amount).toBe('-300');
     expect(entry(report, 0, 58)?.amount).toBe('-300');
+  });
+
+  it('keeps an exempt disposal and its costs out of every SO entry', () => {
+    const exempt = split({
+      disposalEventId: 'd-exempt',
+      costs: '4',
+      proceeds: '996',
+      consumed: [lotOf('a', 400), lotOf('b', 500)],
+    });
+    const taxable = split({
+      disposalEventId: 'd-taxable',
+      costs: '6',
+      proceeds: '594',
+      costBasis: '400',
+      gain: '194',
+      consumed: [lotOf('c', 10), lotOf('d', 20)],
+    });
+    const report = germanTax.assess({
+      year: 2025,
+      matched: [exempt, taxable],
+      income: [],
+      capital: [],
+    });
+    // Only the taxable disposal: gross 594 + 6, cost 400, expenses 6.
+    expect(entry(report, 0, 48)?.amount).toBe('600');
+    expect(entry(report, 0, 49)?.amount).toBe('400');
+    expect(entry(report, 0, 50)?.amount).toBe('6');
+    expect(entry(report, 0, 51)?.amount).toBe('194');
+    expect(entry(report, 0, 58)?.amount).toBe('194');
   });
 
   it('gives Austria no filing figures', () => {

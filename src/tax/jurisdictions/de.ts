@@ -437,6 +437,8 @@ const FILING_TITLE_KAP = 'Derivatives (Anlage KAP)';
 const FILING_OFFICE_NOTE =
   "The Freigrenzen, the saver's allowance and any loss carry-forward are applied by the Finanzamt itself; they are not typed in.";
 const KRYPTO = 'Kryptowerte';
+/** The 2025 form asks "1 = Ja" on the indicator lines. */
+const INDICATOR_YES = '1';
 const INCOME_TYPE_TEXT = 'Staking, Lending, Airdrops (Kryptowerte)';
 
 /**
@@ -517,7 +519,7 @@ const buildFiling = (
       entries: [
         {
           label: 'Kind of private sale',
-          text: KRYPTO,
+          text: INDICATOR_YES,
           ...ref('Anlage SO', so?.indicator),
         },
         {
@@ -569,7 +571,7 @@ const buildFiling = (
       entries: [
         {
           label: 'Kind of other income',
-          text: KRYPTO,
+          text: INDICATOR_YES,
           ...ref('Anlage SO', income?.indicator),
         },
         {
