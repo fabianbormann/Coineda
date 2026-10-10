@@ -35,7 +35,7 @@ import type { EventKind, Leg, RewardKind } from '@/ledger/types';
  */
 const REQUIRED = ['transaction type', 'asset', 'quantity transacted'] as const;
 
-const coinbaseAssetId = (ticker: string): string | null =>
+export const coinbaseAssetId = (ticker: string): string | null =>
   resolveTicker(ticker);
 
 /** Which way the asset moved, per Coinbase transaction type. `null` means

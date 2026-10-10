@@ -5,7 +5,9 @@ import {
   normaliseDecimal,
   toBaseUnits,
 } from '@/sources/csv/ledgerShape';
-import { resolveSymbol } from '@/assets/catalogue';
+import Big from 'big.js';
+import { entriesFor, resolveSymbol } from '@/assets/catalogue';
+import type { AssetEntry } from '@/assets/catalogue';
 import type { ParseResult } from '@/sources/csv/types';
 import type { DerivedEvent } from '@/sources/types';
 import type { Leg } from '@/ledger/types';
@@ -18,6 +20,10 @@ import type { Leg } from '@/ledger/types';
  * fee in the parent account's coin (empty for a token account, whose fee sits
  * on the parent's own row), commas stripped from values - though a German
  * Ledger Live writes a decimal comma, hence `normaliseDecimal`.
+ *
+ * A native OUT's amount includes its fee, as Ledger's own operation type
+ * documents, so sends are booked net of the fee: principal = amount - fee,
+ * a fee event alone when that is zero, a skip when it is negative.
  */
 const REQUIRED = [
   'Operation Date',
@@ -94,6 +100,39 @@ const fnv1a64 = (text: string, seed: bigint): string => {
 const identity = (text: string): string =>
   fnv1a64(text, FNV_OFFSET) + fnv1a64(`|${text}`, FNV_OFFSET ^ 0x9e3779b9n);
 
+/**
+ * Which catalogue entry an account's ticker is.
+ *
+ * A native coin first, whatever the address looks like: POL, BNB, AVAX and
+ * ETC accounts all carry 0x addresses and are not Ethereum tokens. A token
+ * only on an 0x account, because the catalogue's tokens are Ethereum's: a
+ * Tron USDT or a Solana USDC shares the ticker, not the asset. An ambiguous
+ * ticker gets one retry on Ethereum, unless a native coin is among its
+ * candidates: MATIC is both the Polygon coin's old name and an ERC-20, and
+ * an 0x address cannot tell them apart, so it skips.
+ */
+const resolveAccountAsset = (
+  ticker: string,
+  isEthAddress: boolean,
+): AssetEntry | undefined => {
+  const entry = resolveSymbol(ticker);
+  if (entry?.kind === 'native') {
+    return entry;
+  }
+  if (!isEthAddress) {
+    return undefined;
+  }
+  if (entry !== undefined) {
+    return entry;
+  }
+  // Ambiguous: an Ethereum token may answer, unless one of the candidates
+  // is a native coin, which the 0x address could just as well belong to.
+  if (entriesFor(ticker).some((candidate) => candidate.kind === 'native')) {
+    return undefined;
+  }
+  return resolveSymbol(ticker, { chain: 'eth' });
+};
+
 export const parse = (input: string): ParseResult => {
   const { header, rows } = readCsv(input, { delimiter: 'auto' });
   const have = new Set(lower(header));
@@ -167,10 +206,7 @@ export const parse = (input: string): ParseResult => {
 
     const isEthAddress = xpub.startsWith('0x');
     const venue = `ledger-live:${isEthAddress ? xpub.toLowerCase() : xpub}`;
-    const entry = resolveSymbol(
-      ticker,
-      isEthAddress ? { chain: 'eth' } : undefined,
-    );
+    const entry = resolveAccountAsset(ticker, isEthAddress);
     if (entry === undefined) {
       skipped.note(`holdings in ${ticker || '(no ticker)'}`);
       continue;
@@ -225,9 +261,22 @@ export const parse = (input: string): ParseResult => {
       kind = 'reward';
       rewardKind = 'staking';
     } else {
-      if (hasAmount && !failed) {
+      // A native OUT's amount INCLUDES its fee (Ledger's own operation type:
+      // "in OUT case, it includes the fees"), so the principal is what is
+      // left after the fee. A token's amount does not: its gas is on the
+      // parent's row.
+      let principal = amount;
+      if (type === 'OUT' && nativeId !== undefined && hasFee && !failed) {
+        const net = new Big(amount).minus(fee);
+        if (net.lt(0)) {
+          skipped.note('amounts below the fee');
+          continue;
+        }
+        principal = net.toFixed();
+      }
+      if (Number(principal) > 0 && !failed) {
         legs.push(
-          leg(entry.id, amount, type === 'IN' ? 'in' : 'out', 'principal'),
+          leg(entry.id, principal, type === 'IN' ? 'in' : 'out', 'principal'),
         );
       }
       if (type === 'OUT' && hasFee && nativeId !== undefined) {

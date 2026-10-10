@@ -59,16 +59,18 @@ describe('Ledger Live parse', () => {
     ]);
   });
 
-  it('books an outgoing BTC operation with its fee leg', () => {
+  it('books an outgoing BTC operation net of its fee, plus the fee leg', () => {
+    // Ledger's OUT amount INCLUDES the fee (types-live operation.ts), so the
+    // principal sent is 0.1 - 0.0001.
     const [e] = byHash('bbb222');
     expect(e.kind).toBe('transfer');
     expect(e.legs.map((l) => [l.role, l.direction, l.amount])).toEqual([
-      ['principal', 'out', '10000000'],
+      ['principal', 'out', '9990000'],
       ['fee', 'out', '10000'],
     ]);
   });
 
-  it('books a zero-amount ETH OUT as a fee event on the lower-cased venue', () => {
+  it('books an ETH OUT whose amount is all fee as a fee event on the lower-cased venue', () => {
     const e = events().find((x) => x.txHash === 'ccc333' && x.kind === 'fee')!;
     expect(e.legs).toEqual([
       {
@@ -151,7 +153,8 @@ describe('Ledger Live parse', () => {
     })) as LedgerEvent[];
     const held = foldHoldings(ledger, ownedVenuesOf(ledger));
     const btc = held.find((h) => h.assetId === 'bitcoin:native');
-    expect(btc?.amount).toBe('39970000');
+    // 0.5 in, 0.1 out including its 0.0001 fee, a failed send's 0.0002 fee.
+    expect(btc?.amount).toBe('39980000');
   });
 
   it('refuses a wrong header, naming the columns found', () => {
@@ -228,6 +231,70 @@ describe('Ledger Live fix round 1', () => {
     );
     expect(events).toHaveLength(1);
     expect(skipped).toContain('Skipped unparseable amounts in BTC');
+  });
+
+  it('books a native OUT net of its fee and a token OUT as it stands', () => {
+    const { events } = run(
+      `2025-03-05T12:00:00.000Z,Confirmed,ETH,OUT,1,0.01,n1,Ethereum 1,${ETH},EUR,0,0`,
+      `2025-03-05T12:00:00.000Z,Confirmed,USDT,OUT,250,,n1,Tether,${ETH},EUR,0,0`,
+    );
+    expect(events[0].legs.map((l) => [l.role, l.amount])).toEqual([
+      ['principal', '990000000000000000'],
+      ['fee', '10000000000000000'],
+    ]);
+    expect(events[1].legs.map((l) => [l.role, l.amount])).toEqual([
+      ['principal', '250000000'],
+    ]);
+  });
+
+  it('books a native OUT whose amount equals its fee as a fee only', () => {
+    const { events } = run(
+      `2025-03-05T12:00:00.000Z,Confirmed,ETH,OUT,0.002,0.002,n2,Ethereum 1,${ETH},EUR,0,0`,
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0].kind).toBe('fee');
+    expect(events[0].legs.map((l) => [l.role, l.amount])).toEqual([
+      ['fee', '2000000000000000'],
+    ]);
+  });
+
+  it('skips a native OUT whose amount is below its fee', () => {
+    const { events, skipped } = run(
+      `2025-03-05T12:00:00.000Z,Confirmed,ETH,OUT,0.001,0.002,n3,Ethereum 1,${ETH},EUR,0,0`,
+    );
+    expect(events).toHaveLength(0);
+    expect(skipped).toContain('Skipped amounts below the fee');
+  });
+
+  it('resolves a native ticker before any token, whatever the address', () => {
+    const at = (ticker: string, account: string) =>
+      run(
+        `2025-03-05T12:00:00.000Z,Confirmed,${ticker},IN,1,0,r-${ticker},Acc,${account},EUR,0,0`,
+      );
+    expect(at('POL', ETH).events[0].legs[0].assetId).toBe('polygon:native');
+    expect(at('BNB', ETH).events[0].legs[0].assetId).toBe('bnb:native');
+    expect(at('USDT', ETH).events[0].legs[0].assetId).toBe(USDT_ASSET_ID);
+  });
+
+  it('skips a token on an account that is not an 0x address', () => {
+    const tron = run(
+      '2025-03-05T12:00:00.000Z,Confirmed,USDT,IN,10,0,t-tron,Tron 1,TXyzTronAddress,EUR,0,0',
+    );
+    expect(tron.events).toHaveLength(0);
+    expect(tron.skipped).toContain('Skipped holdings in USDT');
+    const solana = run(
+      '2025-03-05T12:00:00.000Z,Confirmed,USDC,IN,10,0,t-sol,Solana 1,SoLExampleAddress,EUR,0,0',
+    );
+    expect(solana.events).toHaveLength(0);
+    expect(solana.skipped).toContain('Skipped holdings in USDC');
+  });
+
+  it('skips an ambiguous MATIC on an 0x account with a reason', () => {
+    const { events, skipped } = run(
+      `2025-03-05T12:00:00.000Z,Confirmed,MATIC,IN,1,0,m1,Polygon 1,${ETH},EUR,0,0`,
+    );
+    expect(events).toHaveLength(0);
+    expect(skipped).toContain('Skipped holdings in MATIC');
   });
 
   it('books the fee of a REDELEGATE', () => {

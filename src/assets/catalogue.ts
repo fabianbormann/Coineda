@@ -305,7 +305,9 @@ export const assetById = (id: string): AssetEntry | undefined => BY_ID.get(id);
 const namesOf = (e: AssetEntry): string[] =>
   [e.symbol, ...(e.aliases ?? [])].map((s) => s.toUpperCase());
 
-const entriesFor = (symbol: string): AssetEntry[] => {
+/** Every entry carrying this symbol or alias - the candidates behind an
+ *  ambiguous answer from `resolveSymbol`. */
+export const entriesFor = (symbol: string): AssetEntry[] => {
   const wanted = symbol.toUpperCase();
   return ASSET_CATALOGUE.filter((e) => namesOf(e).includes(wanted));
 };

@@ -20,6 +20,10 @@ describe('asset catalogue', () => {
     expect(assetById('eth:native')?.symbol).toBe('ETH');
   });
 
+  it('resolves NIGHT to the Cardano asset Bitpanda used to name explicitly', () => {
+    expect(resolveSymbol('NIGHT')?.id).toBe(NIGHT_ASSET_ID);
+  });
+
   it('refuses an ambiguous symbol without a hint', () => {
     expect(resolveSymbol('MATIC')).toBeUndefined();
     expect(ambiguousSymbols()).toContain('MATIC');
