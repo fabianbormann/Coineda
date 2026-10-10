@@ -15,7 +15,8 @@ describe('FileDropArea', () => {
   it('keeps the file input outside the button and out of the tab order', async () => {
     const { container } = render(<FileDropArea onFile={() => {}} />);
     const button = screen.getByRole('button');
-    const input = container.querySelector('input[type="file"]')!;
+    const input =
+      container.querySelector<HTMLInputElement>('input[type="file"]');
     expect(input).not.toBeNull();
     expect(button.contains(input)).toBe(false);
     expect(input).toHaveAttribute('tabindex', '-1');
@@ -103,6 +104,12 @@ describe('ClientMenu semantics', () => {
     );
     expect(glyph).toBeTruthy();
     expect(menu.querySelector('p')).toBeNull();
+    const del = screen.getByRole('menuitem', { name: /delete client/i });
+    expect(del).toHaveAttribute('aria-disabled', 'true');
+    expect(del).not.toHaveAttribute('data-disabled');
+    const note = document.getElementById(del.getAttribute('aria-describedby')!);
+    expect(note).toHaveTextContent('The last client cannot be deleted');
+    expect(menu.contains(note)).toBe(false);
   });
 });
 

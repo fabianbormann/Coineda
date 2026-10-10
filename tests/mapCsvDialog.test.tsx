@@ -68,6 +68,8 @@ beforeEach(() => {
 
 type User = ReturnType<typeof userEvent.setup>;
 
+// testing-library reads label textContent, which includes the aria-hidden
+// required asterisk that assistive tech skips.
 const field = (dialog: HTMLElement, name: string) =>
   within(dialog).getByLabelText(
     new RegExp(`^${name}( \\*)?$`),

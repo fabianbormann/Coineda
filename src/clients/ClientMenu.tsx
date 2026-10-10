@@ -125,9 +125,18 @@ export const ClientMenu = () => {
             {t('Rename')}
           </DropdownMenuItem>
           <DropdownMenuItem
-            disabled={isLast}
+            // aria-disabled rather than disabled: a disabled Radix item is
+            // skipped by arrow keys, so its explanation would never be heard.
+            aria-disabled={isLast ? 'true' : undefined}
             aria-describedby={isLast ? 'client-last-note' : undefined}
-            onSelect={() => open('delete')}
+            className={isLast ? 'opacity-50' : undefined}
+            onSelect={(event) => {
+              if (isLast) {
+                event.preventDefault();
+                return;
+              }
+              open('delete');
+            }}
           >
             {t('Delete client')}
           </DropdownMenuItem>

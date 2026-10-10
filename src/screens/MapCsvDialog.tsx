@@ -510,11 +510,11 @@ export const MapCsvDialog = ({
                 <div key={key} className="flex flex-col gap-1">
                   <label htmlFor={`map-col-${key}`} className="text-sm">
                     {t(name)}
-                    {required ? ' *' : ''}
+                    {required && <span aria-hidden="true"> *</span>}
                   </label>
                   <select
                     id={`map-col-${key}`}
-                    aria-required={required || undefined}
+                    aria-required={required ? 'true' : undefined}
                     className={SELECT_CLASS}
                     value={draft.columns[key] ?? ''}
                     onChange={(event) =>
