@@ -368,6 +368,7 @@ describe('runTaxReport', () => {
     expect(moved?.externalId).toBe('move');
     expect(moved?.source).toBe('My Kraken');
     expect(moved?.currency).toBe('EUR');
+    expect(report.jurisdiction).toBe('test');
   });
 
   it('produces different cost bases under fifo vs moving-average for the same disposal', async () => {

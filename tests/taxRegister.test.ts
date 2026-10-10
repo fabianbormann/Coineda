@@ -6,6 +6,7 @@ import {
   reportToJson,
 } from '@/tax/register';
 import { readCsv } from '@/sources/csv/readCsv';
+import type { SourceDirectoryEntry } from '@/tax/sourceDirectory';
 import type { LedgerEvent } from '@/ledger/types';
 import type {
   RegisterRow,
@@ -350,21 +351,51 @@ describe('a token name that looks like a formula', () => {
 });
 
 describe('reportToJson and filenames', () => {
-  it('is self-describing JSON', () => {
-    const register = build();
-    const report = {
+  const report = (register: RegisterRow[]) =>
+    ({
+      year: 2025,
+      jurisdiction: 'de',
       method: { fingerprint: 'ab'.repeat(32) },
-      totals: { taxableGain: '1' },
+      totals: { taxableGain: '1', omitted: 1 },
       thresholds: [],
       lines: [],
       income: [],
       capital: [],
+      omittedDisposals: [{ ...unpriced, taxEventKind: 'disposal' }],
+      unresolved: [unpriced, { ...unpriced, taxEventKind: 'disposal' }],
       register,
-    } as unknown as TaxReport;
-    const parsed = JSON.parse(reportToJson(report));
+    }) as unknown as TaxReport;
+  const generatedAt = '2026-10-10T08:00:00.000Z';
+
+  it('is self-describing JSON: year, jurisdiction, when, and the gaps', () => {
+    const register = build();
+    const parsed = JSON.parse(reportToJson(report(register), { generatedAt }));
     expect(parsed.fingerprint).toBe('ab'.repeat(32));
+    expect(parsed.year).toBe(2025);
+    expect(parsed.jurisdiction).toBe('de');
+    expect(parsed.generatedAt).toBe(generatedAt);
     expect(parsed.register).toHaveLength(register.length);
     expect(parsed.totals.taxableGain).toBe('1');
+    expect(parsed.omittedDisposals).toHaveLength(1);
+    expect(parsed.unresolved).toHaveLength(2);
+    expect('sourceDirectory' in parsed).toBe(false);
+  });
+
+  it('carries the source directory when the caller supplies it', () => {
+    const sourceDirectory: SourceDirectoryEntry[] = [
+      {
+        sourceId: 's',
+        label: 'Kraken CSV',
+        moduleId: 'kraken-csv',
+        venues: ['kraken'],
+        identities: ['addr1qxyz'],
+        eventCount: 3,
+      },
+    ];
+    const parsed = JSON.parse(
+      reportToJson(report(build()), { generatedAt, sourceDirectory }),
+    );
+    expect(parsed.sourceDirectory).toEqual(sourceDirectory);
   });
 
   it('names the file after the year and fingerprint', () => {

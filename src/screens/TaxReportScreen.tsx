@@ -592,7 +592,10 @@ export const TaxReportScreen = () => {
       return;
     }
     download(
-      reportToJson(assessment),
+      reportToJson(assessment, {
+        generatedAt: new Date().toISOString(),
+        sourceDirectory,
+      }),
       registerFilename(assessment.year, assessment.method.fingerprint, 'json'),
       'application/json',
     );

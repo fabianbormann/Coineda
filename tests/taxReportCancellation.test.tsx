@@ -39,6 +39,7 @@ const GERMAN_TAXABLE_GAIN = '999999';
 
 const germanAssessment: TaxReport = {
   year: 2024,
+  jurisdiction: 'de',
   lines: [],
   income: [],
   capital: [],

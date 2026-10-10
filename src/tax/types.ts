@@ -599,6 +599,8 @@ export type TaxReport = Omit<TaxAssessment, 'lines' | 'capital'> & {
    */
   capitalResult?: CapitalResult;
   method: ReportMethod;
+  /** The module's `manifest.id` ('de', 'at'), set by the host. */
+  jurisdiction: string;
   /**
    * The items behind `totals.omitted`, not just how many there were.
    *

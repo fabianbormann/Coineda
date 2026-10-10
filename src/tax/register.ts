@@ -13,6 +13,7 @@ import type {
   TaxReport,
   UnresolvedItem,
 } from './types';
+import type { SourceDirectoryEntry } from './sourceDirectory';
 
 export { PAID_ORIGIN_KEY, RESIDUAL_ORIGIN_KEY };
 
@@ -323,11 +324,26 @@ export const registerToCsv = (rows: RegisterRow[]): string => {
   return `${BOM}${lines.join('\r\n')}\r\n`;
 };
 
-export const reportToJson = (report: TaxReport): string =>
+/**
+ * The whole report as one self-describing JSON file.
+ *
+ * `generatedAt` is passed in rather than read from the clock so this stays
+ * a pure function of its arguments. The source directory, when supplied, is
+ * copied field by field: its identities are already the allow-listed public
+ * ones (see `publicIdentities`), and an explicit copy keeps any field added
+ * to the entry later from leaking into a file handed to a tax office.
+ */
+export const reportToJson = (
+  report: TaxReport,
+  options: { generatedAt: string; sourceDirectory?: SourceDirectoryEntry[] },
+): string =>
   JSON.stringify(
     {
       format: 'coineda-tax-report',
       formatVersion: 1,
+      year: report.year,
+      jurisdiction: report.jurisdiction,
+      generatedAt: options.generatedAt,
       fingerprint: report.method.fingerprint,
       method: report.method,
       totals: report.totals,
@@ -336,7 +352,25 @@ export const reportToJson = (report: TaxReport): string =>
       income: report.income,
       capital: report.capital,
       capitalResult: report.capitalResult ?? null,
+      omittedDisposals: report.omittedDisposals,
+      unresolved: report.unresolved,
       register: report.register,
+      ...(options.sourceDirectory === undefined
+        ? {}
+        : {
+            sourceDirectory: options.sourceDirectory.map((entry) => ({
+              sourceId: entry.sourceId,
+              label: entry.label,
+              moduleId: entry.moduleId,
+              venues: entry.venues,
+              identities: entry.identities,
+              eventCount: entry.eventCount,
+              ...(entry.firstAt === undefined
+                ? {}
+                : { firstAt: entry.firstAt }),
+              ...(entry.lastAt === undefined ? {} : { lastAt: entry.lastAt }),
+            })),
+          }),
     },
     null,
     2,

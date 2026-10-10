@@ -581,6 +581,7 @@ export const runTaxReport = async (
     income,
     capital,
     method,
+    jurisdiction: module.manifest.id,
     unresolved: [...assessment.unresolved, ...unresolved],
     omittedDisposals,
     register,

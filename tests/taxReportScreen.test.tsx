@@ -237,6 +237,10 @@ describe('downloading the register', () => {
     expect(createObjectURL).toHaveBeenCalledTimes(2);
     const json = JSON.parse(new TextDecoder().decode(await readBlob(blobs[1])));
     expect(json.register.length).toBeGreaterThan(0);
+    expect(json.year).toBe(2025);
+    expect(json.jurisdiction).toBe('test-jurisdiction');
+    expect(Number.isNaN(Date.parse(json.generatedAt))).toBe(false);
+    expect(Array.isArray(json.sourceDirectory)).toBe(true);
   });
 });
 
