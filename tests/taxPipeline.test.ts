@@ -9,6 +9,7 @@ import { buildCheckpoint } from '@/checkpoint/format';
 import austrianTax from '@/tax/jurisdictions/at';
 import type { LedgerEvent } from '@/ledger/types';
 import type { TaxModule, TaxEvent } from '@/tax/types';
+import { writeDeviceEndpoints } from '@/config/deviceConfig';
 import { flatRange, rangeStub } from './priceRangeStub';
 
 /** A deliberately minimal module: the pipeline must work without any
@@ -1307,5 +1308,64 @@ describe('capital events on the report', () => {
     expect(gap?.kind).toBe('needs-price');
     expect(gap?.taxEventKind).toBe('capital-gain');
     expect(report.totals.omitted).toBe(0);
+  });
+});
+
+describe('the egress statement of a run', () => {
+  const ada = ledgerEvent({
+    id: 'buy',
+    externalId: 'buy',
+    timestamp: Date.UTC(2025, 5, 1),
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('states the endpoints the run started with, not a later edit', async () => {
+    await putEvents([ada]);
+    writeDeviceEndpoints({ priceHistory: 'https://prices.start.example/v1' });
+    const inner = flatRange(1);
+    let edited = false;
+    vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
+      if (!edited) {
+        edited = true;
+        // The user edits the endpoints card while the report runs.
+        writeDeviceEndpoints({ priceHistory: 'https://prices.later.example' });
+      }
+      return inner(url, init);
+    });
+
+    const report = await runTaxReport(stubModule, {
+      year: 2025,
+      baseCurrency: 'eur',
+    });
+
+    expect(edited).toBe(true);
+    expect(report.method.egress).toBe('public');
+    expect(report.method.endpoints.priceHistory).toBe('prices.start.example');
+  });
+
+  it('lists no data host when no price was fetched', async () => {
+    await putEvents([
+      ledgerEvent({
+        id: 'fiat',
+        externalId: 'fiat',
+        legs: [
+          {
+            assetId: 'fiat:eur',
+            amount: '10',
+            direction: 'in',
+            venue: 'wallet-a',
+            role: 'principal',
+          },
+        ],
+      }),
+    ]);
+    const report = await runTaxReport(stubModule, {
+      year: 2025,
+      baseCurrency: 'eur',
+    });
+    expect(report.method.endpoints).toEqual({});
   });
 });

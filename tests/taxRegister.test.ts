@@ -5,6 +5,8 @@ import {
   registerToCsv,
   reportToJson,
 } from '@/tax/register';
+import { endpointHosts } from '@/config/egress';
+import { PUBLIC_ENDPOINTS } from '@/config/endpoints';
 import { readCsv } from '@/sources/csv/readCsv';
 import type { SourceDirectoryEntry } from '@/tax/sourceDirectory';
 import type { LedgerEvent } from '@/ledger/types';
@@ -525,5 +527,16 @@ describe('reportToJson egress', () => {
     for (const host of Object.values(parsed.method.endpoints as object)) {
       expect(host).not.toMatch(/[/?]/);
     }
+  });
+});
+
+describe('endpointHosts', () => {
+  it('reduces a URL with credentials and a path to its host', () => {
+    expect(
+      endpointHosts({
+        ...PUBLIC_ENDPOINTS,
+        fx: 'https://user:pw@host.example/path?key=1',
+      }).fx,
+    ).toBe('host.example');
   });
 });

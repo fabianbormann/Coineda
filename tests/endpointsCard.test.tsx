@@ -95,6 +95,25 @@ describe('the endpoints settings card', () => {
         'This build fixes the endpoints; they cannot be changed here.',
       ),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('textbox')).toBeNull();
+    for (const box of screen.getAllByRole('textbox')) {
+      expect(box).toHaveAttribute('readonly');
+    }
+  });
+});
+
+describe('the build-fixed endpoints', () => {
+  it('shows the build value read-only for a field VITE_ENDPOINTS fixes', async () => {
+    vi.stubEnv(
+      'VITE_ENDPOINTS',
+      JSON.stringify({ fx: 'https://fx.operator.example' }),
+    );
+    render(<EndpointsSettingsCard />);
+    await ready(/^price history/i);
+    const fx = screen.getByLabelText(/^exchange rates/i);
+    expect(fx).toHaveValue('https://fx.operator.example');
+    expect(fx).toHaveAttribute('readonly');
+    expect(screen.getByLabelText(/^spot prices/i)).not.toHaveAttribute(
+      'readonly',
+    );
   });
 });

@@ -7,6 +7,7 @@ import { ClientContext } from '@/clients/ClientContext';
 import {
   PUBLIC_ENDPOINTS,
   defaultEndpoints,
+  resolveEndpoints,
   type Endpoints,
 } from '@/config/endpoints';
 import {
@@ -36,11 +37,12 @@ const isHttps = (value: string): boolean => {
 };
 
 /**
- * Per-client overrides of the outbound data hosts. An empty field keeps the
- * build's default. Written on blur to the device (not the client), and
- * Disabled in review mode, and
- * read-only when the build pins `VITE_EGRESS=restricted`: an operator's
- * guarantee is not the user's to change.
+ * Per-device overrides of the outbound data hosts (they apply to every
+ * client). An empty field keeps the default. Written on blur to the device
+ * config. Disabled in review mode; read-only when the build pins
+ * `VITE_EGRESS=restricted`, and per field when the build fixes that host in
+ * `VITE_ENDPOINTS` - an operator's guarantee is not the user's to change.
+ * The value shown is the one in force (build > device > public default).
  */
 export const EndpointsSettingsCard = () => {
   const { t } = useTranslation();
@@ -51,7 +53,14 @@ export const EndpointsSettingsCard = () => {
   );
   const [invalid, setInvalid] = useState<Set<string>>(new Set());
 
-  const defaults = defaultEndpoints();
+  const buildDefaults = defaultEndpoints();
+  const validOverrides: Partial<Endpoints> = {};
+  for (const [key, value] of Object.entries(values)) {
+    if (isHttps(value.trim())) {
+      validOverrides[key as keyof Endpoints] = value.trim();
+    }
+  }
+  const inForce = resolveEndpoints(validOverrides);
 
   const leave = (key: keyof Endpoints) => {
     if (readOnly || pinned) {
@@ -93,14 +102,19 @@ export const EndpointsSettingsCard = () => {
         </p>
         {FIELDS.map(({ key, label }) => {
           const override = (values[key] ?? '').trim();
-          const effective = override !== '' ? override : defaults[key];
+          const effective = inForce[key];
+          // The build fixes this host (VITE_ENDPOINTS): not editable here.
+          const fixedByBuild = buildDefaults[key] !== PUBLIC_ENDPOINTS[key];
           return (
             <div key={key} className="flex flex-col gap-2">
               <Label htmlFor={`endpoint-${key}`}>{t(label)}</Label>
-              {pinned ? (
-                <p id={`endpoint-${key}`} className="font-mono break-all">
-                  {effective}
-                </p>
+              {pinned || fixedByBuild ? (
+                <Input
+                  id={`endpoint-${key}`}
+                  className="font-mono"
+                  value={effective}
+                  readOnly
+                />
               ) : (
                 <>
                   <Input

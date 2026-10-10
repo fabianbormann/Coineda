@@ -23,7 +23,7 @@ import {
 } from './residualOrigin';
 import { buildRegister } from './register';
 import { resolveValues } from './resolveValues';
-import { egressMode } from '@/config/endpoints';
+import { egressMode, type Endpoints } from '@/config/endpoints';
 import { activeEndpoints, endpointHosts } from '@/config/egress';
 import { rewardKindOf } from '@/tax/rewardKinds';
 import { APP_VERSION } from '@/global/version';
@@ -159,6 +159,19 @@ const shortfallToUnresolved = (event: TaxEvent): UnresolvedItem => ({
  * trusted from the module, because omitted is the guarantee that a total
  * cannot be read without knowing what it excludes.
  */
+/** No service: `endpointHosts` omits blanks. */
+const BLANK_ENDPOINTS: Endpoints = {
+  priceHistory: '',
+  spotPrices: '',
+  fx: '',
+  tokenRegistry: '',
+  bitcoinEsplora: '',
+  ethereumBlockscout: '',
+  cardanoYaci: '',
+  cardanoBlockfrost: '',
+  bitpanda: '',
+};
+
 export const runTaxReport = async (
   module: TaxModule,
   options: RunTaxReportOptions,
@@ -170,6 +183,13 @@ export const runTaxReport = async (
       `${module.manifest.id} supports tax years ${range}, not ${options.year}`,
     );
   }
+
+  // ONE snapshot of the egress mode and endpoints for the whole run: the
+  // fetches use it and the method sheet states it, so an edit in the
+  // endpoints card mid-run cannot make the sheet name hosts the run did
+  // not use.
+  const snapshotMode = egressMode();
+  const endpointSnapshot = activeEndpoints();
 
   // Read once, with the events, so the fingerprint describes what this run
   // read even if the ledger changes while prices are being fetched.
@@ -266,9 +286,10 @@ export const runTaxReport = async (
     taxEvents.push(...produced);
   }
 
-  const { valued, unpriced } = await resolveValues(
+  const { valued, unpriced, queried } = await resolveValues(
     taxEvents,
     options.baseCurrency,
+    endpointSnapshot,
   );
   hostUnresolved.push(...unpriced);
 
@@ -554,8 +575,21 @@ export const runTaxReport = async (
     transferResiduals: residuals.filter((event) =>
       event.id.endsWith(FEE_RESIDUAL_SUFFIX),
     ).length,
-    egress: egressMode(),
-    endpoints: endpointHosts(activeEndpoints()),
+    egress: snapshotMode,
+    // Restricted: every configured service. Public: only what this run
+    // asked - the price and rate services, and only if a price was fetched.
+    endpoints: endpointHosts(
+      snapshotMode === 'restricted'
+        ? endpointSnapshot
+        : queried
+          ? {
+              ...BLANK_ENDPOINTS,
+              priceHistory: endpointSnapshot.priceHistory,
+              spotPrices: endpointSnapshot.spotPrices,
+              fx: endpointSnapshot.fx,
+            }
+          : BLANK_ENDPOINTS,
+    ),
   };
 
   // The events dropped as internal transfers: the single-event shape and

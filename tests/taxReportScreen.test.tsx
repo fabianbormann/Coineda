@@ -3404,3 +3404,25 @@ describe('the egress line on the method sheet', () => {
     expect(line.parentElement).not.toHaveTextContent('/v1');
   });
 });
+
+describe('the egress line in German', () => {
+  it('translates the mode', async () => {
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+    await i18n.changeLanguage('de');
+    try {
+      renderScreen();
+      await userEvent.click(
+        await screen.findByRole('button', { name: /testland/i }),
+      );
+      await userEvent.click(
+        await screen.findByRole('button', { name: /report erstellen/i }),
+      );
+      expect(
+        await screen.findByText('Ausgehende Verbindungen: öffentlich'),
+      ).toBeInTheDocument();
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+});

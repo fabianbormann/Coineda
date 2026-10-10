@@ -9,6 +9,7 @@ import { fetchHistory } from '@/prices/history';
 import { valueOf } from '@/prices/scale';
 import { getSettings } from '@/settings/settingsStore';
 import { activeEndpoints } from '@/config/egress';
+import type { Endpoints } from '@/config/endpoints';
 import { isFiatAsset } from '@/ledger/balances';
 import { isZeroAmount, normaliseAmount } from '@/ledger/amount';
 import type { TaxCost, TaxEvent, TaxReason, UnresolvedItem } from '@/tax/types';
@@ -95,6 +96,8 @@ type DayResult = { price: string; source: string } | { reason: TaxReason };
 const lookUp = async (
   pairs: Map<string, { assetId: string; date: string }>,
   currency: string,
+  endpoints: Endpoints,
+  onQuery: () => void,
 ): Promise<Map<string, DayResult>> => {
   const settings = await getSettings();
   const apiKey = settings?.coingeckoApiKey;
@@ -145,6 +148,9 @@ const lookUp = async (
   // free tier refuses anything older than 365 days, and an acquisition
   // three years before its disposal is exactly the figure a cost basis
   // needs.
+  if (missing.size > 0) {
+    onQuery();
+  }
   const {
     prices: fetched,
     sources,
@@ -154,9 +160,9 @@ const lookUp = async (
     currency,
     apiKey,
     undefined,
-    // The device's endpoints and egress mode: in restricted mode an
-    // unconfigured service is blank, and its prices come back missing.
-    activeEndpoints(),
+    // The run's own snapshot: in restricted mode an unconfigured service
+    // is blank, and its prices come back missing.
+    endpoints,
   );
 
   // Still matches the CoinGecko path: with a key, no day is refused locally.
@@ -217,7 +223,15 @@ const lookUp = async (
 export const resolveValues = async (
   events: TaxEvent[],
   currency: string,
-): Promise<{ valued: TaxEvent[]; unpriced: UnresolvedItem[] }> => {
+  endpoints: Endpoints = activeEndpoints(),
+): Promise<{
+  valued: TaxEvent[];
+  unpriced: UnresolvedItem[];
+  /** Whether any price provider was asked (a fully cached or base-currency
+   *  run asks none), so the report names only the hosts it used. */
+  queried: boolean;
+}> => {
+  let queried = false;
   const baseFiatAssetId = `fiat:${currency}`;
 
   // Every (asset, day) pair the run needs, deduplicated: each event's own
@@ -255,7 +269,9 @@ export const resolveValues = async (
   const results =
     pairs.size === 0
       ? new Map<string, DayResult>()
-      : await lookUp(pairs, currency);
+      : await lookUp(pairs, currency, endpoints, () => {
+          queried = true;
+        });
 
   /** The base-currency value of `amount` of `assetId` on the event's day,
    *  or the reason there is none. */
@@ -355,5 +371,5 @@ export const resolveValues = async (
     valued.push({ ...taxEvent, value: own.value, priceSource, costs });
   }
 
-  return { valued, unpriced };
+  return { valued, unpriced, queried };
 };
