@@ -1072,7 +1072,11 @@ describe('for a review client', () => {
     expect(
       screen.getByText(/Review of mueller\.coineda — read-only/),
     ).toBeInTheDocument();
-    expect(screen.getByText(/abcdef012345/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Review of mueller.coineda — read-only — fingerprint abcdef012345 (matches)',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('keeps the controls for an ordinary client', async () => {

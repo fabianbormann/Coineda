@@ -19,7 +19,7 @@ import { DERIVATIVE_KIND_LABELS } from '@/tax/derivativeKinds';
 import { buildDisclaimer, type Disclaimer } from '@/tax/disclaimer';
 import { getSettings, putSettings } from '@/settings/settingsStore';
 import { ClientContext } from '@/clients/ClientContext';
-import { shortFingerprint } from '@/clients/shortFingerprint';
+import { shortFingerprint } from '@/ledger/fingerprint';
 import { getAllEvents, getSources } from '@/ledger/db';
 import {
   buildSourceDirectory,
@@ -219,7 +219,6 @@ export const TaxReportScreen = () => {
   const clientCtx = useContext(ClientContext);
   const readOnly = clientCtx?.readOnly ?? false;
   const clientLabel = clientCtx?.client.label ?? '';
-  const clientFingerprint = clientCtx?.client.review?.fingerprint;
   const navigate = useNavigate();
   /**
    * Whether to hide unresolved items dated outside the tax year.
@@ -2208,9 +2207,10 @@ export const TaxReportScreen = () => {
               >
                 {clientLabel && <span>{clientLabel} · </span>}
                 {t('Tax year')}: {assessment.year}
-                {clientFingerprint && (
-                  <span> · {shortFingerprint(clientFingerprint)}</span>
-                )}
+                <span>
+                  {' '}
+                  · {shortFingerprint(assessment.method.fingerprint)}
+                </span>
               </div>
             )}
 

@@ -602,7 +602,10 @@
     "Close review": "Close review",
     "Review of {{file}} — read-only": "Review of {{file}} — read-only",
     "Client": "Client",
-    "Client": "Client",
+    "matches": "matches",
+    "does NOT match": "does NOT match",
+    "no fingerprint stored": "no fingerprint stored",
+    "Review of {{file}} — read-only — fingerprint {{fingerprint}} ({{verdict}})": "Review of {{file}} — read-only — fingerprint {{fingerprint}} ({{verdict}})",
     "This permanently deletes {{label}} and all its data from this device. Type the label to confirm": "This permanently deletes {{label}} and all its data from this device. Type the label to confirm"
   }
 }

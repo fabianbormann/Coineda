@@ -2732,8 +2732,9 @@ describe('the client on the screen and the printout', () => {
     expect(footer).toHaveClass('print:block');
     expect(footer).toHaveTextContent('Müller GmbH');
     expect(footer).toHaveTextContent('2025');
-    expect(footer).toHaveTextContent('abcdef012345');
-    expect(footer).not.toHaveTextContent('abcdef0123456789');
+    // The report's own fingerprint, never the registry's.
+    expect(footer).toHaveTextContent(/2025 · [0-9a-f]{12}$/);
+    expect(footer).not.toHaveTextContent('abcdef012345');
   });
 
   it('still renders without a client provider', async () => {

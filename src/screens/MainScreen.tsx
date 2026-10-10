@@ -403,6 +403,7 @@ export const MainScreen = ({ onReset }: Props) => {
     : new Set([...syncingIds, ...removingIds]);
 
   const handleRefreshAll = async () => {
+    if (readOnly) return;
     if (syncingAll || syncingIds.size > 0 || removingIds.size > 0) {
       return;
     }
@@ -448,6 +449,7 @@ export const MainScreen = ({ onReset }: Props) => {
   };
 
   const handleStop = (source: SourceRecord) => {
+    if (readOnly) return;
     // Abort the in-flight request directly. The sync itself notices, stops
     // between pages, and keeps everything that already committed - the
     // cursor is persisted per page, so stopping is not losing.
@@ -455,6 +457,7 @@ export const MainScreen = ({ onReset }: Props) => {
   };
 
   const handleRefreshOne = async (source: SourceRecord) => {
+    if (readOnly) return;
     if (busyIds.has(source.id)) {
       return;
     }
@@ -514,6 +517,7 @@ export const MainScreen = ({ onReset }: Props) => {
    * source's entire request history against a provider that may rate-limit.
    */
   const handleResyncOne = async (source: SourceRecord) => {
+    if (readOnly) return;
     if (busyIds.has(source.id)) {
       return;
     }
@@ -639,6 +643,7 @@ export const MainScreen = ({ onReset }: Props) => {
   };
 
   const handleReset = async () => {
+    if (readOnly) return;
     const proceed = await confirm({
       title: t('Reset this device?'),
       // Spells out all three things it takes and that none of them are
@@ -670,6 +675,7 @@ export const MainScreen = ({ onReset }: Props) => {
   };
 
   const handleRemove = async (source: SourceRecord) => {
+    if (readOnly) return;
     if (busyIds.has(source.id)) {
       return;
     }

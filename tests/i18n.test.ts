@@ -4,6 +4,24 @@ import path from 'node:path';
 import en from '../src/translations/en.json';
 import de from '../src/translations/de.json';
 
+describe('locale files', () => {
+  it.each(['en', 'de'])('%s.json has no duplicate keys', (lang) => {
+    const text = fs.readFileSync(
+      path.join(__dirname, '../src/translations', `${lang}.json`),
+      'utf8',
+    );
+    const seen = new Set<string>();
+    const dupes: string[] = [];
+    for (const line of text.split('\n')) {
+      const m = /^\s{4}"((?:[^"\\]|\\.)+)":/.exec(line);
+      if (!m) continue;
+      if (seen.has(m[1])) dupes.push(m[1]);
+      seen.add(m[1]);
+    }
+    expect(dupes).toEqual([]);
+  });
+});
+
 describe('i18n', () => {
   let i18n: any;
 
