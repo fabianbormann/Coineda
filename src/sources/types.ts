@@ -118,6 +118,14 @@ export type FetchPage = {
   /** Optional, and absent on almost every page. Collected into the
    *  sync report by syncSource. */
   notes?: SourceNote[];
+  /**
+   * Identities (`externalId`s) of this source's events that the page
+   * replaces under a new identity. syncSource deletes them before writing
+   * the page, so a module that has to change an id it already stored can
+   * retire the old row instead of leaving it beside the new one. Only ever
+   * an id that can no longer be produced; absent on almost every page.
+   */
+  supersedes?: string[];
 };
 
 /**

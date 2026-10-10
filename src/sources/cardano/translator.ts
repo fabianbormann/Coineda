@@ -224,15 +224,18 @@ export const fetchRewardEvents = async (
       // income: a transfer in.
       kind: reward.type === 'pool_deposit_refund' ? 'transfer' : 'reward',
       origin: 'derived',
-      note: `staking reward (${reward.type}), epoch ${reward.epoch}`,
+      note:
+        reward.type === 'pool_deposit_refund'
+          ? `pool deposit refund, epoch ${reward.epoch}`
+          : `staking reward (${reward.type}), epoch ${reward.epoch}`,
       // The provider record verbatim, so member-versus-leader survives as
       // data rather than only as prose in `note` - a jurisdiction that taxes
       // a pool operator's leader rewards as business income needs to branch
       // on it, and branching on a sentence is not a contract.
       //
-      // Only the two delegation reward types are typed. Anything else the
-      // provider reports here (a pool deposit refund, a treasury or reserves
-      // payout) is not a staking reward, so it carries no kind and surfaces
+      // A treasury or reserves payout is typed `other`. A pool deposit
+      // refund carries no kind - it is the user's own deposit coming back,
+      // not income - and neither does a type unknown here, which surfaces
       // as unclassified rather than being taxed as income by default.
       ...(rewardKind === undefined ? {} : { rewardKind }),
       raw: reward,
@@ -495,7 +498,47 @@ const isAccountRouteAbsent = (error: unknown): boolean =>
   error.status === 404 &&
   (Object.values(ACCOUNT_ROUTE_LABELS) as string[]).includes(error.what);
 
+const REWARD_ID = /^reward:([^:]+):(\d+)(?::(.+))?$/;
+
+/**
+ * The pre-split reward ids this page's rewards replace.
+ *
+ * Before the reward types were split, every reward of an epoch was stored
+ * as `reward:<stake>:<epoch>`. A member reward keeps that id, so it upserts
+ * onto the old row. In an epoch with a non-member reward and NO member
+ * reward, though, the old row can only have been that non-member reward,
+ * now stored under a suffixed id - nothing would ever overwrite the old
+ * one, and it would count twice. Those ids are superseded.
+ *
+ * Computed from the page's own events: an account's rewards are always
+ * fetched whole, onto one page, so an epoch is never split across pages.
+ */
+export const supersededRewardIds = (events: DerivedEvent[]): string[] => {
+  const withMember = new Set<string>();
+  const withOther = new Set<string>();
+  for (const event of events) {
+    const match = REWARD_ID.exec(event.externalId);
+    if (match === null) {
+      continue;
+    }
+    const plain = `reward:${match[1]}:${match[2]}`;
+    (match[3] === undefined ? withMember : withOther).add(plain);
+  }
+  return [...withOther].filter((id) => !withMember.has(id));
+};
+
 export const fetchCardanoEvents = async (
+  provider: CardanoProvider,
+  config: Record<string, string>,
+  cursor: string | null,
+  signal?: AbortSignal,
+): Promise<FetchPage> => {
+  const page = await fetchCardanoPage(provider, config, cursor, signal);
+  const supersedes = supersededRewardIds(page.events);
+  return supersedes.length === 0 ? page : { ...page, supersedes };
+};
+
+const fetchCardanoPage = async (
   provider: CardanoProvider,
   config: Record<string, string>,
   cursor: string | null,

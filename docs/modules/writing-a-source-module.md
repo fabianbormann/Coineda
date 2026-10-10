@@ -185,7 +185,11 @@ An account can receive several rewards in one epoch (a pool operator gets
 `member` and `leader`), so a reward's `externalId` must include everything
 that tells two apart: Cardano uses `reward:<stake>:<epoch>:<type>`. Only
 `member` keeps the older `reward:<stake>:<epoch>` so existing ledgers need no
-migration; changing an id that is already stored duplicates it. A
+migration. Changing an id that is already stored duplicates it unless the
+page names the old id in `FetchPage.supersedes`: `syncSource` deletes those
+rows before writing the page. Cardano does this for `reward:<stake>:<epoch>`
+in every epoch that has a non-member reward and no member reward, where the
+old row can only be the pre-split non-member reward. A
 `pool_deposit_refund` is the user's own deposit coming back, so it is a
 `transfer`, not a `reward`.
 

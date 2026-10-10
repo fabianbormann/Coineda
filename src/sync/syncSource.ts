@@ -7,6 +7,7 @@ import {
   LedgerSwitchedError,
   activeLedgerName,
   deleteDerivedEvents,
+  deleteEventsByIdentity,
   getCursor,
   putCursor,
   putCursorIfSourceExists,
@@ -20,6 +21,9 @@ export type SyncReport = {
   inserted: number;
   updated: number;
   pages: number;
+  /** Events of an earlier identity a page replaced (`FetchPage.supersedes`)
+   *  and that were removed before it was written. Absent when none were. */
+  superseded?: number;
   /** A raw diagnostic string (a provider's own message, or one we construct),
    *  never a translation key. Translation happens at the call site, the same
    *  rule src/lib/notify.ts follows - this module has no useTranslation to
@@ -205,6 +209,22 @@ const drain = async (
         report.error = `${module.manifest.id}: fetchEvents returned the same cursor '${result.cursor}' it was given - the module is not making progress`;
         await putSourceStatus(source.id, { lastError: report.error }, ledger);
         return report;
+      }
+
+      // Before the write, not after - the importFile.ts rule: the old row
+      // and its replacement share a source but not an identity, so an
+      // upsert alone would keep both. Not one transaction with the write; a
+      // failure between them leaves the old row gone and the page unwritten
+      // with the cursor unmoved, so the retry re-creates the replacement.
+      if (result.supersedes !== undefined && result.supersedes.length > 0) {
+        const removed = await deleteEventsByIdentity(
+          source.id,
+          result.supersedes,
+          ledger,
+        );
+        if (removed > 0) {
+          report.superseded = (report.superseded ?? 0) + removed;
+        }
       }
 
       const stamped = result.events.map((event) => stamp(event, source.id));
