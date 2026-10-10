@@ -18,7 +18,7 @@ import {
   putSource,
   setActiveLedger,
 } from '@/ledger/db';
-import { putSettings } from '@/settings/settingsStore';
+import { getSettings, putSettings } from '@/settings/settingsStore';
 import { putManualLink } from '@/ledger/manualLinks';
 import { activeClient, listClients } from '@/clients/registry';
 import { HandoverNotReviewableError, openForReview } from '@/clients/review';
@@ -98,6 +98,42 @@ describe('openForReview', () => {
     expect(activeLedgerName()).toMatch(/^coineda-review-/);
     expect(await getAllEvents()).toEqual(source);
     expect((await getSources())[0].config).toEqual({ address: 'addr1' });
+  });
+
+  it('drops the CoinGecko key from the review copy and keeps the rest', async () => {
+    const datev = {
+      beraternummer: '1234567',
+      mandantennummer: '00042',
+      sachkontenlaenge: 4,
+      konten: {
+        verrechnung: '1360',
+        gewinn23: '2660',
+        verlust23: '2150',
+        einkuenfte22: '8400',
+      },
+    };
+    await putSettings({
+      coingeckoApiKey: 'CG-clientkey123',
+      taxpayer: { name: 'Erika Mustermann', taxNumber: '12/345/67890' },
+      datev,
+      lossCarryForward: { '2025': { privateSales: '100' } },
+    });
+    const bytes = await seal('backup');
+    await openForReview(bytes, secret, 'client.coineda');
+
+    const settings = await getSettings();
+    expect(settings).not.toBeNull();
+    expect(settings).not.toHaveProperty('coingeckoApiKey');
+    expect(settings?.taxpayer).toEqual({
+      name: 'Erika Mustermann',
+      taxNumber: '12/345/67890',
+    });
+    expect(settings?.datev).toEqual(datev);
+    expect(settings?.lossCarryForward).toEqual({
+      '2025': { privateSales: '100' },
+    });
+    expect(settings?.language).toBe('en');
+    expect(settings?.baseCurrency).toBe('eur');
   });
 
   it('refuses a handover before creating any client', async () => {

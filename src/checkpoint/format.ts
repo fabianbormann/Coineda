@@ -295,6 +295,13 @@ export const restoreCheckpoint = async (
         ),
       }))
     : checkpoint.sources;
+  // The client's CoinGecko key is a credential too, so a review copy does
+  // not carry it. The taxpayer, DATEV numbers and loss carry-forward stay:
+  // the reviewer's report needs them. Side effect: without a key, history
+  // older than CoinGecko's free-tier window comes from DefiLlama only, and
+  // the read-only review cannot take a key of its own.
+  const settings = { ...checkpoint.settings };
+  if (options.stripCredentials) delete settings.coingeckoApiKey;
   const events = [
     ...checkpoint.authoredEvents,
     ...(checkpoint.derivedEvents ?? []),
@@ -317,7 +324,7 @@ export const restoreCheckpoint = async (
   try {
     await tx.objectStore('settings').put({
       key: SETTINGS_KEY,
-      value: normalizeSettings(checkpoint.settings),
+      value: normalizeSettings(settings),
     });
     for (const source of sources) {
       await tx.objectStore('sources').put(source);

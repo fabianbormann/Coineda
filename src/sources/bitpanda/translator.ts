@@ -130,7 +130,7 @@ export const asJson = (
     return JSON.parse(fetched.body);
   } catch {
     throw new Error(
-      `bitpanda: ${what} did not return JSON (HTTP ${fetched.status}): ${redactSecret(fetched.body.slice(0, 120), apiKey)}`,
+      `bitpanda: ${what} did not return JSON (HTTP ${fetched.status}): ${redactSecret(fetched.body, apiKey).slice(0, 120)}`,
     );
   }
 };

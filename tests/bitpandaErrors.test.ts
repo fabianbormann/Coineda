@@ -46,4 +46,13 @@ describe('bitpanda error redaction', () => {
       'k=[redacted] z=abXcdYefZgh',
     );
   });
+
+  it('redacts a key that straddles char 120 before truncating', () => {
+    const key = 'K7Q2M9WZ4R8T1V6Y3P5N0J2H8G4F6D1S';
+    const message = messageFor(`${'.'.repeat(110)}${key} trailing`, key);
+    expect(message).toContain('[redacted]');
+    for (let i = 0; i + 6 <= key.length; i++) {
+      expect(message).not.toContain(key.slice(i, i + 6));
+    }
+  });
 });

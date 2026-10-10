@@ -4,6 +4,7 @@ const {
   nativeImage,
   protocol,
   net,
+  session,
   shell,
 } = require('electron');
 const path = require('path');
@@ -49,9 +50,24 @@ function withCsp(response) {
   return new Response(response.body, { status: response.status, headers });
 }
 
-function createWindow() {
-  const isDev = !app.isPackaged;
+const isDev = !app.isPackaged;
 
+// Is this URL the app itself? Node's WHATWG URL reports origin 'null' for a
+// non-special scheme such as coineda:// (registerSchemesAsPrivileged only
+// changes Chromium's parser), so production compares protocol and host.
+// Anything unparsable is not the app.
+function isAppUrl(target) {
+  try {
+    const u = new URL(target);
+    return isDev
+      ? u.origin === 'http://localhost:3000'
+      : u.protocol === 'coineda:' && u.host === 'app';
+  } catch {
+    return false;
+  }
+}
+
+function createWindow() {
   const image = nativeImage.createFromPath(
     path.join(__dirname, 'icons', 'icon.png'),
   );
@@ -74,19 +90,18 @@ function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(({ url: target }) => {
     try {
       const { protocol: proto } = new URL(target);
-      if (['http:', 'https:'].includes(proto)) shell.openExternal(target);
+      // A failure (no default browser) must not become an unhandled
+      // rejection in the main process.
+      if (['http:', 'https:'].includes(proto)) {
+        shell.openExternal(target).catch(() => {});
+      }
     } catch {
       // not a URL: deny silently
     }
     return { action: 'deny' };
   });
   mainWindow.webContents.on('will-navigate', (event, target) => {
-    const allowed = isDev ? 'http://localhost:3000' : `${APP_SCHEME}://app`;
-    try {
-      if (new URL(target).origin !== allowed) event.preventDefault();
-    } catch {
-      event.preventDefault();
-    }
+    if (!isAppUrl(target)) event.preventDefault();
   });
   mainWindow.webContents.on('will-attach-webview', (event) =>
     event.preventDefault(),
@@ -100,6 +115,28 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Electron grants every permission request by default. The only one the
+  // app needs is the camera, for the QR scanner on the onboarding screen
+  // (src/onboarding/ImportCheckpoint.tsx, offered in this build too), so
+  // 'media' is allowed for video only and only to the app itself; every
+  // other permission (microphone, geolocation, notifications, ...) is
+  // denied.
+  session.defaultSession.setPermissionRequestHandler(
+    (_webContents, permission, callback, details) => {
+      const mediaTypes = details.mediaTypes ?? [];
+      callback(
+        permission === 'media' &&
+          mediaTypes.length > 0 &&
+          mediaTypes.every((type) => type === 'video') &&
+          isAppUrl(details.requestingUrl),
+      );
+    },
+  );
+  session.defaultSession.setPermissionCheckHandler(
+    (_webContents, permission, requestingOrigin) =>
+      permission === 'media' && isAppUrl(requestingOrigin),
+  );
+
   protocol.handle(APP_SCHEME, async (request) => {
     const { host, pathname } = new URL(request.url);
 

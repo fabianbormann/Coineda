@@ -11,6 +11,9 @@
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#03A678" />
+    <!-- No Referer on provider requests. The Origin header on CORS fetches
+         cannot be suppressed; see SECURITY.md. -->
+    <meta name="referrer" content="no-referrer" />
     <meta
       name="description"
       content="Coineda — a free, open source, local-running crypto tracking and tax tool"

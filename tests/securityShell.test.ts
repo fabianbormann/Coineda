@@ -38,8 +38,45 @@ describe('shell security gate', () => {
     "host !== 'app'",
     'path.relative(BUILD_DIR, pathToServe)',
     "['http:', 'https:']",
+    // What the measures do, not only that they are named.
+    "{ action: 'deny' }",
+    'devTools: isDev',
+    "require('./csp.json')",
+    "headers.set('Content-Security-Policy', policy)",
+    "withCsp(new Response('Forbidden', { status: 403 }))",
+    "withCsp(new Response('Bad Request', { status: 400 }))",
+    'shell.openExternal(target).catch(',
+    'standard: true',
+    'secure: true',
+    'setMenu(null)',
+    // Node's URL gives origin 'null' for coineda://, so compare the parts.
+    "protocol === 'coineda:'",
+    "host === 'app'",
+    "origin === 'http://localhost:3000'",
+    'setPermissionRequestHandler',
+    'setPermissionCheckHandler',
+    "permission === 'media'",
   ])('electron.js contains %s', (literal) => {
     expect(read('public/electron.js')).toContain(literal);
+  });
+
+  it('cancels webview attachment', () => {
+    expect(read('public/electron.js')).toMatch(
+      /'will-attach-webview',\s*\(event\)\s*=>\s*event\.preventDefault\(\)/,
+    );
+  });
+
+  it('electron.js takes its policy from csp.json, which is the spec string', () => {
+    const js = read('public/electron.js');
+    expect(js).toContain("const { policy } = require('./csp.json');");
+    expect(js).not.toContain("default-src 'self'");
+    expect(JSON.parse(read('public/csp.json')).policy).toBe(POLICY);
+  });
+
+  it('index.html suppresses the Referer header', () => {
+    expect(read('index.html')).toContain(
+      '<meta name="referrer" content="no-referrer" />',
+    );
   });
 
   it('precaches the theme script', () => {
