@@ -1,4 +1,14 @@
 import '@testing-library/jest-dom/vitest';
+import { guardFetch, resetAllowedHosts } from './helpers/egress';
+
+// The egress guard: a test that reaches a real host without stubbing fetch
+// or calling allowHosts() fails with UnexpectedEgressError(host). Assigned
+// directly rather than through vi.stubGlobal, so a test's own
+// vi.unstubAllGlobals() restores the guard rather than removing it.
+globalThis.fetch = guardFetch(globalThis.fetch.bind(globalThis));
+afterEach(() => {
+  resetAllowedHosts();
+});
 
 // jsdom doesn't implement ResizeObserver, but Radix UI's Popper (used by the
 // shadcn Tooltip/DropdownMenu primitives that the sidebar renders) reads

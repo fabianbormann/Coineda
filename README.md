@@ -142,6 +142,9 @@ npm run dist         # desktop installers
 
 Interface languages: English and German.
 
+Self-hosting: to run Coineda against your own price and chain services, with no calls to public
+providers, see [docs/operations/self-hosting.md](docs/operations/self-hosting.md).
+
 Accessibility: the test suite runs axe-core's WCAG 2.1 A/AA rules (BITV 2.0's baseline) over
 every screen, onboarding step and dialog, in at least one state each, and measures colour contrast
 from the tokens ([docs/accessibility.md](docs/accessibility.md) lists exactly what is covered). That

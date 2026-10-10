@@ -112,6 +112,12 @@ beforeEach(async () => {
     await db.clear(store);
   }
   localStorage.clear();
+  // MainScreen values the seeded ADA through CoinGecko's spot endpoint; no
+  // test here is about prices, so the lookup answers with nothing.
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response('{}', { status: 200 })),
+  );
   vi.stubGlobal(
     'matchMedia',
     vi.fn().mockReturnValue({

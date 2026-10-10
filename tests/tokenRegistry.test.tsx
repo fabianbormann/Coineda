@@ -261,10 +261,8 @@ describe('on screen', () => {
   });
 
   it('names the asset offline when the registry gives nothing', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => bulkResponse([])),
-    );
+    const fetchMock = vi.fn(async () => bulkResponse([]));
+    vi.stubGlobal('fetch', fetchMock);
     const { container } = render(
       <TokenMetaProvider assetIds={[NIGHT_ASSET_ID]}>
         <CryptoAmount value="12000000" assetId={NIGHT_ASSET_ID} />
@@ -275,6 +273,9 @@ describe('on screen', () => {
     expect(container.textContent).toContain('12');
     expect(container.textContent).toContain('NIGHT');
     expect(container.textContent).not.toContain(SUBJECT);
+    // The lookup is issued after mount; waiting for it keeps it from firing
+    // after afterEach has put the real fetch back.
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
   });
 });
 
