@@ -307,7 +307,8 @@ export const MapCsvDialog = ({
   }, [draft, label, delimiter, timeZone, typeValues]);
 
   // Mapped columns the file does not have (a saved mapping against a changed
-  // export). Checked here until validateMapping takes the header itself.
+  // export). Checked here rather than via validateMapping(mapping, header),
+  // whose message interpolates the name and so cannot be translated.
   const missingColumns = Object.values(mapping.columns).filter(
     (name) => name && !table.header.includes(name),
   );
@@ -702,17 +703,14 @@ export const MapCsvDialog = ({
                 ))}
               </ul>
             )}
-            {/* warnings arrives with the Task 2 review fix; absent until then. */}
-            {((preview as { warnings?: string[] }).warnings ?? []).map(
-              (warning) => (
-                <p
-                  key={warning}
-                  className="text-sm text-amber-600 dark:text-amber-400"
-                >
-                  {t(warning)}
-                </p>
-              ),
-            )}
+            {preview.warnings.map((warning) => (
+              <p
+                key={warning}
+                className="text-sm text-amber-600 dark:text-amber-400"
+              >
+                {t(warning)}
+              </p>
+            ))}
             {preview.unresolved.length > 0 && (
               <p className="text-sm">
                 {t('Unresolved tickers: {{tickers}}', {
