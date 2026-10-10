@@ -52,7 +52,10 @@ const KEYS = Object.keys(PUBLIC_ENDPOINTS) as (keyof Endpoints)[];
 const normalise = (value: string): string => value.trim().replace(/\/+$/, '');
 
 /** Copies only known keys with string values, normalised. Anything else in
- *  the input is ignored rather than trusted. */
+ *  the input is ignored rather than trusted - including a value that is
+ *  empty after normalisation: `''` would turn every fetch into a relative
+ *  request against the app's own origin, so a cleared field keeps the
+ *  default instead. */
 const overlay = (base: Endpoints, partial: unknown): Endpoints => {
   const result = { ...base };
   if (partial === null || typeof partial !== 'object') {
@@ -61,18 +64,18 @@ const overlay = (base: Endpoints, partial: unknown): Endpoints => {
   const record = partial as Record<string, unknown>;
   for (const key of KEYS) {
     const value = record[key];
-    if (typeof value === 'string') {
-      result[key] = normalise(value);
+    if (typeof value !== 'string') {
+      continue;
+    }
+    const normalised = normalise(value);
+    if (normalised !== '') {
+      result[key] = normalised;
     }
   }
   return result;
 };
 
-/** PUBLIC_ENDPOINTS overlaid by the build's VITE_ENDPOINTS. A malformed
- *  value warns and falls back to the public set rather than breaking the
- *  app at boot. */
-export const defaultEndpoints = (): Endpoints => {
-  const raw = import.meta.env.VITE_ENDPOINTS;
+const parseEnv = (raw: string | undefined): Endpoints => {
   if (raw === undefined || raw.trim() === '') {
     return { ...PUBLIC_ENDPOINTS };
   }
@@ -95,6 +98,22 @@ export const defaultEndpoints = (): Endpoints => {
   return overlay(PUBLIC_ENDPOINTS, parsed);
 };
 
+/** The last parse, keyed by the raw env string: the value is fixed at build
+ *  time, so it is parsed (and a malformed one warned about) once. Keyed
+ *  rather than a plain flag so `vi.stubEnv` in tests still takes effect. */
+let memo: { raw: string | undefined; endpoints: Endpoints } | null = null;
+
+/** PUBLIC_ENDPOINTS overlaid by the build's VITE_ENDPOINTS. A malformed
+ *  value warns once and falls back to the public set rather than breaking
+ *  the app at boot. Returns a fresh copy each call. */
+export const defaultEndpoints = (): Endpoints => {
+  const raw = import.meta.env.VITE_ENDPOINTS;
+  if (memo === null || memo.raw !== raw) {
+    memo = { raw, endpoints: parseEnv(raw) };
+  }
+  return { ...memo.endpoints };
+};
+
 /** The defaults overlaid by the client's own `Settings.endpoints`. */
 export const resolveEndpoints = (
   settings?: Pick<Settings, 'endpoints'> | null,
@@ -114,17 +133,37 @@ export const egressMode = (
   return settings?.egress === 'restricted' ? 'restricted' : 'public';
 };
 
-/** The host names the endpoints point at. Empty or unparsable values
- *  contribute nothing. */
-export const allowedHosts = (endpoints: Endpoints): Set<string> => {
+/**
+ * Whether `key` points somewhere an operator chose, rather than at the
+ * public default. In restricted mode a public default counts as "not
+ * configured": the build (or the user) has not named a service for it.
+ */
+export const isConfigured = (
+  endpoints: Endpoints,
+  key: keyof Endpoints,
+): boolean => {
+  const value = normalise(endpoints[key] ?? '');
+  return value !== '' && value !== PUBLIC_ENDPOINTS[key];
+};
+
+/** The hosts (`host`, port included) the endpoints point at. In restricted
+ *  mode only configured (non-public) endpoints count; in public mode every
+ *  one does. Empty or unparsable values contribute nothing. */
+export const allowedHosts = (
+  endpoints: Endpoints,
+  mode: EgressMode = 'public',
+): Set<string> => {
   const hosts = new Set<string>();
   for (const key of KEYS) {
     const value = endpoints[key];
     if (!value) {
       continue;
     }
+    if (mode === 'restricted' && !isConfigured(endpoints, key)) {
+      continue;
+    }
     try {
-      hosts.add(new URL(value).hostname);
+      hosts.add(new URL(value).host);
     } catch {
       // Not a URL: nothing to allow.
     }

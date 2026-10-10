@@ -4,6 +4,7 @@ import {
   allowedHosts,
   defaultEndpoints,
   egressMode,
+  isConfigured,
   resolveEndpoints,
 } from '@/config/endpoints';
 
@@ -155,5 +156,92 @@ describe('allowedHosts', () => {
     });
     expect(hosts.size).toBe(7);
     expect(hosts).not.toContain('tokens.cardano.org');
+  });
+
+  it('keeps the port, so a service on another port is a different host', () => {
+    expect(
+      allowedHosts({
+        ...PUBLIC_ENDPOINTS,
+        fx: 'http://fx.example.gov:8080/v1',
+      }),
+    ).toContain('fx.example.gov:8080');
+  });
+
+  it('allows every host in public mode', () => {
+    const endpoints = { ...PUBLIC_ENDPOINTS, fx: 'https://fx.example.gov' };
+    expect(allowedHosts(endpoints, 'public').size).toBe(9);
+  });
+
+  it('allows only configured hosts in restricted mode', () => {
+    expect(
+      allowedHosts(
+        {
+          ...PUBLIC_ENDPOINTS,
+          fx: 'https://fx.example.gov',
+          priceHistory: 'https://prices.example.gov:8443',
+        },
+        'restricted',
+      ),
+    ).toEqual(new Set(['fx.example.gov', 'prices.example.gov:8443']));
+    expect(allowedHosts(PUBLIC_ENDPOINTS, 'restricted').size).toBe(0);
+  });
+});
+
+describe('isConfigured', () => {
+  it('is false for a public default', () => {
+    expect(isConfigured(PUBLIC_ENDPOINTS, 'fx')).toBe(false);
+  });
+
+  it('is true for an operator-chosen value', () => {
+    expect(
+      isConfigured({ ...PUBLIC_ENDPOINTS, fx: 'https://fx.example.gov' }, 'fx'),
+    ).toBe(true);
+  });
+
+  it('is false for an empty value', () => {
+    expect(isConfigured({ ...PUBLIC_ENDPOINTS, fx: '' }, 'fx')).toBe(false);
+  });
+
+  it('sees through a configured value that is the public default', () => {
+    vi.stubEnv('VITE_ENDPOINTS', '{"fx":"https://api.frankfurter.dev/v1/"}');
+    expect(isConfigured(defaultEndpoints(), 'fx')).toBe(false);
+  });
+});
+
+describe('empty overrides', () => {
+  it('keeps the default when the build configuration leaves a field empty', () => {
+    vi.stubEnv('VITE_ENDPOINTS', '{"fx":"","spotPrices":"   /  "}');
+    expect(defaultEndpoints()).toEqual(PUBLIC_ENDPOINTS);
+  });
+
+  it('keeps the default when a setting is cleared', () => {
+    vi.stubEnv('VITE_ENDPOINTS', '{"fx":"https://fx.example.gov"}');
+    expect(
+      resolveEndpoints({ endpoints: { fx: '  ', priceHistory: '' } }),
+    ).toEqual({ ...PUBLIC_ENDPOINTS, fx: 'https://fx.example.gov' });
+  });
+});
+
+describe('env parse memoisation', () => {
+  it('warns once for the same invalid value', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.stubEnv('VITE_ENDPOINTS', '{memo not json');
+    defaultEndpoints();
+    defaultEndpoints();
+    resolveEndpoints();
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-reads when the value changes', () => {
+    vi.stubEnv('VITE_ENDPOINTS', '{"fx":"https://a.example.gov"}');
+    expect(defaultEndpoints().fx).toBe('https://a.example.gov');
+    vi.stubEnv('VITE_ENDPOINTS', '{"fx":"https://b.example.gov"}');
+    expect(defaultEndpoints().fx).toBe('https://b.example.gov');
+  });
+
+  it('hands out copies, so a caller cannot corrupt the cache', () => {
+    vi.stubEnv('VITE_ENDPOINTS', '{"fx":"https://c.example.gov"}');
+    defaultEndpoints().fx = 'mutated';
+    expect(defaultEndpoints().fx).toBe('https://c.example.gov');
   });
 });
