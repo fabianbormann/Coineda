@@ -196,7 +196,7 @@ and Anlage KAP); Austria does not, and a module without a filing aid simply
 omits the field. The shape is sections of entries:
 
 ```ts
-FilingFigures = { year; linesVerified: boolean; sections: FilingSection[] }
+FilingFigures = { year; linesVerified: boolean; verifiedBy?; sections: FilingSection[] }
 FilingSection = { title; form; entries: FilingEntry[] }   // title: translation key
 FilingEntry   = { label; amount?; text?; reference?; note? }
 ```
@@ -208,7 +208,8 @@ sums the form asks for, taxable side only: Freigrenzen, the saver's allowance
 and loss carry-forward are applied by the tax office, not by the report. Line
 numbers come from a per-year data table with provenance, never from code or
 memory: Germany's is `FORM_LINES_DE` in `src/tax/jurisdictions/de.forms.ts`,
-each year carrying `verified: { source, checkedOn }`. A year with no verified
+each year carrying `verified: { source, checkedOn }`, which Germany copies to
+`FilingFigures.verifiedBy` so the page can name the source. A year with no verified
 table supplies no `reference` at all and sets `linesVerified: false`, so the
 page prints the section names and says the lines were not verified, rather
 than printing a number that might be a line off.

@@ -2495,6 +2495,98 @@ describe('the filing aid', () => {
     expect(within(section).getByText(/total proceeds/i)).toBeInTheDocument();
   });
 
+  it('names the source the line numbers were verified against', async () => {
+    taxRegistry.push(
+      filingModule({
+        ...verified!,
+        verifiedBy: { source: 'Test form guide', checkedOn: '2026-10-10' },
+      }),
+    );
+    await putEvents([acquisitionEvent, disposalEvent]);
+    renderScreen();
+    await runReport('2025');
+
+    const section = screen.getByTestId('filing-aid');
+    // A calendar date, so it reads the same in every time zone.
+    expect(
+      within(section).getByText(
+        'Line numbers verified against Test form guide on Oct 10, 2026.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('warns that the figures are incomplete when items are unresolved', async () => {
+    const base = filingModule(verified);
+    taxRegistry.push({
+      ...base,
+      assess: (input) => ({
+        ...base.assess(input),
+        unresolved: [
+          {
+            kind: 'needs-price',
+            sourceEventId: 'gap',
+            assetId: 'cardano:lovelace',
+            amount: '1',
+            venue: 'wallet-a',
+            timestamp: Date.UTC(2025, 3, 1),
+            reason: { key: 'gap' },
+            taxEventKind: 'income',
+            resolutions: [],
+          },
+        ],
+      }),
+    });
+    await putEvents([acquisitionEvent, disposalEvent]);
+    renderScreen();
+    await runReport('2025');
+
+    const section = screen.getByTestId('filing-aid');
+    expect(
+      within(section).getByText(
+        'These figures are incomplete: 1 items were omitted or left unresolved (see the Result card). Resolve them before you type anything in.',
+      ),
+    ).toBeInTheDocument();
+    // The figures are still shown beside the warning.
+    expect(within(section).getByText(/line 48/i)).toBeInTheDocument();
+  });
+
+  it('prints no incompleteness warning for a complete report', async () => {
+    taxRegistry.push(filingModule(verified));
+    await putEvents([acquisitionEvent, disposalEvent]);
+    renderScreen();
+    await runReport('2025');
+
+    const section = screen.getByTestId('filing-aid');
+    expect(
+      within(section).queryByText(/these figures are incomplete/i),
+    ).toBeNull();
+  });
+
+  it('shows no figures when the report is not in euros', async () => {
+    await putSettings({ language: 'en', baseCurrency: 'usd' });
+    vi.stubGlobal('fetch', flatRange(1));
+    taxRegistry.push(filingModule(verified));
+    await putEvents([acquisitionEvent, disposalEvent]);
+    renderScreen();
+    await runReport('2025');
+
+    const section = screen.getByTestId('filing-aid');
+    expect(
+      within(section).getByRole('heading', {
+        name: /filing aid — anlage so and anlage kap 2025/i,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(section).getByText(
+        'The German forms take euros; this report is in USD, so no filing figures are shown.',
+      ),
+    ).toBeInTheDocument();
+    expect(within(section).queryByText(/line 48/i)).toBeNull();
+    expect(within(section).queryByText(/total proceeds/i)).toBeNull();
+    expect(within(section).queryByText('Kryptowerte')).toBeNull();
+    expect(within(section).queryByText(/the finanzamt applies/i)).toBeNull();
+  });
+
   it('shows no filing aid when the module supplies none', async () => {
     taxRegistry.push(makeModule());
     await putEvents([acquisitionEvent, disposalEvent]);

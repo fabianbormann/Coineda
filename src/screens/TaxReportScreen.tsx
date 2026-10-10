@@ -1679,7 +1679,9 @@ export const TaxReportScreen = () => {
                 {/* 2c. Filing aid. Printed: it is the page a user holds
                     beside the form. Absent for a module that supplies no
                     `filing`. Line numbers print only when the year's form
-                    was verified (each entry then carries a reference). */}
+                    was verified (each entry then carries a reference). The
+                    German forms take euros, so a report in any other
+                    currency prints the heading and one sentence only. */}
                 {assessment.filing !== undefined && (
                   <div className="flex flex-col gap-2" data-testid="filing-aid">
                     <h3 className="text-sm font-semibold">
@@ -1687,61 +1689,106 @@ export const TaxReportScreen = () => {
                         year: assessment.filing.year,
                       })}
                     </h3>
-                    {!assessment.filing.linesVerified && (
+                    {assessment.method.baseCurrency !== 'eur' ? (
                       <p className="text-sm text-muted-foreground">
                         {t(
-                          'The line numbers of the {{year}} form are not verified; use the section names.',
-                          { year: assessment.filing.year },
+                          'The German forms take euros; this report is in {{currency}}, so no filing figures are shown.',
+                          {
+                            currency:
+                              assessment.method.baseCurrency.toUpperCase(),
+                          },
                         )}
                       </p>
+                    ) : (
+                      <>
+                        {assessment.filing.verifiedBy !== undefined && (
+                          <p className="text-sm text-muted-foreground">
+                            {t(
+                              'Line numbers verified against {{source}} on {{date}}.',
+                              {
+                                source: assessment.filing.verifiedBy.source,
+                                // A calendar date: local midnight, so the
+                                // formatter cannot shift it across a time zone.
+                                date: formatDate(
+                                  Date.parse(
+                                    `${assessment.filing.verifiedBy.checkedOn}T00:00:00`,
+                                  ),
+                                ),
+                              },
+                            )}
+                          </p>
+                        )}
+                        {assessment.omittedDisposals.length +
+                          assessment.unresolved.length >
+                          0 && (
+                          <p className="text-sm text-destructive">
+                            {t(
+                              'These figures are incomplete: {{count}} items were omitted or left unresolved (see the Result card). Resolve them before you type anything in.',
+                              {
+                                count:
+                                  assessment.omittedDisposals.length +
+                                  assessment.unresolved.length,
+                              },
+                            )}
+                          </p>
+                        )}
+                        {!assessment.filing.linesVerified && (
+                          <p className="text-sm text-muted-foreground">
+                            {t(
+                              'The line numbers of the {{year}} form are not verified; use the section names.',
+                              { year: assessment.filing.year },
+                            )}
+                          </p>
+                        )}
+                        {assessment.filing.sections.map((section) => (
+                          <Card key={section.title}>
+                            <CardContent className="flex flex-col gap-1 text-sm">
+                              <p className="font-medium">{t(section.title)}</p>
+                              {section.entries.map((entry, index) => (
+                                <div key={`${entry.label}-${index}`}>
+                                  <p>
+                                    {entry.reference !== undefined && (
+                                      <span className="text-muted-foreground">
+                                        {t('Line {{line}}', {
+                                          line: entry.reference.line,
+                                        })}
+                                        {' · '}
+                                      </span>
+                                    )}
+                                    <span className="font-medium">
+                                      {t(entry.label)}
+                                      {entry.amount !== undefined ||
+                                      entry.text !== undefined
+                                        ? ': '
+                                        : ''}
+                                    </span>
+                                    {entry.amount !== undefined && (
+                                      <Money
+                                        value={Number(entry.amount)}
+                                        currency={baseCurrency}
+                                      />
+                                    )}
+                                    {entry.text !== undefined && (
+                                      <span>{entry.text}</span>
+                                    )}
+                                  </p>
+                                  {entry.note !== undefined && (
+                                    <p className="text-muted-foreground">
+                                      {t(entry.note)}
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
+                            </CardContent>
+                          </Card>
+                        ))}
+                        <p className="text-sm text-muted-foreground">
+                          {t(
+                            "The Finanzamt applies the Freigrenzen, the saver's allowance and any loss carry-forward itself; they are not typed in.",
+                          )}
+                        </p>
+                      </>
                     )}
-                    {assessment.filing.sections.map((section) => (
-                      <Card key={section.title}>
-                        <CardContent className="flex flex-col gap-1 text-sm">
-                          <p className="font-medium">{t(section.title)}</p>
-                          {section.entries.map((entry, index) => (
-                            <div key={`${entry.label}-${index}`}>
-                              <p>
-                                {entry.reference !== undefined && (
-                                  <span className="text-muted-foreground">
-                                    {t('Line {{line}}', {
-                                      line: entry.reference.line,
-                                    })}
-                                    {' · '}
-                                  </span>
-                                )}
-                                <span className="font-medium">
-                                  {t(entry.label)}
-                                  {entry.amount !== undefined ||
-                                  entry.text !== undefined
-                                    ? ': '
-                                    : ''}
-                                </span>
-                                {entry.amount !== undefined && (
-                                  <Money
-                                    value={Number(entry.amount)}
-                                    currency={baseCurrency}
-                                  />
-                                )}
-                                {entry.text !== undefined && (
-                                  <span>{entry.text}</span>
-                                )}
-                              </p>
-                              {entry.note !== undefined && (
-                                <p className="text-muted-foreground">
-                                  {t(entry.note)}
-                                </p>
-                              )}
-                            </div>
-                          ))}
-                        </CardContent>
-                      </Card>
-                    ))}
-                    <p className="text-sm text-muted-foreground">
-                      {t(
-                        "The Finanzamt applies the Freigrenzen, the saver's allowance and any loss carry-forward itself; they are not typed in.",
-                      )}
-                    </p>
                   </div>
                 )}
 
