@@ -252,6 +252,63 @@ const readBlob = (blob: Blob): Promise<ArrayBuffer> =>
     reader.readAsArrayBuffer(blob);
   });
 
+/** A buy for 100 EUR and a sale for 100 EUR with a 7 EUR fee. */
+const putSaleWithFee = async () => {
+  await putEvents([
+    ledgerEvent({
+      id: 'buy',
+      externalId: 'buy',
+      kind: 'trade',
+      timestamp: Date.UTC(new Date().getUTCFullYear(), 0, 2),
+      legs: [
+        {
+          assetId: 'fiat:eur',
+          amount: '100',
+          direction: 'out',
+          venue: 'wallet-a',
+          role: 'principal',
+        },
+        {
+          assetId: 'cardano:lovelace',
+          amount: '100000000',
+          direction: 'in',
+          venue: 'wallet-a',
+          role: 'principal',
+        },
+      ],
+    }),
+    ledgerEvent({
+      id: 'sell',
+      externalId: 'sell',
+      kind: 'trade',
+      timestamp: Date.UTC(new Date().getUTCFullYear(), 0, 3),
+      legs: [
+        {
+          assetId: 'cardano:lovelace',
+          amount: '100000000',
+          direction: 'out',
+          venue: 'wallet-a',
+          role: 'principal',
+        },
+        {
+          assetId: 'fiat:eur',
+          amount: '100',
+          direction: 'in',
+          venue: 'wallet-a',
+          role: 'principal',
+        },
+        {
+          assetId: 'fiat:eur',
+          amount: '7',
+          direction: 'out',
+          venue: 'wallet-a',
+          role: 'fee',
+        },
+      ],
+    }),
+  ]);
+};
+
 describe('running a report', () => {
   it('runs a report and renders the totals', async () => {
     taxRegistry.push(makeModule());
@@ -351,59 +408,7 @@ describe('running a report', () => {
   it('prints the fees deducted from a disposal', async () => {
     vi.stubGlobal('fetch', flatRange(1));
     taxRegistry.push(germanTax);
-    await putEvents([
-      ledgerEvent({
-        id: 'buy',
-        externalId: 'buy',
-        kind: 'trade',
-        timestamp: Date.UTC(new Date().getUTCFullYear(), 0, 2),
-        legs: [
-          {
-            assetId: 'fiat:eur',
-            amount: '100',
-            direction: 'out',
-            venue: 'wallet-a',
-            role: 'principal',
-          },
-          {
-            assetId: 'cardano:lovelace',
-            amount: '100000000',
-            direction: 'in',
-            venue: 'wallet-a',
-            role: 'principal',
-          },
-        ],
-      }),
-      ledgerEvent({
-        id: 'sell',
-        externalId: 'sell',
-        kind: 'trade',
-        timestamp: Date.UTC(new Date().getUTCFullYear(), 0, 3),
-        legs: [
-          {
-            assetId: 'cardano:lovelace',
-            amount: '100000000',
-            direction: 'out',
-            venue: 'wallet-a',
-            role: 'principal',
-          },
-          {
-            assetId: 'fiat:eur',
-            amount: '100',
-            direction: 'in',
-            venue: 'wallet-a',
-            role: 'principal',
-          },
-          {
-            assetId: 'fiat:eur',
-            amount: '7',
-            direction: 'out',
-            venue: 'wallet-a',
-            role: 'fee',
-          },
-        ],
-      }),
-    ]);
+    await putSaleWithFee();
     vi.stubGlobal('fetch', flatRange(1));
 
     renderScreen();
@@ -427,6 +432,30 @@ describe('running a report', () => {
     expect(
       screen.getAllByText(/priced by consideration · base currency/i),
     ).not.toHaveLength(0);
+  });
+
+  it('names the price source in German on a German sheet', async () => {
+    vi.stubGlobal('fetch', flatRange(1));
+    taxRegistry.push(germanTax);
+    await putSaleWithFee();
+    await i18n.changeLanguage('de');
+    try {
+      renderScreen();
+      await userEvent.click(
+        await screen.findByRole('button', { name: /deutschland/i }),
+      );
+      await userEvent.click(
+        await screen.findByRole('button', { name: /report erstellen/i }),
+      );
+      expect(
+        await screen.findAllByText(
+          /bewertet über Gegenleistung · Basiswährung/,
+        ),
+      ).not.toHaveLength(0);
+      expect(screen.queryByText(/base currency/i)).toBeNull();
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 
   it('labels a transfer fee disposal and states the count on the method sheet', async () => {

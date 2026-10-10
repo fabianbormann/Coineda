@@ -13,6 +13,7 @@ import { findModule } from '@/sources/registry';
 import { taxRegistry } from '@/tax/registry';
 import { runTaxReport } from '@/tax/runTaxReport';
 import { registerFilename, registerToCsv, reportToJson } from '@/tax/register';
+import { describePriceSource } from '@/components/money/priceSource';
 import { REWARD_KIND_LABELS } from '@/tax/rewardKinds';
 import { DERIVATIVE_KIND_LABELS } from '@/tax/derivativeKinds';
 import { buildDisclaimer, type Disclaimer } from '@/tax/disclaimer';
@@ -1651,7 +1652,8 @@ export const TaxReportScreen = () => {
                                 {row.priceSource !== undefined && (
                                   <span className="text-xs text-muted-foreground">
                                     {' '}
-                                    · {t('priced by')} {row.priceSource}
+                                    · {t('priced by')}{' '}
+                                    {describePriceSource(row.priceSource, t)}
                                   </span>
                                 )}
                               </p>
@@ -1829,7 +1831,8 @@ export const TaxReportScreen = () => {
                             {line.priceSource !== undefined && (
                               <span className="text-xs text-muted-foreground">
                                 {' '}
-                                · {t('priced by')} {line.priceSource}
+                                · {t('priced by')}{' '}
+                                {describePriceSource(line.priceSource, t)}
                               </span>
                             )}
                           </p>
@@ -1939,7 +1942,8 @@ export const TaxReportScreen = () => {
                             {row.priceSource !== undefined && (
                               <span className="text-xs text-muted-foreground">
                                 {' '}
-                                · {t('priced by')} {row.priceSource}
+                                · {t('priced by')}{' '}
+                                {describePriceSource(row.priceSource, t)}
                               </span>
                             )}
                           </p>
