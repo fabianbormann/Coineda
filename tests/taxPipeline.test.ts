@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { APP_VERSION } from '@/global/version';
 import { runTaxReport, taxYearOf } from '@/tax/runTaxReport';
-import { getAllEvents, openLedger, putEvents } from '@/ledger/db';
+import { getAllEvents, openLedger, putEvents, putSource } from '@/ledger/db';
 import { fingerprintLedger } from '@/ledger/fingerprint';
 import { getManualLinks, putManualLink } from '@/ledger/manualLinks';
 import { buildCheckpoint } from '@/checkpoint/format';
@@ -340,6 +340,12 @@ describe('runTaxReport', () => {
         legs: [leg('in', 'wallet-a')],
       }),
     ]);
+    await putSource({
+      id: 's1',
+      moduleId: 'kraken-csv',
+      label: 'My Kraken',
+      config: {},
+    });
 
     const report = await runTaxReport(stubModule, {
       year: 2025,
@@ -358,6 +364,9 @@ describe('runTaxReport', () => {
     const moved = report.register.find((r) => r.kind === 'internal-transfer');
     expect(moved?.counterVenue).toBe('wallet-b');
     expect(moved?.value).toBeUndefined();
+    // Traceable outside Coineda: the provider's id and the source's name.
+    expect(moved?.externalId).toBe('move');
+    expect(moved?.source).toBe('My Kraken');
   });
 
   it('produces different cost bases under fifo vs moving-average for the same disposal', async () => {

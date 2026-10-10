@@ -547,6 +547,14 @@ export type RegisterRow = {
   date: string;
   kind: RegisterRowKind;
   sourceEventId: string;
+  /**
+   * The provider's own id for the record behind this row, which survives a
+   * re-import on another device where `sourceEventId` need not. Absent when
+   * no ledger event stands behind the row.
+   */
+  externalId?: string;
+  /** The label of the source that holds the record; '' when unknown. */
+  source: string;
   txHash?: string;
   assetId: string;
   symbol: string;

@@ -66,6 +66,8 @@ const unpriced: UnresolvedItem = {
   resolutions: [],
 };
 
+const LABELS = new Map([['s', 'Kraken CSV']]);
+
 const build = () =>
   buildRegister({
     year: 2025,
@@ -86,6 +88,7 @@ const build = () =>
     internalTransfers: [transfer],
     residuals: [],
     unresolved: [unpriced],
+    sourceLabelById: LABELS,
   });
 
 describe('buildRegister', () => {
@@ -121,6 +124,66 @@ describe('buildRegister', () => {
   });
 });
 
+describe('tracing a row to its provider', () => {
+  const ledgerEvent = (id: string, externalId: string): LedgerEvent => ({
+    ...transfer,
+    id,
+    externalId,
+    sourceId: 's',
+  });
+
+  it('names the provider record and the source that holds it', () => {
+    const rows = buildRegister({
+      year: 2025,
+      valued: [taxEvent({ sourceEventId: 'buy' })],
+      internalTransfers: [transfer],
+      residuals: [],
+      unresolved: [{ ...unpriced, sourceEventId: 'gone' }],
+      sourceLabelById: LABELS,
+      eventById: new Map([['buy', ledgerEvent('buy', 'kraken-TX1')]]),
+    });
+    const byKind = new Map(rows.map((row) => [row.kind, row]));
+    expect(byKind.get('acquisition')?.externalId).toBe('kraken-TX1');
+    expect(byKind.get('acquisition')?.source).toBe('Kraken CSV');
+    expect(byKind.get('internal-transfer')?.externalId).toBe('move');
+    expect(byKind.get('internal-transfer')?.source).toBe('Kraken CSV');
+    // No ledger event behind it: nothing to name, and no guess.
+    expect(byKind.get('unpriced')?.externalId).toBeUndefined();
+    expect(byKind.get('unpriced')?.source).toBe('');
+  });
+
+  it('yields an empty source for a source id it does not know', () => {
+    const rows = buildRegister({
+      year: 2025,
+      valued: [],
+      internalTransfers: [{ ...transfer, sourceId: 'removed' }],
+      residuals: [],
+      unresolved: [],
+      sourceLabelById: LABELS,
+    });
+    expect(rows[0].source).toBe('');
+  });
+
+  it('orders rows at the same instant by externalId', () => {
+    const rows = buildRegister({
+      year: 2025,
+      valued: [
+        taxEvent({ sourceEventId: 'a' }),
+        taxEvent({ sourceEventId: 'b' }),
+      ],
+      internalTransfers: [],
+      residuals: [],
+      unresolved: [],
+      sourceLabelById: LABELS,
+      eventById: new Map([
+        ['a', ledgerEvent('a', 'z-later')],
+        ['b', ledgerEvent('b', 'y-earlier')],
+      ]),
+    });
+    expect(rows.map((row) => row.externalId)).toEqual(['y-earlier', 'z-later']);
+  });
+});
+
 describe('a transfer straddling New Year', () => {
   const sender: LedgerEvent = {
     ...transfer,
@@ -145,6 +208,7 @@ describe('a transfer straddling New Year', () => {
       internalTransfers: [sender, receipt],
       residuals: [],
       unresolved: [],
+      sourceLabelById: LABELS,
     });
 
   it('is one row in the sender year and none in the receiver year', () => {
@@ -165,6 +229,8 @@ describe('registerToCsv', () => {
       'date',
       'kind',
       'sourceEventId',
+      'externalId',
+      'source',
       'txHash',
       'assetId',
       'symbol',
@@ -208,6 +274,7 @@ describe('a token name that looks like a formula', () => {
       internalTransfers: [],
       residuals: [],
       unresolved: [],
+      sourceLabelById: LABELS,
     });
     expect(rows[0].symbol).toBe(name);
     const csv = registerToCsv(rows);

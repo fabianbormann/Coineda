@@ -28,15 +28,33 @@ const costsOf = (event: TaxEvent): string | undefined => {
     .toString();
 };
 
+/**
+ * Where a row came from, in terms a reader can check outside Coineda: the
+ * provider's own id for the record (stable across devices, unlike the
+ * ledger's) and the name of the source the user added. Absent `event`
+ * (a module that minted its own id) gives no externalId rather than a
+ * guess; an unknown source id gives an empty label.
+ */
+const provenance = (
+  event: LedgerEvent | undefined,
+  sourceLabelById: Map<string, string>,
+) => ({
+  ...(event === undefined ? {} : { externalId: event.externalId }),
+  source:
+    event === undefined ? '' : (sourceLabelById.get(event.sourceId) ?? ''),
+});
+
 const baseRow = (
   timestamp: number,
   sourceEventId: string,
   assetId: string,
   amount: string,
   venue: string,
+  origin: { externalId?: string; source: string },
 ) => ({
   date: iso(timestamp),
   sourceEventId,
+  ...origin,
   assetId,
   symbol: symbolOf(assetId),
   amount,
@@ -49,7 +67,10 @@ const baseRow = (
  * venues, on the SENDING side. The receiving half of a linked pair is
  * skipped when its sender is also dropped, so one movement is one row.
  */
-const internalTransferRows = (events: LedgerEvent[]): RegisterRow[] => {
+const internalTransferRows = (
+  events: LedgerEvent[],
+  sourceLabelById: Map<string, string>,
+): RegisterRow[] => {
   const sends = (event: LedgerEvent) =>
     event.legs.some((leg) => leg.direction === 'out');
   const senderHashes = new Set(
@@ -95,7 +116,14 @@ const internalTransferRows = (events: LedgerEvent[]): RegisterRow[] => {
           leg.venue !== out.venue,
       );
     rows.push({
-      ...baseRow(event.timestamp, event.id, out.assetId, out.amount, out.venue),
+      ...baseRow(
+        event.timestamp,
+        event.id,
+        out.assetId,
+        out.amount,
+        out.venue,
+        provenance(event, sourceLabelById),
+      ),
       kind: 'internal-transfer',
       ...(event.txHash === undefined ? {} : { txHash: event.txHash }),
       ...(arrival === undefined ? {} : { counterVenue: arrival.venue }),
@@ -113,11 +141,16 @@ export const buildRegister = (input: {
   unresolved: UnresolvedItem[];
   /** Ledger events by id, for the transaction hash behind a row. */
   eventById?: Map<string, LedgerEvent>;
+  /** Source record labels by id, for the `source` column. */
+  sourceLabelById: Map<string, string>;
 }): RegisterRow[] => {
   const residualIds = new Set(input.residuals.map((event) => event.id));
-  const hashOf = (id: string): string | undefined =>
-    input.eventById?.get(id)?.txHash ??
-    input.residuals.find((event) => event.id === id)?.txHash;
+  const ledgerEventOf = (id: string): LedgerEvent | undefined =>
+    input.eventById?.get(id) ??
+    input.residuals.find((event) => event.id === id);
+  const hashOf = (id: string): string | undefined => ledgerEventOf(id)?.txHash;
+  const originOf = (id: string) =>
+    provenance(ledgerEventOf(id), input.sourceLabelById);
 
   const rows: RegisterRow[] = [];
 
@@ -139,6 +172,7 @@ export const buildRegister = (input: {
         event.assetId,
         event.amount,
         event.venue,
+        originOf(event.sourceEventId),
       ),
       kind: event.kind,
       ...(txHash === undefined ? {} : { txHash }),
@@ -161,9 +195,10 @@ export const buildRegister = (input: {
     // Paired on the WHOLE dropped set and only then cut to the year, by the
     // SENDER's date: a pair straddling New Year is one movement in the
     // sender's year and nothing in the receiver's.
-    ...internalTransferRows(input.internalTransfers).filter(
-      (row) => new Date(row.date).getUTCFullYear() === input.year,
-    ),
+    ...internalTransferRows(
+      input.internalTransfers,
+      input.sourceLabelById,
+    ).filter((row) => new Date(row.date).getUTCFullYear() === input.year),
   );
 
   for (const item of input.unresolved) {
@@ -177,6 +212,7 @@ export const buildRegister = (input: {
         item.assetId,
         item.amount,
         item.venue,
+        originOf(item.sourceEventId),
       ),
       kind: 'unpriced',
       ...(item.txHash === undefined ? {} : { txHash: item.txHash }),
@@ -187,8 +223,11 @@ export const buildRegister = (input: {
   return rows.sort(
     (a, b) =>
       compare(a.date, b.date) ||
-      compare(a.sourceEventId, b.sourceEventId) ||
-      compare(a.kind, b.kind),
+      // The provider's id, not the ledger's: the same records must order
+      // the same on every device that imported them.
+      compare(a.externalId ?? '', b.externalId ?? '') ||
+      compare(a.kind, b.kind) ||
+      compare(a.sourceEventId, b.sourceEventId),
   );
 };
 
@@ -196,6 +235,8 @@ const COLUMNS: { key: keyof RegisterRow; header: string }[] = [
   { key: 'date', header: 'date' },
   { key: 'kind', header: 'kind' },
   { key: 'sourceEventId', header: 'sourceEventId' },
+  { key: 'externalId', header: 'externalId' },
+  { key: 'source', header: 'source' },
   { key: 'txHash', header: 'txHash' },
   { key: 'assetId', header: 'assetId' },
   { key: 'symbol', header: 'symbol' },

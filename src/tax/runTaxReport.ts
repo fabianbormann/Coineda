@@ -6,7 +6,7 @@ import {
   netPrincipalLegs,
   ownedVenuesOf,
 } from '@/ledger/balances';
-import { getAllEvents } from '@/ledger/db';
+import { getAllEvents, getSources } from '@/ledger/db';
 import type { LedgerEvent } from '@/ledger/types';
 import {
   intraEventLotMoves,
@@ -171,9 +171,10 @@ export const runTaxReport = async (
 
   // Read once, with the events, so the fingerprint describes what this run
   // read even if the ledger changes while prices are being fetched.
-  const [rawEvents, manualLinks] = await Promise.all([
+  const [rawEvents, manualLinks, sources] = await Promise.all([
     getAllEvents(),
     getManualLinks(),
+    getSources(),
   ]);
   const allEvents = await getLinkedEvents();
   const ownedVenues = ownedVenuesOf(allEvents);
@@ -565,6 +566,9 @@ export const runTaxReport = async (
       (item) => taxYearOf(item.timestamp) === options.year,
     ),
     eventById,
+    sourceLabelById: new Map(
+      sources.map((source) => [source.id, source.label]),
+    ),
   });
 
   const { capital: capitalResult, ...assessed } = assessment;
