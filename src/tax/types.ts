@@ -539,7 +539,8 @@ export type RegisterRowKind =
   | 'capital-gain'
   | 'capital-loss'
   | 'internal-transfer'
-  | 'unpriced';
+  /** A gap: see `unresolvedKind` for which. Never valued. */
+  | 'unresolved';
 
 /** One line of the year's register: every event the report touched. */
 export type RegisterRow = {
@@ -573,7 +574,16 @@ export type RegisterRow = {
   considerationAmount?: string;
   /** Sum of the valued costs attached. */
   costs?: string;
-  /** A translation key, left untranslated in the file. */
+  /** Unresolved rows: which kind of gap - a missing price, a missing
+   *  acquisition, or an event the jurisdiction has no rule for. */
+  unresolvedKind?: UnresolvedItem['kind'];
+  /** Unresolved rows: the tax event the gap sits on, where there was one. */
+  taxEventKind?: TaxEventKind;
+  /**
+   * English, untranslated in the file. A valued row's note is its key as
+   * the module wrote it; an unresolved row's is the reason with its
+   * parameters filled in (`fillReason`).
+   */
   note?: string;
 };
 

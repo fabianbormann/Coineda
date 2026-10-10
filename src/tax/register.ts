@@ -6,11 +6,33 @@ import {
   RESIDUAL_ORIGIN_KEY,
   residualOriginKey,
 } from './residualOrigin';
-import type { RegisterRow, TaxEvent, TaxReport, UnresolvedItem } from './types';
+import type {
+  RegisterRow,
+  TaxEvent,
+  TaxReason,
+  TaxReport,
+  UnresolvedItem,
+} from './types';
 
 export { PAID_ORIGIN_KEY, RESIDUAL_ORIGIN_KEY };
 
 const INTERNAL_TRANSFER_NOTE = 'Moved between your own wallets, not a sale.';
+
+/**
+ * A reason's English key with its `{{param}}`s filled in.
+ *
+ * Deliberately not translated: the register file is machine-readable
+ * evidence, read by scripts and spreadsheets in any locale, so it carries
+ * the one stable wording (the English key) - but filled, because a bare
+ * `{{asset}}` template names nothing. A parameter the key does not use is
+ * ignored; a placeholder with no parameter is left as written.
+ */
+export const fillReason = (reason: TaxReason): string =>
+  reason.key.replace(/\{\{(\w+)\}\}/g, (placeholder, name: string) =>
+    reason.params !== undefined && name in reason.params
+      ? String(reason.params[name])
+      : placeholder,
+  );
 
 const iso = (timestamp: number): string => new Date(timestamp).toISOString();
 
@@ -226,9 +248,13 @@ export const buildRegister = (input: {
         item.venue,
         originOf(item.sourceEventId),
       ),
-      kind: 'unpriced',
+      kind: 'unresolved',
       ...(item.txHash === undefined ? {} : { txHash: item.txHash }),
-      note: item.reason.key,
+      unresolvedKind: item.kind,
+      ...(item.taxEventKind === undefined
+        ? {}
+        : { taxEventKind: item.taxEventKind }),
+      note: fillReason(item.reason),
     });
   }
 
@@ -262,6 +288,8 @@ const COLUMNS: { key: keyof RegisterRow; header: string }[] = [
   { key: 'considerationAssetId', header: 'considerationAssetId' },
   { key: 'considerationAmount', header: 'considerationAmount' },
   { key: 'costs', header: 'costs' },
+  { key: 'unresolvedKind', header: 'unresolvedKind' },
+  { key: 'taxEventKind', header: 'taxEventKind' },
   { key: 'note', header: 'note' },
 ];
 

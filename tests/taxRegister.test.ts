@@ -97,7 +97,7 @@ describe('buildRegister', () => {
     const rows = build();
     expect(rows.map((r) => r.kind)).toEqual([
       'acquisition',
-      'unpriced',
+      'unresolved',
       'internal-transfer',
       'income',
       'disposal',
@@ -117,11 +117,58 @@ describe('buildRegister', () => {
     expect(row?.value).toBeUndefined();
   });
 
-  it('turns an unresolved item into an unpriced row with no value', () => {
-    const row = build().find((r) => r.kind === 'unpriced');
+  it('turns an unresolved item into an unresolved row with no value', () => {
+    const row = build().find((r) => r.kind === 'unresolved');
     expect(row?.value).toBeUndefined();
     expect(row?.priceSource).toBeUndefined();
     expect(row?.sourceEventId).toBe('u1');
+  });
+});
+
+describe('unresolved rows', () => {
+  const rowFor = (item: UnresolvedItem) =>
+    buildRegister({
+      year: 2025,
+      valued: [],
+      internalTransfers: [],
+      residuals: [],
+      unresolved: [item],
+      sourceLabelById: LABELS,
+      currency: 'eur',
+    })[0];
+
+  it('says which kind of gap it is and on which tax event', () => {
+    const row = rowFor({
+      ...unpriced,
+      kind: 'needs-cost-basis',
+      taxEventKind: 'disposal',
+      reason: { key: 'No acquisition is on record for this disposal.' },
+    });
+    expect(row.kind).toBe('unresolved');
+    expect(row.unresolvedKind).toBe('needs-cost-basis');
+    expect(row.taxEventKind).toBe('disposal');
+    const parsed = readCsv(registerToCsv([row])).rows[0];
+    expect(parsed.unresolvedKind).toBe('needs-cost-basis');
+    expect(parsed.taxEventKind).toBe('disposal');
+  });
+
+  it('leaves taxEventKind empty for an unclassified item', () => {
+    const { taxEventKind: _omit, ...rest } = unpriced;
+    void _omit;
+    const row = rowFor({ ...rest, kind: 'unclassified' });
+    expect(row.unresolvedKind).toBe('unclassified');
+    expect(row.taxEventKind).toBeUndefined();
+  });
+
+  it('fills the note parameters into the English sentence', () => {
+    const row = rowFor({
+      ...unpriced,
+      reason: {
+        key: 'No price for {{asset}} on {{date}}.',
+        params: { asset: 'ADA', date: '2025-02-01' },
+      },
+    });
+    expect(row.note).toBe('No price for ADA on 2025-02-01.');
   });
 });
 
@@ -150,8 +197,8 @@ describe('tracing a row to its provider', () => {
     expect(byKind.get('internal-transfer')?.externalId).toBe('move');
     expect(byKind.get('internal-transfer')?.source).toBe('Kraken CSV');
     // No ledger event behind it: nothing to name, and no guess.
-    expect(byKind.get('unpriced')?.externalId).toBeUndefined();
-    expect(byKind.get('unpriced')?.source).toBe('');
+    expect(byKind.get('unresolved')?.externalId).toBeUndefined();
+    expect(byKind.get('unresolved')?.source).toBe('');
   });
 
   it('yields an empty source for a source id it does not know', () => {
@@ -249,6 +296,8 @@ describe('registerToCsv', () => {
       'considerationAssetId',
       'considerationAmount',
       'costs',
+      'unresolvedKind',
+      'taxEventKind',
       'note',
     ]);
     expect(rows).toHaveLength(0);
@@ -268,7 +317,7 @@ describe('registerToCsv', () => {
     expect(rows[0].venue).toBe('a, "b"\nc');
     expect(rows[0].note).toBe('x');
     expect(rows[0].amount).toBe(row.amount);
-    expect(rows[1].kind).toBe('unpriced');
+    expect(rows[1].kind).toBe('unresolved');
   });
 });
 
