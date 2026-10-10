@@ -5,21 +5,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 Coineda is a **local-first** crypto portfolio tracker and tax calculator (GPLv3). There is no backend: all
-user data lives in the browser's IndexedDB. The same React codebase ships three ways — as a PWA, as an
-Electron desktop app, and (historically) as a Flutter shell in `mobile/` that is essentially a stub.
+user data lives in the browser's IndexedDB, and chains and exchanges are queried directly from the browser.
+The same React codebase ships as a PWA (GitHub Pages) and as an Electron desktop app; `mobile/` is a
+separate Flutter project that ESLint and Prettier ignore. The German report is built around BMF 06.03.2025
+and aims to be a filing aid: figures with their Anlage SO / KAP line references and an audit trail back to
+the ledger.
 
-Legal note carried from the README: Coineda gives no tax/legal/accounting advice, and the tax calculations
-are explicitly "to the best of my knowledge" — be conservative when changing them.
+Legal note carried from the README: Coineda gives no tax, legal or accounting advice; the rules are written
+"to the best of the contributors' knowledge". Be conservative when changing tax code.
 
 ## Commands
 
 ```bash
-npm start                # Vite dev server on http://localhost:3000
+npm start                # Vite dev server on http://localhost:3000 (port is load-bearing for Electron)
+npm run dev:expose:https # LAN dev server with a self-signed cert (camera/QR needs a secure context)
 npm run build            # tsc --noEmit, then production build into build/
 npm test                 # vitest in watch mode
 npx vitest run           # vitest once (this is what you want for a check)
-npx vitest run tests/imports.test.ts            # single file
-npx vitest run -t 'should import 25 Kraken'     # single test by name
+npx vitest run tests/krakenCsv.test.ts          # single file
+npx vitest run -t 'strips a UTF-8 BOM'           # single test by name
 npm run coverage         # vitest run --coverage
 npm run lint             # eslint .
 npm run format           # prettier --write .
@@ -28,139 +32,201 @@ npm run electron-dev     # Vite dev server + Electron pointed at :3000
 npm run dist             # electron-builder installers
 ```
 
-`eslint.config.js` is an ESLint 10 flat config (`@eslint/js` recommended + `typescript-eslint` +
-`eslint-plugin-react-hooks`, with `eslint-config-prettier` last to defer style to Prettier rather than
-double-enforcing it as a lint error). `.eslintrc` and the CRA `react-app` preset are gone; lint and format
-are separate `npm` scripts and separate CI steps, not something that runs implicitly as part of the build.
-Prettier is configured for single quotes and 2-space tabs.
-
-There is no split toolchain anymore: `vite.config.ts` configures both the production build and Vitest (via
-its `test` block), and `vitest.config.ts` no longer exists. One config, one module resolution, for both.
+`eslint.config.js` is an ESLint 10 flat config (`@eslint/js` + `typescript-eslint` +
+`eslint-plugin-react-hooks`, `eslint-config-prettier` last). Prettier: single quotes, 2-space tabs.
+`vite.config.ts` configures both the build and Vitest (its `test` block: jsdom, `tests/setup.ts`, and
+`TZ: 'America/New_York'` on purpose, so a local-time slip across a UTC day or year boundary fails in tests).
+`tsconfig.json` is `strict`, `noEmit`, `"jsx": "react-jsx"` (no per-file `import React`), with `@/*` →
+`src/*`. `npx tsc --noEmit` is the only typecheck.
 
 ## Architecture
 
-### Persistence (`src/persistence/storage.js`)
+### Ledger (`src/ledger/`)
 
-`storage` is a single default-exported object created by calling `setup()` **at module import time** — the
-`openDB` promise is module-global and shared. Every store method awaits that promise internally, so callers
-just `await storage.transactions.getAll()`.
+- `db.ts`: one IndexedDB database per client (default name `coineda-v2`, `DB_VERSION = 6`) with stores
+  `events`, `sources`, `cursors`, `prices`, `settings`, `tokenMeta`, `transferLinks`. Schema changes go in
+  `upgrade()` behind `oldVersion < n` guards. The old v1 `Coineda` database is deliberately left untouched.
+- Events upsert on the unique `identity` index `[sourceId, externalId]` (`putEvents`,
+  `putEventsIfSourceExists`), keeping the original row `id`. That identity is what makes a re-sync or
+  re-import converge instead of duplicating, so a source's `externalId` must be stable across runs.
+- `openLedger(expected?)` / `openLedgerForWrite(options)`: long-running flows (sync, tax run) capture
+  `activeLedgerName()` once and pass it as `{ ledger }`; a write after a client switch throws
+  `LedgerSwitchedError` instead of landing in another client's database.
+- **Read-only flag**: `setLedgerReadOnly` makes every write helper throw `LedgerReadOnlyError`.
+  `setActiveLedger` clears it on every call, so whoever activates a ledger must set it again afterwards
+  (`setActiveClient` and the `Gate` in `App.tsx` do). Review copies rely on this at the store level, not
+  just on hidden buttons.
+- `types.ts`: `LedgerEvent { id, sourceId, externalId, timestamp (epoch ms UTC), kind, legs, origin,
+rewardKind?, derivative?, txHash?, raw?, note? }`; `EventKind` = trade | transfer | reward | fee | fiat-in |
+  fiat-out | derivative; `Leg { assetId, amount, direction: in|out, venue, role: principal|fee }`.
+  `origin: 'derived'` rows are re-fetchable; `'authored'` rows are the user's own and survive
+  `deleteDerivedEvents`. `note` is display-only prose, never parsed: anything a rule branches on needs a
+  typed field (that is why `rewardKind`, `derivative` and `txHash` exist).
+- `amount.ts`: amounts are **decimal strings, never JS numbers**, through big.js (no exponents, `-0`
+  normalised to `0`). For any asset in `ASSET_DECIMALS` the amount is in **base units** (lovelace, satoshi,
+  wei); fiat amounts are plain decimals.
+- `balances.ts`: holdings are folded from the log (`foldHoldings`), never stored. `ownedVenuesOf` trusts
+  every venue in the ledger as the user's own; `isInternalTransfer` handles a self-send within one event.
+- `transfers.ts`: `linkInternalTransfers` pairs an owned OUT and an owned IN **only by identical `txHash`**:
+  no amount or time heuristics, because a wrong pair hides a real disposal. `proposeTransfers.ts` suggests
+  candidates (amount within 1 %, ≤ 72 h apart) for sources without a hash; it never decides. A confirmed
+  proposal is stored in `transferLinks` (`manualLinks.ts`) keyed by `${sourceId}|${externalId}` and overlaid
+  as `txHash` by `getLinkedEvents()`, so the exact linker handles it from then on.
+- `fingerprint.ts`: SHA-256 over canonical events (excluding `id`, `sourceId`, `raw`) plus manual links.
+  Printed on reports and carried in checkpoints so the two can be tied together.
 
-- DB `Coineda`, version 2. Schema changes go in the `upgrade()` callback guarded by `oldVersion` checks.
-- `wrapObjectStore` provides the generic get/getAll/set/delete/clear/keys/add; each store then adds its own
-  index-backed queries on top.
-- On first run the `assets` store is seeded from `src/persistence/assets.json`. An asset is fiat iff it has
-  a `roughly_estimated_in_euro` field, which is stored as `isFiat: 1` (fiat) or `2` (crypto) — a number,
-  not a boolean, because IndexedDB cannot index booleans.
+### Assets and prices (`src/assets/`, `src/prices/`)
 
-### Accounts
+- `src/assets/catalogue.ts` `ASSET_CATALOGUE` is the single list of assets Coineda can scale and price, each
+  row with `decimals`, `chain`, `kind`, optional `coingeckoId` and `verified` provenance. Asset ids are
+  chain-qualified (`cardano:lovelace`, `eth:native`, `eth:0x…`, `fiat:eur`). `ASSET_DECIMALS`
+  (`prices/scale.ts`) and `COINGECKO_IDS` (`prices/coingecko.ts`) are derived from it: add an asset there,
+  never to the derived maps.
+- **Never guess a ticker.** `resolveSymbol` returns an entry only when exactly one matches; ambiguous
+  symbols (NIGHT, see `src/assets/ids.ts`) need an explicit asset id. Exchange importers go through
+  `src/sources/csv/resolveTicker.ts`. `decimalsOf` returns 0 for an unknown asset, which is correct for
+  pricing and corrupting for import, hence `toBaseUnits` below refuses instead.
+- Spot prices: CoinGecko (`fetchSpotPrices`), cached in the ledger's `prices` store keyed
+  `${assetId}|${currency}|${date}` for the current UTC day (`priceStore.ts` `resolveSpotPrices`). The base
+  fiat is priced at 1; other fiat at the ECB rate (`ecb.ts`). Unpriced assets go to a `missing` list,
+  never to zero.
+- Historical prices (`history.ts` `fetchHistory`): per UTC day, DefiLlama USD × ECB rate first, CoinGecko
+  (365-day free-tier limit, optional user API key) as fallback. Failures are reported per asset.
+- Base currency is a user setting (`baseCurrency`, normalised lowercase so it matches `fiat:<iso>`). The
+  DATEV export and the German forms are euro by nature.
 
-Coineda supports multiple isolated portfolios. Nearly every read is
-`storage.transactions.getAllFromAccount(account.id)` — if you add a query, keep it account-scoped. The
-active account lives in `SettingsContext` (`src/SettingsContext.tsx`) and is persisted by name in
-`localStorage['activeAccount']`; `App.tsx` resolves it on boot and creates a default "Coineda" account if
-none exists. Pages must wait for `settings.account` before calculating anything.
+### Sources (`src/sources/`)
 
-### The composed-transaction model (`src/helper/common.js`)
+Two registries, both bundled and added only by reviewed PR (code runs beside the user's credentials):
 
-This is the least obvious part of the codebase. `createTransaction` normalizes everything into buys and
-sells denominated in **EUR** (hardcoded throughout — there is no multi-fiat base currency):
+- **Pull modules** (`SourceModule`, `src/sources/types.ts`) in `registry.ts`: `cardano-yaci`,
+  `cardano-blockfrost`, `bitcoin-esplora`, `ethereum-blockscout`, `bitpanda`. Driven page by page with an
+  opaque cursor by `src/sync/syncSource.ts`, capped at `MAX_PAGES`. `conformance.ts` `runConformance`
+  (termination, idempotent replay, no duplicate `externalId`, decimal amounts, declared kinds, trades with
+  both directions) is enforced by `tests/registry.test.ts` and per-module tests; fixtures live in
+  `src/sources/<id>/fixtures/`.
+- **File modules** (`FileSourceModule`, `src/sources/csv/types.ts`) in `csv/registry.ts`: `kraken-csv`,
+  `binance-csv`, `coinbase-csv`, `ledger-live-csv`, `mapped-csv`. A module is a pure `sniff(text)` +
+  `parse(text) → { events, skipped, supersedes? }`; unreadable rows go to `skipped`, never silently
+  dropped. `detectFileModule` picks the first module whose `sniff` matches the **content** (never the
+  filename).
+- **The file gate** (`tests/fileConformance.test.ts`): every file module except `mapped-csv` must parse its
+  first `fixtures/*.csv` into well-formed events (crypto amounts as integer base-unit strings), key its
+  label and help in both locales, refuse junk without throwing, and be the **only** module whose `sniff`
+  accepts its fixture. Sniffs must be mutually exclusive; registry order is not a substitute.
+- `csv/importFile.ts` keeps **one source per module id**, reused on every import, so a longer export
+  rewrites rows it already wrote. It deletes `supersedes` ids first (Kraken `refid` and Binance same-second
+  grouping replaced earlier per-row events). `mapped-csv` is never sniffed: `MapCsvDialog` collects a
+  `CsvMapping` and `mapped-csv/importMapped.ts` keeps **one source per module + venue label**, deletes
+  nothing unless `replaceExisting` is passed (then atomically via `replaceSourceEvents`).
+- `csv/readCsv.ts` reads by column name and strips a BOM. Delimiter sniffing is **opt-in**
+  (`{ delimiter: 'auto' }`), because a German-Excel `;` file also carries decimal commas.
+- `csv/ledgerShape.ts`: `toBaseUnits` is the one whole-unit → base-unit boundary; it requires known
+  decimals (`UnscalableAmountError`). `normaliseDecimal` refuses values with both `.` and `,`;
+  `stripThousands` removes commas only where they are unmistakably thousands groups.
+- `docs/modules/writing-a-source-module.md` and `writing-a-tax-module.md` are the contributor contracts.
 
-- fiat → crypto = `buy`; crypto → fiat = `sell`.
-- crypto → crypto is stored as **three rows**: a synthetic `sell` into euro, a synthetic `buy` out of euro,
-  and a parent `swap` row with `isComposed: true` and `composedKeys: "<sellId>,<buyId>"`. The children carry
-  `parent: <parentId>`. The EUR leg price is fetched from CoinGecko at write time, so `createTransaction`
-  can throw on network failure.
+### Tax (`src/tax/`)
 
-Consequences to respect: aggregations must exclude `type === 'swap'` to avoid double counting, and the
-importer drops rows where `isComposed === '1'` (a string, from CSV round-tripping) before re-creating them.
+`runTaxReport(module, { year, baseCurrency, matching?, rate?, carryForward? })` in `runTaxReport.ts`:
+read events + manual links → link internal transfers by `txHash` and net them out (transfer fees become
+`:residual-out` disposals) → `module.classify` → `resolveValues` (historical prices, per UTC day) →
+`match` (`matching.ts`, grouped per asset, hard partition boundary from `module.partitionBy`) →
+`module.assess` → `buildRegister`. Tax years are UTC (`taxYearOf`).
 
-### Import sources (`src/import/`) — the main extension point
+- Jurisdictions in `registry.ts`: `de` (`defaultMatching: 'fifo'`, partitioned per venue) and `at`
+  (`'moving-average'`, partitioned Altvermögen/Neuvermögen). `classify` must be pure and deterministic;
+  `tests/taxConformance.test.ts` runs it twice and stubs the clock and randomness to throw.
+- `handles` lists kinds a module has confident rules for; an empty `classify` result for an unlisted kind
+  becomes an `unclassified` unresolved item rather than vanishing.
+- `de.forms.ts` `FORM_LINES_DE` maps filing figures to form lines per year, with provenance; unverified
+  years are deliberately absent.
+- `TaxReport.method` (`ReportMethod`) records matching, partition label, base currency,
+  `valuation: 'utc-day'`, price sources, app version, ledger `fingerprint` and the jurisdiction's
+  `rulesVersion` (bump it with a `changelog` entry when rules change).
+- Loss carry-forward comes from settings `lossCarryForward[year]`, entered by the user.
+- `register.ts`: `registerToCsv` / `reportToJson` exports.
 
-Two abstract bases, both intentionally easy to extend (the README points contributors here):
+### Exports (`src/datev/`)
 
-- **`FileInputSource`** — implement `static canImport(file)` plus `async deserialize(file)`, pushing into
-  the inherited `transactions` / `transfers` / `errors` arrays. Register it in the `importSources` array in
-  `src/import/index.ts`. **Order matters**: the loop breaks on the first `canImport` that returns true, and
-  some detectors are loose (`KrakenFileInput` claims nearly any `.csv`), so new CSV sources generally belong
-  _before_ it.
-- **`ApiSyncSource`** — implement `fetch(config)`, `getMandatoryFields()` and `getDescription(t)` (the last
-  returns JSX, which is why `BinanceApiSync` is a `.tsx` file). Registered in the `availableApiSources`
-  `useMemo` in `src/pages/Wallets.tsx`. `BinanceApiSync` is incomplete — its button is hard-disabled by name
-  in that page.
+`buchungsstapel.ts` builds a DATEV EXTF Buchungsstapel (format 700) from a German `TaxReport`; pure, the
+caller supplies the time. Dates are DDMM of the UTC day. Encode with `encodeCp1252` (`cp1252.ts`), not
+UTF-8. Advisor numbers and accounts come from settings `datev`; there are no defaults.
 
-`importFiles` also dedupes by `JSON.stringify` of the row with `id` zeroed, and auto-creates any exchange it
-encounters. Failures are collected as typed `ImportError`s (see `ImportErrorType`) rather than thrown.
+### Clients and checkpoints (`src/clients/`, `src/checkpoint/`)
 
-### Tax calculation (`src/tax/`)
+- A client is one IndexedDB database. `clients/registry.ts` keeps the list in localStorage
+  (`coineda.clients`, active id in `coineda.activeClient`, in-memory fallback when storage throws). Kinds:
+  `client` (`coineda-v2` or `coineda-client-<id>`) and `review` (`coineda-review-<id>`, read-only). The
+  last `client` cannot be removed.
+- `App.tsx` keys `ClientProvider` on the client id, so a switch remounts the gate and router. The `Gate`
+  activates the ledger, re-applies the read-only flag, and shows `OnboardingFlow` until `isOnboarded()`.
+- `checkpoint/format.ts`: a checkpoint is sealed (`crypto.ts`: deflate-raw, then AES-GCM with PBKDF2 over
+  an 8-character base32 secret). Scope `handover` carries settings, sources with credentials, authored
+  events and manual links (small enough for a QR); `backup` adds all derived events. `restoreCheckpoint`
+  writes in one transaction; `clients/review.ts` restores with `stripCredentials: true`, keeping only
+  `PUBLIC_IDENTITY_KEYS` in source configs.
+- `settings/settingsStore.ts`: settings live in the ledger's `settings` store under `SETTINGS_KEY` and
+  `ONBOARDED_KEY` (language, baseCurrency, coingeckoApiKey, taxpayer, lossCarryForward, datev).
 
-`TaxCalculator` (abstract) owns the country-independent part: `calculateRealizedAndUnrealizedGains` walks
-transactions in date order and matches sells against buys **FIFO**, filling `realizedGains` /
-`unrealizedGains` keyed by currency. Subclasses implement `calculate(account, year)` and supply the local
-rules — `GermanTaxCalculator` applies the €600 threshold, a flat 50% rate, and `taxFreeAfterHoldingPeriod`.
-Add a country by subclassing and registering it in the `taxCalculators` `useMemo` in `src/pages/TaxReports.tsx`.
+### UI shell
 
-`src/helper/tax.js` is the **superseded pre-refactor implementation and is dead code** — nothing imports it.
-Don't extend it; the name collision with a local function in `TaxReports.tsx` makes greps misleading.
+Routes (`HashRouter`): `/` → `screens/MainScreen.tsx`, `/tax` → `screens/TaxReportScreen.tsx`, inside
+`components/layout/AppShell.tsx`. Sources are added via `AddSourceDialog` (file drops go to `importFile`,
+unknown formats to `MapCsvDialog`). UI is Tailwind + shadcn/ui; `src/components/ui/` is vendored CLI
+output, ignored by Prettier, with relaxed hook rules in ESLint: update it through the shadcn CLI, not by
+hand.
 
-### Prices
-
-All price data comes from the public CoinGecko API via `fetchPrice` in `src/helper/common.js`, cached in
-`localStorage`: `simple-price-<ids>` with a 15-minute TTL for spot, `<from>-<to>-<currency>` cached forever
-for historical. `fetchPrice` is overloaded — a string returns a number, an array returns a keyed map. Tax
-runs issue one request per buy/sell pair, so they are slow and rate-limit-prone on real portfolios; tests
-mock `axios` wholesale.
-
-### Routing, packaging and the PWA
-
-`HashRouter` plus `base: './'` in `vite.config.ts` is deliberate: relative asset paths and hash routes are
-what make one build work from a custom scheme inside Electron **and** from an arbitrary web subpath (GitHub
-Pages) without server rewrites. Don't switch to `BrowserRouter` or an absolute `base` without accounting for
-both targets.
-
-Electron's entry is `public/electron.js` (`main` in package.json); it loads `localhost:3000` in dev. In
-production it does **not** load the bundled `index.html` via `file://` — Vite emits
-`<script type="module" crossorigin>` tags, and module/crossorigin fetches are blocked by the browser's CORS
-checks when the document has a `file://` (null) origin, which renders a blank window. Instead
-`registerSchemesAsPrivileged` registers a `coineda` scheme (`standard: true`, `secure: true`) before
-`app.whenReady()`, and a `protocol.handle('coineda', ...)` serves `build/` off `coineda://app/...`, giving
-the page a real origin. That handler checks the request `host` (rejecting anything but `app`) and contains
-the resolved path inside `build/` via `path.relative`, so treat both checks as load-bearing if you touch it.
-
-The service worker (`vite-plugin-pwa`, `registerType: 'autoUpdate'`) genuinely works now: registration in
-`src/index.tsx` is guarded to `location.protocol` being `http:`/`https:`, so it never runs inside Electron's
-`coineda://` window. `workbox.globPatterns` in `vite.config.ts` is deliberately narrow
-(`assets/**/*.{js,css,ttf,svg}` plus `index.html`) — a broad glob over the whole build root would also sweep
-up `public/electron.js` and the Electron-only `icons/` directory, which Vite copies into `build/` alongside
-the web output. The app version comes from `src/global/version.ts` (a typed re-export of
-`package.json.version`, via `resolveJsonModule`), not an env var.
+`HashRouter` plus `base: './'` is deliberate: one build works from Electron's custom scheme **and** from a
+GitHub Pages subpath without rewrites. Electron (`public/electron.js`) loads `localhost:3000` in dev and
+serves `build/` over a privileged `coineda://app/` scheme in production, because Vite's
+`<script type="module" crossorigin>` fails from a `file://` origin. The handler's `host === 'app'` check
+and its `path.relative` containment inside `build/` are both load-bearing. The service worker
+(`vite-plugin-pwa`, `autoUpdate`) registers only when `location.protocol` is `http:`/`https:`;
+`workbox.globPatterns` stays narrow so Electron-only files are not precached. The app version comes from
+`src/global/version.ts`.
 
 ### i18n
 
-`src/i18n.js` loads `src/translations/{en,de}.json` eagerly (no HTTP backend) with browser language detection
-(`i18next-browser-languagedetector`). `i18next-localstorage-cache` was removed as abandoned/unmaintained, so
-there is no longer a localStorage-backed cache layer — detection just re-runs on each load. Keys are **the
-English strings themselves**, nested under a top-level `"translation"` object. New UI strings must be added
-to both files, and changing English copy means changing the key in `de.json` too.
+`src/i18n.js` loads `src/translations/{en,de}.json` eagerly with browser language detection. Keys are the
+English strings themselves under `"translation"`. Every key goes into **both** files; changing English
+copy means changing the key in `de.json` too. New German copy uses the du-form (some older strings still
+say Sie). `tests/i18n.test.ts` checks duplicate keys, keys present in only one file, empty translations
+and literal `t()` keys missing from `en.json`; the registry and file gates check module labels.
 
 ## Conventions
 
-- **Conventional Commits are required** — `release-please` parses them to generate `CHANGELOG.md` and bump
-  the version. See `CONTRIBUTING.md`.
-- Work lands via PR from a feature branch (historically through `develop`) into `main`.
-- CI is keyed on release-please: `deploy.yml` and `build.yml` only run when the head commit message
-  _contains_ `release-please--branches--main`, while `release.yml` only runs when it does not. Keep that
-  condition intact when editing workflows. `test.yml` deliberately skips `main`. `deploy.yml` publishes the
-  PWA to GitHub Pages (`https://fabianbormann.github.io/Coineda/`) — hosting moved off Firebase — and now
-  runs lint, `format:check`, `tsc --noEmit` and `vitest run` before the build step, so the commit actually
-  published has been verified rather than just the one release-please merges from.
-- Mixed JS/TS is expected: `src/helper/*` and `src/persistence/storage.js` are still plain JS (`allowJs`),
-  everything newer is TypeScript. Shared types live in one place, `src/global/types.ts`.
-- `tsconfig.json` is `strict` with `"jsx": "react-jsx"` and `noEmit` (Vite/esbuild does the transpiling), so
-  `npx tsc --noEmit` is the only way to typecheck. `react-jsx` means files using JSX no longer need a
-  per-file `import React from 'react'` just to make `React` resolve — don't reflexively add one.
-- `recharts` is pinned at exactly `2.15.4` deliberately (it added React 19 support the week it was pinned,
-  so waiting costs nothing), and MUI/`@emotion/*`/React itself are deliberately held back on their current
-  majors — all four are Phase 2 work, a Tailwind CSS redesign that replaces MUI outright rather than a
-  version bump. Don't upgrade any of them as a drive-by.
-- Tests live in `tests/`, use `fake-indexeddb/auto` for storage and real fixture exports in `tests/assets/`.
-  Tests assert exact insert/duplicate/error counts, so importer changes surface as count mismatches.
+- **Conventional Commits are required**: `release-please` parses them for `CHANGELOG.md` and versioning.
+  No attribution or co-author trailers.
+- Before a commit: `npx vitest run && npx tsc --noEmit && npx eslint . && npx prettier --check .` (CI runs
+  lint, format check, typecheck and tests in `test.yml` and again in `deploy.yml` before the build).
+- CI is keyed on release-please: `deploy.yml` and `build.yml` run only when the head commit message
+  contains `release-please--branches--main`, `release.yml` only when it does not; `test.yml` skips `main`.
+  Keep those conditions intact.
+- Money and amounts are decimal strings through big.js or `src/ledger/amount.ts`, never JS numbers.
+- Timestamps are epoch ms UTC; day and year boundaries are taken in UTC.
+- Tests live in `tests/`, import `fake-indexeddb/auto`, clear the stores they touch in `beforeEach`, and
+  build events with `tests/helpers/ledger.ts`. Importer fixtures sit beside their module in
+  `src/sources/<id>/fixtures/`. Exact insert/update/skip counts in tests are specs: a changed count needs
+  a reason, not a new number.
+- Feature work happens in git worktrees under `.claude/worktrees/`. Vitest's default exclude is only
+  `node_modules` and `.git`, so `npx vitest run` from the main checkout also collects every worktree's
+  `tests/` and reports doubled or foreign failures; run tests from inside the worktree you changed.
+- `TODO.md` is the owner's private roadmap and is gitignored; `docs/superpowers/` is gitignored working
+  notes, and `.superpowers/` is a working directory Prettier ignores. Do not commit them.
+
+## Pitfalls that have bitten this codebase
+
+- **Unit errors**: whole units stored as base units (or the reverse) are silent 10^n errors. Go through
+  `toBaseUnits`; add decimals to the catalogue in the same commit as the source.
+- **Sniff overlap**: a loose `sniff` steals another importer's files. The file gate's "only claimant"
+  test is the guard; keep it passing rather than reordering the registry.
+- **Binance same-second grouping**: rows sharing a timestamp are grouped into one trade; more than two
+  principal assets in one bucket are ambiguous and are left as transfers with a note, not fused.
+- **Ledger Live**: a native send's amount includes its fee, so principal = amount − fee; token rows never
+  book the gas a second time.
+- **Decimal commas**: `0,01` is a hundredth, not `001`. Never strip commas outside `stripThousands`.
+- **DST**: mapped-CSV local times go through `mapped-csv/dates.ts` (gap uses the pre-change offset,
+  overlap resolves to the first occurrence); do not hand-roll offsets.
+- **The NIGHT ticker**: two CoinGecko coins share the symbol at prices ~4,500× apart. Identify by
+  `NIGHT_ASSET_ID` (policy id + asset name), never by ticker.
