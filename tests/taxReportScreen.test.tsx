@@ -3002,3 +3002,126 @@ describe('the DATEV settings card', () => {
     }
   });
 });
+
+describe('downloading the DATEV Buchungsstapel', () => {
+  const originalCreate = URL.createObjectURL;
+  const originalRevoke = URL.revokeObjectURL;
+  const validDatev = {
+    beraternummer: '1234567',
+    mandantennummer: '12345',
+    sachkontenlaenge: 4,
+    konten: {
+      verrechnung: '1200',
+      gewinn23: '2300',
+      verlust23: '2310',
+      einkuenfte22: '2320',
+    },
+  };
+  const blobs: Blob[] = [];
+
+  beforeEach(() => {
+    localStorage.clear();
+    blobs.length = 0;
+    URL.createObjectURL = vi.fn((blob: Blob) => {
+      blobs.push(blob);
+      return 'blob:test';
+    });
+    URL.revokeObjectURL = vi.fn();
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    URL.createObjectURL = originalCreate;
+    URL.revokeObjectURL = originalRevoke;
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  const runGermany = async (draw: () => unknown = renderScreen) => {
+    taxRegistry.push(germanTax);
+    await putSaleWithFee();
+    vi.stubGlobal('fetch', flatRange(1));
+    draw();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /germany/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /run report/i }),
+    );
+    return screen.findByRole('button', {
+      name: /download datev \(buchungsstapel\)/i,
+    });
+  };
+
+  const confirm = async () => {
+    const dialog = await screen.findByRole('dialog');
+    const buttons = within(dialog).getAllByRole('button', {
+      name: /download datev \(buchungsstapel\)/i,
+    });
+    await userEvent.click(buttons[buttons.length - 1]);
+  };
+
+  it('stays disabled and names the missing settings', async () => {
+    const button = await runGermany();
+    expect(button).toBeDisabled();
+    expect(
+      screen.getByText(/complete the datev settings first: advisor number/i),
+    ).toBeInTheDocument();
+  });
+
+  it('downloads a windows-1252 EXTF file after confirming', async () => {
+    await putSettings({ datev: validDatev });
+    const button = await runGermany();
+    await waitFor(() => expect(button).toBeEnabled());
+    await userEvent.click(button);
+    expect(await screen.findByText(/\d+ postings/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/rounded to cents on its own/i),
+    ).toBeInTheDocument();
+    await confirm();
+    expect(blobs).toHaveLength(1);
+    expect(blobs[0].type).toBe('text/csv;charset=windows-1252');
+    const bytes = new Uint8Array(await readBlob(blobs[0]));
+    expect(String.fromCharCode(...bytes.slice(0, 5))).toBe('"EXTF');
+  });
+
+  it('is disabled with a note when the report is not in euros', async () => {
+    await putSettings({ datev: validDatev, baseCurrency: 'usd' });
+    const button = await runGermany();
+    expect(button).toBeDisabled();
+    expect(
+      screen.getByText('The DATEV export needs a report in euros.'),
+    ).toBeInTheDocument();
+  });
+
+  it('still downloads for a review client', async () => {
+    await putSettings({ datev: validDatev });
+    const button = await runGermany(() =>
+      render(
+        <MemoryRouter>
+          <ClientProvider
+            client={{
+              id: 'c-1',
+              label: 'Müller GmbH',
+              dbName: 'db-1',
+              kind: 'review',
+              createdAt: '2026-01-01T00:00:00.000Z',
+              review: {
+                fingerprint: 'abcdef0123456789abcdef',
+                omittedEventCount: 0,
+                file: 'mueller.coineda',
+                verdict: 'match',
+              },
+            }}
+            onChange={vi.fn()}
+          >
+            <TaxReportScreen />
+          </ClientProvider>
+        </MemoryRouter>,
+      ),
+    );
+    await waitFor(() => expect(button).toBeEnabled());
+    await userEvent.click(button);
+    await confirm();
+    expect(blobs).toHaveLength(1);
+  });
+});

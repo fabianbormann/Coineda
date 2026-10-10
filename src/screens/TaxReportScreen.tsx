@@ -9,6 +9,22 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { DatevSettingsCard } from '@/datev/DatevSettingsCard';
+import {
+  buchungsstapel,
+  datevFilename,
+  postingsFromReport,
+  validateDatevSettings,
+  type DatevSettingsIssue,
+} from '@/datev/buchungsstapel';
+import { encodeCp1252 } from '@/datev/cp1252';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import markBlack from '@/assets/logo/coineda-mark-black.svg';
 import { findModule } from '@/sources/registry';
 import { taxRegistry } from '@/tax/registry';
@@ -18,7 +34,11 @@ import { describePriceSource } from '@/components/money/priceSource';
 import { REWARD_KIND_LABELS } from '@/tax/rewardKinds';
 import { DERIVATIVE_KIND_LABELS } from '@/tax/derivativeKinds';
 import { buildDisclaimer, type Disclaimer } from '@/tax/disclaimer';
-import { getSettings, putSettings } from '@/settings/settingsStore';
+import {
+  getSettings,
+  putSettings,
+  type DatevSettings,
+} from '@/settings/settingsStore';
 import { ClientContext } from '@/clients/ClientContext';
 import { labelOf, listClients } from '@/clients/registry';
 import { shortFingerprint } from '@/ledger/fingerprint';
@@ -266,6 +286,8 @@ export const TaxReportScreen = () => {
    * be impossible.
    */
   const [step, setStep] = useState<'form' | 'report'>('form');
+  const [datev, setDatev] = useState<DatevSettings | undefined>(undefined);
+  const [datevOpen, setDatevOpen] = useState(false);
   const [module, setModule] = useState<TaxModule | null>(null);
   // Built once, when the jurisdiction is actually chosen (an event
   // handler, not render), because `buildDisclaimer` takes the current time
@@ -593,9 +615,31 @@ export const TaxReportScreen = () => {
     }
   };
 
-  /** Hands a text file to the browser, the way the checkpoint dialog does. */
-  const download = (content: string, filename: string, type: string) => {
-    const blob = new Blob([content], { type });
+  // The DATEV numbers are edited on the setup step, so they are read again
+  // whenever the report is shown rather than once on mount.
+  useEffect(() => {
+    if (step !== 'report') {
+      return;
+    }
+    let active = true;
+    void getSettings().then((stored) => {
+      if (active) {
+        setDatev(stored?.datev);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [step]);
+
+  /** Hands a file to the browser, the way the checkpoint dialog does. Bytes
+   *  go into the Blob as they are, never through a UTF-8 encoder. */
+  const download = (
+    content: string | Uint8Array,
+    filename: string,
+    type: string,
+  ) => {
+    const blob = new Blob([content as BlobPart], { type });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -613,6 +657,44 @@ export const TaxReportScreen = () => {
       registerFilename(assessment.year, assessment.method.fingerprint, 'csv'),
       'text/csv;charset=utf-8',
     );
+  };
+
+  const DATEV_FIELD_LABELS: Record<DatevSettingsIssue['field'], string> = {
+    beraternummer: 'Advisor number',
+    mandantennummer: 'Client number',
+    sachkontenlaenge: 'Account number length',
+    'konten.verrechnung': 'Clearing account',
+    'konten.gewinn23': 'Account for §23 gains',
+    'konten.verlust23': 'Account for §23 losses',
+    'konten.einkuenfte22': 'Account for §22 Nr. 3 income',
+  };
+  const datevIssues = validateDatevSettings(datev);
+  const datevNotEuro = assessment?.method.baseCurrency !== 'eur';
+  const datevPostings =
+    assessment && datev && datevIssues.length === 0 && !datevNotEuro
+      ? postingsFromReport(assessment, datev)
+      : [];
+
+  const handleDownloadDatev = () => {
+    if (!assessment || !datev) {
+      return;
+    }
+    const text = buchungsstapel(
+      postingsFromReport(assessment, datev),
+      {
+        year: assessment.year,
+        fingerprint: assessment.method.fingerprint,
+        createdAt: new Date(),
+        appVersion: assessment.method.appVersion,
+      },
+      datev,
+    );
+    download(
+      encodeCp1252(text),
+      datevFilename(assessment.year, assessment.method.fingerprint),
+      'text/csv;charset=windows-1252',
+    );
+    setDatevOpen(false);
   };
 
   const handleDownloadJson = () => {
@@ -2338,6 +2420,79 @@ export const TaxReportScreen = () => {
                   >
                     {t('Download report (JSON)')}
                   </Button>
+                  {module?.manifest.id === 'de' && (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={datevIssues.length > 0 || datevNotEuro}
+                        onClick={() => setDatevOpen(true)}
+                      >
+                        {t('Download DATEV (Buchungsstapel)')}
+                      </Button>
+                      {datevNotEuro ? (
+                        <span className="text-xs text-muted-foreground">
+                          {t('The DATEV export needs a report in euros.')}
+                        </span>
+                      ) : (
+                        datevIssues.length > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            {t(
+                              'Complete the DATEV settings first: {{fields}}',
+                              {
+                                fields: [
+                                  ...new Set(
+                                    datevIssues.map((issue) =>
+                                      t(DATEV_FIELD_LABELS[issue.field]),
+                                    ),
+                                  ),
+                                ].join(', '),
+                              },
+                            )}
+                          </span>
+                        )
+                      )}
+                      <Dialog open={datevOpen} onOpenChange={setDatevOpen}>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>
+                              {t('Download DATEV (Buchungsstapel)')}
+                            </DialogTitle>
+                            <DialogDescription>
+                              {t('{{count}} postings', {
+                                count: datevPostings.length,
+                              })}
+                            </DialogDescription>
+                          </DialogHeader>
+                          <p className="text-sm">
+                            {t(
+                              'Each posting is rounded to cents on its own, so the file may differ from the report totals by a few cents.',
+                            )}
+                          </p>
+                          {unresolvedInYear > 0 && (
+                            <p className="text-sm text-destructive">
+                              {t(
+                                'These figures are incomplete: {{count}} items were omitted or left unresolved (see the Result card). Resolve them before you type anything in.',
+                                { count: unresolvedInYear },
+                              )}
+                            </p>
+                          )}
+                          <DialogFooter>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setDatevOpen(false)}
+                            >
+                              {t('Cancel')}
+                            </Button>
+                            <Button type="button" onClick={handleDownloadDatev}>
+                              {t('Download DATEV (Buchungsstapel)')}
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    </>
+                  )}
                   <span className="text-xs text-muted-foreground">
                     {t(
                       'In Excel, open the CSV via Data → From Text/CSV and choose the comma as separator.',
