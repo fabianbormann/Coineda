@@ -8,6 +8,22 @@ import type { CarryForward } from '@/tax/types';
  * onboarding flow (Task 10) distinguishes "not yet configured" from
  * "configured as empty".
  */
+export type DatevSettings = {
+  /** 1-7 digits. */
+  beraternummer: string;
+  /** 1-5 digits. */
+  mandantennummer: string;
+  /** 4-8. */
+  sachkontenlaenge: number;
+  /** The advisor's accounts, each exactly `sachkontenlaenge` digits. */
+  konten: {
+    verrechnung: string;
+    gewinn23: string;
+    verlust23: string;
+    einkuenfte22: string;
+  };
+};
+
 export type Settings = {
   language: string;
   baseCurrency: string;
@@ -45,6 +61,13 @@ export type Settings = {
    * at the top level, so a write replaces this whole record.
    */
   lossCarryForward?: Record<string, CarryForward>;
+  /**
+   * The advisor's DATEV numbers and accounts for the Buchungsstapel export.
+   * No defaults: Coineda does not know the advisor's Kontenrahmen. Not
+   * normalised (spread through by normalizeSettings, account numbers keep
+   * their leading zeros).
+   */
+  datev?: DatevSettings;
 };
 
 /**
