@@ -51,7 +51,7 @@ export const ClientMenu = () => {
     clients.filter((c) => c.kind === 'client').length <= 1;
 
   const open = (m: Exclude<Mode, null>) => {
-    setText(m === 'rename' ? client.label : '');
+    setText(m === 'rename' ? labelOf(client) : '');
     setMode(m);
   };
   const close = () => setMode(null);
@@ -67,7 +67,7 @@ export const ClientMenu = () => {
       renameClient(client.id, value);
       close();
       refresh();
-    } else if (mode === 'delete' && text === client.label && !isLast) {
+    } else if (mode === 'delete' && text === labelOf(client) && !isLast) {
       await removeClient(client.id);
       close();
       const next = listClients().find((c) => c.kind === 'client');
@@ -79,7 +79,11 @@ export const ClientMenu = () => {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" aria-label={t('Clients')}>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={`${t('Clients')}: ${labelOf(client)}`}
+          >
             <span className="max-w-40 truncate">{labelOf(client)}</span>
             <ChevronDown aria-hidden="true" />
           </Button>
@@ -159,7 +163,7 @@ export const ClientMenu = () => {
                 <Button
                   type="submit"
                   variant="destructive"
-                  disabled={text !== client.label}
+                  disabled={text !== labelOf(client)}
                 >
                   {t('Delete')}
                 </Button>

@@ -40,6 +40,12 @@ const Gate = () => {
         if (active) {
           setState(done ? 'onboarded' : 'pending');
         }
+      })
+      .catch((error: unknown) => {
+        // Never leave the app on the skeleton: onboarding is the safe
+        // fallback, and it can be retried from there.
+        console.error(error);
+        if (active) setState('pending');
       });
     return () => {
       active = false;

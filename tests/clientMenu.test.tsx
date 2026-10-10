@@ -10,6 +10,7 @@ import {
   createReviewClient,
   listClients,
 } from '@/clients/registry';
+import i18n from '@/i18n';
 import { setOnboarded } from '@/settings/settingsStore';
 
 beforeEach(async () => {
@@ -131,5 +132,28 @@ describe('ClientMenu', () => {
     expect(
       screen.getByRole('menuitem', { name: /open a checkpoint for review/i }),
     ).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('confirms deletion against the displayed label in German', async () => {
+    createClient('Client B');
+    await i18n.changeLanguage('de');
+    try {
+      render(<App />);
+      await userEvent.click(
+        await screen.findByRole('button', { name: /mandanten/i }),
+      );
+      await userEvent.click(
+        await screen.findByRole('menuitem', { name: /mandant löschen/i }),
+      );
+      await userEvent.type(
+        await screen.findByLabelText('Gib zur Bestätigung die Bezeichnung ein'),
+        'Mein Portfolio',
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Löschen' }));
+      await screen.findByText(/willkommen/i);
+      expect(listClients().map((c) => c.label)).toEqual(['Client B']);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });
