@@ -11,8 +11,37 @@
  */
 export type CsvRow = Record<string, string>;
 
+export type CsvDelimiter = ',' | ';' | '\t';
+
+/**
+ * Picks the delimiter from a header line: the most frequent of `,` `;` and
+ * tab OUTSIDE double quotes (a quoted header such as "Fee (EUR; net)" must
+ * not flip the answer). A tie, or no separator at all, answers `,`.
+ */
+export const sniffDelimiter = (headerLine: string): CsvDelimiter => {
+  const counts: Record<CsvDelimiter, number> = { ',': 0, ';': 0, '\t': 0 };
+  let quoted = false;
+  for (const char of headerLine) {
+    if (char === '"') {
+      quoted = !quoted;
+    } else if (!quoted && char in counts) {
+      counts[char as CsvDelimiter] += 1;
+    }
+  }
+  let best: CsvDelimiter = ',';
+  for (const candidate of [';', '\t'] as const) {
+    if (counts[candidate] > counts[best]) {
+      best = candidate;
+    }
+  }
+  return best;
+};
+
 /** Splits one CSV document into rows of raw fields. */
-export const readCsvRows = (text: string): string[][] => {
+export const readCsvRows = (
+  text: string,
+  delimiter: CsvDelimiter = ',',
+): string[][] => {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = '';
@@ -53,7 +82,7 @@ export const readCsvRows = (text: string): string[][] => {
       started = true;
       continue;
     }
-    if (char === ',') {
+    if (char === delimiter) {
       endField();
       continue;
     }
@@ -107,8 +136,12 @@ const BOM = 0xfeff;
 const stripBom = (value: string): string =>
   value.charCodeAt(0) === BOM ? value.slice(1) : value;
 
-export const readCsv = (text: string): { header: string[]; rows: CsvRow[] } => {
-  const raw = readCsvRows(text);
+export const readCsv = (
+  text: string,
+  options: { delimiter?: CsvDelimiter } = {},
+): { header: string[]; rows: CsvRow[] } => {
+  const firstLine = stripBom(text).split(/\r\n|\n|\r/, 1)[0] ?? '';
+  const raw = readCsvRows(text, options.delimiter ?? sniffDelimiter(firstLine));
   if (raw.length === 0) {
     return { header: [], rows: [] };
   }

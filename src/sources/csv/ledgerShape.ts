@@ -29,6 +29,30 @@ export class UnscalableAmountError extends Error {
   }
 }
 
+export class AmbiguousDecimalError extends Error {
+  constructor(readonly value: string) {
+    super(
+      `'${value}' has both '.' and ',', so which is the decimal separator cannot be told`,
+    );
+    this.name = 'AmbiguousDecimalError';
+  }
+}
+
+/**
+ * Turns a decimal-comma amount ('0,5', '1 234,5') into a decimal-point one.
+ * Both separators together are refused: '1.234,5' and '1,234.5' look alike
+ * and guessing wrong is a thousandfold error.
+ */
+export const normaliseDecimal = (value: string): string => {
+  const stripped = value.replace(/\s/g, '');
+  const hasDot = stripped.includes('.');
+  const hasComma = stripped.includes(',');
+  if (hasDot && hasComma) {
+    throw new AmbiguousDecimalError(value);
+  }
+  return hasComma ? stripped.replace(',', '.') : stripped;
+};
+
 export const toBaseUnits = (
   importer: string,
   whole: string,
