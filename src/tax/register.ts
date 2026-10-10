@@ -158,10 +158,11 @@ export const buildRegister = (input: {
   }
 
   rows.push(
-    ...internalTransferRows(
-      input.internalTransfers.filter(
-        (event) => new Date(event.timestamp).getUTCFullYear() === input.year,
-      ),
+    // Paired on the WHOLE dropped set and only then cut to the year, by the
+    // SENDER's date: a pair straddling New Year is one movement in the
+    // sender's year and nothing in the receiver's.
+    ...internalTransferRows(input.internalTransfers).filter(
+      (row) => new Date(row.date).getUTCFullYear() === input.year,
     ),
   );
 

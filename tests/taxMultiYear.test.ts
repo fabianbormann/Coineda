@@ -29,6 +29,7 @@ const trade = (
   timestamp: number,
   side: 'buy' | 'sell',
   whole: number,
+  eur: number = whole,
 ): LedgerEvent => ({
   id,
   sourceId: 's1',
@@ -39,12 +40,12 @@ const trade = (
   legs:
     side === 'buy'
       ? [
-          leg({ assetId: EUR, amount: String(whole), direction: 'out' }),
+          leg({ assetId: EUR, amount: String(eur), direction: 'out' }),
           leg({ assetId: ADA, amount: ada(whole), direction: 'in' }),
         ]
       : [
           leg({ assetId: ADA, amount: ada(whole), direction: 'out' }),
-          leg({ assetId: EUR, amount: String(whole), direction: 'in' }),
+          leg({ assetId: EUR, amount: String(eur), direction: 'in' }),
         ],
 });
 
@@ -65,53 +66,51 @@ const runGermany = (year: number) =>
 
 describe('lots across tax years', () => {
   it('consumes each acquisition once across two yearly reports', async () => {
+    // Two lots at different costs, so FIFO has an order to get wrong:
+    //   2023: 100 ADA for 100 EUR    2024: 50 ADA for 100 EUR
+    //   2024 sells 70 -> all from the 2023 lot (30 left)
+    //   2025 sells 40 -> 30 from the 2023 lot, then 10 from the 2024 lot.
+    // A matcher that forgot the 2024 sale would take all 40 from the 2023
+    // lot in 2025 (one consumed entry of 40) and fail here.
     await putEvents([
-      trade('buy-2023', Date.UTC(2023, 0, 1), 'buy', 100),
-      trade('sell-2024', Date.UTC(2024, 5, 1), 'sell', 40),
+      trade('buy-2023', Date.UTC(2023, 0, 1), 'buy', 100, 100),
+      trade('buy-2024', Date.UTC(2024, 2, 1), 'buy', 50, 100),
+      trade('sell-2024', Date.UTC(2024, 5, 1), 'sell', 70),
       trade('sell-2025', Date.UTC(2025, 5, 1), 'sell', 40),
     ]);
 
     const r2024 = await runGermany(2024);
     const r2025 = await runGermany(2025);
 
-    const consumed = [...r2024.lines, ...r2025.lines].flatMap(
-      (line) => line.consumed,
-    );
-    const byAcquisition = new Map<string, number>();
-    for (const lot of consumed) {
-      byAcquisition.set(
+    expect(r2024.lines).toHaveLength(1);
+    expect(
+      r2024.lines[0].consumed.map((lot) => [
         lot.acquisitionEventId,
-        (byAcquisition.get(lot.acquisitionEventId) ?? 0) + Number(lot.amount),
-      );
-    }
-    for (const total of byAcquisition.values()) {
-      expect(total).toBeLessThanOrEqual(Number(ada(100)));
-    }
+        lot.amount,
+      ]),
+    ).toEqual([[expect.stringContaining('buy-2023'), ada(70)]]);
 
     expect(r2025.lines).toHaveLength(1);
-    const lot = r2025.lines[0].consumed[0];
-    expect(lot.amount).toBe(ada(40));
-    expect(lot.acquisitionEventId).toBe(
-      r2024.lines[0].consumed[0].acquisitionEventId,
-    );
-    // The 2025 sale starts from the 60 left after 2024's, not from 100.
-    expect(r2024.lines[0].consumed[0].amount).toBe(ada(40));
-  });
+    const consumed2025 = r2025.lines[0].consumed;
+    expect(consumed2025).toHaveLength(2);
+    expect(consumed2025[0].acquisitionEventId).toContain('buy-2023');
+    expect(consumed2025[0].amount).toBe(ada(30));
+    expect(consumed2025[1].acquisitionEventId).toContain('buy-2024');
+    expect(consumed2025[1].amount).toBe(ada(10));
 
-  it('leaves a later acquisition alone when an earlier lot covers the sale', async () => {
-    await putEvents([
-      trade('buy-2023', Date.UTC(2023, 0, 1), 'buy', 100),
-      trade('buy-2024', Date.UTC(2024, 2, 1), 'buy', 50),
-      trade('sell-2024', Date.UTC(2024, 5, 1), 'sell', 40),
-    ]);
-
-    const report = await runGermany(2024);
-
-    const ids = report.lines.flatMap((line) =>
-      line.consumed.map((lot) => lot.acquisitionEventId),
-    );
-    expect(ids.length).toBeGreaterThan(0);
-    expect(new Set(ids).size).toBe(1);
-    expect(ids[0]).toContain('buy-2023');
+    const totals = new Map<string, bigint>();
+    for (const lot of [...r2024.lines, ...r2025.lines].flatMap(
+      (line) => line.consumed,
+    )) {
+      totals.set(
+        lot.acquisitionEventId,
+        (totals.get(lot.acquisitionEventId) ?? 0n) + BigInt(lot.amount),
+      );
+    }
+    const byName = (name: string) =>
+      [...totals.entries()].find(([id]) => id.includes(name))?.[1];
+    expect(byName('buy-2023')).toBe(BigInt(ada(100)));
+    expect(byName('buy-2024')).toBe(BigInt(ada(10)));
+    expect(totals.size).toBe(2);
   });
 });

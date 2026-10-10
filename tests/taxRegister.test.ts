@@ -121,6 +121,41 @@ describe('buildRegister', () => {
   });
 });
 
+describe('a transfer straddling New Year', () => {
+  const sender: LedgerEvent = {
+    ...transfer,
+    id: 'send',
+    externalId: 'send',
+    txHash: '0xabc',
+    timestamp: Date.UTC(2025, 11, 31, 23, 0),
+    legs: [transfer.legs[0]],
+  };
+  const receipt: LedgerEvent = {
+    ...transfer,
+    id: 'recv',
+    externalId: 'recv',
+    txHash: '0xabc',
+    timestamp: Date.UTC(2026, 0, 1, 1, 0),
+    legs: [transfer.legs[1]],
+  };
+  const forYear = (year: number) =>
+    buildRegister({
+      year,
+      valued: [],
+      internalTransfers: [sender, receipt],
+      residuals: [],
+      unresolved: [],
+    });
+
+  it('is one row in the sender year and none in the receiver year', () => {
+    const rows = forYear(2025);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].venue).toBe('wallet-a');
+    expect(rows[0].counterVenue).toBe('wallet-b');
+    expect(forYear(2026)).toHaveLength(0);
+  });
+});
+
 describe('registerToCsv', () => {
   it('starts with a BOM and names every column in the header', () => {
     const csv = registerToCsv([]);

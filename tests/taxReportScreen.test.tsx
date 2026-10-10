@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import 'fake-indexeddb/auto';
@@ -194,6 +194,14 @@ const runReport = async (year: string) => {
 };
 
 describe('downloading the register', () => {
+  const originalCreate = URL.createObjectURL;
+  const originalRevoke = URL.revokeObjectURL;
+  afterEach(() => {
+    URL.createObjectURL = originalCreate;
+    URL.revokeObjectURL = originalRevoke;
+    vi.restoreAllMocks();
+  });
+
   it('offers the register and the report as files, inside the print-hidden bar', async () => {
     taxRegistry.push(makeModule());
     await putEvents([acquisitionEvent, disposalEvent]);
@@ -202,10 +210,10 @@ describe('downloading the register', () => {
       blobs.push(blob);
       return 'blob:test';
     });
-    vi.stubGlobal(
-      'URL',
-      Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }),
-    );
+    // jsdom has no createObjectURL to spy on, so it is assigned and put
+    // back (to absent) in afterEach.
+    URL.createObjectURL = createObjectURL;
+    URL.revokeObjectURL = vi.fn();
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 
     renderScreen();
