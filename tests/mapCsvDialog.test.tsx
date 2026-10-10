@@ -42,7 +42,7 @@ const MAPPING_A: CsvMapping = {
     Einzahlung: 'fiat-in',
     Staking: 'reward',
   },
-  fiatCounter: true,
+  counter: { kind: 'fiat', currency: 'EUR' },
 };
 
 const KEEP = { replaceExisting: false };
@@ -165,7 +165,7 @@ describe('the mapping dialog', () => {
     ).toBeDisabled();
   });
 
-  it('disables Preview when a type value is both incoming and outgoing', async () => {
+  it('moves a type value to the other direction instead of tagging it both ways', async () => {
     const user = userEvent.setup();
     render(
       <MapCsvDialog
@@ -182,25 +182,55 @@ describe('the mapping dialog', () => {
     expect(
       within(dialog).getByRole('button', { name: 'Preview' }),
     ).toBeEnabled();
-    // Kauf is already incoming; tag it outgoing too.
+    // Kauf is incoming; clicking Outgoing moves it there.
     await user.click(
       within(dialog).getByRole('button', { name: 'Outgoing: Kauf' }),
     );
     expect(
-      within(dialog).getByText(
+      within(dialog).getByRole('button', { name: 'Outgoing: Kauf' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      within(dialog).getByRole('button', { name: 'Incoming: Kauf' }),
+    ).toHaveAttribute('aria-pressed', 'false');
+    expect(
+      within(dialog).queryByText(
         'A type value cannot be both incoming and outgoing',
       ),
-    ).toBeInTheDocument();
-    expect(
-      within(dialog).getByRole('button', { name: 'Preview' }),
-    ).toBeDisabled();
-    // Untagging the conflict makes it usable again.
-    await user.click(
-      within(dialog).getByRole('button', { name: 'Outgoing: Kauf' }),
-    );
+    ).toBeNull();
     expect(
       within(dialog).getByRole('button', { name: 'Preview' }),
     ).toBeEnabled();
+    // And back.
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Incoming: Kauf' }),
+    );
+    expect(
+      within(dialog).getByRole('button', { name: 'Incoming: Kauf' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      within(dialog).getByRole('button', { name: 'Outgoing: Kauf' }),
+    ).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('does not offer derivative as a kind', async () => {
+    const user = userEvent.setup();
+    render(
+      <MapCsvDialog
+        open
+        onOpenChange={onOpenChange}
+        file={file()}
+        onImport={onImport}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Venue label'), 'Bison');
+    await user.click(within(dialog).getByRole('button', { name: 'Continue' }));
+    await fillMapping(user, dialog);
+    const options = [...field(dialog, 'Kind: Kauf').options].map(
+      (option) => option.value,
+    );
+    expect(options).not.toContain('derivative');
+    expect(options).toContain('trade');
   });
 
   it('shows a conflicting saved mapping as a conflict', async () => {
@@ -348,7 +378,7 @@ describe('the mapping dialog', () => {
       decimal: 'dot',
       direction: { mode: 'sign' },
       kinds: { '*': 'transfer' },
-      fiatCounter: false,
+      counter: { kind: 'column' },
     };
 
     it('imports the sign-mode mapping and warns that nothing leaves', async () => {
@@ -363,6 +393,32 @@ describe('the mapping dialog', () => {
       await user.click(within(dialog).getByRole('button', { name: 'Import' }));
       await waitFor(() =>
         expect(onImport).toHaveBeenCalledWith(PLAIN, base, 'plain.csv', KEEP),
+      );
+    });
+
+    it('names the fiat currency of the price column, EUR by default', async () => {
+      const user = userEvent.setup();
+      const dialog = await toStepTwo(user);
+      expect(within(dialog).queryByLabelText('Fiat currency')).toBeNull();
+      await user.click(
+        within(dialog).getByRole('checkbox', {
+          name: 'Counter value is fiat',
+        }),
+      );
+      expect(field(dialog, 'Fiat currency').value).toBe('EUR');
+      expect(
+        [...field(dialog, 'Fiat currency').options].map((o) => o.value),
+      ).toEqual(['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD']);
+      await user.selectOptions(field(dialog, 'Fiat currency'), 'USD');
+      await user.click(within(dialog).getByRole('button', { name: 'Preview' }));
+      await user.click(within(dialog).getByRole('button', { name: 'Import' }));
+      await waitFor(() =>
+        expect(onImport).toHaveBeenCalledWith(
+          PLAIN,
+          { ...base, counter: { kind: 'fiat', currency: 'USD' } },
+          'plain.csv',
+          KEEP,
+        ),
       );
     });
 

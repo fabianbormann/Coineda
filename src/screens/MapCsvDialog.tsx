@@ -77,6 +77,8 @@ const KIND_LABELS: Record<EventKind, string> = {
   derivative: 'Derivative settlement',
 };
 
+// No 'derivative': the module does not emit it, and a mapped row would carry
+// none of the typed derivative fields a settlement needs.
 const KINDS: EventKind[] = [
   'trade',
   'transfer',
@@ -84,8 +86,9 @@ const KINDS: EventKind[] = [
   'fee',
   'fiat-in',
   'fiat-out',
-  'derivative',
 ];
+
+const FIAT_CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD'];
 
 type Draft = {
   delimiter: CsvMapping['delimiter'];
@@ -95,11 +98,13 @@ type Draft = {
   zoneOther: string;
   decimal: CsvMapping['decimal'];
   mode: 'sign' | 'type';
-  /** Independent flags, so a conflicting saved mapping is shown as the
-   *  conflict it is rather than silently resolved. */
+  /** Two flags rather than one direction, so a conflicting SAVED mapping is
+   *  shown as the conflict it is rather than silently resolved. Clicking
+   *  keeps them exclusive (see `tag`). */
   tags: Record<string, { in?: boolean; out?: boolean }>;
   kinds: Record<string, EventKind>;
   fiatCounter: boolean;
+  fiatCurrency: string;
 };
 
 const EMPTY: Draft = {
@@ -113,6 +118,7 @@ const EMPTY: Draft = {
   tags: {},
   kinds: {},
   fiatCounter: false,
+  fiatCurrency: 'EUR',
 };
 
 const draftFrom = (mapping: CsvMapping): Draft => {
@@ -136,7 +142,9 @@ const draftFrom = (mapping: CsvMapping): Draft => {
     mode: mapping.direction.mode,
     tags,
     kinds: { ...mapping.kinds },
-    fiatCounter: mapping.fiatCounter,
+    fiatCounter: mapping.counter?.kind === 'fiat',
+    fiatCurrency:
+      mapping.counter?.kind === 'fiat' ? mapping.counter.currency : 'EUR',
   };
 };
 
@@ -343,7 +351,9 @@ export const MapCsvDialog = ({
             }
           : { mode: 'sign' },
       kinds,
-      fiatCounter: draft.fiatCounter,
+      counter: draft.fiatCounter
+        ? { kind: 'fiat', currency: draft.fiatCurrency }
+        : { kind: 'column' },
     };
   }, [draft, label, delimiter, timeZone, typeValues]);
 
@@ -389,9 +399,13 @@ export const MapCsvDialog = ({
       const current = previous.tags[value] ?? {};
       return {
         ...previous,
+        // Exclusive: tagging one direction clears the other.
         tags: {
           ...previous.tags,
-          [value]: { ...current, [direction]: !current[direction] },
+          [value]:
+            direction === 'in'
+              ? { in: !current.in, out: false }
+              : { in: false, out: !current.out },
         },
       };
     });
@@ -719,6 +733,27 @@ export const MapCsvDialog = ({
               />
               {t('Counter value is fiat')}
             </label>
+            {draft.fiatCounter && (
+              <div className="flex items-center gap-2">
+                <label htmlFor="map-fiat-currency" className="text-sm">
+                  {t('Fiat currency')}
+                </label>
+                <select
+                  id="map-fiat-currency"
+                  className={SELECT_CLASS}
+                  value={draft.fiatCurrency}
+                  onChange={(event) =>
+                    patch({ fiatCurrency: event.target.value })
+                  }
+                >
+                  {FIAT_CURRENCIES.map((code) => (
+                    <option key={code} value={code}>
+                      {code}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {problems.map((problem) => (
               <p key={problem} className="text-xs text-destructive">

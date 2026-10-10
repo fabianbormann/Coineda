@@ -447,7 +447,10 @@ type CsvMapping = {
   decimal: 'dot' | 'comma';
   direction: { mode: 'sign' } | { mode: 'type'; in: string[]; out: string[] };
   kinds: Record<string, EventKind>; // type value -> kind
-  fiatCounter: boolean;
+  // Where a single-row trade's other side comes from when the row has no
+  // counter asset cell: the counter asset column only, or a named fiat
+  // currency (ISO code, e.g. 'EUR') for a price column.
+  counter: { kind: 'column' } | { kind: 'fiat'; currency: string };
 };
 ```
 

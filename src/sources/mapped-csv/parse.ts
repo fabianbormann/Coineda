@@ -5,6 +5,7 @@ import { fnv64Hex } from '@/sources/csv/identity';
 import {
   makeSkipLog,
   normaliseDecimal,
+  stripThousands,
   toBaseUnits,
 } from '@/sources/csv/ledgerShape';
 import { readCsv, type CsvRow } from '@/sources/csv/readCsv';
@@ -25,6 +26,14 @@ const EVENT_KINDS: EventKind[] = [
   'fiat-out',
   'derivative',
 ];
+
+/** The fiat asset id a mapping's fiat counter names, or undefined when the
+ *  mapping names none or names something that is not a fiat currency. */
+export const counterFiatOf = (mapping: CsvMapping): string | undefined => {
+  if (mapping.counter?.kind !== 'fiat') return undefined;
+  const id = resolveSymbol(mapping.counter.currency.trim())?.id;
+  return id !== undefined && isFiatAsset(id) ? id : undefined;
+};
 
 /** Mapped column names that the file's header does not carry. A misspelt
  *  optional column would otherwise read as empty on every row, silently. */
@@ -73,6 +82,12 @@ export const validateMapping = (
       problems.push('A type value cannot be both incoming and outgoing');
     }
   }
+  if (
+    mapping.counter?.kind === 'fiat' &&
+    counterFiatOf(mapping) === undefined
+  ) {
+    problems.push('Choose the fiat currency of the price column');
+  }
   return problems;
 };
 
@@ -90,7 +105,10 @@ const wholeOf = (raw: string, decimal: CsvMapping['decimal']) => {
       return undefined;
     }
   }
-  return value;
+  // Commas in a decimal-dot file are thousands groups only where that is
+  // unmistakable: "0,5" or "4500,50" is a decimal comma in the wrong
+  // style, and stripping it would book it ten or a hundred times over.
+  return stripThousands(value);
 };
 
 class AmountError extends Error {}
@@ -100,16 +118,15 @@ const unitsOf = (raw: string, assetId: string, m: CsvMapping): string => {
   const whole = wholeOf(raw, m.decimal);
   if (whole === undefined) throw new AmountError(raw);
   try {
-    new Big(whole.replace(/,/g, ''));
+    new Big(whole);
   } catch {
     throw new AmountError(raw);
   }
   try {
     if (isFiatAsset(assetId)) {
-      const stripped = whole.replace(/,/g, '');
       return toBaseUnits(
         IMPORTER,
-        new Big(stripped).round(2, Big.roundHalfUp).toFixed(2),
+        new Big(whole).round(2, Big.roundHalfUp).toFixed(2),
         assetId,
       );
     }
@@ -274,6 +291,7 @@ export const parseMapped = (
   };
 
   const events: DerivedEvent[] = [];
+  const counterFiat = counterFiatOf(m);
 
   const leg = (
     assetId: string,
@@ -315,7 +333,14 @@ export const parseMapped = (
       kind = 'trade';
       for (const row of run) {
         if (new Big(safeBig(absOf(row.amountRaw), m)).eq(0)) continue;
-        legs.push(leg(row.asset, row.amountRaw, row.direction, 'principal'));
+        // A fee on its own row of the order is a cost of the trade, never
+        // a principal disposal: as a principal it would make two fiat legs
+        // and lose the trade's consideration.
+        legs.push(
+          row.kind === 'fee'
+            ? leg(row.asset, row.amountRaw, 'out', 'fee')
+            : leg(row.asset, row.amountRaw, row.direction, 'principal'),
+        );
       }
       for (const row of run) {
         const fee = feeLeg(row, row.asset);
@@ -339,7 +364,8 @@ export const parseMapped = (
         legs.push(leg(row.asset, row.amountRaw, 'out', 'fee'));
       } else if (kind === 'reward') {
         legs.push(leg(row.asset, row.amountRaw, 'in', 'principal'));
-        rewardKind = /stak/i.test(row.rawType) ? 'staking' : 'other';
+        // Never guessed from the label ("Unstaking" is not staking income).
+        rewardKind = 'other';
       } else if (kind === 'fiat-in' || kind === 'fiat-out') {
         legs.push(
           leg(
@@ -389,17 +415,26 @@ export const parseMapped = (
     if (row.counterAssetCode !== '') {
       counterId = resolve(row.counterAssetCode);
       if (counterId === undefined) return null;
-    } else if (m.fiatCounter) {
-      counterId = 'fiat:eur';
+    } else if (counterFiat !== undefined) {
+      counterId = counterFiat;
     } else {
       skip.note('trades with no counter asset');
       return null;
     }
 
-    let whole: string;
     if (row.counterAmount !== '') {
-      whole = absOf(row.counterAmount);
-      return leg(counterId, whole, direction, 'principal');
+      // Zero would book a disposal for nothing (a fabricated loss of the
+      // whole cost basis); a negative counter contradicts the row.
+      if (
+        isNegative(row.counterAmount) ||
+        !safeBig(row.counterAmount, m).gt(0)
+      ) {
+        throw new AmountError(row.counterAmount);
+      }
+      const counter = leg(counterId, row.counterAmount, direction, 'principal');
+      if (new Big(counter.amount).eq(0))
+        throw new AmountError(row.counterAmount);
+      return counter;
     }
     if (row.price === '') {
       skip.note('trades with no price or counter amount');
@@ -419,6 +454,10 @@ export const parseMapped = (
     const rounded = isFiatAsset(counterId)
       ? product.round(2, Big.roundHalfUp)
       : product;
+    if (!rounded.gt(0)) {
+      skip.note('rows with unparseable amounts');
+      return null;
+    }
     // Already a dot decimal: bypass the style conversion.
     return {
       assetId: counterId,
@@ -476,7 +515,7 @@ const safeBig = (raw: string, m: CsvMapping): Big => {
   const whole = wholeOf(raw, m.decimal);
   if (whole === undefined) throw new AmountError(raw);
   try {
-    return new Big(whole.replace(/,/g, ''));
+    return new Big(whole);
   } catch {
     throw new AmountError(raw);
   }

@@ -63,7 +63,7 @@ const mappingA: CsvMapping = {
     Einzahlung: 'fiat-in',
     Staking: 'reward',
   },
-  fiatCounter: true,
+  counter: { kind: 'fiat', currency: 'EUR' },
 };
 
 const mappingB: CsvMapping = {
@@ -84,7 +84,7 @@ const mappingB: CsvMapping = {
   decimal: 'dot',
   direction: { mode: 'sign' },
   kinds: { '*': 'transfer' },
-  fiatCounter: false,
+  counter: { kind: 'column' },
 };
 
 const shape = (
@@ -127,7 +127,7 @@ describe('parseMapped, type-tagged decimal-comma file', () => {
     ]);
   });
 
-  it('books fiat-in and a staking reward', () => {
+  it('books fiat-in and a reward, never guessing its kind from the label', () => {
     expect(dep.kind).toBe('fiat-in');
     expect(dep.legs[0]).toMatchObject({
       assetId: 'fiat:eur',
@@ -135,7 +135,7 @@ describe('parseMapped, type-tagged decimal-comma file', () => {
       direction: 'in',
     });
     expect(reward.kind).toBe('reward');
-    expect(reward.rewardKind).toBe('staking');
+    expect(reward.rewardKind).toBe('other');
     expect(reward.legs[0]).toMatchObject({
       amount: '12300000',
       direction: 'in',
@@ -319,7 +319,7 @@ describe('fix round 1', () => {
           counterAsset: 'cc',
         },
         kinds: { '*': 'trade' },
-        fiatCounter: true,
+        counter: { kind: 'fiat', currency: 'EUR' },
       },
     );
     expect(withUsd.events[0].legs.map((l) => [l.assetId, l.role])).toEqual([
@@ -448,5 +448,153 @@ describe('a second file from the same venue', () => {
       ]),
     ).rejects.toThrow();
     expect(await getEventsBySource(first.source.id)).toHaveLength(4);
+  });
+});
+
+describe('fix wave', () => {
+  const plain: CsvMapping = {
+    ...mappingB,
+    columns: { date: 'time', asset: 'symbol', amount: 'qty' },
+  };
+
+  describe('dot-mode fiat follows the thousands-group rule', () => {
+    const fiatIn = (qty: string) =>
+      parseMapped(`time,symbol,qty\n2024-05-02T10:00:00Z,EUR,"${qty}"\n`, {
+        ...plain,
+        kinds: { '*': 'fiat-in' },
+      });
+
+    it('reads a grouped amount', () => {
+      const r = fiatIn('4,500.50');
+      expect(r.events).toHaveLength(1);
+      expect(r.events[0].legs[0]).toMatchObject({
+        assetId: 'fiat:eur',
+        amount: '4500.5',
+      });
+    });
+
+    it.each(['0,5', '4500,50'])('skips %s as unparseable', (qty) => {
+      const r = fiatIn(qty);
+      expect(r.events).toHaveLength(0);
+      expect(r.skipped.join('\n')).toMatch(/unparseable amounts/);
+    });
+
+    it('applies the rule to a fiat counter amount too', () => {
+      const r = parseMapped(
+        'time,symbol,qty,cc,ca\n2024-05-02T10:00:00Z,BTC,0.1,EUR,"0,5"\n',
+        {
+          ...plain,
+          columns: {
+            ...plain.columns,
+            counterAsset: 'cc',
+            counterAmount: 'ca',
+          },
+          kinds: { '*': 'trade' },
+        },
+      );
+      expect(r.events).toHaveLength(0);
+      expect(r.skipped.join('\n')).toMatch(/unparseable amounts/);
+    });
+  });
+
+  it('books a fee row inside a trade-id group as a fee leg', () => {
+    const csv = `time,type,trade_id,symbol,qty
+2024-05-01T10:00:00Z,Buy,T9,BTC,0.01
+2024-05-01T10:00:00Z,Buy,T9,EUR,-400
+2024-05-01T10:00:00Z,Fee,T9,EUR,-1
+`;
+    const r = parseMapped(csv, {
+      ...mappingB,
+      columns: {
+        date: 'time',
+        type: 'type',
+        tradeId: 'trade_id',
+        asset: 'symbol',
+        amount: 'qty',
+      },
+      kinds: { Buy: 'trade', Fee: 'fee' },
+    });
+    expect(r.events).toHaveLength(1);
+    expect(r.events[0].kind).toBe('trade');
+    expect(shape(r.events[0].legs)).toEqual([
+      ['bitcoin:native', '1000000', 'in', 'principal'],
+      ['fiat:eur', '400', 'out', 'principal'],
+      ['fiat:eur', '1', 'out', 'fee'],
+    ]);
+  });
+
+  describe('the fiat counter currency is explicit', () => {
+    const priced = (counter: CsvMapping['counter']) =>
+      parseMapped('time,sym,qty,px\n2024-05-01T10:00:00Z,BTC,0.5,100\n', {
+        ...plain,
+        columns: { date: 'time', asset: 'sym', amount: 'qty', price: 'px' },
+        kinds: { '*': 'trade' },
+        counter,
+      });
+
+    it('books the price in the named currency', () => {
+      const r = priced({ kind: 'fiat', currency: 'USD' });
+      expect(shape(r.events[0].legs)).toEqual([
+        ['bitcoin:native', '50000000', 'in', 'principal'],
+        ['fiat:usd', '50', 'out', 'principal'],
+      ]);
+    });
+
+    it('skips a price with no counter column and no fiat named', () => {
+      const r = priced({ kind: 'column' });
+      expect(r.events).toHaveLength(0);
+      expect(r.skipped.join('\n')).toMatch(/no counter asset/);
+    });
+
+    it('asks for a known fiat currency', () => {
+      const key = 'Choose the fiat currency of the price column';
+      expect(
+        validateMapping({
+          ...mappingA,
+          counter: { kind: 'fiat', currency: '' },
+        }),
+      ).toContain(key);
+      expect(
+        validateMapping({
+          ...mappingA,
+          counter: { kind: 'fiat', currency: 'BTC' },
+        }),
+      ).toContain(key);
+      expect(validateMapping(mappingA)).not.toContain(key);
+    });
+  });
+
+  it.each(['0', '-100', '0.00'])(
+    'skips a row whose counter amount is %s',
+    (amount) => {
+      const r = parseMapped(
+        `time,symbol,qty,cc,ca\n2024-05-02T10:00:00Z,BTC,0.1,EUR,${amount}\n`,
+        {
+          ...plain,
+          columns: {
+            ...plain.columns,
+            counterAsset: 'cc',
+            counterAmount: 'ca',
+          },
+          kinds: { '*': 'trade' },
+        },
+      );
+      expect(r.events).toHaveLength(0);
+      expect(r.skipped.join('\n')).toMatch(/unparseable amounts/);
+    },
+  );
+
+  it('skips a row whose price times amount rounds to no fiat at all', () => {
+    const r = parseMapped(
+      'time,sym,qty,px\n2024-05-01T10:00:00Z,BTC,0.00000001,0.1\n',
+      {
+        ...plain,
+        columns: { date: 'time', asset: 'sym', amount: 'qty', price: 'px' },
+        kinds: { '*': 'trade' },
+        counter: { kind: 'fiat', currency: 'EUR' },
+      },
+    );
+    expect(r.events).toHaveLength(0);
+    expect(r.skipped.join('\n')).toMatch(/unparseable amounts/);
   });
 });

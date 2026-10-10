@@ -83,6 +83,9 @@ export function parseMappedDate(
   if (format === 'unix-s' || format === 'unix-ms') {
     if (!/^\d{1,16}(?:\.\d+)?$/.test(v)) return undefined;
     const n = Number(v);
+    // 1e11 seconds is the year 5138 and 1e11 ms is March 1973: a value on
+    // the wrong side is the other unit, a thousandfold misdating.
+    if (format === 'unix-s' ? n >= 1e11 : n < 1e11) return undefined;
     return Math.round(format === 'unix-s' ? n * 1000 : n);
   }
 

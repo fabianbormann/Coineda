@@ -676,6 +676,8 @@
     "No outgoing rows: check the direction setting": "Keine ausgehenden Zeilen: prüfe die Richtungseinstellung",
     "No incoming rows: check the direction setting": "Keine eingehenden Zeilen: prüfe die Richtungseinstellung",
     "Replace this venue's existing events ({{count}})": "Vorhandene Ereignisse dieser Börse ersetzen ({{count}})",
-    "Replaced {{removed}} and imported {{inserted}} events": "Hat {{removed}} ersetzt und {{inserted}} Ereignisse importiert"
+    "Replaced {{removed}} and imported {{inserted}} events": "Hat {{removed}} ersetzt und {{inserted}} Ereignisse importiert",
+    "Fiat currency": "Fiat-Währung",
+    "Choose the fiat currency of the price column": "Wähle die Fiat-Währung der Preisspalte"
   }
 }

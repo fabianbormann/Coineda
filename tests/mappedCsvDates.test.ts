@@ -63,3 +63,28 @@ describe('parseMappedDate', () => {
     expect(parseMappedDate('abc', 'unix-s', 'UTC')).toBeUndefined();
   });
 });
+
+describe('parseMappedDate, fix wave', () => {
+  it('refuses a unix value in the other unit', () => {
+    expect(parseMappedDate('1709805600000', 'unix-s', 'UTC')).toBeUndefined();
+    expect(parseMappedDate('1709805600', 'unix-ms', 'UTC')).toBeUndefined();
+  });
+
+  it('applies half-hour and American zones', () => {
+    expect(parseMappedDate('2024-03-07 10:00', 'iso', 'Asia/Kolkata')).toBe(
+      U(2024, 2, 7, 4, 30),
+    );
+    expect(parseMappedDate('2024-01-15 10:00', 'iso', 'America/New_York')).toBe(
+      U(2024, 0, 15, 15),
+    );
+    expect(parseMappedDate('2024-07-15 10:00', 'iso', 'America/New_York')).toBe(
+      U(2024, 6, 15, 14),
+    );
+  });
+
+  it('answers undefined for an unknown zone', () => {
+    expect(
+      parseMappedDate('2024-03-07 10:00', 'iso', 'Nope/Zone'),
+    ).toBeUndefined();
+  });
+});

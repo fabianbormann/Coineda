@@ -23,7 +23,11 @@ export type CsvMapping = {
   decimal: 'dot' | 'comma';
   direction: { mode: 'sign' } | { mode: 'type'; in: string[]; out: string[] };
   kinds: Record<string, EventKind>; // type value → kind; rows whose type is absent here are skipped by reason
-  fiatCounter: boolean; // counterAsset/price is fiat → the trade gets a fiat consideration leg
+  /** Where a single-row trade's other side comes from when the row has no
+   *  counter asset cell: nowhere (`column`: the counter asset column must
+   *  say), or a named fiat currency (ISO code, e.g. 'EUR'), so a price
+   *  column in dollars is never booked as euros. */
+  counter: { kind: 'column' } | { kind: 'fiat'; currency: string };
 };
 
 /** Thrown by the mapped-CSV module's `parse`: it cannot parse without a
