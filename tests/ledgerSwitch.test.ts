@@ -41,13 +41,36 @@ describe('switching the active ledger', () => {
 
   it('refuses a write that started before a switch', async () => {
     await putSource(source);
-    const pending = (async () => {
-      const name = activeLedgerName();
-      await new Promise((r) => setTimeout(r, 0));
-      return openLedger(name);
-    })();
-    await setActiveLedger('coineda-client-c');
+    // putEvents captures the name, then validates, then opens. Switching
+    // from inside validation lands the switch exactly between the two.
+    const events = [
+      ledgerEvent({ id: 'e9', sourceId: 'src-a', externalId: 'x9' }),
+    ];
+    const racing = new Proxy(events, {
+      get(target, prop, receiver) {
+        if (prop === Symbol.iterator) void setActiveLedger('coineda-client-c');
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+    const pending = putEvents(racing);
     await expect(pending).rejects.toThrow(/switched/);
+    expect(await getAllEvents()).toEqual([]);
+    await setActiveLedger(DEFAULT_LEDGER_NAME);
+    expect(await getAllEvents()).toEqual([]);
+  });
+
+  it('does not reopen the old database when opened during a switch', async () => {
+    await putSource(source);
+    await putEvents([
+      ledgerEvent({ id: 'e1', sourceId: 'src-a', externalId: 'x1' }),
+    ]);
+    const first = openLedger();
+    const switching = setActiveLedger('coineda-client-x');
+    const second = openLedger();
+    await first;
+    const db = await second;
+    await switching;
+    expect(db.name).toBe('coineda-client-x');
     expect(await getAllEvents()).toEqual([]);
   });
 

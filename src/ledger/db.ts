@@ -165,16 +165,31 @@ export const openLedger = (
   return connection;
 };
 
+const closeConnection = async (
+  open: Promise<IDBPDatabase<LedgerSchema>> | null,
+): Promise<void> => {
+  if (!open) return;
+  try {
+    (await open).close();
+  } catch {
+    // A rejected open has nothing to close.
+  }
+};
+
 export const closeLedger = async (): Promise<void> => {
   const open = connection;
   connection = null;
-  if (open) (await open).close();
+  await closeConnection(open);
 };
 
 export const setActiveLedger = async (dbName: string): Promise<void> => {
   if (dbName === activeName && connection) return;
-  await closeLedger();
+  // Swap synchronously: an openLedger() during the close below must see the
+  // new name and open the new database, not re-memoise the old one.
+  const old = connection;
+  connection = null;
   activeName = dbName;
+  await closeConnection(old);
 };
 
 export const deleteLedgerDatabase = async (dbName: string): Promise<void> => {
