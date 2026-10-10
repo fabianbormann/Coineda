@@ -87,8 +87,10 @@ verified for 2025 and section names only for other years.
 
 The German report can also be downloaded as a DATEV Buchungsstapel (EXTF, format version 700) for your
 tax advisor: one posting per taxable §23 result and one per §22 Nr. 3 receipt. The advisor supplies the
-account numbers in the settings, and there are no defaults. Derivatives under §20 are not included. The
-file has not been verified against a DATEV installation, so have your advisor try an import first.
+account numbers in the settings, and there are no defaults. The postings are the figures before the
+Freigrenzen and any loss carry-forward; those are applied in the tax return, not in the file. Derivatives
+under §20 are not included. The file has not been verified against a DATEV installation, so have your
+advisor try an import first.
 
 > **Coineda gives no tax, legal or accounting advice.** The rules are a community contribution,
 > written to the best of the contributors' knowledge, and may be wrong for your situation or

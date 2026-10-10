@@ -29,17 +29,30 @@ const KONTEN: { name: KontoName; label: string }[] = [
   { name: 'einkuenfte22', label: 'Account for §22 Nr. 3 income' },
 ];
 
+type DatevSettingsCardProps = {
+  /** The screen's live values, if it has any: they win over the stored
+   *  ones, so a review's session values survive leaving the setup step. */
+  value?: DatevSettings;
+  /** Called on every change, so the screen validates what is on screen
+   *  rather than what has reached the database. */
+  onChange?: (datev: DatevSettings) => void;
+};
+
 /**
  * The advisor's DATEV numbers and accounts, per client. Shown on the setup
  * step for Germany only. Written on blur as the whole object (the store
- * replaces `datev` wholesale), never in review mode, and never before the
- * stored value has been read - an early blur must not put the empty
- * defaults over a stored configuration.
+ * replaces `datev` wholesale), and never before the stored value has been
+ * read - an early blur must not put the empty defaults over a stored
+ * configuration. In review mode the card is editable but writes nothing: the
+ * values live for the session only, through `onChange`.
  */
-export const DatevSettingsCard = () => {
+export const DatevSettingsCard = ({
+  value,
+  onChange,
+}: DatevSettingsCardProps) => {
   const { t } = useTranslation();
   const readOnly = useContext(ClientContext)?.readOnly ?? false;
-  const [datev, setDatev] = useState<DatevSettings>(EMPTY);
+  const [datev, setDatevState] = useState<DatevSettings>(value ?? EMPTY);
   const [loaded, setLoaded] = useState(false);
   const [touched, setTouched] = useState<Set<string>>(new Set());
 
@@ -50,8 +63,8 @@ export const DatevSettingsCard = () => {
         if (!active) {
           return;
         }
-        if (settings?.datev) {
-          setDatev(settings.datev);
+        if (!value && settings?.datev) {
+          setDatevState(settings.datev);
         }
         setLoaded(true);
       })
@@ -63,14 +76,21 @@ export const DatevSettingsCard = () => {
     return () => {
       active = false;
     };
+    // Read once on mount; `value` only seeds the first render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const disabled = readOnly || !loaded;
+  const setDatev = (next: DatevSettings) => {
+    setDatevState(next);
+    onChange?.(next);
+  };
+
+  const disabled = !loaded;
   const issues = validateDatevSettings(datev);
 
   const leave = (field: string) => {
     setTouched((previous) => new Set(previous).add(field));
-    if (disabled) {
+    if (disabled || readOnly) {
       return;
     }
     putSettings({ datev }).catch((error: unknown) => {
@@ -125,6 +145,13 @@ export const DatevSettingsCard = () => {
             'Your DATEV advisor and client numbers and the accounts to book §23 results and §22 Nr. 3 income to. Coineda ships no defaults; the export stays disabled until all are set.',
           )}
         </p>
+        {readOnly && (
+          <p className="text-sm text-muted-foreground">
+            {t(
+              'In a review these values are kept for this session only and not saved.',
+            )}
+          </p>
+        )}
         {textField(
           'beraternummer',
           'Advisor number',

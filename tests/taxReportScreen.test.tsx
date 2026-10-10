@@ -266,7 +266,7 @@ const readBlob = (blob: Blob): Promise<ArrayBuffer> =>
   });
 
 /** A buy for 100 EUR and a sale for 100 EUR with a 7 EUR fee. */
-const putSaleWithFee = async () => {
+const putSaleWithFee = async (venue = 'wallet-a') => {
   await putEvents([
     ledgerEvent({
       id: 'buy',
@@ -278,14 +278,14 @@ const putSaleWithFee = async () => {
           assetId: 'fiat:eur',
           amount: '100',
           direction: 'out',
-          venue: 'wallet-a',
+          venue,
           role: 'principal',
         },
         {
           assetId: 'cardano:lovelace',
           amount: '100000000',
           direction: 'in',
-          venue: 'wallet-a',
+          venue,
           role: 'principal',
         },
       ],
@@ -300,21 +300,21 @@ const putSaleWithFee = async () => {
           assetId: 'cardano:lovelace',
           amount: '100000000',
           direction: 'out',
-          venue: 'wallet-a',
+          venue,
           role: 'principal',
         },
         {
           assetId: 'fiat:eur',
           amount: '100',
           direction: 'in',
-          venue: 'wallet-a',
+          venue,
           role: 'principal',
         },
         {
           assetId: 'fiat:eur',
           amount: '7',
           direction: 'out',
-          venue: 'wallet-a',
+          venue,
           role: 'fee',
         },
       ],
@@ -2888,7 +2888,7 @@ describe('the DATEV settings card', () => {
     expect(await screen.findByText('Must be 4 digits')).toBeInTheDocument();
   });
 
-  it('disables every input in review mode and writes nothing', async () => {
+  it('lets a review edit the values for the session without writing them', async () => {
     await putSettings({
       datev: {
         beraternummer: '99',
@@ -2931,9 +2931,18 @@ describe('the DATEV settings card', () => {
     );
     const advisor = await screen.findByLabelText(/^advisor number/i);
     await waitFor(() => expect(advisor).toHaveValue('99'));
+    await waitFor(() => expect(advisor).toBeEnabled());
     for (const label of labels) {
-      expect(screen.getByLabelText(label)).toBeDisabled();
+      expect(screen.getByLabelText(label)).toBeEnabled();
     }
+    expect(
+      screen.getByText(
+        'In a review these values are kept for this session only and not saved.',
+      ),
+    ).toBeInTheDocument();
+    await userEvent.type(advisor, '1');
+    await userEvent.tab();
+    expect(advisor).toHaveValue('991');
     expect(spy).not.toHaveBeenCalled();
   });
 
@@ -3036,9 +3045,12 @@ describe('downloading the DATEV Buchungsstapel', () => {
     vi.unstubAllGlobals();
   });
 
-  const runGermany = async (draw: () => unknown = renderScreen) => {
+  const runGermany = async (
+    draw: () => unknown = renderScreen,
+    venue?: string,
+  ) => {
     taxRegistry.push(germanTax);
-    await putSaleWithFee();
+    await putSaleWithFee(venue);
     vi.stubGlobal('fetch', flatRange(1));
     draw();
     await userEvent.click(
@@ -3070,18 +3082,115 @@ describe('downloading the DATEV Buchungsstapel', () => {
 
   it('downloads a windows-1252 EXTF file after confirming', async () => {
     await putSettings({ datev: validDatev });
-    const button = await runGermany();
+    const button = await runGermany(renderScreen, 'händler');
     await waitFor(() => expect(button).toBeEnabled());
     await userEvent.click(button);
-    expect(await screen.findByText(/\d+ postings/)).toBeInTheDocument();
+    expect(await screen.findByText('1 posting')).toBeInTheDocument();
     expect(
-      screen.getByText(/rounded to cents on its own/i),
+      screen.getByText(
+        'The postings are the figures before the Freigrenzen and any loss carry-forward; the tax return applies those.',
+      ),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText('Each posting is rounded to cents on its own.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/by a few cents/i)).toBeNull();
     await confirm();
     expect(blobs).toHaveLength(1);
     expect(blobs[0].type).toBe('text/csv;charset=windows-1252');
     const bytes = new Uint8Array(await readBlob(blobs[0]));
     expect(String.fromCharCode(...bytes.slice(0, 5))).toBe('"EXTF');
+    // The venue's 'ä' is the single cp1252 byte 0xE4, never UTF-8's C3 A4.
+    const prefix = Array.from('Verkauf 100 ADA H', (c) => c.charCodeAt(0));
+    const at = bytes.findIndex((_, i) =>
+      prefix.every((byte, k) => bytes[i + k] === byte),
+    );
+    expect(at).toBeGreaterThan(0);
+    expect(bytes[at + prefix.length]).toBe(0xe4);
+    expect(
+      bytes.some((byte, i) => byte === 0xc3 && bytes[i + 1] === 0xa4),
+    ).toBe(false);
+    // Three lines: header, columns, one posting.
+    const text = new TextDecoder('windows-1252').decode(bytes);
+    expect(text.split('\r\n').filter(Boolean)).toHaveLength(3);
+  });
+
+  it('enables the button for settings completed without leaving the last field', async () => {
+    // A write that never lands: only the live values can enable the button.
+    vi.spyOn(settingsStore, 'putSettings').mockResolvedValue(undefined);
+    taxRegistry.push(germanTax);
+    await putSaleWithFee();
+    vi.stubGlobal('fetch', flatRange(1));
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /germany/i }),
+    );
+    const advisor = await screen.findByLabelText(/^advisor number/i);
+    await waitFor(() => expect(advisor).toBeEnabled());
+    await userEvent.type(advisor, '1234567');
+    await userEvent.type(screen.getByLabelText(/^client number/i), '12345');
+    await userEvent.type(screen.getByLabelText(/^clearing account/i), '1200');
+    await userEvent.type(
+      screen.getByLabelText(/^account for §23 gains/i),
+      '2300',
+    );
+    await userEvent.type(
+      screen.getByLabelText(/^account for §23 losses/i),
+      '2310',
+    );
+    await userEvent.type(
+      screen.getByLabelText(/^account for §22 nr\. 3 income/i),
+      '2320',
+    );
+    await userEvent.click(screen.getByRole('button', { name: /run report/i }));
+    const button = await screen.findByRole('button', {
+      name: /download datev \(buchungsstapel\)/i,
+    });
+    await waitFor(() => expect(button).toBeEnabled());
+  });
+
+  it('says in the dialog when the figures are incomplete', async () => {
+    await putSettings({ datev: validDatev });
+    const withGap: TaxModule = {
+      ...germanTax,
+      assess: (input) => ({
+        ...germanTax.assess(input),
+        unresolved: [
+          {
+            kind: 'needs-price',
+            sourceEventId: 'gap',
+            assetId: 'cardano:lovelace',
+            amount: '1',
+            venue: 'wallet-a',
+            timestamp: Date.UTC(new Date().getUTCFullYear(), 0, 4),
+            reason: { key: 'gap' },
+            taxEventKind: 'income',
+            resolutions: [],
+          },
+        ],
+      }),
+    };
+    taxRegistry.push(withGap);
+    await putSaleWithFee();
+    vi.stubGlobal('fetch', flatRange(1));
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /germany/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /run report/i }),
+    );
+    const button = await screen.findByRole('button', {
+      name: /download datev \(buchungsstapel\)/i,
+    });
+    await waitFor(() => expect(button).toBeEnabled());
+    await userEvent.click(button);
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText(
+        'These figures are incomplete: 1 items in this year were omitted or left unresolved (see the Result card). Postings for them are missing.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('is disabled with a note when the report is not in euros', async () => {
@@ -3093,35 +3202,66 @@ describe('downloading the DATEV Buchungsstapel', () => {
     ).toBeInTheDocument();
   });
 
-  it('still downloads for a review client', async () => {
-    await putSettings({ datev: validDatev });
-    const button = await runGermany(() =>
-      render(
-        <MemoryRouter>
-          <ClientProvider
-            client={{
-              id: 'c-1',
-              label: 'Müller GmbH',
-              dbName: 'db-1',
-              kind: 'review',
-              createdAt: '2026-01-01T00:00:00.000Z',
-              review: {
-                fingerprint: 'abcdef0123456789abcdef',
-                omittedEventCount: 0,
-                file: 'mueller.coineda',
-                verdict: 'match',
-              },
-            }}
-            onChange={vi.fn()}
-          >
-            <TaxReportScreen />
-          </ClientProvider>
-        </MemoryRouter>,
-      ),
+  it('downloads for a review client with session-only settings', async () => {
+    taxRegistry.push(germanTax);
+    await putSaleWithFee();
+    vi.stubGlobal('fetch', flatRange(1));
+    const spy = vi.spyOn(settingsStore, 'putSettings');
+    render(
+      <MemoryRouter>
+        <ClientProvider
+          client={{
+            id: 'c-1',
+            label: 'Müller GmbH',
+            dbName: 'db-1',
+            kind: 'review',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            review: {
+              fingerprint: 'abcdef0123456789abcdef',
+              omittedEventCount: 0,
+              file: 'mueller.coineda',
+              verdict: 'match',
+            },
+          }}
+          onChange={vi.fn()}
+        >
+          <TaxReportScreen />
+        </ClientProvider>
+      </MemoryRouter>,
     );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /germany/i }),
+    );
+    const advisor = await screen.findByLabelText(/^advisor number/i);
+    await waitFor(() => expect(advisor).toBeEnabled());
+    await userEvent.type(advisor, '7654321');
+    await userEvent.type(screen.getByLabelText(/^client number/i), '54321');
+    await userEvent.type(screen.getByLabelText(/^clearing account/i), '1200');
+    await userEvent.type(
+      screen.getByLabelText(/^account for §23 gains/i),
+      '2300',
+    );
+    await userEvent.type(
+      screen.getByLabelText(/^account for §23 losses/i),
+      '2310',
+    );
+    await userEvent.type(
+      screen.getByLabelText(/^account for §22 nr\. 3 income/i),
+      '2320',
+    );
+    await userEvent.click(screen.getByRole('button', { name: /run report/i }));
+    const button = await screen.findByRole('button', {
+      name: /download datev \(buchungsstapel\)/i,
+    });
     await waitFor(() => expect(button).toBeEnabled());
     await userEvent.click(button);
     await confirm();
     expect(blobs).toHaveLength(1);
+    const text = new TextDecoder('windows-1252').decode(
+      await readBlob(blobs[0]),
+    );
+    expect(text.split('\r\n')[0]).toContain(';7654321;54321;');
+    expect(spy).not.toHaveBeenCalled();
+    expect((await getSettings())?.datev).toBeUndefined();
   });
 });

@@ -615,18 +615,24 @@ export const TaxReportScreen = () => {
     }
   };
 
-  // The DATEV numbers are edited on the setup step, so they are read again
-  // whenever the report is shown rather than once on mount.
+  // The live DATEV values come from the settings card through `onChange`;
+  // the stored ones fill in only while the card has reported nothing, so a
+  // read racing a pending write (or a review's session values, which are
+  // never written) cannot overwrite what is on screen.
   useEffect(() => {
     if (step !== 'report') {
       return;
     }
     let active = true;
-    void getSettings().then((stored) => {
-      if (active) {
-        setDatev(stored?.datev);
-      }
-    });
+    getSettings()
+      .then((stored) => {
+        if (active) {
+          setDatev((live) => live ?? stored?.datev);
+        }
+      })
+      .catch((error: unknown) => {
+        console.error('Could not read the DATEV settings', error);
+      });
     return () => {
       active = false;
     };
@@ -1164,7 +1170,9 @@ export const TaxReportScreen = () => {
                       disabled={status === 'loading' || readOnly}
                     />
                   </div>
-                  {module?.manifest.id === 'de' && <DatevSettingsCard />}
+                  {module?.manifest.id === 'de' && (
+                    <DatevSettingsCard value={datev} onChange={setDatev} />
+                  )}
                 </div>
 
                 {status === 'loading' && (
@@ -2466,13 +2474,16 @@ export const TaxReportScreen = () => {
                           </DialogHeader>
                           <p className="text-sm">
                             {t(
-                              'Each posting is rounded to cents on its own, so the file may differ from the report totals by a few cents.',
+                              'The postings are the figures before the Freigrenzen and any loss carry-forward; the tax return applies those.',
                             )}
+                          </p>
+                          <p className="text-sm">
+                            {t('Each posting is rounded to cents on its own.')}
                           </p>
                           {unresolvedInYear > 0 && (
                             <p className="text-sm text-destructive">
                               {t(
-                                'These figures are incomplete: {{count}} items were omitted or left unresolved (see the Result card). Resolve them before you type anything in.',
+                                'These figures are incomplete: {{count}} items in this year were omitted or left unresolved (see the Result card). Postings for them are missing.',
                                 { count: unresolvedInYear },
                               )}
                             </p>
