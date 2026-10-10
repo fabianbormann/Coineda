@@ -446,9 +446,6 @@ describe.each(taxRegistry.map((m) => [m.manifest.id, m] as const))(
         expect(keys.size).toBeGreaterThan(0);
         expect(keys.has('Private sales - crypto assets')).toBe(true);
         expect(keys.has('Total proceeds')).toBe(true);
-        expect([...keys].some((key) => key.startsWith('The Freigrenzen'))).toBe(
-          true,
-        );
       }
 
       for (const key of keys) {

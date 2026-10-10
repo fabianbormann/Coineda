@@ -434,8 +434,6 @@ const assessDisposal = (disposal: MatchedDisposal): AssessedDisposal => {
 const FILING_TITLE_SALES = 'Private sales - crypto assets';
 const FILING_TITLE_INCOME = 'Other income (§22 Nr. 3 EStG)';
 const FILING_TITLE_KAP = 'Derivatives (Anlage KAP)';
-const FILING_OFFICE_NOTE =
-  "The Freigrenzen, the saver's allowance and any loss carry-forward are applied by the Finanzamt itself; they are not typed in.";
 const KRYPTO = 'Kryptowerte';
 /** The 2025 form asks "1 = Ja" on the indicator lines. */
 const INDICATOR_YES = '1';
@@ -550,7 +548,6 @@ const buildFiling = (
         {
           label: 'Result of the private sales',
           amount: result,
-          note: FILING_OFFICE_NOTE,
           ...ref('Anlage SO', so?.result),
         },
         {
@@ -592,7 +589,6 @@ const buildFiling = (
         {
           label: 'Result of the other income',
           amount: sum,
-          note: FILING_OFFICE_NOTE,
           ...ref('Anlage SO', income?.result),
         },
       ],
@@ -612,7 +608,6 @@ const buildFiling = (
         {
           label: 'Losses from derivatives',
           amount: capital.losses,
-          note: FILING_OFFICE_NOTE,
           ...ref('Anlage KAP', forms?.kap.losses),
         },
       ],

@@ -7,6 +7,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { TaxReportScreen } from '@/screens/TaxReportScreen';
 import { taxRegistry } from '@/tax/registry';
 import germanTax from '@/tax/jurisdictions/de';
+import { formatFiat } from '@/components/money/format';
 import { openLedger, putEvents, putSource } from '@/ledger/db';
 import * as settingsStore from '@/settings/settingsStore';
 import type { Settings } from '@/settings/settingsStore';
@@ -2427,6 +2428,11 @@ describe('the filing aid', () => {
             amount: '-20',
             reference: { form: 'Anlage SO', line: 50 },
           },
+          {
+            label: 'Total proceeds',
+            text: 'Kryptowerte',
+            reference: { form: 'Anlage SO', line: 41 },
+          },
         ],
       },
     ],
@@ -2447,7 +2453,13 @@ describe('the filing aid', () => {
     expect(within(section).getByText(/line 48/i)).toBeInTheDocument();
     expect(within(section).getByText(/1,500\.50/)).toBeInTheDocument();
     // A loss to declare keeps its sign.
-    expect(within(section).getByText(/-.*20\.00/)).toBeInTheDocument();
+    expect(
+      within(section).getByText(formatFiat(-20, 'en', 'eur')),
+    ).toBeInTheDocument();
+    expect(
+      within(section).getByText(formatFiat(1500.5, 'en', 'eur')),
+    ).toBeInTheDocument();
+    expect(within(section).getByText('Kryptowerte')).toBeInTheDocument();
     expect(
       within(section).getByText(/the finanzamt applies the freigrenzen/i),
     ).toBeInTheDocument();
