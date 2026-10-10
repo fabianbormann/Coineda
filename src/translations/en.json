@@ -679,6 +679,11 @@
     "Replace this venue's existing events ({{count}})": "Replace this venue's existing events ({{count}})",
     "Replaced {{removed}} and imported {{inserted}} events": "Replaced {{removed}} and imported {{inserted}} events",
     "Fiat currency": "Fiat currency",
-    "Choose the fiat currency of the price column": "Choose the fiat currency of the price column"
+    "Choose the fiat currency of the price column": "Choose the fiat currency of the price column",
+    "Skip to content": "Skip to content",
+    "Overview": "Overview",
+    "Pause": "Pause",
+    "Play": "Play",
+    "A short animation of your holdings over time.": "A short animation of your holdings over time."
   }
 }

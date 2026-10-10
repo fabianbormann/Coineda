@@ -112,7 +112,9 @@ describe('the masthead', () => {
     const { container } = renderShell();
     const home = screen.getByRole('link', { name: /coineda/i });
     expect(home.querySelectorAll('img')).toHaveLength(2);
-    expect(home.querySelector('h1')?.textContent).toBe('Coineda');
+    // The wordmark is not a heading: each page owns the single h1.
+    expect(home.querySelector('h1')).toBeNull();
+    expect(home.textContent).toBe('Coineda');
     // And the marks are still the only images in the header.
     expect(container.querySelectorAll('header img')).toHaveLength(2);
   });

@@ -679,6 +679,11 @@
     "Replace this venue's existing events ({{count}})": "Vorhandene Ereignisse dieser Börse ersetzen ({{count}})",
     "Replaced {{removed}} and imported {{inserted}} events": "Hat {{removed}} ersetzt und {{inserted}} Ereignisse importiert",
     "Fiat currency": "Fiat-Währung",
-    "Choose the fiat currency of the price column": "Wähle die Fiat-Währung der Preisspalte"
+    "Choose the fiat currency of the price column": "Wähle die Fiat-Währung der Preisspalte",
+    "Skip to content": "Zum Inhalt springen",
+    "Overview": "Übersicht",
+    "Pause": "Pause",
+    "Play": "Abspielen",
+    "A short animation of your holdings over time.": "Eine kurze Animation deiner Bestände über die Zeit."
   }
 }

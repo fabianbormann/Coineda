@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { useRouteAnnounce } from '@/a11y/useRouteAnnounce';
 import { Button } from '@/components/ui/button';
 import {
   deleteSourceCascade,
@@ -68,6 +69,7 @@ type Props = {
 export const MainScreen = ({ onReset }: Props) => {
   const readOnly = useContext(ClientContext)?.readOnly ?? false;
   const { t } = useTranslation();
+  const headingRef = useRouteAnnounce(t('Overview'));
   const navigate = useNavigate();
   const confirm = useConfirm();
 
@@ -757,6 +759,9 @@ export const MainScreen = ({ onReset }: Props) => {
     // row, dialog and table under it - including the ones that mount later.
     <TokenMetaProvider assetIds={assetIds}>
       <div className="flex flex-col gap-6 p-6">
+        <h1 ref={headingRef} tabIndex={-1} className="sr-only">
+          {t('Overview')}
+        </h1>
         <BalanceHeader
           total={total}
           currency={currency}

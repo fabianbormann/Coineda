@@ -46,7 +46,7 @@ export const AppHeader = () => {
         {/* The mark and the wordmark are ONE link, the way a site's masthead
         conventionally is: the whole thing is the way home, not a small
         image beside a title that is not. Its accessible name comes from
-        the heading inside it, which is why the marks stay aria-hidden -
+        the wordmark inside it, which is why the marks stay aria-hidden -
         otherwise the link would announce the name twice. */}
         <Link
           to="/"
@@ -64,7 +64,7 @@ export const AppHeader = () => {
             aria-hidden="true"
             className="hidden h-6 w-auto dark:block"
           />
-          <h1 className="truncate font-serif text-lg">Coineda</h1>
+          <span className="truncate font-serif text-lg">Coineda</span>
         </Link>
         <div className="flex-1" />
         <ClientMenu />

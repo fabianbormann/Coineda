@@ -1,5 +1,6 @@
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useRouteAnnounce } from '@/a11y/useRouteAnnounce';
 import { TriangleAlertIcon, Loader2Icon } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Printer } from 'lucide-react';
@@ -237,6 +238,7 @@ const UnresolvedGroups = ({
  */
 export const TaxReportScreen = () => {
   const { t, i18n } = useTranslation();
+  const headingRef = useRouteAnnounce(t('Tax report'));
   // Optional: the screen is also rendered without a provider in isolation.
   const clientCtx = useContext(ClientContext);
   const readOnly = clientCtx?.readOnly ?? false;
@@ -809,6 +811,9 @@ export const TaxReportScreen = () => {
       data-print="document"
       className="mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-6 p-6"
     >
+      <h1 ref={headingRef} tabIndex={-1} className="sr-only print:not-sr-only">
+        {t('Tax report')}
+      </h1>
       <div className="flex min-w-0 flex-col gap-4">
         {!module ? (
           <>
