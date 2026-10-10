@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Dialog,
@@ -108,21 +108,28 @@ export const CarfReconcileDialog = ({
     [sources],
   );
 
-  // Start over each time the dialog is (re)opened, while rendering, so a
-  // previous file never flashes.
+  // Start over each time the dialog opens or closes, while rendering, so a
+  // previous file never flashes and the file's text and parsed message
+  // (names, TINs of every user in it) do not outlive the dialog. Dropping
+  // the file also cancels a read still in flight (the effect's cleanup).
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
-    if (open) {
-      setFile(null);
-      setText('');
-      setMessage(null);
-      setUserIndex(-1);
-      setSelected([]);
-      setProblem(null);
-      setBusy(false);
-    }
+    setFile(null);
+    setText('');
+    setMessage(null);
+    setUserIndex(-1);
+    setSelected([]);
+    setProblem(null);
+    setBusy(false);
   }
+
+  // Bumped on every open and close: a comparison started in an earlier
+  // session of the dialog reports nothing.
+  const session = useRef(0);
+  useEffect(() => {
+    session.current += 1;
+  }, [open]);
 
   // Read and parse the chosen file.
   useEffect(() => {
@@ -198,6 +205,7 @@ export const CarfReconcileDialog = ({
     if (!message || !canCompare) {
       return;
     }
+    const started = session.current;
     setBusy(true);
     try {
       const chosen = providerSources.filter((source) =>
@@ -230,6 +238,7 @@ export const CarfReconcileDialog = ({
         valueOf,
       });
       const fileHash = await sha256Hex(text);
+      if (session.current !== started) return;
       onReconciled(
         reconcile({
           message,
@@ -241,8 +250,9 @@ export const CarfReconcileDialog = ({
         }),
       );
       onOpenChange(false);
-    } catch (failure: unknown) {
-      console.error('The CARF reconciliation failed', failure);
+    } catch {
+      // A fixed string only: the error could carry figures from the file.
+      console.error('The CARF reconciliation failed');
       setProblem({ key: 'The comparison could not be completed.' });
     } finally {
       setBusy(false);

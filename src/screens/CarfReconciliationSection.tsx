@@ -1,14 +1,14 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { formatCrypto, formatFiat } from '@/components/money/format';
+import { formatCrypto, formatFiatDecimal } from '@/components/money/format';
 import { labelOfCode } from '@/carf/codes';
 import type {
   CarfReconciliation,
   ReconciliationRow,
   Verdict,
 } from '@/carf/reconcile';
-import type { CarfCategory } from '@/carf/types';
+import type { CarfAssetReport, CarfCategory } from '@/carf/types';
 
 /** Translation keys of the CARF categories, as the section names them. */
 export const CATEGORY_LABELS: Record<CarfCategory, string> = {
@@ -34,12 +34,12 @@ export const VERDICT_LABELS: Record<Verdict | 'not-recognised', string> = {
 };
 
 const VERDICT_CLASS: Record<Verdict, string> = {
-  match: 'border-stroke',
+  match: '',
   differs: 'border-destructive text-destructive',
   'missing-own': 'border-destructive text-destructive',
   'not-reported': 'border-destructive text-destructive',
-  unpriced: 'border-stroke text-muted-foreground',
-  'not-compared': 'border-stroke text-muted-foreground',
+  unpriced: 'text-muted-foreground',
+  'not-compared': 'text-muted-foreground',
 };
 
 const TRANSFER_CATEGORIES = new Set<CarfCategory>([
@@ -74,7 +74,7 @@ export const CarfReconciliationSection = ({
   const money = (value: string, currency: string) =>
     currency === ''
       ? `${value} (${t('several currencies')})`
-      : formatFiat(Number(value), language, currency.toUpperCase());
+      : formatFiatDecimal(value, language, currency);
   const signed = (text: string, negative: boolean, zero: boolean) =>
     zero || negative ? text : `+${text}`;
   const count = (n: number) => t('{{count}} transactions', { count: n });
@@ -173,6 +173,31 @@ export const CarfReconciliationSection = ({
     );
   };
 
+  /** Reported names that are not compared, with their reported figures. */
+  const listing = (assets: CarfAssetReport[]) => (
+    <ul className="flex flex-col gap-1">
+      {assets.map((asset, index) => (
+        <li key={`${asset.name}-${index}`}>
+          <span className="font-medium">{asset.name}</span>
+          {asset.blocks.length > 0 && ' · '}
+          {asset.blocks
+            .map(
+              (block) =>
+                `${t(CATEGORY_LABELS[block.category])}: ${
+                  block.transactions !== undefined
+                    ? `${block.transactions} × `
+                    : ''
+                }${formatCrypto(block.units, language)} · ${money(
+                  block.amount,
+                  block.currency,
+                )}`,
+            )
+            .join('; ')}
+        </li>
+      ))}
+    </ul>
+  );
+
   const s = r.summary;
 
   return (
@@ -238,12 +263,13 @@ export const CarfReconciliationSection = ({
           </p>
           <p className="font-medium">
             {t(
-              '{{match}} match, {{differs}} differ, {{missing}} missing on one side, {{skipped}} not compared, {{unknown}} not recognised',
+              '{{match}} match, {{differs}} differ, {{missing}} missing on one side, {{unpriced}} unpriced, {{skipped}} not compared, {{unknown}} not recognised',
               {
                 match: s.match,
                 differs: s.differs,
                 missing: s['missing-own'] + s['not-reported'],
-                skipped: s['not-compared'] + s.unpriced,
+                unpriced: s.unpriced,
+                skipped: s['not-compared'],
                 unknown: s['not-recognised'],
               },
             )}
@@ -311,34 +337,33 @@ export const CarfReconciliationSection = ({
             </div>
           )}
 
+          <p className="mt-2 text-xs text-muted-foreground">
+            {t(
+              'Amounts match within 1 % or 1.00 {{currency}}. The provider values at transaction time, Coineda at the UTC-day price. Retail payments (RRPT) are not computed. Transfer types are shown for orientation only. Fees are kept out of the amounts and listed separately. Deposits and withdrawals are usually unpriced.',
+              { currency: base },
+            )}
+          </p>
+
           {r.unrecognised.length > 0 && (
             <div className="mt-2 flex flex-col gap-1">
               <p className="font-medium">{t('Reported, not recognised')}</p>
-              <ul className="flex flex-col gap-1">
-                {r.unrecognised.map((asset, index) => (
-                  <li key={`${asset.name}-${index}`}>
-                    <span className="font-medium">{asset.name}</span>
-                    {' · '}
-                    {asset.blocks
-                      .map(
-                        (block) =>
-                          `${t(CATEGORY_LABELS[block.category])}: ${
-                            block.transactions !== undefined
-                              ? `${block.transactions} × `
-                              : ''
-                          }${formatCrypto(block.units, language)} · ${money(
-                            block.amount,
-                            block.currency,
-                          )}`,
-                      )
-                      .join('; ')}
-                  </li>
-                ))}
-              </ul>
+              {listing(r.unrecognised)}
               <p className="text-xs text-muted-foreground">
                 {t(
                   'These names match no asset Coineda knows, or more than one; they are not guessed.',
                 )}
+              </p>
+            </div>
+          )}
+
+          {r.fiat.length > 0 && (
+            <div className="mt-2 flex flex-col gap-1">
+              <p className="font-medium">
+                {t('Listed by the provider but not a crypto-asset')}
+              </p>
+              {listing(r.fiat)}
+              <p className="text-xs text-muted-foreground">
+                {t('These are fiat currencies; they are not compared.')}
               </p>
             </div>
           )}

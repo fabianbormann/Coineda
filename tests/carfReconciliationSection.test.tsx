@@ -41,13 +41,13 @@ const own: OwnFigures = {
   },
 };
 
-const renderSection = (user?: CarfUser) =>
+const renderSection = (user?: CarfUser, figures: OwnFigures = own) =>
   render(
     <CarfReconciliationSection
       reconciliation={reconcile({
         message: message(user ? [user] : []),
         ...(user ? { user } : {}),
-        own,
+        own: figures,
         baseCurrency: 'eur',
         fileHash: 'a'.repeat(64),
         sources: [{ id: 's1', label: 'Bitpanda' }],
@@ -75,5 +75,84 @@ describe('CarfReconciliationSection', () => {
     expect(section.textContent).toContain('Erika Mustermann');
     expect(section.textContent).toContain('12 345 678 901 (DE)');
     expect(section.textContent).toContain('DocRefId: D1');
+  });
+
+  const fiatIn = (amount: string, units = '0.250000') => ({
+    category: 'fiat-in' as const,
+    transactions: 1,
+    amount,
+    currency: 'EUR',
+    units,
+  });
+
+  it('states the limits of the comparison under the table', () => {
+    renderSection(erika([]));
+    const section = screen.getByTestId('carf-reconciliation');
+    expect(section.textContent).toContain(
+      'Amounts match within 1 % or 1.00 EUR. The provider values at transaction time, Coineda at the UTC-day price. Retail payments (RRPT) are not computed. Transfer types are shown for orientation only. Fees are kept out of the amounts and listed separately. Deposits and withdrawals are usually unpriced.',
+    );
+  });
+
+  it('counts unpriced rows apart from the rows not compared', () => {
+    renderSection(
+      erika([
+        {
+          name: 'BTC',
+          blocks: [
+            fiatIn('15000.00'),
+            { ...fiatIn('1.00'), category: 'rrpt' as const },
+          ],
+        },
+      ]),
+      {
+        [BTC]: {
+          'fiat-in': {
+            transactions: 1,
+            units: '25000000',
+            fees: '0',
+            byType: {},
+          },
+        },
+      },
+    );
+    const section = screen.getByTestId('carf-reconciliation');
+    expect(section.textContent).toContain(
+      '0 match, 0 differ, 0 missing on one side, 1 unpriced, 1 not compared, 0 not recognised',
+    );
+  });
+
+  it('lists fiat the provider reported as a crypto-asset apart from unrecognised names', () => {
+    renderSection(
+      erika([
+        { name: 'EUR', blocks: [fiatIn('100.00', '100')] },
+        { name: 'XYZNOPE', blocks: [fiatIn('5.00', '1')] },
+      ]),
+    );
+    const section = screen.getByTestId('carf-reconciliation');
+    expect(section.textContent).toContain(
+      'Listed by the provider but not a crypto-asset',
+    );
+    expect(section.textContent).toContain('Reported, not recognised');
+    const fiatList = screen
+      .getByText('Listed by the provider but not a crypto-asset')
+      .closest('div');
+    expect(fiatList?.textContent).toContain('EUR');
+    expect(fiatList?.textContent).not.toContain('XYZNOPE');
+  });
+
+  it('formats a large amount from its decimal string without losing digits', () => {
+    renderSection(
+      erika([{ name: 'BTC', blocks: [fiatIn('12345678901234567.25')] }]),
+    );
+    const section = screen.getByTestId('carf-reconciliation');
+    expect(section.textContent).toContain('12,345,678,901,234,567.25');
+  });
+
+  it('keeps TIN as TIN in German', async () => {
+    await i18n.changeLanguage('de');
+    renderSection(erika([]));
+    const section = screen.getByTestId('carf-reconciliation');
+    expect(section.textContent).toContain('TIN: 12 345 678 901 (DE)');
+    expect(section.textContent).not.toContain('Steuer-ID');
   });
 });

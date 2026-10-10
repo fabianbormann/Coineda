@@ -50,6 +50,7 @@ import { activeLedgerName, getSources } from '@/ledger/db';
 import { getLinkedEvents } from '@/ledger/manualLinks';
 import type { LedgerEvent, SourceRecord } from '@/ledger/types';
 import { reconciliationToCsv, type CarfReconciliation } from '@/carf/reconcile';
+import { registerValueLookup } from '@/carf/registerValues';
 import { CarfReconcileDialog } from '@/screens/CarfReconcileDialog';
 import {
   CarfReconciliationSection,
@@ -718,19 +719,11 @@ export const TaxReportScreen = () => {
   };
 
   /** The register value of an event's leg in an asset, for the CARF
-   *  comparison: the first row with that event and asset. */
-  const registerValues = useMemo(() => {
-    const values = new Map<string, string | undefined>();
-    for (const row of assessment?.register ?? []) {
-      const key = `${row.sourceEventId}|${row.assetId}`;
-      if (!values.has(key)) {
-        values.set(key, row.value);
-      }
-    }
-    return values;
-  }, [assessment]);
-  const valueOf = (sourceEventId: string, assetId: string) =>
-    registerValues.get(`${sourceEventId}|${assetId}`);
+   *  comparison (see `registerValueLookup`). */
+  const valueOf = useMemo(
+    () => registerValueLookup(assessment?.register ?? []),
+    [assessment],
+  );
 
   const handleDownloadReconciliation = () => {
     if (!reconciliation) {

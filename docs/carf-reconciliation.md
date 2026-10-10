@@ -93,7 +93,9 @@ explanation only.
 Per asset and category, with R the reported and O the own figures:
 
 - **Not recognised**: the reported asset name matches no catalogue asset, or more than one. Listed with
-  its reported figures under "Reported, not recognised"; never guessed.
+  its reported figures under "Reported, not recognised"; never guessed. A fiat currency the provider
+  listed as a crypto-asset is shown apart, under "Listed by the provider but not a crypto-asset", and
+  is not compared.
 - **Not compared**: RRPT; or the reported currency is not the report's base currency and counts and
   units agree (the row notes the reported currency).
 - **Not in the ledger**: R has a block, O has no event in that category.
@@ -105,8 +107,10 @@ Per asset and category, with R the reported and O the own figures:
   row shows the differences in count, units and amount (own minus
   reported).
 
-The summary line counts "missing on one side" as Not in the ledger plus Not reported, and "not compared"
-as Not compared plus Unpriced.
+The summary line counts "missing on one side" as Not in the ledger plus Not reported, and Unpriced and
+Not compared separately. Under the table, the printed section states the comparison's limits in short:
+the tolerance, the valuation time, RRPT not computed, transfer types for orientation only, fees kept
+out of the amounts, and deposits and withdrawals usually unpriced.
 
 ## Known limits
 
@@ -117,8 +121,16 @@ as Not compared plus Unpriced.
 - **Valuation time**: the provider values each transaction at the time it happened, Coineda at the UTC
   day's price. The 1 % / 1.00 tolerance absorbs the usual gap; volatile days can exceed it. Fiat
   categories ordinarily match exactly.
-- **Fees**: the own fiat amounts exclude fees, which are listed separately. A provider that reports
-  amounts including fees will show a difference of the fee total.
+- **Fees**: CARF amounts are net of transaction fees, and the own amounts exclude fee legs; own fees
+  are listed separately. A provider that folds a fee into the price leaves no fee leg in the ledger
+  (Bitpanda's spread sits inside the fiat amount), so the own amount then carries that fee and can
+  differ from the reported one by it.
+- **TransferWallet**: CARF counts transfers to any wallet not known to belong to a provider, including
+  other people's wallets. The own side counts every withdrawal not linked by transaction hash to a
+  receipt at one of your exchange or file sources, so a withdrawal to a provider you have not added
+  shows on the own side only.
+- **Transfers in and out** are usually "Unpriced": deposits and internal moves carry no value in the
+  tax report, so only counts and units can agree.
 - **Unrecognised names**: the CARF asset name is free text in practice. A name that is ambiguous (NIGHT)
   or unknown stays unmatched; there is no manual mapping yet.
 - **Scope of the venues**: "at the provider" is whatever venues the selected sources' events use. A

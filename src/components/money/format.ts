@@ -1,3 +1,5 @@
+import Big from 'big.js';
+
 /**
  * The currency is a parameter, never a constant: v2 stores
  * `settings.baseCurrency` and prices every total in it, so a fixed 'EUR'
@@ -45,7 +47,7 @@ const CRYPTO_OPTIONS: Intl.NumberFormatOptions = {
  * plain string so the function genuinely never throws.
  */
 const safeFormat = (
-  value: number,
+  value: number | `${number}`,
   language: string,
   options: Intl.NumberFormatOptions,
 ): string => {
@@ -92,4 +94,26 @@ export const formatCrypto = (value: string, language: string): string => {
   return Number.isFinite(numeric)
     ? safeFormat(numeric, language, CRYPTO_OPTIONS)
     : '—';
+};
+
+/**
+ * `formatFiat` for a decimal string, such as a figure read from a report
+ * file: rounded half-up to two places with big.js, then handed to
+ * `Intl.NumberFormat` as a string, which formats it exactly. `Number()`
+ * would round a large amount to the nearest double first. Anything that is
+ * not a decimal is '—'.
+ */
+export const formatFiatDecimal = (
+  value: string,
+  language: string,
+  currency: string,
+): string => {
+  let rounded: string;
+  try {
+    rounded = new Big(value).round(2, Big.roundHalfUp).toFixed(2);
+  } catch {
+    return '—';
+  }
+  if (rounded === '-0.00') rounded = '0.00';
+  return safeFormat(rounded as `${number}`, language, fiatOptions(currency));
 };

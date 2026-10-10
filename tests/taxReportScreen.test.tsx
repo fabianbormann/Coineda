@@ -3649,7 +3649,7 @@ describe('the DAC8 / CARF reconciliation', () => {
     expect(section.textContent).toContain('DE2026BITPANDA0001');
     expect(section.textContent).toContain('Erika Mustermann');
     expect(section.textContent).toMatch(
-      /\d+ match, \d+ differ, \d+ missing on one side, \d+ not compared, 1 not recognised/,
+      /\d+ match, \d+ differ, \d+ missing on one side, \d+ unpriced, \d+ not compared, 1 not recognised/,
     );
     const btcRow = within(section)
       .getAllByRole('row')

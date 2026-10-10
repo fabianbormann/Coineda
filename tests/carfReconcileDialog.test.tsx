@@ -10,6 +10,19 @@ import type { CarfReconciliation } from '@/carf/reconcile';
 import type { LedgerEvent, SourceRecord } from '@/ledger/types';
 import type { SourceDirectoryEntry } from '@/tax/sourceDirectory';
 
+/** When set, the file hash waits for it: lets a test close the dialog
+ *  while the comparison is still running. */
+let hashGate: Promise<void> | null = null;
+vi.mock('@/carf/hash', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/carf/hash')>();
+  return {
+    sha256Hex: async (text: string) => {
+      if (hashGate) await hashGate;
+      return real.sha256Hex(text);
+    },
+  };
+});
+
 const fixture = (name: string) =>
   readFileSync(path.join(__dirname, 'assets', 'carf', name), 'utf8');
 
@@ -89,6 +102,7 @@ beforeEach(async () => {
   await i18n.changeLanguage('en');
   onReconciled.mockReset();
   onOpenChange.mockReset();
+  hashGate = null;
 });
 
 const renderDialog = (
@@ -122,7 +136,41 @@ const drop = async (file: File) => {
   return box;
 };
 
+const dialogElement = (open: boolean) => (
+  <CarfReconcileDialog
+    open={open}
+    onOpenChange={onOpenChange}
+    taxYear={2026}
+    baseCurrency="eur"
+    sources={sources}
+    directory={directory}
+    events={events}
+    valueOf={() => undefined}
+    onReconciled={onReconciled}
+  />
+);
+
 describe('CarfReconcileDialog', () => {
+  it('drops a comparison that finishes after the dialog was closed', async () => {
+    let release = () => {};
+    hashGate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const view = render(dialogElement(true));
+    const box = await drop(xmlFile(fixture('plain.xml')));
+    await within(box).findByRole('radio', { name: /erika mustermann/i });
+    await userEvent.click(within(box).getByRole('button', { name: 'Compare' }));
+    view.rerender(dialogElement(false));
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(onReconciled).not.toHaveBeenCalled();
+
+    // Reopened, it starts over at the file step.
+    view.rerender(dialogElement(true));
+    const again = await screen.findByRole('dialog');
+    expect(within(again).queryByRole('radio')).toBeNull();
+  });
+
   it('lists the users, preselects by tax number and proposes the provider source', async () => {
     renderDialog({ taxNumber: '12/345/678/901' });
     const box = await drop(xmlFile(fixture('plain.xml')));

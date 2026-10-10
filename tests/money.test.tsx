@@ -4,7 +4,11 @@ import i18n from '@/i18n';
 import { Money } from '@/components/money/Money';
 import { CryptoAmount } from '@/components/money/CryptoAmount';
 import { GainLoss } from '@/components/money/GainLoss';
-import { formatCrypto, formatFiat } from '@/components/money/format';
+import {
+  formatCrypto,
+  formatFiat,
+  formatFiatDecimal,
+} from '@/components/money/format';
 
 beforeEach(async () => {
   await i18n.changeLanguage('en');
@@ -57,6 +61,21 @@ describe('fiat formatting', () => {
   it('renders with tabular figures so columns align', () => {
     render(<Money value={12} currency="eur" />);
     expect(screen.getByText(/12/)).toHaveClass('tabular-nums');
+  });
+});
+
+describe('fiat formatting from a decimal string', () => {
+  it('keeps every digit of a large amount and rounds half-up to cents', () => {
+    expect(formatFiatDecimal('12345678901234567.255', 'en', 'eur')).toBe(
+      '€12,345,678,901,234,567.26',
+    );
+    expect(formatFiatDecimal('1234.5', 'de', 'EUR')).toBe('1.234,50\u00a0€');
+    // A negative amount that rounds to zero is not shown as minus zero.
+    expect(formatFiatDecimal('-0.004', 'en', 'usd')).toBe('$0.00');
+  });
+
+  it('shows a dash for text that is not a decimal', () => {
+    expect(formatFiatDecimal('abc', 'en', 'eur')).toBe('—');
   });
 });
 
