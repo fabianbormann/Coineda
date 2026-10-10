@@ -8,7 +8,7 @@ import { BINANCE_ASSETS, parseBinanceTime } from '@/sources/binance-csv/parse';
 import { findHeaderRow } from '@/sources/coinbase-csv/parse';
 import { readCsvRows } from '@/sources/csv/readCsv';
 import { detectFileModule } from '@/sources/csv/registry';
-import { toBaseUnits } from '@/sources/csv/ledgerShape';
+import { toBaseUnits, UnscalableAmountError } from '@/sources/csv/ledgerShape';
 import {
   foldHoldings,
   isInternalTransfer,
@@ -55,6 +55,22 @@ describe('the shared unit boundary', () => {
     expect(toBaseUnits('t', '1.50', 'fiat:eur')).toBe('1.5');
   });
 
+  it('strips commas only when they are thousands groups', () => {
+    expect(toBaseUnits('t', '1,234.5', 'bitcoin:native')).toBe('123450000000');
+    expect(toBaseUnits('t', '-12,345,678', 'fiat:eur')).toBe('-12345678');
+  });
+
+  it('refuses any other comma, naming the value', () => {
+    // '0,01' is a decimal comma: stripping it would book one BTC for a
+    // hundredth of one.
+    for (const value of ['0,01', '1,5', '12,34,5', '12,345,6', ',5']) {
+      expect(() => toBaseUnits('t', value, 'bitcoin:native')).toThrow(
+        UnscalableAmountError,
+      );
+      expect(() => toBaseUnits('t', value, 'bitcoin:native')).toThrow(value);
+    }
+  });
+
   it('refuses an asset it cannot scale rather than defaulting to 1:1', () => {
     expect(() => toBaseUnits('t', '1', 'cardano:somepolicy')).toThrow(
       /decimals/,
@@ -66,6 +82,49 @@ describe('detecting which exchange a file came from', () => {
   it('tells the three formats apart by their headers', async () => {
     expect(detectFileModule(BINANCE)?.manifest.id).toBe('binance-csv');
     expect(detectFileModule(COINBASE)?.manifest.id).toBe('coinbase-csv');
+  });
+
+  it('refuses a Binance export re-saved by a German Excel', () => {
+    // Semicolons between fields and decimal commas inside them. Before the
+    // delimiter sniff this file was one header cell and was refused; it must
+    // stay refused rather than parse '0,01000000' as 1000000 BTC.
+    const german = BINANCE.split(/\r?\n/)
+      .map((line) =>
+        line
+          .split(',')
+          .map((field) => field.replace(/^(-?\d+)\.(\d+)$/, '$1,$2'))
+          .join(';'),
+      )
+      .join('\n');
+    expect(german).toContain(';BTC;0,01000000;');
+    expect(binanceCsv.sniff(german)).toBe(false);
+    expect(detectFileModule(german)?.manifest.id).not.toBe('binance-csv');
+    expect(() => binanceCsv.parse(german)).toThrow(/carried/);
+
+    const original = binanceCsv.parse(BINANCE).events.flatMap((e) => e.legs);
+    const largest = original.reduce(
+      (max, leg) => (new Big(leg.amount).gt(max) ? new Big(leg.amount) : max),
+      new Big(0),
+    );
+    let parsed: { legs: { amount: string }[] }[] = [];
+    try {
+      parsed = binanceCsv.parse(german).events;
+    } catch {
+      // Refused: the outcome this test wants.
+    }
+    for (const leg of parsed.flatMap((e) => e.legs)) {
+      expect(new Big(leg.amount).lt(largest.times(1000))).toBe(true);
+    }
+  });
+
+  it('skips a quoted decimal-comma change instead of stripping it', () => {
+    const file =
+      'User_ID,UTC_Time,Account,Operation,Coin,Change,Remark\n' +
+      '1,2024-03-10 14:22:51,Spot,Deposit,BTC,"0,01000000",\n' +
+      '1,2024-03-10 14:22:52,Spot,Deposit,BTC,"1,234.5",\n';
+    const { events, skipped } = binanceCsv.parse(file);
+    expect(events.map((e) => e.legs[0].amount)).toEqual(['123450000000']);
+    expect(skipped).toContain('Skipped rows with an unreadable change');
   });
 
   it('still refuses a file none of them recognise', () => {

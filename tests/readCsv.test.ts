@@ -37,8 +37,26 @@ describe('sniffDelimiter', () => {
 });
 
 describe('readCsv delimiter', () => {
-  it('auto-sniffs a semicolon file', () => {
-    expect(readCsv('x;y\r\n1;2\r\n').rows).toEqual([{ x: '1', y: '2' }]);
+  it('sniffs a semicolon file only when asked to', () => {
+    expect(readCsv('x;y\r\n1;2\r\n', { delimiter: 'auto' }).rows).toEqual([
+      { x: '1', y: '2' },
+    ]);
+  });
+  it('reads commas only by default, exactly as before the sniff existed', () => {
+    // An exchange module that never asked for a sniff must keep refusing a
+    // German-Excel re-save: one header cell, not a matching header.
+    expect(readCsv('x;y\r\n1;2\r\n').header).toEqual(['x;y']);
+    expect(readCsv('a\tb\n1\t2\n').header).toEqual(['a\tb']);
+  });
+  it('honours a fixed semicolon or tab', () => {
+    expect(readCsv('x;y\n1;2\n', { delimiter: ';' }).header).toEqual([
+      'x',
+      'y',
+    ]);
+    expect(readCsv('x\ty\n1\t2\n', { delimiter: '\t' }).header).toEqual([
+      'x',
+      'y',
+    ]);
   });
   it('honours a forced delimiter', () => {
     expect(readCsv('x;y,z\n1;2,3\n', { delimiter: ',' }).header).toEqual([

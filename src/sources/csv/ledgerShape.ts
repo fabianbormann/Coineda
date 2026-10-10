@@ -21,9 +21,11 @@ export class UnscalableAmountError extends Error {
   constructor(
     readonly importer: string,
     assetId: string,
+    reason?: string,
   ) {
     super(
-      `${importer}: no decimals are known for ${assetId}, so its amount cannot be stored`,
+      reason ??
+        `${importer}: no decimals are known for ${assetId}, so its amount cannot be stored`,
     );
     this.name = 'UnscalableAmountError';
   }
@@ -54,6 +56,21 @@ export const normaliseDecimal = (value: string): string => {
   return hasComma ? stripped.replace(',', '.') : stripped;
 };
 
+const THOUSANDS_GROUPED = /^-?\d{1,3}(,\d{3})+(\.\d+)?$/;
+
+/**
+ * Removes commas only where they are unmistakably thousands groups
+ * ('1,234.5', '12,345,678'). Any other comma ('0,01', '1,5', '12,345,6') is
+ * a decimal comma or garbage, and stripping it would turn a hundredth into
+ * a whole: the answer is `undefined`, and the caller refuses the value.
+ */
+export const stripThousands = (value: string): string | undefined => {
+  if (!value.includes(',')) {
+    return value;
+  }
+  return THOUSANDS_GROUPED.test(value) ? value.replace(/,/g, '') : undefined;
+};
+
 export const toBaseUnits = (
   importer: string,
   whole: string,
@@ -65,9 +82,11 @@ export const toBaseUnits = (
     throw new UnscalableAmountError(importer, assetId);
   }
 
-  const trimmed = whole.trim().replace(/,/g, '');
-  if (trimmed === '' || !/^-?\d*\.?\d+$/.test(trimmed)) {
-    throw new Error(
+  const trimmed = stripThousands(whole.trim());
+  if (trimmed === undefined || !/^-?\d*\.?\d+$/.test(trimmed)) {
+    throw new UnscalableAmountError(
+      importer,
+      assetId,
       `${importer}: expected a decimal amount but got '${whole}' for ${assetId}`,
     );
   }

@@ -1,7 +1,12 @@
 import Big from 'big.js';
 import { readCsvRows } from '@/sources/csv/readCsv';
 import { resolveTicker } from '@/sources/csv/resolveTicker';
-import { makeSkipLog, toBaseUnits } from '@/sources/csv/ledgerShape';
+import {
+  makeSkipLog,
+  stripThousands,
+  toBaseUnits,
+  UnscalableAmountError,
+} from '@/sources/csv/ledgerShape';
 import type { ParseResult } from '@/sources/csv/types';
 import type { DerivedEvent } from '@/sources/types';
 import type { EventKind, Leg, RewardKind } from '@/ledger/types';
@@ -134,7 +139,12 @@ export const parse = (input: string): ParseResult => {
       // Always positive in this format: the direction is the type's, not
       // the number's. Taking abs() rather than trusting a sign that is not
       // there keeps a stray minus from flipping a sale into a purchase.
-      moved = new Big(quantity.replace(/,/g, '')).abs();
+      // Commas only as thousands groups; a decimal comma is refused.
+      const plain = stripThousands(quantity);
+      if (plain === undefined) {
+        throw new Error(quantity);
+      }
+      moved = new Big(plain).abs();
     } catch {
       skipped.note('rows with an unreadable quantity');
       return;
@@ -143,10 +153,21 @@ export const parse = (input: string): ParseResult => {
       return;
     }
 
+    let amount: string;
+    try {
+      amount = toBaseUnits('coinbase-csv', moved.toString(), assetId);
+    } catch (error) {
+      if (error instanceof UnscalableAmountError) {
+        skipped.note(`unparseable amounts in ${asset}`);
+        return;
+      }
+      throw error;
+    }
+
     const legs: Leg[] = [
       {
         assetId,
-        amount: toBaseUnits('coinbase-csv', moved.toString(), assetId),
+        amount,
         direction: movement.incoming ? 'in' : 'out',
         venue: 'coinbase',
         role: 'principal',

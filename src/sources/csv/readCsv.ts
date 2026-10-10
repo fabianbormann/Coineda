@@ -136,12 +136,24 @@ const BOM = 0xfeff;
 const stripBom = (value: string): string =>
   value.charCodeAt(0) === BOM ? value.slice(1) : value;
 
+/**
+ * The delimiter is a comma unless the caller asks otherwise. Sniffing is
+ * OPT-IN on purpose: an exchange export re-saved by a German Excel carries
+ * `;` between fields and decimal commas inside them, and a module that
+ * strips commas as thousands separators would read `0,01` as `001`. Read
+ * with commas, that file is one header cell and is refused loudly - which
+ * is what every module that did not ask for `'auto'` keeps getting.
+ */
 export const readCsv = (
   text: string,
-  options: { delimiter?: CsvDelimiter } = {},
+  options: { delimiter?: CsvDelimiter | 'auto' } = {},
 ): { header: string[]; rows: CsvRow[] } => {
-  const firstLine = stripBom(text).split(/\r\n|\n|\r/, 1)[0] ?? '';
-  const raw = readCsvRows(text, options.delimiter ?? sniffDelimiter(firstLine));
+  const requested = options.delimiter ?? ',';
+  const delimiter =
+    requested === 'auto'
+      ? sniffDelimiter(stripBom(text).split(/\r\n|\n|\r/, 1)[0] ?? '')
+      : requested;
+  const raw = readCsvRows(text, delimiter);
   if (raw.length === 0) {
     return { header: [], rows: [] };
   }

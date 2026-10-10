@@ -1,6 +1,11 @@
 import Big from 'big.js';
 import { readCsv, type CsvRow } from '@/sources/csv/readCsv';
-import { makeSkipLog, toBaseUnits } from '@/sources/csv/ledgerShape';
+import {
+  makeSkipLog,
+  stripThousands,
+  toBaseUnits,
+  UnscalableAmountError,
+} from '@/sources/csv/ledgerShape';
 import { resolveTicker, tickerMap } from '@/sources/csv/resolveTicker';
 import type { ParseResult } from '@/sources/csv/types';
 import type { DerivedEvent } from '@/sources/types';
@@ -209,7 +214,13 @@ export const parse = (input: string): ParseResult => {
 
     let moved: Big;
     try {
-      moved = new Big(change === '' ? '0' : change.replace(/,/g, ''));
+      // Commas only as thousands groups: a decimal comma is refused, never
+      // stripped into a thousandfold amount.
+      const plain = stripThousands(change);
+      if (plain === undefined) {
+        throw new Error(change);
+      }
+      moved = new Big(plain === '' ? '0' : plain);
     } catch {
       skipped.note('rows with an unreadable change');
       return;
@@ -218,10 +229,21 @@ export const parse = (input: string): ParseResult => {
       return;
     }
 
+    let amount: string;
+    try {
+      amount = toBaseUnits('binance-csv', moved.abs().toString(), assetId);
+    } catch (error) {
+      if (error instanceof UnscalableAmountError) {
+        skipped.note(`unparseable amounts in ${coin}`);
+        return;
+      }
+      throw error;
+    }
+
     const legs: Leg[] = [
       {
         assetId,
-        amount: toBaseUnits('binance-csv', moved.abs().toString(), assetId),
+        amount,
         // Binance signs the change: negative leaves the account.
         direction: moved.lt(0) ? 'out' : 'in',
         venue: account,

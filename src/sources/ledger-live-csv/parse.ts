@@ -58,12 +58,14 @@ const CHAIN_ACTIONS = new Set([
   'SET_CONTROLLER',
 ]);
 
+const UNSIGNED_DECIMAL = /^\d*\.?\d+$/;
+
 const lower = (names: string[]): string[] =>
   names.map((name) => name.trim().toLowerCase());
 
 export const sniff = (text: string): boolean => {
   try {
-    const { header } = readCsv(text);
+    const { header } = readCsv(text, { delimiter: 'auto' });
     const names = new Set(lower(header));
     return REQUIRED.every((column) => names.has(column.toLowerCase()));
   } catch {
@@ -93,7 +95,7 @@ const identity = (text: string): string =>
   fnv1a64(text, FNV_OFFSET) + fnv1a64(`|${text}`, FNV_OFFSET ^ 0x9e3779b9n);
 
 export const parse = (input: string): ParseResult => {
-  const { header, rows } = readCsv(input);
+  const { header, rows } = readCsv(input, { delimiter: 'auto' });
   const have = new Set(lower(header));
   const missing = REQUIRED.filter((column) => !have.has(column.toLowerCase()));
   if (missing.length > 0) {
@@ -144,10 +146,16 @@ export const parse = (input: string): ParseResult => {
       fee = normaliseDecimal(cell('Operation Fees') || '0');
     } catch (error) {
       if (error instanceof AmbiguousDecimalError) {
-        skipped.note('unparseable amounts');
+        skipped.note(`unparseable amounts in ${ticker || '(no ticker)'}`);
         continue;
       }
       throw error;
+    }
+    // Unsigned decimals only, checked per row: a value the unit boundary
+    // would refuse must skip this row, not abort the whole import.
+    if (!UNSIGNED_DECIMAL.test(amount) || !UNSIGNED_DECIMAL.test(fee)) {
+      skipped.note(`unparseable amounts in ${ticker || '(no ticker)'}`);
+      continue;
     }
     const hasAmount = Number(amount) > 0;
     const hasFee = Number(fee) > 0;

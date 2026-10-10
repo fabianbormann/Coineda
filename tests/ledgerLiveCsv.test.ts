@@ -221,6 +221,15 @@ describe('Ledger Live fix round 1', () => {
     );
   });
 
+  it('skips a row whose amount is not a number instead of aborting', () => {
+    const { events, skipped } = run(
+      '2025-03-05T12:00:00.000Z,Confirmed,BTC,IN,abc,0,h5,Bitcoin 1,xpub1,EUR,0,0',
+      '2025-03-05T12:00:00.000Z,Confirmed,BTC,IN,1,0,h6,Bitcoin 1,xpub1,EUR,0,0',
+    );
+    expect(events).toHaveLength(1);
+    expect(skipped).toContain('Skipped unparseable amounts in BTC');
+  });
+
   it('books the fee of a REDELEGATE', () => {
     const { events } = run(
       '2025-03-05T12:00:00.000Z,Confirmed,DOT,REDELEGATE,0,0.01,h4,Polkadot 1,1Dot,EUR,0,0',
