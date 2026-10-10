@@ -4,6 +4,8 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { PUBLIC_ENDPOINTS } from '@/config/endpoints';
 import {
   allowHosts,
+  checkEgressRefusals,
+  expectEgressRefusals,
   guardFetch,
   resetAllowedHosts,
   UnexpectedEgressError,
@@ -14,12 +16,15 @@ import {
  *
  * Every `http(s)://` literal in `src/**\/*.ts(x)` - code, strings and
  * comments alike, since telling them apart reliably would need a parser -
- * must either point at a host in `PUBLIC_ENDPOINTS` (the single list of
- * outbound hosts, which an operator overrides) or be named below as a link
- * the app only SHOWS: a manifest `docsUrl`, a field's help text, the
- * footer, a comment citing a provider. A new outbound host therefore fails
- * this test until it is added to `endpoints.ts`, where the operator's
- * configuration and restricted mode can see it.
+ * must either be named below as a link the app only SHOWS (a manifest
+ * `docsUrl`, a field's help text, the footer, a comment citing a provider)
+ * or point at a host in `PUBLIC_ENDPOINTS` FROM `src/config/endpoints.ts`
+ * itself. A public endpoint host anywhere else fails too: a hard-coded
+ * `fetch('https://api.coingecko.com/...')` would skip `activeEndpoints()`
+ * and reach the public provider from a restricted build. A new outbound
+ * host therefore fails this test until it is added to `endpoints.ts`, where
+ * the operator's configuration and restricted mode can see it, and every
+ * caller must take its base from the resolved endpoints.
  *
  * `src/translations` is excluded: it is JSON, and its keys are the English
  * copy, not code paths.
@@ -66,11 +71,15 @@ const ENDPOINT_HOSTS = new Set(
   Object.values(PUBLIC_ENDPOINTS).map((url) => new URL(url).host),
 );
 
+/** The only file (relative to src/) allowed to name a public endpoint
+ *  host: everything else must take its base from the resolved endpoints. */
+const ENDPOINTS_FILE = 'config/endpoints.ts';
+
 const LITERAL = /https?:\/\/[^\s'"`<>()\]]+/g;
 
 /** The `http(s)://` literals in `text` that are neither a public endpoint's
  *  host nor allow-listed documentation. */
-const unexpectedLiterals = (text: string): string[] => {
+const unexpectedLiterals = (text: string, file: string): string[] => {
   const found: string[] = [];
   for (const match of text.matchAll(LITERAL)) {
     const literal = match[0].replace(/[.,;:]+$/, '');
@@ -78,7 +87,10 @@ const unexpectedLiterals = (text: string): string[] => {
       continue;
     }
     const host = /^https?:\/\/([^/?#]+)/.exec(literal)?.[1] ?? '';
-    if (ENDPOINT_HOSTS.has(host) || DOC_HOSTS.has(host)) {
+    if (DOC_HOSTS.has(host)) {
+      continue;
+    }
+    if (ENDPOINT_HOSTS.has(host) && file === ENDPOINTS_FILE) {
       continue;
     }
     found.push(literal);
@@ -102,25 +114,38 @@ describe('the static egress gate', () => {
     expect(sourceFiles(SRC).length).toBeGreaterThan(50);
   });
 
-  it('allows only the public endpoints and named documentation links in src', () => {
+  it('allows public endpoint hosts only in endpoints.ts, and named documentation links anywhere', () => {
     const offenders = sourceFiles(SRC).flatMap((file) =>
-      unexpectedLiterals(fs.readFileSync(file, 'utf8')).map(
-        (literal) => `${path.relative(SRC, file)}: ${literal}`,
-      ),
+      unexpectedLiterals(
+        fs.readFileSync(file, 'utf8'),
+        path.relative(SRC, file).split(path.sep).join('/'),
+      ).map((literal) => `${path.relative(SRC, file)}: ${literal}`),
     );
     expect(offenders).toEqual([]);
   });
 
   it('flags an unknown host', () => {
     const text = `const url = 'https://unexpected.example/api';\n// see https://github.com/x`;
-    expect(unexpectedLiterals(text)).toEqual([
+    expect(unexpectedLiterals(text, 'prices/fake.ts')).toEqual([
       'https://unexpected.example/api',
     ]);
   });
 
-  it('accepts a public endpoint host on any route', () => {
+  it('flags a public endpoint host outside src/config/endpoints.ts', () => {
     expect(
-      unexpectedLiterals('`https://coins.llama.fi/batchHistorical?coins=`'),
+      unexpectedLiterals(
+        "await fetch('https://api.coingecko.com/x');",
+        'prices/fake.ts',
+      ),
+    ).toEqual(['https://api.coingecko.com/x']);
+  });
+
+  it('accepts the public endpoint hosts in src/config/endpoints.ts', () => {
+    expect(
+      unexpectedLiterals(
+        "spotPrices: 'https://api.coingecko.com/api/v3',",
+        ENDPOINTS_FILE,
+      ),
     ).toEqual([]);
   });
 });
@@ -131,6 +156,7 @@ describe('the runtime egress guard', () => {
   });
 
   it('rejects a request to a host no test allowed', async () => {
+    expectEgressRefusals();
     const attempt = fetch('https://unexpected.example/prices');
     await expect(attempt).rejects.toBeInstanceOf(UnexpectedEgressError);
     await expect(
@@ -146,9 +172,26 @@ describe('the runtime egress guard', () => {
     expect(await response.text()).toBe('ok');
     expect(original).toHaveBeenCalledTimes(1);
     // Port is part of the host: the same name on another port is refused.
+    expectEgressRefusals();
     await expect(
       guarded('https://mirror.internal/prices'),
     ).rejects.toBeInstanceOf(UnexpectedEgressError);
+  });
+
+  it('records a refusal even when the caller swallows the rejection, and fails the check', async () => {
+    // A catch-all, as resolveSpotPrices and fetchHistory have.
+    await fetch('https://api.coingecko.com/x').catch(() => undefined);
+    expect(() => checkEgressRefusals()).toThrow(
+      /https:\/\/api\.coingecko\.com\/x/,
+    );
+    // The check clears the list, so the setup afterEach stays green.
+    expect(() => checkEgressRefusals()).not.toThrow();
+  });
+
+  it('does not fail the check when the test expected refusals', async () => {
+    expectEgressRefusals();
+    await fetch('https://unexpected.example/x').catch(() => undefined);
+    expect(() => checkEgressRefusals()).not.toThrow();
   });
 
   it('lets non-http schemes through', async () => {
