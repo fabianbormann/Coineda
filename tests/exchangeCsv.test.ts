@@ -63,7 +63,17 @@ describe('the shared unit boundary', () => {
   it('refuses any other comma, naming the value', () => {
     // '0,01' is a decimal comma: stripping it would book one BTC for a
     // hundredth of one.
-    for (const value of ['0,01', '1,5', '12,34,5', '12,345,6', ',5']) {
+    for (const value of [
+      '0,01',
+      '1,5',
+      '12,34,5',
+      '12,345,6',
+      ',5',
+      // A leading zero group is a decimal comma too: "0,010" is a
+      // hundredth, not a thousands-grouped ten.
+      '0,010',
+      '0,123',
+    ]) {
       expect(() => toBaseUnits('t', value, 'bitcoin:native')).toThrow(
         UnscalableAmountError,
       );

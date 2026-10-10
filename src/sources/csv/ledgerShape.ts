@@ -56,7 +56,9 @@ export const normaliseDecimal = (value: string): string => {
   return hasComma ? stripped.replace(',', '.') : stripped;
 };
 
-const THOUSANDS_GROUPED = /^-?\d{1,3}(,\d{3})+(\.\d+)?$/;
+// The leading group may not start with 0: "0,010" is a decimal comma
+// (one hundredth), never a thousands-grouped ten.
+const THOUSANDS_GROUPED = /^-?[1-9]\d{0,2}(,\d{3})+(\.\d+)?$/;
 
 /**
  * Removes commas only where they are unmistakably thousands groups
