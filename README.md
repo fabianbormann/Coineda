@@ -97,6 +97,9 @@ same second become one trade.
 Every report prints who contributed the rules, when they were last checked against the law, and the
 references used. Rules unchecked for more than a year are flagged as stale on the report itself.
 
+In Germany a fee paid to receive a reward is now deducted as Werbungskosten against that income, and the Ethereum and
+Cardano sources accept several addresses each.
+
 A German report ends with a filing aid for Anlage SO and Anlage KAP, in form order, with line numbers
 verified for 2025 and section names only for other years.
 

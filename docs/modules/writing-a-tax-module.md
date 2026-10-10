@@ -120,6 +120,35 @@ the reference: a fee on a sell or swap goes on the disposal, on a buy on
 the acquisition, and a fee paid in crypto additionally keeps its own
 disposal because the coins really left.
 
+## Cost provenance, reward fees and per-lot fee shares
+
+Every valued `TaxCost` (and every valued event) carries a `priceSource`, set
+by the host alongside the value: it names who supplied the rate. You never
+set it; you only have to keep the cost attached so there is something to
+price. The register exports it as `costsPriceSource`, and the report JSON
+(formatVersion 2) lists the sources per line as `costSources`.
+
+A fee paid to receive a reward is a cost of the income, not of a sale. Put it
+on the `income` event's `costs`. Germany disposes of the fee asset at market
+and deducts the valued fee as Werbungskosten against that §22 Nr. 3 income,
+floored so the net never goes below 0; the sum shows as
+`ReportedIncome.costs` and `totals.incomeCosts`, and the filing aid's
+Leistungen expenses line carries it. Austria only disposes of the fee asset
+and sets neither field, the flat tax allowing no deduction. If your law
+deducts, say so in `totals.incomeCosts`; if it does not, leave it absent.
+
+An acquisition may carry `origin: { key }`, a translation key saying why its
+lot looks the way it does (Germany: a hard fork's zero cost basis,
+`fork-at-zero`). It is printed on the lot row and as the register note. Every
+consumed lot also carries `acquisitionCosts`, the part of `costBasis` that
+was the acquisition's own fee, shown as "of which fees" and never added
+again.
+
+The rule behind all of it: a module never drops a fee leg silently. Each
+`role: 'fee'` leg either becomes a cost on the event it belongs to, or its own
+disposal, or an unresolved item. A fee that disappears makes the figures
+look cleaner than the truth.
+
 ## Freigrenze vs. Freibetrag — pick the right one
 
 `ThresholdOutcome.kind` is `'freigrenze' | 'freibetrag'`, and conflating the

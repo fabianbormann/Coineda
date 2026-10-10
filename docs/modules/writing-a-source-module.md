@@ -179,6 +179,30 @@ This means `externalId` must be:
   this directly (see below), but the property has to hold for real, not just
   pass the fixture.
 
+### Reward ids are unique per account, epoch and type
+
+An account can receive several rewards in one epoch (a pool operator gets
+`member` and `leader`), so a reward's `externalId` must include everything
+that tells two apart: Cardano uses `reward:<stake>:<epoch>:<type>`. Only
+`member` keeps the older `reward:<stake>:<epoch>` so existing ledgers need no
+migration; changing an id that is already stored duplicates it. A
+`pool_deposit_refund` is the user's own deposit coming back, so it is a
+`transfer`, not a `reward`.
+
+### Several addresses: `readAddresses`
+
+A module that tracks addresses (Ethereum, Cardano) declares an `addressList`
+field and reads it with `readAddresses(config)` from
+`src/sources/addresses.ts`. It returns the trimmed, non-blank lines, and falls
+back to a legacy single `address` key so old configs keep working; the first
+save through the edit dialog migrates it (`migrateAddressConfig`). Do not read
+`config.address` directly.
+
+A listed address the provider answers 404 for (never seen on chain) is not a
+failure: return an empty page for it plus a note with
+`ADDRESS_NO_TRANSACTIONS_YET`, naming the address by its line in the list,
+never by its value (see the config rule below).
+
 ## Cursors: how they work, and what `null` means
 
 `fetchEvents(config, cursor)` takes a `Cursor` (`string | null`) and returns a
