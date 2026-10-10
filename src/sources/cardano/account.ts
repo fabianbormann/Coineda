@@ -1,5 +1,5 @@
 import type { Leg } from '@/ledger/types';
-import { fetchJson } from './http';
+import { fetchJson, mapConcurrent, UTXO_CONCURRENCY } from './http';
 import { ADDRESS_PAGE_SIZE, MAX_ADDRESS_PAGES } from './cursor';
 import { assetIdOf, type UtxoEntry } from './utxo';
 import type { DerivedEvent, FetchPage } from '@/sources/types';
@@ -240,13 +240,17 @@ export const fetchAccountPage = async ({
   const withdrawals = await fetchWithdrawalMap(root, headers, account, signal);
 
   const events: DerivedEvent[] = [];
-  for (const row of uniqueTransactions(rows, carriedTxHash)) {
-    const utxos = await fetchJson<TxUtxos>(
+  const unique = uniqueTransactions(rows, carriedTxHash);
+  const allUtxos = await mapConcurrent(unique, UTXO_CONCURRENCY, (row) =>
+    fetchJson<TxUtxos>(
       `${root}/txs/${row.tx_hash}/utxos`,
       'fetching transaction utxos',
       headers,
       signal,
-    );
+    ),
+  );
+  for (const [index, row] of unique.entries()) {
+    const utxos = allUtxos[index];
     const legs = [
       ...legsForAccount(utxos.inputs, 'out', addresses, account),
       ...legsForAccount(utxos.outputs, 'in', addresses, account),

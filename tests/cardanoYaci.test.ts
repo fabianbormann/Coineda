@@ -147,7 +147,11 @@ describe('cardano-yaci', () => {
     do {
       const page: Awaited<ReturnType<typeof cardanoYaci.fetchEvents>> =
         await cardanoYaci.fetchEvents(config, cursor);
-      rewards.push(...page.events.filter((e) => e.kind === 'reward'));
+      rewards.push(
+        ...page.events.filter(
+          (e) => e.kind === 'reward' || e.externalId.startsWith('reward:'),
+        ),
+      );
       cursor = page.cursor;
     } while (cursor !== null);
     expect(rewards.length).toBeGreaterThan(0);
@@ -179,7 +183,11 @@ describe('cardano-yaci', () => {
     do {
       const page: Awaited<ReturnType<typeof cardanoYaci.fetchEvents>> =
         await cardanoYaci.fetchEvents(config, cursor);
-      rewards.push(...page.events.filter((e) => e.kind === 'reward'));
+      rewards.push(
+        ...page.events.filter(
+          (e) => e.kind === 'reward' || e.externalId.startsWith('reward:'),
+        ),
+      );
       cursor = page.cursor;
     } while (cursor !== null);
     const kindByType = new Map(
@@ -191,6 +199,12 @@ describe('cardano-yaci', () => {
     expect(kindByType.get('member')).toBe('staking');
     expect(kindByType.get('leader')).toBe('leader');
     expect(kindByType.get('pool_deposit_refund')).toBe('absent');
+    // A returned deposit is a transfer in, not income.
+    expect(
+      rewards.find(
+        (e) => (e.raw as { type: string }).type === 'pool_deposit_refund',
+      )?.kind,
+    ).toBe('transfer');
   });
 
   it('declares every kind the shared translator can emit', () => {

@@ -255,3 +255,36 @@ export const fetchJson = async <T>(
   }
   return (await response.json()) as T;
 };
+
+/**
+ * `fn` over `items` with at most `limit` calls in flight, results in item
+ * order. Order is the point: callers emit events in page order, and a
+ * Promise.all over a shared pool would be just as fast but a completion-
+ * ordered push would make a replay differ from the first drain. The first
+ * rejection rejects the whole call; workers stop picking up new items.
+ */
+export const mapConcurrent = async <T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> => {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  let failed = false;
+  const worker = async (): Promise<void> => {
+    while (!failed && next < items.length) {
+      const index = next;
+      next += 1;
+      try {
+        results[index] = await fn(items[index], index);
+      } catch (error) {
+        failed = true;
+        throw error;
+      }
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, worker),
+  );
+  return results;
+};

@@ -335,3 +335,57 @@ describe('the account tier', () => {
     expect(events.map((event) => event.externalId)).toEqual(['tx9']);
   });
 });
+
+describe('utxo detail requests', () => {
+  const five = Array.from({ length: 5 }, (_, i) => ({
+    address: A1,
+    tx_hash: `c${i}`,
+    block_time: 1_667_587_468 + i,
+  }));
+
+  it('run at most three at a time and keep page order', async () => {
+    const table: Record<string, unknown> = routes({
+      [`${ROOT}/accounts/${STAKE}/transactions?page=1&count=20&order=asc`]:
+        five,
+      ...Object.fromEntries(
+        five.map((r) => [`${ROOT}/txs/${r.tx_hash}/utxos`, utxos(r.tx_hash)]),
+      ),
+    });
+    let inFlight = 0;
+    let peak = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const key = String(url);
+        if (key.includes('/utxos')) {
+          inFlight += 1;
+          peak = Math.max(peak, inFlight);
+          // Earlier items answer slowest, so completion order is the
+          // reverse of page order.
+          const n = Number(key.match(/\/c(\d)\//)?.[1] ?? 0);
+          await new Promise((resolve) => setTimeout(resolve, (5 - n) * 5));
+          inFlight -= 1;
+        }
+        return key in table
+          ? new Response(JSON.stringify(table[key]), { status: 200 })
+          : new Response('{}', { status: 404 });
+      }),
+    );
+    const { events } = await cardanoBlockfrost.fetchEvents(config, null);
+    expect(peak).toBe(3);
+    expect(
+      events
+        .filter((e) => !e.externalId.startsWith('reward:'))
+        .map((e) => e.externalId),
+    ).toEqual(['c0', 'c1', 'c2', 'c3', 'c4']);
+  });
+
+  it('still fail the sync on a 404', async () => {
+    const table = routes();
+    delete (table as Record<string, unknown>)[`${ROOT}/txs/tx2/utxos`];
+    stub(table);
+    await expect(cardanoBlockfrost.fetchEvents(config, null)).rejects.toThrow(
+      /fetching transaction utxos failed with status 404/,
+    );
+  });
+});

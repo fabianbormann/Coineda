@@ -6,7 +6,9 @@ import {
   drainPagedRoute,
   fetchJson,
   HostShapeError,
+  mapConcurrent,
   RouteStatusError,
+  UTXO_CONCURRENCY,
 } from './http';
 import { amountString, assetIdOf, type TxUtxos, type UtxoEntry } from './utxo';
 import { CARDANO_MESSAGES } from './messages';
@@ -54,7 +56,13 @@ type AddressTransaction = {
 };
 
 const rewardKindOfType = (type: string): RewardKind | undefined =>
-  type === 'member' ? 'staking' : type === 'leader' ? 'leader' : undefined;
+  type === 'member'
+    ? 'staking'
+    : type === 'leader'
+      ? 'leader'
+      : type === 'treasury' || type === 'reserves'
+        ? 'other'
+        : undefined;
 
 type EpochReward = {
   epoch: number;
@@ -200,11 +208,18 @@ export const fetchRewardEvents = async (
     const rewardKind = rewardKindOfType(reward.type);
     events.push({
       // Stable across replays, which is what the host's dedupe on
-      // (sourceId, externalId) depends on: one reward per account per epoch
-      // is a fact that never changes.
-      externalId: `reward:${stakeAddress}:${reward.epoch}`,
+      // (sourceId, externalId) depends on. An account can receive several
+      // rewards in one epoch (a pool operator gets `member` and `leader`),
+      // so the type is part of the identity - except for `member`, which
+      // keeps the original id so existing ledgers need no migration.
+      externalId:
+        reward.type === 'member'
+          ? `reward:${stakeAddress}:${reward.epoch}`
+          : `reward:${stakeAddress}:${reward.epoch}:${reward.type}`,
       timestamp: await endMsOf(reward.epoch),
-      kind: 'reward',
+      // A returned pool deposit is the user's own money coming back, not
+      // income: a transfer in.
+      kind: reward.type === 'pool_deposit_refund' ? 'transfer' : 'reward',
       origin: 'derived',
       note: `staking reward (${reward.type}), epoch ${reward.epoch}`,
       // The provider record verbatim, so member-versus-leader survives as
@@ -319,16 +334,19 @@ const fetchAddressPage = async (
   // revealed it. The utxos are fetched once, in pass one, and reused.
   const fetched: { tx: AddressTransaction; utxos: TxUtxos }[] = [];
   let account: string | null = null;
-  for (const tx of transactions) {
-    const utxos = await fetchJson<TxUtxos>(
+  const allUtxos = await mapConcurrent(transactions, UTXO_CONCURRENCY, (tx) =>
+    fetchJson<TxUtxos>(
       `${root}/txs/${tx.tx_hash}/utxos`,
       'fetching transaction utxos',
       headers,
       signal,
-    );
+    ),
+  );
+  transactions.forEach((tx, index) => {
+    const utxos = allUtxos[index];
     fetched.push({ tx, utxos });
     account = account ?? accountOf(utxos, address);
-  }
+  });
 
   // Only when an account was resolved: without one there is no pot to
   // withdraw from, and nothing to key the route on.

@@ -37,7 +37,11 @@ export {
   signalFor,
   HostShapeError,
   RouteStatusError,
+  mapConcurrent,
 } from '@/sources/http';
+
+/** Utxo detail requests in flight at once; see fetchAddressPage. */
+export const UTXO_CONCURRENCY = 3;
 export type { RouteOutcome } from '@/sources/http';
 
 export const assertHostOnly = (host: string, exampleHost: string): void =>

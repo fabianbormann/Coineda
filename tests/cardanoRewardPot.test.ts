@@ -588,3 +588,52 @@ describe('the account-level routes are paged', () => {
     );
   });
 });
+
+describe('every reward type keeps its own identity', () => {
+  const rewardsOf = async (rows: { epoch: number; type: string }[]) => {
+    stub(
+      routes({
+        [`${ROOT}/accounts/${STAKE}/rewards?${PAGED}`]: rows.map((row) => ({
+          ...row,
+          amount: '5',
+        })),
+        [`${ROOT}/accounts/${STAKE}/withdrawals?${PAGED}`]: [],
+        [`${ROOT}/epochs/450`]: { end_time: 1_690_000_000 },
+      }),
+    );
+    const events = await drainAll();
+    return events.filter((event) => event.externalId.startsWith('reward:'));
+  };
+
+  it('keeps member and leader of one epoch as two events', async () => {
+    const events = await rewardsOf([
+      { epoch: 450, type: 'member' },
+      { epoch: 450, type: 'leader' },
+    ]);
+    expect(events.map((e) => [e.externalId, e.kind, e.rewardKind])).toEqual([
+      [`reward:${STAKE}:450`, 'reward', 'staking'],
+      [`reward:${STAKE}:450:leader`, 'reward', 'leader'],
+    ]);
+  });
+
+  it('books a pool deposit refund as a transfer in, not income', async () => {
+    const [event] = await rewardsOf([
+      { epoch: 450, type: 'pool_deposit_refund' },
+    ]);
+    expect(event.externalId).toBe(`reward:${STAKE}:450:pool_deposit_refund`);
+    expect(event.kind).toBe('transfer');
+    expect(event.rewardKind).toBeUndefined();
+    expect(event.legs[0].direction).toBe('in');
+  });
+
+  it('classifies treasury and reserves as other rewards', async () => {
+    const events = await rewardsOf([
+      { epoch: 450, type: 'treasury' },
+      { epoch: 450, type: 'reserves' },
+    ]);
+    expect(events.map((e) => [e.externalId, e.kind, e.rewardKind])).toEqual([
+      [`reward:${STAKE}:450:treasury`, 'reward', 'other'],
+      [`reward:${STAKE}:450:reserves`, 'reward', 'other'],
+    ]);
+  });
+});
