@@ -21,7 +21,7 @@ describe('bitpanda error redaction', () => {
   });
 
   it('redacts a URL-encoded key with special characters', () => {
-    const key = 'a+b/c=';
+    const key = 'a+b/c=d+e/f=';
     const message = messageFor(`oops ?key=${encodeURIComponent(key)} end`, key);
     expect(message).toContain('[redacted]');
     expect(message).not.toContain('a%2Bb%2Fc%3D');
@@ -34,7 +34,16 @@ describe('bitpanda error redaction', () => {
     expect(message.toLowerCase()).not.toContain('abc123secret');
   });
 
-  it('leaves text alone for an empty secret', () => {
+  it('leaves text alone for an empty or too-short secret', () => {
     expect(redactSecret('hello', '')).toBe('hello');
+    expect(redactSecret('a banana', 'a')).toBe('a banana');
+    expect(redactSecret('key=abcdefg', 'abcdefg')).toBe('key=abcdefg');
+    expect(redactSecret('key=abcdefgh', 'abcdefgh')).toBe('key=[redacted]');
+  });
+
+  it('treats regex characters in the key literally', () => {
+    expect(redactSecret('k=ab.cd.ef.gh z=abXcdYefZgh', 'ab.cd.ef.gh')).toBe(
+      'k=[redacted] z=abXcdYefZgh',
+    );
   });
 });

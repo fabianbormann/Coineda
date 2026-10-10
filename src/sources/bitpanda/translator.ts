@@ -99,13 +99,17 @@ const request = async (
   return { status: response.status, body: await response.text() };
 };
 
+/** A key shorter than this cannot be a real Bitpanda key, and redacting it
+ *  would only mangle the message. */
+const MIN_REDACTED_KEY_LENGTH = 8;
+
 const escapeRegExp = (text: string): string =>
   text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** Replaces a secret (raw or URL-encoded, any case) with [redacted], so a
  *  response body echoed into an error can never carry the API key. */
 export const redactSecret = (text: string, secret: string): string => {
-  if (secret === '') return text;
+  if (secret.length < MIN_REDACTED_KEY_LENGTH) return text;
   const variants = [secret, encodeURIComponent(secret)]
     .filter((v, i, all) => v !== '' && all.indexOf(v) === i)
     .sort((a, b) => b.length - a.length);

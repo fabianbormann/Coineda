@@ -30,6 +30,17 @@ describe('ExternalLink', () => {
     expect(cue?.textContent?.trim()).toBe('(opens in a new tab)');
   });
 
+  it('forwards other anchor props', () => {
+    render(
+      <ExternalLink href="https://example.com" aria-label="Read the docs">
+        Docs
+      </ExternalLink>,
+    );
+    expect(screen.getByRole('link').getAttribute('aria-label')).toBe(
+      'Read the docs',
+    );
+  });
+
   it('is the only place in src that sets target="_blank"', () => {
     const offenders = walk(path.join(__dirname, '../src'))
       .filter((file) => file.endsWith('.tsx'))
