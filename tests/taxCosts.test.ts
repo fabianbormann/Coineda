@@ -97,6 +97,36 @@ describe('trade fees reach the gain', () => {
     expect(report.unresolved).toHaveLength(0);
   });
 
+  it('lists cost sources only on the line that carries the costs', async () => {
+    // A same-asset fee: the sale and the fee coins are two disposals of the
+    // same event and asset. Only the principal carries the fee as a cost,
+    // so the fee coins' own line must not borrow its sources.
+    await putEvents([
+      oldBuy,
+      event({
+        id: 'sell',
+        externalId: 'sell',
+        legs: [
+          leg({ assetId: ADA, amount: ada(100), direction: 'out' }),
+          leg({ assetId: EUR, amount: '100', direction: 'in' }),
+          leg({ assetId: ADA, amount: ada(1), direction: 'out', role: 'fee' }),
+        ],
+      }),
+    ]);
+
+    const report = await runGermany(2025);
+
+    expect(report.lines).toHaveLength(2);
+    for (const line of report.lines) {
+      if (line.costs === '0') {
+        expect(line.costSources).toBeUndefined();
+      } else {
+        expect(line.costSources).toBeDefined();
+      }
+    }
+    expect(report.lines.some((line) => line.costs === '0')).toBe(true);
+  });
+
   it('adds a fiat fee on a buy to the cost basis of the lot', async () => {
     await putEvents([
       event({

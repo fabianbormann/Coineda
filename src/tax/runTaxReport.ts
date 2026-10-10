@@ -15,7 +15,7 @@ import {
   residualTransferEvents,
 } from '@/ledger/transfers';
 import { costsOf, match } from './matching';
-import { compareAmounts } from '@/ledger/amount';
+import { isZeroAmount } from '@/ledger/amount';
 import {
   FEE_RESIDUAL_SUFFIX,
   PAID_RESIDUAL_SUFFIX,
@@ -79,10 +79,6 @@ export const HOST_REASON_KEYS = [
 ] as const;
 
 export { RESIDUAL_ORIGIN_KEY, PAID_ORIGIN_KEY };
-
-/** The note on an income row whose deducted costs would exceed its value. */
-export const INCOME_COSTS_EXCEED_NOTE =
-  'The fee exceeds the value of this reward. Only up to that value is deducted, so the income counts as 0.';
 
 /** A ledger event the module's `classify` produced nothing for. Recorded
  *  so a new `EventKind` the module has not been taught about cannot vanish
@@ -291,25 +287,12 @@ export const runTaxReport = async (
     taxEvents.push(...produced);
   }
 
-  const {
-    valued: priced,
-    unpriced,
-    contacted,
-  } = await resolveValues(taxEvents, options.baseCurrency, endpointSnapshot);
-  hostUnresolved.push(...unpriced);
-  // An income event carries costs only where its jurisdiction deducts them
-  // (Germany: a fee paid to receive a reward), and the deduction stops at
-  // the income's own value. Noted here, once values exist, so the report
-  // row and the register row both say why the income counts as 0. A
-  // module's own caveat on the event (a leader reward's) is kept: it is
-  // the classification question, and the row's figures show the excess.
-  const valued = priced.map((event) =>
-    event.kind === 'income' &&
-    event.note === undefined &&
-    compareAmounts(costsOf(event), event.value ?? '0') > 0
-      ? { ...event, note: INCOME_COSTS_EXCEED_NOTE }
-      : event,
+  const { valued, unpriced, contacted } = await resolveValues(
+    taxEvents,
+    options.baseCurrency,
+    endpointSnapshot,
   );
+  hostUnresolved.push(...unpriced);
 
   // Resolved once and reused, rather than read twice: the method the
   // matcher ran under and the method the document states must be the same
@@ -562,9 +545,13 @@ export const runTaxReport = async (
     const priceSource = priceSourceByDisposal.get(
       `${line.disposalEventId}|${line.assetId}`,
     );
-    const costSources =
-      costSourcesByDisposal.get(`${line.disposalEventId}|${line.assetId}`) ??
-      [];
+    // Only on a line that carries costs: a same-asset fee disposal shares
+    // its event and asset with the principal, which is the one carrying the
+    // fee, and must not borrow the principal's sources.
+    const costSources = isZeroAmount(disposal.costs)
+      ? []
+      : (costSourcesByDisposal.get(`${line.disposalEventId}|${line.assetId}`) ??
+        []);
     const reported: ReportedDisposal = {
       ...line,
       ...(priceSource === undefined ? {} : { priceSource }),

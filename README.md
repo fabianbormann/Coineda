@@ -71,6 +71,8 @@ when you are done except the tab.
 | Ledger Live       | Operation history CSV export             |
 | Other CSV         | Any CSV, through a column mapping        |
 
+The Ethereum and Cardano sources accept several addresses each.
+
 Modules ship in the bundle and arrive by reviewed pull request, never by download at runtime: a
 source module runs beside your exchange keys, and that is not a place for code nobody has read.
 
@@ -97,8 +99,9 @@ same second become one trade.
 Every report prints who contributed the rules, when they were last checked against the law, and the
 references used. Rules unchecked for more than a year are flagged as stale on the report itself.
 
-In Germany a fee paid to receive a reward is now deducted as Werbungskosten against that income, and the Ethereum and
-Cardano sources accept several addresses each.
+In Germany a fee paid to receive a reward is deducted as Werbungskosten, netted against the year's §22 Nr. 3
+income; in Austria the fee coins are disposed and nothing is deducted. Upgrading an existing install? See
+[docs/upgrade-notes.md](docs/upgrade-notes.md) for figures that move on the next sync or report.
 
 A German report ends with a filing aid for Anlage SO and Anlage KAP, in form order, with line numbers
 verified for 2025 and section names only for other years.

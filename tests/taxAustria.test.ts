@@ -321,16 +321,28 @@ describe('austrian assessment', () => {
 
   it('versions the figure-changing rules of 9 October as a minor release', () => {
     // Valuing sales at the fiat received, zero-cost forks and leaving
-    // rewards unclassified all change figures: a minor bump, not a patch,
-    // dated and checked on the day they were changed and reviewed.
+    // rewards unclassified all change figures: a minor bump, not a patch.
     const { manifest } = austrianTax;
-    expect(manifest.rulesVersion).toBe('1.1.0');
-    expect(manifest.rulesCheckedOn).toBe('2026-10-09');
-    expect(manifest.changelog[0]).toEqual({
+    expect(manifest.changelog[1]).toEqual({
       version: '1.1.0',
       date: '2026-10-09',
       summary:
         'Sales valued at the fiat actually received; hard forks acquired at zero; airdrop, other, mining, masternode and liquidity rewards left unclassified until rules exist.',
+    });
+  });
+
+  it('versions the disposal of reward fee coins as a minor release', () => {
+    // Disposing of the coins paid as a fee to receive a reward moves lines
+    // and gains, so two reports with different figures must not share a
+    // rules version.
+    const { manifest } = austrianTax;
+    expect(manifest.rulesVersion).toBe('1.2.0');
+    expect(manifest.rulesCheckedOn).toBe('2026-10-10');
+    expect(manifest.changelog[0]).toEqual({
+      version: '1.2.0',
+      date: '2026-10-10',
+      summary:
+        'Fee coins paid to receive a reward are disposed; no deduction under the flat tax.',
     });
   });
 });

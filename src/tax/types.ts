@@ -426,11 +426,18 @@ export type TaxAssessment = {
     /**
      * The costs deducted from the year's income, as a positive decimal
      * string: Germany deducts a fee paid to receive a reward as
-     * Werbungskosten against that reward's §22 Nr. 3 income, never more
-     * than the reward's own value. Absent when no income carried a cost -
-     * Austria never sets it, the flat tax allowing no deduction.
+     * Werbungskosten against the year's §22 Nr. 3 income. The full sum;
+     * the year's result is floored at 0 separately (see `incomeNote`).
+     * Absent when no income carried a cost - Austria never sets it, the
+     * flat tax allowing no deduction.
      */
     incomeCosts?: string;
+    /**
+     * Translation key noting the income total, when there is something to
+     * say about it: Germany's when the year's Werbungskosten exceed its
+     * receipts and the result is floored at 0.
+     */
+    incomeNote?: string;
     /**
      * The year's loss, as a POSITIVE number, or '0'.
      *

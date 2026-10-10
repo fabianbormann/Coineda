@@ -99,6 +99,10 @@ const OTHER_INCOME_THRESHOLD_LABEL =
   'Tax-free threshold for other income (§22 Nr. 3 EStG)';
 const OTHER_INCOME_SCOPE_NOTE =
   'This limit covers all of your income under §22 Nr. 3 EStG in the year, not only crypto rewards.';
+/** On the income total when the year's Werbungskosten exceed its §22 Nr. 3
+ *  receipts and the result is floored at 0. Exported for the locale gate. */
+export const INCOME_YEAR_FLOOR_NOTE =
+  'Werbungskosten exceed the income of the year; the excess is not deductible here.';
 
 /** §20 Abs. 9 EStG Sparer-Pauschbetrag: a Freibetrag, so only the excess is
  *  taxed. It is shared with all other capital income, which the scope note
@@ -301,18 +305,21 @@ const classifyReward = (event: LedgerEvent): TaxEvent[] => {
 };
 
 /**
- * One income event's figures: its value, the costs deducted from it, and
- * what is left. The deduction is capped at the value, so a fee larger than
- * the reward leaves the income at 0 rather than negative; the host notes
- * the excess on the row.
+ * The year's §22 Nr. 3 figures. All receipts and all Werbungskosten of the
+ * year net into one result (§22 Nr. 3 S. 1-2 EStG), so a fee larger than
+ * its own reward still reduces the year's other receipts. Only the year's
+ * result is floored at 0: a negative total is not offset against other
+ * income here, and `floored` says when that happened so the report can
+ * note it. `expenses` is the full sum of the costs.
  */
-const netIncome = (
-  event: TaxEvent,
-): { value: string; deducted: string; net: string } => {
-  const value = event.value ?? '0';
-  const costs = costsOf(event);
-  const deducted = compareAmounts(costs, value) > 0 ? value : costs;
-  return { value, deducted, net: subtractAmounts(value, deducted) };
+const yearIncome = (
+  events: TaxEvent[],
+): { sum: string; expenses: string; result: string; floored: boolean } => {
+  const sum = sumAmounts(events.map((event) => event.value ?? '0'));
+  const expenses = sumAmounts(events.map(costsOf));
+  const net = subtractAmounts(sum, expenses);
+  const floored = compareAmounts(net, '0') < 0;
+  return { sum, expenses, result: floored ? '0' : net, floored };
 };
 
 /**
@@ -610,10 +617,8 @@ const buildFiling = (
   if (input.income.length > 0) {
     // Gross receipts and the Werbungskosten separately, as the form asks;
     // the result is the same net sum the Freigrenze is tested on.
-    const figures = input.income.map(netIncome);
-    const sum = sumAmounts(figures.map((one) => one.value));
-    const expenses = sumAmounts(figures.map((one) => one.deducted));
-    const result = sumAmounts(figures.map((one) => one.net));
+    // L20 is max(0, L18 - L19): the floor is the year's, not a reward's.
+    const { sum, expenses, result } = yearIncome(input.income);
     const income = forms?.income;
     sections.push({
       title: FILING_TITLE_INCOME,
@@ -751,13 +756,16 @@ const assess = (input: AssessInput): TaxAssessment => {
 
   // §22 Nr. 3 EStG's own €256 Freigrenze, assessed independently of §23 -
   // a private-sale loss must never reduce it. Tested on the income net of
-  // its Werbungskosten (a fee paid to receive a reward), per event.
-  const incomeFigures = input.income.map(netIncome);
-  const incomeSum = sumAmounts(incomeFigures.map((one) => one.net));
+  // its Werbungskosten (a fee paid to receive a reward), netted over the
+  // whole year.
+  const {
+    result: incomeSum,
+    expenses: incomeCosts,
+    floored: incomeFloored,
+  } = yearIncome(input.income);
   const hasIncomeCosts = input.income.some(
     (event) => (event.costs ?? []).length > 0,
   );
-  const incomeCosts = sumAmounts(incomeFigures.map((one) => one.deducted));
   const incomeLimit = '256';
   const incomeExceeded = compareAmounts(incomeSum, incomeLimit) >= 0;
   const income = incomeExceeded ? incomeSum : '0';
@@ -875,6 +883,7 @@ const assess = (input: AssessInput): TaxAssessment => {
       exemptGain,
       income,
       ...(hasIncomeCosts ? { incomeCosts } : {}),
+      ...(incomeFloored ? { incomeNote: INCOME_YEAR_FLOOR_NOTE } : {}),
       loss,
       // The host (runTaxReport) recomputes `omitted` from what it could not
       // resolve; this module only knows the disposals it was handed.
@@ -913,7 +922,7 @@ const germanTax: TaxModule = {
         version: '1.6.0',
         date: '2026-10-10',
         summary:
-          'Fees paid to receive a reward are disposed and deducted as Werbungskosten.',
+          "Fees paid to receive a reward are disposed and deducted as Werbungskosten, netted against the year's §22 Nr. 3 income; only a negative year is floored at 0.",
       },
       {
         version: '1.5.0',

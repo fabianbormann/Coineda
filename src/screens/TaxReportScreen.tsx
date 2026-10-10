@@ -1645,6 +1645,14 @@ export const TaxReportScreen = () => {
                         value={Number(assessment.totals.income)}
                         currency={baseCurrency}
                       />
+                      {/* The jurisdiction's note on the total - Germany's
+                          when the year's Werbungskosten exceed its income
+                          and the result is floored at 0. */}
+                      {assessment.totals.incomeNote && (
+                        <span className="ml-2 text-sm text-muted-foreground">
+                          {t(assessment.totals.incomeNote)}
+                        </span>
+                      )}
                     </p>
                     {assessment.estimatedLiability !== undefined && (
                       <p>

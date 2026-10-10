@@ -326,9 +326,15 @@ const austrianTax: TaxModule = {
     jurisdiction: 'Austria',
     contributor: 'Fabian Bormann',
     // The day the rules below were changed and reviewed.
-    rulesCheckedOn: '2026-10-09',
-    rulesVersion: '1.1.0',
+    rulesCheckedOn: '2026-10-10',
+    rulesVersion: '1.2.0',
     changelog: [
+      {
+        version: '1.2.0',
+        date: '2026-10-10',
+        summary:
+          'Fee coins paid to receive a reward are disposed; no deduction under the flat tax.',
+      },
       {
         version: '1.1.0',
         date: '2026-10-09',

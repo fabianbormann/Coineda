@@ -4,10 +4,10 @@ import path from 'node:path';
 import { taxRegistry } from '@/tax/registry';
 import {
   HOST_REASON_KEYS,
-  INCOME_COSTS_EXCEED_NOTE,
   PAID_ORIGIN_KEY,
   RESIDUAL_ORIGIN_KEY,
 } from '@/tax/runTaxReport';
+import { INCOME_YEAR_FLOOR_NOTE } from '@/tax/jurisdictions/de';
 import { REWARD_KIND_LABELS } from '@/tax/rewardKinds';
 import { DERIVATIVE_KIND_LABELS } from '@/tax/derivativeKinds';
 import { PRICE_REASON_KEYS } from '@/tax/resolveValues';
@@ -599,7 +599,7 @@ describe('host reason keys', () => {
     ...HOST_REASON_KEYS,
     RESIDUAL_ORIGIN_KEY,
     PAID_ORIGIN_KEY,
-    INCOME_COSTS_EXCEED_NOTE,
+    INCOME_YEAR_FLOOR_NOTE,
     ...PRICE_REASON_KEYS,
     ...Object.values(REWARD_KIND_LABELS),
     ...Object.values(DERIVATIVE_KIND_LABELS),

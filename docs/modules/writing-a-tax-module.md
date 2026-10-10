@@ -130,10 +130,11 @@ price. The register exports it as `costsPriceSource`, and the report JSON
 
 A fee paid to receive a reward is a cost of the income, not of a sale. Put it
 on the `income` event's `costs`. Germany disposes of the fee asset at market
-and deducts the valued fee as Werbungskosten against that §22 Nr. 3 income,
-floored so the net never goes below 0; the sum shows as
-`ReportedIncome.costs` and `totals.incomeCosts`, and the filing aid's
-Leistungen expenses line carries it. Austria only disposes of the fee asset
+and deducts the valued fee as Werbungskosten against the year's §22 Nr. 3
+income: all receipts and costs of the year net into one result, and only that
+result is floored at 0 (noted through `totals.incomeNote`). The costs show as
+`ReportedIncome.costs` and, in full, `totals.incomeCosts`, and the filing
+aid's Leistungen expenses line carries them. Austria only disposes of the fee asset
 and sets neither field, the flat tax allowing no deduction. If your law
 deducts, say so in `totals.incomeCosts`; if it does not, leave it absent.
 

@@ -1027,7 +1027,7 @@ describe('german reward kinds', () => {
       ]);
     });
 
-    it('nets the costs per event, floored at zero, before the Freigrenze', () => {
+    it('nets the costs against the whole year before the Freigrenze', () => {
       const income = (id: string, value: string, costs?: string): TaxEvent => ({
         sourceEventId: id,
         kind: 'income',
@@ -1049,26 +1049,27 @@ describe('german reward kinds', () => {
         matched: [],
         income: [
           income('a', '300', '10'),
-          // Costs above the value deduct only the value.
+          // Costs above this reward's value still reduce the year.
           income('b', '5', '8'),
           income('c', '20'),
         ],
         capital: [],
       });
-      expect(result.totals.incomeCosts).toBe('15');
-      expect(result.totals.income).toBe('310');
+      expect(result.totals.incomeCosts).toBe('18');
+      expect(result.totals.income).toBe('307');
+      expect(result.totals.incomeNote).toBeUndefined();
       const threshold = result.thresholds.find((one) =>
         one.label.includes('§22'),
       );
-      expect(threshold).toMatchObject({ actual: '310', exceeded: true });
+      expect(threshold).toMatchObject({ actual: '307', exceeded: true });
       const entries = result.filing?.sections.find(
         (section) => section.title === 'Other income (§22 Nr. 3 EStG)',
       )?.entries;
       const amount = (label: string) =>
         entries?.find((entry) => entry.label === label)?.amount;
       expect(amount('Sum of the receipts')).toBe('325');
-      expect(amount('Expenses related to the receipts')).toBe('15');
-      expect(amount('Result of the other income')).toBe('310');
+      expect(amount('Expenses related to the receipts')).toBe('18');
+      expect(amount('Result of the other income')).toBe('307');
     });
 
     it('leaves the totals without incomeCosts when no income has a cost', () => {

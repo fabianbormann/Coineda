@@ -41,7 +41,6 @@ const iso = (timestamp: number): string => new Date(timestamp).toISOString();
 /** A plain comparison: the same ledger must order the same everywhere. */
 const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
-/** The sum of the costs the host managed to value; absent when none were. */
 /** The distinct sources that priced an event's costs, first-seen order. */
 export const costSourcesOf = (event: TaxEvent): string[] => [
   ...new Set(
@@ -53,6 +52,7 @@ export const costSourcesOf = (event: TaxEvent): string[] => [
   ),
 ];
 
+/** The sum of the costs the host managed to value; absent when none were. */
 const costsOf = (event: TaxEvent): string | undefined => {
   const valued = (event.costs ?? []).filter((cost) => cost.value !== undefined);
   if (valued.length === 0) {

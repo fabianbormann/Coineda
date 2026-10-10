@@ -300,30 +300,77 @@ describe('a fee paid to receive a reward', () => {
     );
   });
 
-  it('floors the income at zero and notes the excess when the fee is larger', async () => {
+  const YEAR_FLOOR_NOTE =
+    'Werbungskosten exceed the income of the year; the excess is not deductible here.';
+
+  it('floors the year at zero and notes the excess on the total when the fee is larger', async () => {
+    // One reward worth 10 with a 15 fee: 25 ADA in, 37.5 ADA fee.
     await putEvents([
-      buyAda,
-      feeReward(
-        leg({ assetId: ADA, amount: '100000', direction: 'in' }),
-        adaFee,
-      ),
+      {
+        ...buyAda,
+        legs: [buyAda.legs[0], { ...buyAda.legs[1], amount: ada(100) }],
+      },
+      feeReward(leg({ assetId: ADA, amount: ada(25), direction: 'in' }), {
+        ...adaFee,
+        amount: '37500000',
+      }),
     ]);
 
     const report = await runGermany();
 
     expect(report.income).toHaveLength(1);
-    expect(report.income[0]).toMatchObject({ value: '0.04', costs: '0.08' });
-    expect(report.income[0].note).toMatch(/exceeds/);
-    expect(report.register.find((row) => row.kind === 'income')?.note).toMatch(
-      /exceeds/,
-    );
-    // Only what the income can absorb is deducted.
-    expect(report.totals.incomeCosts).toBe('0.04');
+    expect(report.income[0]).toMatchObject({ value: '10', costs: '15' });
+    // No per-reward note: the floor is the year's, and so is its note.
+    expect(report.income[0].note).toBeUndefined();
+    expect(
+      report.register.find((row) => row.kind === 'income')?.note,
+    ).toBeUndefined();
+    expect(report.totals.incomeNote).toBe(YEAR_FLOOR_NOTE);
+    expect(report.totals.incomeCosts).toBe('15');
+    expect(report.totals.income).toBe('0');
     expect(incomeThreshold(report)).toMatchObject({ actual: '0' });
-    expect(incomeEntry(report, 'Expenses related to the receipts')).toBe(
-      '0.04',
-    );
+    expect(incomeEntry(report, 'Sum of the receipts')).toBe('10');
+    expect(incomeEntry(report, 'Expenses related to the receipts')).toBe('15');
     expect(incomeEntry(report, 'Result of the other income')).toBe('0');
+  });
+
+  it('nets the Werbungskosten against the whole year, not per reward', async () => {
+    // Two rewards worth 10 each; the first paid a 15 fee, the second none.
+    // Per reward the first would floor at 0 and the year show 10; netted
+    // per year it is 20 - 15 = 5.
+    await putEvents([
+      {
+        ...buyAda,
+        legs: [buyAda.legs[0], { ...buyAda.legs[1], amount: ada(100) }],
+      },
+      feeReward(leg({ assetId: ADA, amount: ada(25), direction: 'in' }), {
+        ...adaFee,
+        amount: '37500000',
+      }),
+      {
+        ...feeReward(
+          leg({ assetId: ADA, amount: ada(25), direction: 'in' }),
+          adaFee,
+        ),
+        id: 'stake-2',
+        externalId: 'stake-2',
+        timestamp: Date.UTC(2025, 4, 1),
+        legs: [leg({ assetId: ADA, amount: ada(25), direction: 'in' })],
+      },
+    ]);
+
+    const report = await runGermany();
+
+    expect(report.income).toHaveLength(2);
+    expect(report.totals.incomeCosts).toBe('15');
+    expect(report.totals.incomeNote).toBeUndefined();
+    expect(incomeThreshold(report)).toMatchObject({
+      actual: '5',
+      exceeded: false,
+    });
+    expect(incomeEntry(report, 'Sum of the receipts')).toBe('20');
+    expect(incomeEntry(report, 'Expenses related to the receipts')).toBe('15');
+    expect(incomeEntry(report, 'Result of the other income')).toBe('5');
   });
 
   it('disposes of the fee asset and values the cost in it when the reward is another asset', async () => {
