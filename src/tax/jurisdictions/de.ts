@@ -595,18 +595,25 @@ const buildFiling = (
     });
   }
 
-  if (capital !== undefined) {
+  // Line 19 is a balance, line 22 the losses contained in it. A year whose
+  // only capital events are not deducted (rollover fees) has nothing to type.
+  if (
+    capital !== undefined &&
+    !(isZeroAmount(capital.gains) && isZeroAmount(capital.losses))
+  ) {
     sections.push({
       title: FILING_TITLE_KAP,
       form: 'Anlage KAP',
       entries: [
         {
-          label: 'Gains from derivatives',
-          amount: capital.gains,
-          ...ref('Anlage KAP', forms?.kap.gains),
+          label:
+            'Foreign capital income without withholding (net of the losses below)',
+          amount: capital.net,
+          ...ref('Anlage KAP', forms?.kap.net),
+          note: 'Other foreign capital income you have is added on this line as well.',
         },
         {
-          label: 'Losses from derivatives',
+          label: 'Losses contained in the line above',
           amount: capital.losses,
           ...ref('Anlage KAP', forms?.kap.losses),
         },
@@ -617,7 +624,12 @@ const buildFiling = (
   if (sections.length === 0) {
     return undefined;
   }
-  return { year: input.year, linesVerified: forms !== undefined, sections };
+  return {
+    year: input.year,
+    linesVerified: forms !== undefined,
+    ...(forms === undefined ? {} : { verifiedBy: forms.verified }),
+    sections,
+  };
 };
 
 /**
@@ -835,8 +847,14 @@ const germanTax: TaxModule = {
     jurisdiction: 'Germany',
     contributor: 'Fabian Bormann',
     rulesCheckedOn: '2026-10-10',
-    rulesVersion: '1.4.0',
+    rulesVersion: '1.5.0',
     changelog: [
+      {
+        version: '1.5.0',
+        date: '2026-10-10',
+        summary:
+          'The report builds the Anlage SO and Anlage KAP filing figures in form order (2025 lines verified); Anlage KAP line 19 is the net balance.',
+      },
       {
         version: '1.4.0',
         date: '2026-10-10',

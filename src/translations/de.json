@@ -574,11 +574,15 @@
     "Sum of the receipts": "Summe der Einnahmen",
     "Expenses related to the receipts": "Werbungskosten zu den Einnahmen",
     "Result of the other income": "Ergebnis der sonstigen Leistungen",
-    "Gains from derivatives": "Gewinne aus Termingeschäften",
-    "Losses from derivatives": "Verluste aus Termingeschäften",
+    "Foreign capital income without withholding (net of the losses below)": "Ausländische Kapitalerträge ohne Steuerabzug (saldiert mit den Verlusten unten)",
+    "Losses contained in the line above": "In der Zeile oben enthaltene Verluste",
     "Filing aid — Anlage SO and Anlage KAP {{year}}": "Ausfüllhilfe — Anlage SO und Anlage KAP {{year}}",
     "Line {{line}}": "Zeile {{line}}",
     "The line numbers of the {{year}} form are not verified; use the section names.": "Die Zeilennummern des Formulars {{year}} sind nicht geprüft; nutze die Abschnittsnamen.",
-    "The Finanzamt applies the Freigrenzen, the saver's allowance and any loss carry-forward itself; they are not typed in.": "Freigrenzen, Sparer-Pauschbetrag und Verlustvortrag wendet das Finanzamt selbst an; sie werden nicht eingetragen."
+    "The Finanzamt applies the Freigrenzen, the saver's allowance and any loss carry-forward itself; they are not typed in.": "Freigrenzen, Sparer-Pauschbetrag und Verlustvortrag wendet das Finanzamt selbst an; sie werden nicht eingetragen.",
+    "Other foreign capital income you have is added on this line as well.": "Andere ausländische Kapitalerträge, die du hast, kommen ebenfalls in diese Zeile.",
+    "These figures are incomplete: {{count}} items were omitted or left unresolved (see the Result card). Resolve them before you type anything in.": "Diese Zahlen sind unvollständig: {{count}} Posten wurden ausgelassen oder blieben ungeklärt (siehe Ergebnis-Karte). Kläre sie, bevor du etwas einträgst.",
+    "The German forms take euros; this report is in {{currency}}, so no filing figures are shown.": "Die deutschen Formulare nehmen Euro; dieser Bericht ist in {{currency}}, deshalb werden keine Formularzahlen gezeigt.",
+    "Line numbers verified against {{source}} on {{date}}.": "Zeilennummern geprüft gegen {{source}} am {{date}}."
   }
 }

@@ -27,8 +27,13 @@ export type FormLinesDe = {
     expenses: number;
     result: number;
   };
-  /** Anlage KAP, derivatives without domestic withholding. */
-  kap: { gains: number; losses: number };
+  /**
+   * Anlage KAP, derivatives without domestic withholding. `net` is a
+   * BALANCE line (gains minus deductible losses, signed: a loss year types
+   * a negative figure), and `losses` lists the losses CONTAINED in that
+   * balance for the loss-offset rules - it is not a second deduction.
+   */
+  kap: { net: number; losses: number };
 };
 
 export const FORM_LINES_DE: Record<number, FormLinesDe> = {
@@ -46,7 +51,7 @@ export const FORM_LINES_DE: Record<number, FormLinesDe> = {
       carryOver: 58,
     },
     income: { indicator: 14, type: 15, sum: 18, expenses: 19, result: 20 },
-    kap: { gains: 19, losses: 22 },
+    kap: { net: 19, losses: 22 },
   },
 };
 

@@ -574,11 +574,15 @@
     "Sum of the receipts": "Sum of the receipts",
     "Expenses related to the receipts": "Expenses related to the receipts",
     "Result of the other income": "Result of the other income",
-    "Gains from derivatives": "Gains from derivatives",
-    "Losses from derivatives": "Losses from derivatives",
+    "Foreign capital income without withholding (net of the losses below)": "Foreign capital income without withholding (net of the losses below)",
+    "Losses contained in the line above": "Losses contained in the line above",
     "Filing aid — Anlage SO and Anlage KAP {{year}}": "Filing aid — Anlage SO and Anlage KAP {{year}}",
     "Line {{line}}": "Line {{line}}",
     "The line numbers of the {{year}} form are not verified; use the section names.": "The line numbers of the {{year}} form are not verified; use the section names.",
-    "The Finanzamt applies the Freigrenzen, the saver's allowance and any loss carry-forward itself; they are not typed in.": "The Finanzamt applies the Freigrenzen, the saver's allowance and any loss carry-forward itself; they are not typed in."
+    "The Finanzamt applies the Freigrenzen, the saver's allowance and any loss carry-forward itself; they are not typed in.": "The Finanzamt applies the Freigrenzen, the saver's allowance and any loss carry-forward itself; they are not typed in.",
+    "Other foreign capital income you have is added on this line as well.": "Other foreign capital income you have is added on this line as well.",
+    "These figures are incomplete: {{count}} items were omitted or left unresolved (see the Result card). Resolve them before you type anything in.": "These figures are incomplete: {{count}} items were omitted or left unresolved (see the Result card). Resolve them before you type anything in.",
+    "The German forms take euros; this report is in {{currency}}, so no filing figures are shown.": "The German forms take euros; this report is in {{currency}}, so no filing figures are shown.",
+    "Line numbers verified against {{source}} on {{date}}.": "Line numbers verified against {{source}} on {{date}}."
   }
 }

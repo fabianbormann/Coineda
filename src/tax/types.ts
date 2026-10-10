@@ -389,6 +389,8 @@ export type FilingFigures = {
   year: number;
   /** False: the page says the line numbers were not verified. */
   linesVerified: boolean;
+  /** Where the line numbers were checked; present only when verified. */
+  verifiedBy?: { source: string; checkedOn: string };
   sections: FilingSection[];
 };
 

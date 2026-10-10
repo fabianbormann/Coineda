@@ -19,7 +19,7 @@ describe('buildDisclaimer', () => {
       Date.UTC(2026, 9, 1),
     );
     expect(disclaimer.rulesVersion).toBe(germanTax.manifest.rulesVersion);
-    expect(disclaimer.rulesVersion).toBe('1.4.0');
+    expect(disclaimer.rulesVersion).toBe('1.5.0');
   });
 
   it('computes how stale the rules are rather than warning statically', () => {

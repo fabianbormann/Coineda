@@ -1417,10 +1417,49 @@ describe('german filing figures', () => {
     expect(entry(report, 1, 19)?.amount).toBe('0');
     expect(entry(report, 1, 20)?.amount).toBe('300');
 
-    // Gross deductible losses only; the not-deducted loss never appears.
-    expect(entry(report, 2, 19)?.amount).toBe('500');
+    // Line 19 is the NET balance (500 - 205); line 22 lists the deductible
+    // losses contained in it. The not-deducted loss never appears.
+    expect(entry(report, 2, 19)?.amount).toBe('295');
     expect(entry(report, 2, 22)?.amount).toBe('205');
     expect(entry(report, 2, 19)?.reference?.form).toBe('Anlage KAP');
+    expect(entry(report, 2, 19)?.label).toBe(
+      'Foreign capital income without withholding (net of the losses below)',
+    );
+    expect(entry(report, 2, 19)?.note).toBe(
+      'Other foreign capital income you have is added on this line as well.',
+    );
+    expect(entry(report, 2, 22)?.label).toBe(
+      'Losses contained in the line above',
+    );
+    expect(report.filing?.verifiedBy).toEqual({
+      source: 'Blockpit ELSTER guide',
+      checkedOn: '2026-10-10',
+    });
+  });
+
+  it('keeps the sign of a net capital loss on line 19', () => {
+    const report = germanTax.assess({
+      year: 2025,
+      matched: [],
+      income: [],
+      capital: [
+        capitalEvent('capital-gain', '40'),
+        capitalEvent('capital-loss', '100'),
+      ],
+    });
+    expect(report.filing?.sections).toHaveLength(1);
+    expect(entry(report, 0, 19)?.amount).toBe('-60');
+    expect(entry(report, 0, 22)?.amount).toBe('100');
+  });
+
+  it('omits the derivatives section when gains and losses are both zero', () => {
+    const report = germanTax.assess({
+      year: 2025,
+      matched: [],
+      income: [incomeEvent('300')],
+      capital: [capitalEvent('capital-loss', '9', false)],
+    });
+    expect(report.filing?.sections.map((s) => s.form)).toEqual(['Anlage SO']);
   });
 
   it('prints a fully taxable disposal with its full costs', () => {
@@ -1449,6 +1488,7 @@ describe('german filing figures', () => {
       capital: [capitalEvent('capital-gain', '5')],
     });
     expect(report.filing?.linesVerified).toBe(false);
+    expect(report.filing?.verifiedBy).toBeUndefined();
     const entries = report.filing?.sections.flatMap((s) => s.entries) ?? [];
     expect(entries.length).toBeGreaterThan(0);
     expect(entries.every((e) => e.reference === undefined)).toBe(true);
