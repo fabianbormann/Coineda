@@ -9,9 +9,9 @@ import { fetchEvents, probe } from './translator';
  * the only thing this module asks for besides where to ask.
  *
  * The translation itself lives in src/sources/bitcoin-esplora/translator.ts,
- * including the default base URL (`baseUrlOf`'s `DEFAULT_BASE_URL`) - kept
- * there rather than duplicated here, since that is the one place it is
- * actually used.
+ * including the fallback for an empty base URL (`baseUrlOf`, which reads
+ * `resolveEndpoints().bitcoinEsplora` from src/config/endpoints.ts - the one
+ * place every outbound host is defined).
  */
 export const bitcoinEsplora: SourceModule = {
   manifest: {

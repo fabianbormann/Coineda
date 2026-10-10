@@ -1,4 +1,5 @@
 import Big from 'big.js';
+import { defaultEndpoints, type Endpoints } from '@/config/endpoints';
 import { COINGECKO_IDS } from './coingecko';
 
 /**
@@ -27,7 +28,6 @@ import { COINGECKO_IDS } from './coingecko';
  * What it does NOT do is quote anything but USD, which is why src/prices/ecb.ts
  * exists beside it.
  */
-const BATCH_URL = 'https://coins.llama.fi/batchHistorical';
 
 const TIMEOUT_MS = 20_000;
 
@@ -87,6 +87,7 @@ export const pairKey = (assetId: string, date: string): string =>
 export const fetchUsdHistory = async (
   wanted: Map<string, string[]>,
   signal?: AbortSignal,
+  endpoints: Endpoints = defaultEndpoints(),
 ): Promise<Map<string, string>> => {
   const prices = new Map<string, string>();
 
@@ -116,7 +117,7 @@ export const fetchUsdHistory = async (
     return prices;
   }
 
-  const url = `${BATCH_URL}?coins=${encodeURIComponent(JSON.stringify(coins))}`;
+  const url = `${endpoints.priceHistory}/batchHistorical?coins=${encodeURIComponent(JSON.stringify(coins))}`;
   const response = await fetch(url, {
     headers: { Accept: 'application/json' },
     signal: signal ?? AbortSignal.timeout(TIMEOUT_MS),

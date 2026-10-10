@@ -1,4 +1,5 @@
 import Big from 'big.js';
+import { defaultEndpoints, type Endpoints } from '@/config/endpoints';
 
 /**
  * Euro-area reference rates, for turning DefiLlama's USD quotes into the
@@ -16,8 +17,6 @@ import Big from 'big.js';
  * office requires a specific source is a question for the person filing -
  * Coineda gives no advice - but an auditable default is the better one.
  */
-const ROOT = 'https://api.frankfurter.dev/v1';
-
 const TIMEOUT_MS = 15_000;
 
 const DAY_MS = 86_400_000;
@@ -65,6 +64,7 @@ export const fetchRates = async (
   from: string,
   to: string,
   signal?: AbortSignal,
+  endpoints: Endpoints = defaultEndpoints(),
 ): Promise<Map<string, string>> => {
   const rates = new Map<string, string>();
   const days = [...new Set(isoDates)].sort();
@@ -89,7 +89,7 @@ export const fetchRates = async (
   const end = days[days.length - 1];
 
   const response = await fetch(
-    `${ROOT}/${start}..${end}?base=${encodeURIComponent(base)}&symbols=${encodeURIComponent(symbol)}`,
+    `${endpoints.fx}/${start}..${end}?base=${encodeURIComponent(base)}&symbols=${encodeURIComponent(symbol)}`,
     {
       headers: { Accept: 'application/json' },
       signal: signal ?? AbortSignal.timeout(TIMEOUT_MS),
@@ -131,5 +131,6 @@ export const fetchUsdRates = (
   isoDates: string[],
   currency: string,
   signal?: AbortSignal,
+  endpoints: Endpoints = defaultEndpoints(),
 ): Promise<Map<string, string>> =>
-  fetchRates(isoDates, 'usd', currency, signal);
+  fetchRates(isoDates, 'usd', currency, signal, endpoints);

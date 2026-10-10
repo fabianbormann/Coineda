@@ -1,3 +1,4 @@
+import { resolveEndpoints } from '@/config/endpoints';
 import Big from 'big.js';
 import type { DerivedEvent, FetchPage, ProbeResult } from '@/sources/types';
 import type { Leg } from '@/ledger/types';
@@ -34,7 +35,6 @@ import { configuredAddress, normaliseAddress } from './address';
  *   `status: "error"`, `value: "100000000000000"` and a real fee: the ether
  *   did NOT move, the gas did. Booking that value would invent a holding.
  */
-const DEFAULT_BASE_URL = 'https://eth.blockscout.com';
 
 export const ETHEREUM_MESSAGES = {
   missingAddress:
@@ -50,10 +50,9 @@ export const baseUrlOf = (config: Record<string, string>): string => {
   // Trailing slashes are stripped so the paths below can own the leading
   // one, rather than producing `//api/v2/...` for anyone who pasted a URL
   // the way a browser shows it.
-  return (configured === '' ? DEFAULT_BASE_URL : configured).replace(
-    /\/+$/,
-    '',
-  );
+  return (
+    configured === '' ? resolveEndpoints().ethereumBlockscout : configured
+  ).replace(/\/+$/, '');
 };
 
 type Fetched = { status: number; body: string };

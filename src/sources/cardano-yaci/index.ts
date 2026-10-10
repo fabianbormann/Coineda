@@ -1,3 +1,4 @@
+import { defaultEndpoints, resolveEndpoints } from '@/config/endpoints';
 import type { SourceModule } from '@/sources/types';
 import {
   fetchCardanoEvents,
@@ -16,7 +17,6 @@ import {
  * with cardano-blockfrost: Yaci Store mirrors Blockfrost's API, so the two
  * modules differ only in host, API path and authentication.
  */
-const DEFAULT_BASE_URL = 'https://yaci-store.mainnet.colo2.cf-systems.org';
 
 /**
  * Needs no credential of any kind: no API key, no project id, no header. A
@@ -30,10 +30,10 @@ const provider: CardanoProvider = {
   // Handles all three states an optional field can be stored in - empty
   // string, whitespace, or absent from config entirely. See the `optional`
   // doc comment on ManifestField.
-  host: (config) => config.baseUrl?.trim() || DEFAULT_BASE_URL,
+  host: (config) => config.baseUrl?.trim() || resolveEndpoints().cardanoYaci,
   apiPath: '/api/v1',
   headers: () => ({}),
-  exampleHost: DEFAULT_BASE_URL,
+  exampleHost: defaultEndpoints().cardanoYaci,
   probeMessage: () => 'Could not reach the Yaci Store instance.',
 };
 

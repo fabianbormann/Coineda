@@ -1,3 +1,4 @@
+import { resolveEndpoints } from '@/config/endpoints';
 import type { Leg } from '@/ledger/types';
 import type { DerivedEvent, FetchPage, ProbeResult } from '@/sources/types';
 import { fetchJson, probeRoute } from '@/sources/http';
@@ -56,8 +57,6 @@ import { GAP_LIMIT, buildWallet, type Wallet } from './wallet';
 const amountString = (value: number | string, what: string): string =>
   genericAmountString(value, what, 'bitcoin');
 
-const DEFAULT_BASE_URL = 'https://blockstream.info/api';
-
 /** Esplora's own page size for `/address/{addr}/txs` and
  *  `/address/{addr}/txs/chain/{last_seen_txid}` - both return at most this
  *  many, newest first. A page shorter than this is the last page for that
@@ -86,7 +85,10 @@ export const BITCOIN_ESPLORA_MESSAGES = {
  *  separate host/API-path split to validate, so there is no `apiRoot`/
  *  `HostShapeError` use here. */
 export const baseUrlOf = (config: Record<string, string>): string =>
-  (config.baseUrl?.trim() || DEFAULT_BASE_URL).replace(/\/+$/, '');
+  (config.baseUrl?.trim() || resolveEndpoints().bitcoinEsplora).replace(
+    /\/+$/,
+    '',
+  );
 
 export const configuredAddresses = (config: Record<string, string>): string[] =>
   parseAddressList(config.address);

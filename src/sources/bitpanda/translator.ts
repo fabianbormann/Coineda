@@ -1,3 +1,4 @@
+import { resolveEndpoints } from '@/config/endpoints';
 import Big from 'big.js';
 import type { DerivedEvent, FetchPage, ProbeResult } from '@/sources/types';
 import type { Leg } from '@/ledger/types';
@@ -53,7 +54,6 @@ import { assetIdForSymbol, baseUnits } from './assets';
  * round-half-up per row rather than truncation, which would bias the other
  * way and never over-report.
  */
-const API_ROOT = 'https://api.bitpanda.com/v1';
 
 /** Bitpanda's own page size cap; the drain asks for the largest page it
  *  allows, because an exchange history is long and each page is a request. */
@@ -92,7 +92,7 @@ const request = async (
   apiKey: string,
   signal?: AbortSignal,
 ): Promise<Fetched> => {
-  const response = await fetch(`${API_ROOT}${path}`, {
+  const response = await fetch(`${resolveEndpoints().bitpanda}${path}`, {
     headers: headersFor(apiKey),
     signal: signalFor(signal),
   });

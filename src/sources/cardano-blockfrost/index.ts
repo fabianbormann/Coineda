@@ -1,3 +1,4 @@
+import { defaultEndpoints, resolveEndpoints } from '@/config/endpoints';
 import type { SourceModule } from '@/sources/types';
 import {
   fetchCardanoEvents,
@@ -71,12 +72,12 @@ import {
  *   it is reachable on a self-hosted Yaci with that profile on, which is
  *   why the tier is chosen by probing behaviour rather than by provider.
  */
-const DEFAULT_BASE_URL = 'https://cardano-mainnet.blockfrost.io';
 
 const provider: CardanoProvider = {
-  host: (config) => config.baseUrl?.trim() || DEFAULT_BASE_URL,
+  host: (config) =>
+    config.baseUrl?.trim() || resolveEndpoints().cardanoBlockfrost,
   apiPath: '/api/v0',
-  exampleHost: DEFAULT_BASE_URL,
+  exampleHost: defaultEndpoints().cardanoBlockfrost,
   // The credential goes in a header, never the URL: a project id in a query
   // string lands in the provider's own request logs and in any proxy
   // between here and them.

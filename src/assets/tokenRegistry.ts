@@ -1,4 +1,5 @@
 import { subjectOf } from './cardanoAsset';
+import { defaultEndpoints, type Endpoints } from '@/config/endpoints';
 
 /**
  * The Cardano Token Metadata Registry (CIP-26), at tokens.cardano.org.
@@ -26,7 +27,6 @@ import { subjectOf } from './cardanoAsset';
  *   from "not asked about" unless the caller records it, which is why
  *   resolveTokenMeta caches misses as well as hits.
  */
-const REGISTRY_ROOT = 'https://tokens.cardano.org/metadata';
 
 /** The registry answers a bulk query happily, but a request is still a
  *  request: a wallet with hundreds of native tokens is chunked rather than
@@ -129,6 +129,7 @@ const chunk = <T>(items: T[], size: number): T[][] => {
 export const fetchTokenMeta = async (
   subjects: string[],
   signal?: AbortSignal,
+  endpoints: Endpoints = defaultEndpoints(),
 ): Promise<Map<string, TokenMeta>> => {
   const result = new Map<string, TokenMeta>();
   const wanted = [...new Set(subjects.map((s) => s.toLowerCase()))];
@@ -137,7 +138,7 @@ export const fetchTokenMeta = async (
   }
 
   for (const group of chunk(wanted, QUERY_CHUNK)) {
-    const response = await fetch(`${REGISTRY_ROOT}/query`, {
+    const response = await fetch(`${endpoints.tokenRegistry}/query`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

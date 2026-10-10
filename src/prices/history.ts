@@ -3,6 +3,7 @@ import { fetchHistoricalPrices } from './coingecko';
 import { fetchUsdHistory, pairKey } from './defillama';
 import { fetchRates, fetchUsdRates } from './ecb';
 import { isFiatAsset } from '@/ledger/balances';
+import { defaultEndpoints, type Endpoints } from '@/config/endpoints';
 
 export { pairKey };
 
@@ -53,6 +54,7 @@ export const fetchHistory = async (
   currency: string,
   apiKey?: string,
   signal?: AbortSignal,
+  endpoints: Endpoints = defaultEndpoints(),
 ): Promise<HistoryResult> => {
   const prices = new Map<string, string>();
   const sources = new Map<string, PriceSource>();
@@ -74,7 +76,7 @@ export const fetchHistory = async (
     }
     const ccy = assetId.slice('fiat:'.length);
     try {
-      const rates = await fetchRates(dates, ccy, currency, signal);
+      const rates = await fetchRates(dates, ccy, currency, signal, endpoints);
       for (const date of dates) {
         const rate = rates.get(date);
         if (rate !== undefined) {
@@ -99,8 +101,8 @@ export const fetchHistory = async (
   let rates = new Map<string, string>();
   try {
     [usd, rates] = await Promise.all([
-      fetchUsdHistory(crypto, signal),
-      fetchUsdRates(everyDay, currency, signal),
+      fetchUsdHistory(crypto, signal, endpoints),
+      fetchUsdRates(everyDay, currency, signal, endpoints),
     ]);
   } catch {
     // Either leg failing drops the whole primary path to the fallback, and
@@ -139,6 +141,7 @@ export const fetchHistory = async (
         currency,
         outstanding,
         apiKey,
+        endpoints,
       );
       for (const [date, price] of fetched) {
         prices.set(pairKey(assetId, date), price);

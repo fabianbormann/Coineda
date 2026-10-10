@@ -1,4 +1,5 @@
 import { ASSET_CATALOGUE } from '@/assets/catalogue';
+import { defaultEndpoints, type Endpoints } from '@/config/endpoints';
 
 /**
  * CoinGecko is the only price provider. Native `fetch` only - `axios` was
@@ -22,9 +23,6 @@ export const COINGECKO_IDS: Record<string, string> = Object.fromEntries(
 // CoinGecko and they are different coins at wildly different prices; see the
 // note on NIGHT_ASSET_ID in src/assets/ids.ts.
 
-const SIMPLE_PRICE_URL = 'https://api.coingecko.com/api/v3/simple/price';
-const HISTORY_URL = 'https://api.coingecko.com/api/v3/coins';
-
 /**
  * Fetches spot prices for the given ledger asset ids, in the given
  * currency. Returns only the assets it could both map AND price - an
@@ -39,6 +37,7 @@ const HISTORY_URL = 'https://api.coingecko.com/api/v3/coins';
 export const fetchSpotPrices = async (
   assetIds: string[],
   currency: string,
+  endpoints: Endpoints = defaultEndpoints(),
 ): Promise<Map<string, string>> => {
   const assetsByCoinId = new Map<string, string>();
   for (const assetId of assetIds) {
@@ -55,7 +54,7 @@ export const fetchSpotPrices = async (
 
   const vsCurrency = currency.toLowerCase();
   const url =
-    `${SIMPLE_PRICE_URL}?ids=${encodeURIComponent([...assetsByCoinId.keys()].join(','))}` +
+    `${endpoints.spotPrices}/simple/price?ids=${encodeURIComponent([...assetsByCoinId.keys()].join(','))}` +
     `&vs_currencies=${encodeURIComponent(vsCurrency)}`;
 
   const response = await fetch(url);
@@ -182,6 +181,7 @@ export const fetchHistoricalPrices = async (
   currency: string,
   isoDates: string[],
   apiKey?: string,
+  endpoints: Endpoints = defaultEndpoints(),
 ): Promise<Map<string, string>> => {
   const prices = new Map<string, string>();
   const coinId = COINGECKO_IDS[assetId];
@@ -210,7 +210,7 @@ export const fetchHistoricalPrices = async (
   const from = Math.floor(Math.max(wanted[0].at - DAY_MS, cutoff) / 1000);
   const to = Math.ceil((wanted[wanted.length - 1].at + DAY_MS) / 1000);
 
-  const url = `${HISTORY_URL}/${coinId}/market_chart/range?vs_currency=${encodeURIComponent(
+  const url = `${endpoints.spotPrices}/coins/${coinId}/market_chart/range?vs_currency=${encodeURIComponent(
     currency.toLowerCase(),
   )}&from=${from}&to=${to}`;
   const headers: Record<string, string> = {};
@@ -266,13 +266,14 @@ export const fetchHistoricalPrice = async (
   currency: string,
   isoDate: string,
   apiKey?: string,
+  endpoints: Endpoints = defaultEndpoints(),
 ): Promise<string | null> => {
   const coinId = COINGECKO_IDS[assetId];
   if (!coinId) {
     return null;
   }
 
-  const url = `${HISTORY_URL}/${coinId}/history?date=${toCoinGeckoDate(isoDate)}&localization=false`;
+  const url = `${endpoints.spotPrices}/coins/${coinId}/history?date=${toCoinGeckoDate(isoDate)}&localization=false`;
   const headers: Record<string, string> = {};
   if (apiKey) {
     headers['x-cg-demo-api-key'] = apiKey;
