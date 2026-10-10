@@ -523,29 +523,22 @@
 }
 
 /* Honour the reduced-motion preference for every animation the app owns:
-   the digit roll and each tw-animate-css class the vendored overlays use
-   (dialog, sheet, dropdown-menu, select, tooltip). tests/reducedMotion
-   fails when one of those files gains a class that is not named here. */
+   the digit roll and each tw-animate-css family the vendored overlays use
+   (dialog, sheet, dropdown-menu, select, tooltip). Those overlays apply the
+   classes as Tailwind variants (data-[state=open]:animate-in), whose compiled
+   selectors a bare `.animate-in` would never match, hence the attribute
+   substring selectors. tests/reducedMotion fails when one of those files
+   gains a family that is not matched here. */
 @media (prefers-reduced-motion: reduce) {
   .roll-strip,
-  .animate-in,
-  .animate-out,
-  .fade-in-0,
-  .fade-out-0,
-  .zoom-in-95,
-  .zoom-out-95,
-  .slide-in-from-top,
-  .slide-in-from-top-2,
-  .slide-in-from-bottom,
-  .slide-in-from-bottom-2,
-  .slide-in-from-left,
-  .slide-in-from-left-2,
-  .slide-in-from-right,
-  .slide-in-from-right-2,
-  .slide-out-to-top,
-  .slide-out-to-bottom,
-  .slide-out-to-left,
-  .slide-out-to-right {
+  [class*='animate-in'],
+  [class*='animate-out'],
+  [class*='fade-in'],
+  [class*='fade-out'],
+  [class*='zoom-in'],
+  [class*='zoom-out'],
+  [class*='slide-in-from'],
+  [class*='slide-out-to'] {
     animation: none !important;
     transition-duration: 0.01ms !important;
   }

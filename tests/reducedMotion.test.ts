@@ -11,6 +11,17 @@ const block = (() => {
   return css.slice(start, css.indexOf('\n}', start));
 })();
 
+/** The selectors of the media block's rule, one per list entry. */
+const selectors = block
+  .slice(block.indexOf('{') + 1, block.indexOf('{', block.indexOf('{') + 1))
+  .split(',')
+  .map((entry) => entry.trim());
+
+/** The families the block matches via [class*='...'] attribute selectors. */
+const matched = selectors
+  .map((entry) => /^\[class\*='([^']+)'\]$/.exec(entry)?.[1])
+  .filter((family): family is string => Boolean(family));
+
 const overlays = ['dialog', 'sheet', 'dropdown-menu', 'select', 'tooltip'].map(
   (name) => `src/components/ui/${name}.tsx`,
 );
@@ -35,14 +46,22 @@ describe('reduced motion', () => {
   });
 
   it('covers the digit roll', () => {
-    expect(block).toContain('.roll-strip');
+    expect(selectors).toContain('.roll-strip');
   });
 
-  it.each(overlays)('covers every animation class %s uses', (file) => {
-    const names = used(file);
-    expect(names.length).toBeGreaterThan(0);
-    for (const name of names) {
-      expect(block, `${name} in ${file}`).toContain(`.${name}`);
-    }
-  });
+  it.each(overlays)(
+    'matches every animation class %s uses by an attribute selector',
+    (file) => {
+      const names = used(file);
+      expect(names.length).toBeGreaterThan(0);
+      for (const name of names) {
+        // A bare class selector would miss the Tailwind variant form, so the
+        // class must contain one of the block's [class*=...] families.
+        expect(
+          matched.some((family) => name.includes(family)),
+          `${name} in ${file}`,
+        ).toBe(true);
+      }
+    },
+  );
 });
