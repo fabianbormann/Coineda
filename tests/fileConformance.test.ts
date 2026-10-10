@@ -35,6 +35,14 @@ describe('every module in the file registry', () => {
     expect(ids).toEqual([...new Set(ids)]);
   });
 
+  it('keys the mapped-CSV label and help in both locale files', () => {
+    const mapped = fileRegistry.find((m) => m.manifest.id === 'mapped-csv')!;
+    for (const key of [mapped.manifest.label, mapped.manifest.help]) {
+      expect(enKeys).toContain(key);
+      expect(deKeys).toContain(key);
+    }
+  });
+
   // The mapped-CSV module has no fixture of its own and is never sniffed: it
   // parses only with a user mapping, and tests/mappedCsv.test.ts covers it.
   describe.each(

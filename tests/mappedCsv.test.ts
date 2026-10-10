@@ -6,6 +6,7 @@ import {
   type CsvMapping,
 } from '@/sources/mapped-csv/types';
 import {
+  MappingColumnError,
   parseMapped,
   previewMapped,
   validateMapping,
@@ -271,5 +272,102 @@ describe('mapped-csv module and import', () => {
     expect(other.source.id).not.toBe(first.source.id);
     expect(await getSources()).toHaveLength(2);
     expect(await getAllEvents()).toHaveLength(8);
+  });
+});
+
+describe('fix round 1', () => {
+  const columnsOf = (patch: Partial<CsvMapping['columns']>): CsvMapping => ({
+    ...mappingA,
+    columns: { ...mappingA.columns, ...patch },
+  });
+
+  it('names mapped columns the header lacks', () => {
+    const header = ['Datum', 'Typ', 'Coin', 'Menge', 'Gebühr', 'Preis'];
+    expect(validateMapping(mappingA, header)).toEqual([]);
+    expect(validateMapping(columnsOf({ price: 'Kurs' }), header)).toContain(
+      'Column Kurs is not in the file',
+    );
+  });
+
+  it('refuses to parse a file missing a mapped column', () => {
+    expect(() => parseMapped(A, columnsOf({ fee: 'Gebuehr' }))).toThrow(
+      MappingColumnError,
+    );
+    expect(() => parseMapped(A, columnsOf({ fee: 'Gebuehr' }))).toThrow(
+      /Gebuehr/,
+    );
+  });
+
+  it('books the fee in the counter asset of a fiat trade', () => {
+    const withUsd = parseMapped(
+      'time,sym,qty,px,fee,cc\n2024-05-01T10:00:00Z,BTC,0.5,100,1,USD\n',
+      {
+        ...mappingB,
+        columns: {
+          date: 'time',
+          asset: 'sym',
+          amount: 'qty',
+          price: 'px',
+          fee: 'fee',
+          counterAsset: 'cc',
+        },
+        kinds: { '*': 'trade' },
+        fiatCounter: true,
+      },
+    );
+    expect(withUsd.events[0].legs.map((l) => [l.assetId, l.role])).toEqual([
+      ['bitcoin:native', 'principal'],
+      ['fiat:usd', 'principal'],
+      ['fiat:usd', 'fee'],
+    ]);
+  });
+
+  it('warns when a sign mapping only ever goes one way', () => {
+    const csv = 'time,symbol,qty\n2024-05-02T10:00:00Z,BTC,0.1\n';
+    const sign: CsvMapping = {
+      ...mappingB,
+      columns: { date: 'time', asset: 'symbol', amount: 'qty' },
+    };
+    expect(parseMapped(csv, sign).warnings).toEqual([
+      'No outgoing rows: check the direction setting',
+    ]);
+    expect(previewMapped(csv.replace('0.1', '-0.1'), sign).warnings).toEqual([
+      'No incoming rows: check the direction setting',
+    ]);
+    expect(parseMapped(B, mappingB).warnings).toEqual([]);
+  });
+
+  it('skips a zero price', () => {
+    const csv =
+      'Datum;Typ;Coin;Menge;Preis\n07.03.2024 10:00:00;Kauf;BTC;0,5;0,00\n';
+    const r = parseMapped(csv, {
+      ...mappingA,
+      columns: {
+        date: 'Datum',
+        type: 'Typ',
+        asset: 'Coin',
+        amount: 'Menge',
+        price: 'Preis',
+      },
+    });
+    expect(r.events).toHaveLength(0);
+    expect(r.skipped.join('\n')).toMatch(/unparseable amounts/);
+  });
+
+  it('replaces a venue’s events when its mapping changes', async () => {
+    const db = await openLedger();
+    for (const store of ['events', 'sources', 'cursors'] as const) {
+      await db.clear(store);
+    }
+    const first = await importMappedFile(A, mappingA, 'a.csv', 1);
+    const m2: CsvMapping = { ...mappingA, timeZone: 'UTC' };
+    const second = await importMappedFile(A, m2, 'a.csv', 2);
+    expect(second.source.id).toBe(first.source.id);
+    expect(second.superseded).toBe(4);
+    expect(second.inserted).toBe(4);
+    expect(await getAllEvents()).toHaveLength(4);
+    const third = await importMappedFile(A, m2, 'a.csv', 3);
+    expect(third.superseded).toBe(0);
+    expect(third.updated).toBe(4);
   });
 });

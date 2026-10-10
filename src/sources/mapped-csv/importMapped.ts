@@ -1,4 +1,5 @@
 import {
+  deleteDerivedEvents,
   deleteEventsByIdentity,
   getSources,
   putSource,
@@ -41,8 +42,16 @@ export const importMappedFile = async (
 
   await putSource({ ...source, lastSyncedAt: now, lastError: undefined });
 
-  const superseded =
-    supersedes.length === 0
+  // A corrected mapping changes every row's identity, so an upsert would
+  // keep the wrong events beside the right ones. Replace the venue's derived
+  // events instead. The same mapping upserts as before.
+  const mappingChanged =
+    existing !== undefined &&
+    existing.config?.mapping !== undefined &&
+    existing.config.mapping !== source.config.mapping;
+  const superseded = mappingChanged
+    ? await deleteDerivedEvents(source.id)
+    : supersedes.length === 0
       ? 0
       : await deleteEventsByIdentity(source.id, supersedes);
 

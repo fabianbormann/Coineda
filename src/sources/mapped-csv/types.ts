@@ -37,4 +37,8 @@ export class MappingRequiredError extends Error {
   }
 }
 
-export type MappedParseResult = ParseResult & { unresolved: string[] };
+export type MappedParseResult = ParseResult & {
+  unresolved: string[];
+  /** Translation keys: settings that parsed but look wrong. */
+  warnings: string[];
+};

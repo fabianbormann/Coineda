@@ -26,14 +26,38 @@ const EVENT_KINDS: EventKind[] = [
   'derivative',
 ];
 
+/** Mapped column names that the file's header does not carry. A misspelt
+ *  optional column would otherwise read as empty on every row, silently. */
+const missingColumns = (mapping: CsvMapping, header: string[]): string[] => {
+  const present = new Set(header);
+  return Object.values(mapping.columns).filter(
+    (name): name is string => !!name && !present.has(name),
+  );
+};
+
+export class MappingColumnError extends Error {
+  constructor(readonly columns: string[]) {
+    super(`The file has no column named ${columns.join(', ')}`);
+    this.name = 'MappingColumnError';
+  }
+}
+
 /**
  * The mapping's problems as translation keys; empty means it can be used.
  * Checked before a file is parsed, so a half-finished mapping is told what is
  * missing rather than producing a file of skipped rows.
  */
-export const validateMapping = (mapping: CsvMapping): string[] => {
+export const validateMapping = (
+  mapping: CsvMapping,
+  header?: string[],
+): string[] => {
   const problems: string[] = [];
   const { date, asset, amount, type } = mapping.columns;
+  if (header) {
+    for (const name of missingColumns(mapping, header)) {
+      problems.push(`Column ${name} is not in the file`);
+    }
+  }
   if (!date || !asset || !amount) {
     problems.push('Map the date, asset and amount columns');
   }
@@ -120,7 +144,9 @@ export const parseMapped = (
 ): MappedParseResult => {
   const m = mapping;
   const c = m.columns;
-  const { rows } = readCsv(text, { delimiter: m.delimiter });
+  const { header, rows } = readCsv(text, { delimiter: m.delimiter });
+  const missing = missingColumns(m, header);
+  if (missing.length > 0) throw new MappingColumnError(missing);
   const skip = makeSkipLog();
   const unresolved = new Set<string>();
   const venue = `csv:${m.venueLabel}`;
@@ -280,6 +306,7 @@ export const parseMapped = (
     let kind: EventKind = first.kind;
     let rewardKind: RewardKind | undefined;
     let txHash = first.txHash;
+    let counterAsset: string | undefined;
 
     if (grouped) {
       kind = 'trade';
@@ -325,23 +352,23 @@ export const parseMapped = (
           const counter = counterLeg(row);
           if (counter === null) return null;
           legs.push(counter);
+          counterAsset = counter.assetId;
         }
       }
-      const defaultFee =
-        kind === 'trade' && m.fiatCounter && row.feeAssetCode === ''
-          ? 'fiat:eur'
-          : row.asset;
+      const defaultFee = counterAsset ?? row.asset;
       const fee = feeLeg(row, defaultFee);
       if (fee) legs.push(fee);
     }
 
+    let earliest = first.at;
+    for (const row of run) if (row.at < earliest) earliest = row.at;
     const type = first.rawType || kind;
     const key = grouped
       ? `trade|${tradeRuns.get(run) ?? first.tradeId}`
       : first.key;
     return {
       externalId: grouped ? fnv64Hex(key) : idFor(key),
-      timestamp: Math.min(...run.map((row) => row.at)),
+      timestamp: earliest,
       kind,
       origin: 'derived',
       legs,
@@ -381,6 +408,10 @@ export const parseMapped = (
       skip.note('rows with unparseable amounts');
       return null;
     }
+    if (new Big(price).lte(0)) {
+      skip.note('rows with unparseable amounts');
+      return null;
+    }
     const product = new Big(price).times(amount);
     const rounded = isFiatAsset(counterId)
       ? product.round(2, Big.roundHalfUp)
@@ -410,7 +441,28 @@ export const parseMapped = (
     }
   }
 
-  return { events, skipped: skip.lines(), unresolved: [...unresolved] };
+  // A sign-based direction over a column that never goes negative (or never
+  // positive) books every row one way. That is a wrong setting far more often
+  // than a real file, and nothing else would say so.
+  const warnings: string[] = [];
+  if (m.direction.mode === 'sign' && events.length > 0) {
+    const principal = events.flatMap((e) =>
+      e.legs.filter((l) => l.role === 'principal'),
+    );
+    if (!principal.some((l) => l.direction === 'out')) {
+      warnings.push('No outgoing rows: check the direction setting');
+    }
+    if (!principal.some((l) => l.direction === 'in')) {
+      warnings.push('No incoming rows: check the direction setting');
+    }
+  }
+
+  return {
+    events,
+    skipped: skip.lines(),
+    unresolved: [...unresolved],
+    warnings,
+  };
 };
 
 class SkippedRow extends Error {}
@@ -432,16 +484,23 @@ export type MappedPreview = {
   skipped: string[];
   unresolved: string[];
   sample: DerivedEvent[];
+  warnings: string[];
 };
 
 export const previewMapped = (
   text: string,
   mapping: CsvMapping,
 ): MappedPreview => {
-  const { events, skipped, unresolved } = parseMapped(text, mapping);
+  const { events, skipped, unresolved, warnings } = parseMapped(text, mapping);
   const byKind = Object.fromEntries(
     EVENT_KINDS.map((kind) => [kind, 0]),
   ) as Record<EventKind, number>;
   for (const event of events) byKind[event.kind] += 1;
-  return { byKind, skipped, unresolved, sample: events.slice(0, 5) };
+  return {
+    byKind,
+    skipped,
+    unresolved,
+    sample: events.slice(0, 5),
+    warnings,
+  };
 };
