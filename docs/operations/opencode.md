@@ -26,7 +26,9 @@ The repository is prepared; publishing is the owner's step. Nothing in this repo
 2. Create a group or use a personal namespace for the project.
 3. Create the repository there. Either push a copy by hand, or set up a pull mirror from
    `https://github.com/fabianbormann/Coineda` (Settings, Repository, Mirroring repositories). A mirror
-   keeps `publiccode.yml`, the pipeline and the release tags current without further work.
+   keeps `publiccode.yml`, the pipeline and the release tags current without further work. If the
+   instance does not offer pull mirroring, push to it instead (a push mirror from GitHub, or a manual push
+   per release).
 4. Change `url:` in `publiccode.yml` to the gitlab.opencode.de repository URL. openCode requires `url` to be
    the repository it reads. Keep `landingURL` (the hosted app) as it is. Commit the change on the
    repository openCode reads; if it is a pull mirror, make the change on GitHub instead.
@@ -54,7 +56,7 @@ depends on how the project is run, and "n/a" means the criterion does not apply 
 | Aktive Wartung   | 1     | Issue response in under 7 days                                     | Owner, and the issue tracker is a platform setting   |
 | Aktive Wartung   | 2     | Level 1 and a release or tag in 6 months                           | Repository: release-please cuts releases and tags    |
 | Aktive Wartung   | 3     | Level 2 and several maintainers                                    | Owner: needs more maintainers (community)            |
-| Nachnutzung      | 1     | A published package                                                | Repository: installers on GitHub Releases, the PWA   |
+| Nachnutzung      | 1     | A published package                                                | Owner: installers are on GitHub Releases; check after mirroring whether openCode counts them, else publish a release on gitlab.opencode.de |
 | Nachnutzung      | 1     | A successful CI pipeline in 6 months                               | Repository: `.gitlab-ci.yml`; runs once mirrored     |
 | Nachnutzung      | 2     | One organisation uses the project                                  | Owner/community                                      |
 | Nachnutzung      | 3     | Ten organisations use the project                                  | Owner/community                                      |

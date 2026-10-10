@@ -31,56 +31,56 @@ description:
   en:
     shortDescription: Local-first crypto portfolio tracker and tax calculator for Germany and Austria that runs in the browser or as a desktop app, without a backend.
     longDescription: |-
-      Coineda is a crypto portfolio tracker and tax calculator that runs entirely on the user's own device. There is no Coineda server and no account: the same code ships as a progressive web app and as an Electron desktop app, talks to chains, exchanges and price services directly from the device, and stores everything it learns in the browser's own database (IndexedDB). It contains no telemetry.
+      Coineda is a crypto portfolio tracker and tax calculator that runs entirely on the user's own device. There is no Coineda server and no account: the same code ships as a progressive web app and as an Electron desktop app, talks to chains, exchanges and price services directly from the device, and stores everything it learns in the browser's own storage (IndexedDB and localStorage). It contains no telemetry.
 
-      The ledger is built from wallet addresses (Cardano, Bitcoin, Ethereum), a Bitpanda API key and CSV exports (Binance, Coinbase, Kraken, Ledger Live, or any other CSV through a column mapping). Transfers between the user's own wallets and exchanges are paired by transaction hash, and candidates for the remaining ones are only proposed, never decided automatically. Historical prices are taken per UTC day from DefiLlama and CoinGecko, with European Central Bank reference rates for the fiat side.
+      The ledger is built from wallet addresses (Cardano, Bitcoin, and Ethereum for ether only; ERC-20 tokens are not read yet), a Bitpanda API key and CSV exports (Binance, Coinbase, Kraken, Ledger Live, or any other CSV through a column mapping). Transfers between the user's own wallets and exchanges are paired by transaction hash, and candidates for the remaining ones are only proposed, never decided automatically. Historical prices are taken per UTC day from DefiLlama and CoinGecko, with European Central Bank reference rates for the fiat side.
 
-      The German tax report is written around the BMF letter of 6 March 2025 (§ 23 and § 22 Nr. 3 EStG) with FIFO lot matching. It aims to be a filing aid: every figure is shown with its Anlage SO or Anlage KAP line reference where one has been verified, and an audit trail leads back to the ledger events. Disposals that cannot be computed are named instead of guessed. The report can be exported as a DATEV Buchungsstapel for a tax advisor, and a provider's DAC8 / CARF report can be compared with the ledger per asset and category. Austrian rules (§ 27a and § 27b EStG) are included as a second jurisdiction.
+      The German tax report is written around the BMF letter of 6 March 2025 (§ 23 and § 22 Nr. 3 EStG, and derivatives under § 20 EStG) with FIFO lot matching. It aims to be a filing aid: every figure is shown with its Anlage SO or Anlage KAP line reference where one has been verified, and an audit trail leads back to the ledger events. Disposals that cannot be computed are named instead of guessed. The report can be exported as a DATEV Buchungsstapel for a tax advisor, and a provider's DAC8 / CARF report can be compared with the ledger per asset and category. Austrian rules (§ 27a and § 27b EStG) are included as a second jurisdiction.
 
-      One device can hold several client ledgers, each in its own database. A sealed, encrypted checkpoint carries a ledger from one device to another and serves as a backup; a reviewer can open a backup as a read-only copy with exchange credentials removed and check its fingerprint. Organisations that must not contact public providers can build Coineda against their own price and chain services and pin the build to them. The interface is available in English and German, and the automated test suite checks every screen against the WCAG 2.1 A and AA rules.
+      One device can hold several client ledgers, each in its own database. A sealed, encrypted checkpoint carries a ledger from one device to another and serves as a backup; a reviewer can open a backup as a read-only copy with exchange credentials removed and check its fingerprint. Organisations that must not contact public providers can build Coineda against their own price and chain services and pin the build to them. The interface is available in English and German. The automated test suite runs axe-core's WCAG 2.1 A and AA rules over every screen and dialog, and colour contrast is measured separately from the design tokens; this is an automated check, not a conformance claim or a BITV audit.
 
       Coineda gives no tax, legal or accounting advice. The rules are written to the best of the contributors' knowledge and have to be verified against the cited references or with a professional before a report is relied on.
     features:
-      - All data stays in the browser's IndexedDB; no backend, no account, no telemetry
-      - Pulls history from Cardano, Bitcoin and Ethereum addresses and from Bitpanda
+      - Data is stored only on the device, in the browser profile; no backend, no account, no telemetry
+      - Pulls history from Cardano and Bitcoin addresses, ether from Ethereum addresses, and Bitpanda
       - Imports Binance, Coinbase, Kraken and Ledger Live CSV exports, or any CSV through a column mapping
       - Pairs transfers between the user's own wallets by transaction hash and proposes candidates for the rest
       - Historical prices per UTC day from DefiLlama and CoinGecko, with ECB reference rates
-      - German report with FIFO matching, Anlage SO and Anlage KAP line references and an audit trail
+      - German report with FIFO matching, an audit trail and Anlage SO / Anlage KAP line references (lines verified for 2025)
       - Austrian rules as a second jurisdiction
       - DATEV Buchungsstapel export of the German report
       - Comparison of a provider's DAC8 / CARF report with the ledger
       - Several client ledgers and read-only review copies from encrypted checkpoints
       - Restricted build that calls only self-hosted price and chain services
-      - English and German interface, tested against WCAG 2.1 A and AA
+      - English and German interface; automated axe-core checks against the WCAG 2.1 A and AA rules
     documentation: https://github.com/fabianbormann/Coineda#readme
     screenshots:
       - .github/images/journey.png
   de:
     shortDescription: Lokal arbeitender Krypto-Portfolio-Tracker und Steuerrechner für Deutschland und Österreich, im Browser oder als Desktop-App, ohne Backend.
     longDescription: |-
-      Coineda ist ein Krypto-Portfolio-Tracker und Steuerrechner, der vollständig auf dem eigenen Gerät läuft. Es gibt keinen Coineda-Server und kein Benutzerkonto: Derselbe Code wird als Progressive Web App und als Electron-Desktop-Anwendung ausgeliefert, fragt Blockchains, Börsen und Kursdienste direkt vom Gerät ab und speichert alles, was die Anwendung erfährt, in der Datenbank des Browsers (IndexedDB). Telemetrie ist nicht enthalten.
+      Coineda ist ein Krypto-Portfolio-Tracker und Steuerrechner, der vollständig auf dem eigenen Gerät läuft. Es gibt keinen Coineda-Server und kein Benutzerkonto: Derselbe Code wird als Progressive Web App und als Electron-Desktop-Anwendung ausgeliefert, fragt Blockchains, Börsen und Kursdienste direkt vom Gerät ab und speichert alles, was die Anwendung erfährt, in der Datenbank und dem lokalen Speicher des Browsers (IndexedDB, localStorage). Telemetrie ist nicht enthalten.
 
-      Das Hauptbuch entsteht aus Wallet-Adressen (Cardano, Bitcoin, Ethereum), einem Bitpanda-API-Schlüssel und CSV-Exporten (Binance, Coinbase, Kraken, Ledger Live oder jede andere CSV-Datei über eine Spaltenzuordnung). Übertragungen zwischen eigenen Wallets und Börsen werden über den Transaktions-Hash zusammengeführt; für die übrigen werden nur Vorschläge gemacht, nie automatisch entschieden. Historische Kurse stammen tagesgenau (UTC) von DefiLlama und CoinGecko, die Referenzkurse der Europäischen Zentralbank dienen für die Fiat-Seite.
+      Das Hauptbuch entsteht aus Wallet-Adressen (Cardano, Bitcoin sowie Ethereum, dort nur Ether; ERC-20-Token werden noch nicht gelesen), einem Bitpanda-API-Schlüssel und CSV-Exporten (Binance, Coinbase, Kraken, Ledger Live oder jede andere CSV-Datei über eine Spaltenzuordnung). Übertragungen zwischen eigenen Wallets und Börsen werden über den Transaktions-Hash zusammengeführt; für die übrigen werden nur Vorschläge gemacht, nie automatisch entschieden. Historische Kurse stammen tagesgenau (UTC) von DefiLlama und CoinGecko; für die Fiat-Seite werden die Referenzkurse der Europäischen Zentralbank verwendet.
 
-      Der deutsche Steuerbericht orientiert sich am BMF-Schreiben vom 6. März 2025 (§ 23 und § 22 Nr. 3 EStG) und verwendet die FIFO-Methode. Er versteht sich als Ausfüllhilfe: Jeder Betrag wird mit seiner Zeilenangabe in der Anlage SO oder Anlage KAP ausgewiesen, soweit diese geprüft wurde, und ein Prüfpfad führt zurück zu den Ereignissen im Hauptbuch. Veräußerungen, die sich nicht berechnen lassen, werden benannt statt geschätzt. Der Bericht kann als DATEV-Buchungsstapel für die Steuerberatung exportiert werden, und der DAC8-/CARF-Bericht eines Anbieters lässt sich je Asset und Kategorie mit dem Hauptbuch vergleichen. Die österreichischen Regeln (§ 27a und § 27b EStG) sind als zweite Rechtsordnung enthalten.
+      Der deutsche Steuerbericht orientiert sich am BMF-Schreiben vom 6. März 2025 (§ 23 und § 22 Nr. 3 EStG, Derivate nach § 20 EStG) und verwendet die FIFO-Methode. Er versteht sich als Ausfüllhilfe: Jeder Betrag wird mit seiner Zeilenangabe in der Anlage SO oder Anlage KAP ausgewiesen, soweit diese geprüft wurde, und ein Prüfpfad führt zurück zu den Ereignissen im Hauptbuch. Veräußerungen, die sich nicht berechnen lassen, werden benannt statt geschätzt. Der Bericht kann als DATEV-Buchungsstapel für die Steuerberatung exportiert werden, und der DAC8-/CARF-Bericht eines Anbieters lässt sich je Asset und Kategorie mit dem Hauptbuch vergleichen. Die österreichischen Regeln (§ 27a und § 27b EStG) sind als zweite Rechtsordnung enthalten.
 
-      Ein Gerät kann mehrere Mandanten-Hauptbücher mit jeweils eigener Datenbank verwalten. Ein verschlüsselter, versiegelter Checkpoint überträgt ein Hauptbuch von einem Gerät auf ein anderes und dient zugleich als Sicherung; eine prüfende Person kann eine Sicherung als schreibgeschützte Kopie ohne Börsen-Zugangsdaten öffnen und ihren Fingerabdruck kontrollieren. Organisationen, die keine öffentlichen Anbieter kontaktieren dürfen, können Coineda gegen eigene Kurs- und Blockchain-Dienste bauen und den Build darauf festlegen. Die Oberfläche steht auf Deutsch und Englisch zur Verfügung, und die automatisierte Testsuite prüft jeden Bildschirm gegen die WCAG-2.1-Regeln der Stufen A und AA.
+      Ein Gerät kann mehrere Mandanten-Hauptbücher mit jeweils eigener Datenbank verwalten. Ein verschlüsselter, versiegelter Checkpoint überträgt ein Hauptbuch von einem Gerät auf ein anderes und dient zugleich als Sicherung; eine prüfende Person kann eine Sicherung als schreibgeschützte Kopie ohne Börsen-Zugangsdaten öffnen und ihren Fingerabdruck kontrollieren. Organisationen, die keine öffentlichen Anbieter kontaktieren dürfen, können Coineda gegen eigene Kurs- und Blockchain-Dienste bauen und den Build darauf festlegen. Die Oberfläche steht auf Deutsch und Englisch zur Verfügung. Die automatisierte Testsuite prüft jeden Bildschirm und jeden Dialog mit den axe-core-Regeln für WCAG 2.1 A und AA, der Farbkontrast wird gesondert aus den Design-Tokens berechnet; das ist eine automatisierte Prüfung, keine Konformitätserklärung und kein BITV-Test.
 
       Coineda leistet keine Steuer-, Rechts- oder Buchhaltungsberatung. Die Regeln sind nach bestem Wissen der Mitwirkenden formuliert und müssen vor der Verwendung eines Berichts anhand der genannten Quellen oder mit fachkundiger Unterstützung überprüft werden.
     features:
-      - Alle Daten bleiben in der IndexedDB des Browsers; kein Backend, kein Konto, keine Telemetrie
-      - Lädt den Verlauf von Cardano-, Bitcoin- und Ethereum-Adressen sowie von Bitpanda
+      - Daten liegen nur auf dem Gerät im Browser-Profil; kein Backend, kein Konto, keine Telemetrie
+      - Lädt den Verlauf von Cardano- und Bitcoin-Adressen, Ether von Ethereum-Adressen sowie von Bitpanda
       - Importiert CSV-Exporte von Binance, Coinbase, Kraken und Ledger Live oder beliebige CSV-Dateien über eine Spaltenzuordnung
       - Führt Übertragungen zwischen eigenen Wallets über den Transaktions-Hash zusammen und schlägt für den Rest Kandidaten vor
       - Historische Kurse tagesgenau (UTC) von DefiLlama und CoinGecko mit EZB-Referenzkursen
-      - Deutscher Bericht mit FIFO-Zuordnung, Zeilenangaben zu Anlage SO und Anlage KAP und Prüfpfad
+      - Deutscher Bericht mit FIFO-Zuordnung, Prüfpfad und Zeilenangaben zu Anlage SO und Anlage KAP (Zeilen für 2025 geprüft)
       - Österreichische Regeln als zweite Rechtsordnung
       - DATEV-Buchungsstapel-Export des deutschen Berichts
       - Abgleich des DAC8-/CARF-Berichts eines Anbieters mit dem Hauptbuch
       - Mehrere Mandanten-Hauptbücher und schreibgeschützte Prüfkopien aus verschlüsselten Checkpoints
       - Eingeschränkter Build, der nur selbst betriebene Kurs- und Blockchain-Dienste aufruft
-      - Deutsche und englische Oberfläche, geprüft gegen WCAG 2.1 A und AA
+      - Deutsche und englische Oberfläche; automatisierte axe-core-Prüfung nach den Regeln von WCAG 2.1 A und AA
     documentation: https://github.com/fabianbormann/Coineda#readme
     screenshots:
       - .github/images/journey.png
