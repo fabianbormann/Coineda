@@ -367,6 +367,7 @@ describe('runTaxReport', () => {
     // Traceable outside Coineda: the provider's id and the source's name.
     expect(moved?.externalId).toBe('move');
     expect(moved?.source).toBe('My Kraken');
+    expect(moved?.currency).toBe('EUR');
   });
 
   it('produces different cost bases under fifo vs moving-average for the same disposal', async () => {

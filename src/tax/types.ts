@@ -566,6 +566,8 @@ export type RegisterRow = {
   /** Internal transfers: where it went. */
   counterVenue?: string;
   value?: string;
+  /** The base currency `value` and `costs` are in, upper-case: 'EUR'. */
+  currency: string;
   priceSource?: string;
   considerationAssetId?: string;
   considerationAmount?: string;

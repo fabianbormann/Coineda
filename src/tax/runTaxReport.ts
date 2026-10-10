@@ -569,6 +569,7 @@ export const runTaxReport = async (
     sourceLabelById: new Map(
       sources.map((source) => [source.id, source.label]),
     ),
+    currency: options.baseCurrency,
   });
 
   const { capital: capitalResult, ...assessed } = assessment;

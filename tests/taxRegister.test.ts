@@ -89,6 +89,7 @@ const build = () =>
     residuals: [],
     unresolved: [unpriced],
     sourceLabelById: LABELS,
+    currency: 'eur',
   });
 
 describe('buildRegister', () => {
@@ -140,6 +141,7 @@ describe('tracing a row to its provider', () => {
       residuals: [],
       unresolved: [{ ...unpriced, sourceEventId: 'gone' }],
       sourceLabelById: LABELS,
+      currency: 'eur',
       eventById: new Map([['buy', ledgerEvent('buy', 'kraken-TX1')]]),
     });
     const byKind = new Map(rows.map((row) => [row.kind, row]));
@@ -160,6 +162,7 @@ describe('tracing a row to its provider', () => {
       residuals: [],
       unresolved: [],
       sourceLabelById: LABELS,
+      currency: 'eur',
     });
     expect(rows[0].source).toBe('');
   });
@@ -175,6 +178,7 @@ describe('tracing a row to its provider', () => {
       residuals: [],
       unresolved: [],
       sourceLabelById: LABELS,
+      currency: 'eur',
       eventById: new Map([
         ['a', ledgerEvent('a', 'z-later')],
         ['b', ledgerEvent('b', 'y-earlier')],
@@ -209,6 +213,7 @@ describe('a transfer straddling New Year', () => {
       residuals: [],
       unresolved: [],
       sourceLabelById: LABELS,
+      currency: 'eur',
     });
 
   it('is one row in the sender year and none in the receiver year', () => {
@@ -239,6 +244,7 @@ describe('registerToCsv', () => {
       'venue',
       'counterVenue',
       'value',
+      'currency',
       'priceSource',
       'considerationAssetId',
       'considerationAmount',
@@ -246,6 +252,12 @@ describe('registerToCsv', () => {
       'note',
     ]);
     expect(rows).toHaveLength(0);
+  });
+
+  it('names the currency on every row, upper-case', () => {
+    const { rows } = readCsv(registerToCsv(build()));
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.map((row) => row.currency)).toEqual(rows.map(() => 'EUR'));
   });
 
   it('quotes and doubles awkward cells so readCsv gets them back', () => {
@@ -275,6 +287,7 @@ describe('a token name that looks like a formula', () => {
       residuals: [],
       unresolved: [],
       sourceLabelById: LABELS,
+      currency: 'eur',
     });
     expect(rows[0].symbol).toBe(name);
     const csv = registerToCsv(rows);

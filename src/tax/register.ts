@@ -33,15 +33,23 @@ const costsOf = (event: TaxEvent): string | undefined => {
  * provider's own id for the record (stable across devices, unlike the
  * ledger's) and the name of the source the user added. Absent `event`
  * (a module that minted its own id) gives no externalId rather than a
- * guess; an unknown source id gives an empty label.
+ * guess; an unknown source id gives an empty label. The currency rides
+ * along so every row names the unit its `value` and `costs` are in.
  */
+type RowContext = { sourceLabelById: Map<string, string>; currency: string };
+
+type RowOrigin = { externalId?: string; source: string; currency: string };
+
 const provenance = (
   event: LedgerEvent | undefined,
-  sourceLabelById: Map<string, string>,
-) => ({
+  context: RowContext,
+): RowOrigin => ({
   ...(event === undefined ? {} : { externalId: event.externalId }),
   source:
-    event === undefined ? '' : (sourceLabelById.get(event.sourceId) ?? ''),
+    event === undefined
+      ? ''
+      : (context.sourceLabelById.get(event.sourceId) ?? ''),
+  currency: context.currency,
 });
 
 const baseRow = (
@@ -50,7 +58,7 @@ const baseRow = (
   assetId: string,
   amount: string,
   venue: string,
-  origin: { externalId?: string; source: string },
+  origin: RowOrigin,
 ) => ({
   date: iso(timestamp),
   sourceEventId,
@@ -69,7 +77,7 @@ const baseRow = (
  */
 const internalTransferRows = (
   events: LedgerEvent[],
-  sourceLabelById: Map<string, string>,
+  context: RowContext,
 ): RegisterRow[] => {
   const sends = (event: LedgerEvent) =>
     event.legs.some((leg) => leg.direction === 'out');
@@ -122,7 +130,7 @@ const internalTransferRows = (
         out.assetId,
         out.amount,
         out.venue,
-        provenance(event, sourceLabelById),
+        provenance(event, context),
       ),
       kind: 'internal-transfer',
       ...(event.txHash === undefined ? {} : { txHash: event.txHash }),
@@ -143,14 +151,19 @@ export const buildRegister = (input: {
   eventById?: Map<string, LedgerEvent>;
   /** Source record labels by id, for the `source` column. */
   sourceLabelById: Map<string, string>;
+  /** The report's base currency; written upper-case on every row. */
+  currency: string;
 }): RegisterRow[] => {
+  const context: RowContext = {
+    sourceLabelById: input.sourceLabelById,
+    currency: input.currency.toUpperCase(),
+  };
   const residualIds = new Set(input.residuals.map((event) => event.id));
   const ledgerEventOf = (id: string): LedgerEvent | undefined =>
     input.eventById?.get(id) ??
     input.residuals.find((event) => event.id === id);
   const hashOf = (id: string): string | undefined => ledgerEventOf(id)?.txHash;
-  const originOf = (id: string) =>
-    provenance(ledgerEventOf(id), input.sourceLabelById);
+  const originOf = (id: string) => provenance(ledgerEventOf(id), context);
 
   const rows: RegisterRow[] = [];
 
@@ -195,10 +208,9 @@ export const buildRegister = (input: {
     // Paired on the WHOLE dropped set and only then cut to the year, by the
     // SENDER's date: a pair straddling New Year is one movement in the
     // sender's year and nothing in the receiver's.
-    ...internalTransferRows(
-      input.internalTransfers,
-      input.sourceLabelById,
-    ).filter((row) => new Date(row.date).getUTCFullYear() === input.year),
+    ...internalTransferRows(input.internalTransfers, context).filter(
+      (row) => new Date(row.date).getUTCFullYear() === input.year,
+    ),
   );
 
   for (const item of input.unresolved) {
@@ -245,6 +257,7 @@ const COLUMNS: { key: keyof RegisterRow; header: string }[] = [
   { key: 'venue', header: 'venue' },
   { key: 'counterVenue', header: 'counterVenue' },
   { key: 'value', header: 'value' },
+  { key: 'currency', header: 'currency' },
   { key: 'priceSource', header: 'priceSource' },
   { key: 'considerationAssetId', header: 'considerationAssetId' },
   { key: 'considerationAmount', header: 'considerationAmount' },
