@@ -212,8 +212,8 @@ and literal `t()` keys missing from `en.json`; the registry and file gates check
 - Feature work happens in git worktrees under `.claude/worktrees/`. Vitest's default exclude is only
   `node_modules` and `.git`, so `npx vitest run` from the main checkout also collects every worktree's
   `tests/` and reports doubled or foreign failures; run tests from inside the worktree you changed.
-- `TODO.md` is the owner's private roadmap and is gitignored; `docs/superpowers/` is gitignored working
-  notes, and `.superpowers/` is a working directory Prettier ignores. Do not commit them.
+- `TODO.md` is the owner's private roadmap and is gitignored; `docs/superpowers/` (specs and plans) and
+  `.superpowers/` (execution ledgers, briefs, reviews) are gitignored working notes. Do not commit them.
 
 ## Pitfalls that have bitten this codebase
 

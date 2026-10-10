@@ -86,11 +86,11 @@ export default defineConfig({
         // tolerated that duplication because both copies happened to share
         // the same revision hash.
         globPatterns: ['assets/**/*.{js,css,ttf,woff2,svg}', 'index.html'],
-        // CoinGecko is deliberately absent from runtimeCaching. fetchPrice in
-        // src/helper/common.js already owns price caching in localStorage, with
-        // a 15-minute TTL for spot prices and indefinite retention for
-        // historical ones. A second cache with different expiry rules over the
-        // same data would produce stale prices no one could explain.
+        // Price APIs (CoinGecko, DefiLlama, ECB) are deliberately absent from
+        // runtimeCaching. src/prices/priceStore.ts already caches prices in
+        // IndexedDB per asset and UTC day. A second cache with different
+        // expiry rules over the same data would produce stale prices no one
+        // could explain.
         navigateFallback: 'index.html',
       },
     }),
