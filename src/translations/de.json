@@ -511,6 +511,7 @@
     "Where these figures come from": "Woher diese Zahlen stammen",
     "No configured source": "Keine hinterlegte Datenquelle",
     "{{count}} events · {{from}} to {{to}}": "{{count}} Buchungen · {{from}} bis {{to}}",
+    "Addresses and keys": "Adressen und Schlüssel",
     "Wallets and accounts": "Wallets und Konten",
     "No events from this source yet": "Noch keine Buchungen aus dieser Quelle",
     "Tax-free loss": "Steuerfreier Verlust",

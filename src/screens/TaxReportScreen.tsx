@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import markBlack from '@/assets/logo/coineda-mark-black.svg';
+import { findModule } from '@/sources/registry';
 import { taxRegistry } from '@/tax/registry';
 import { runTaxReport } from '@/tax/runTaxReport';
 import { REWARD_KIND_LABELS } from '@/tax/rewardKinds';
@@ -517,7 +518,13 @@ export const TaxReportScreen = () => {
         if (cancelled) {
           return;
         }
-        setSourceDirectory(buildSourceDirectory(sources, events));
+        setSourceDirectory(
+          buildSourceDirectory(
+            sources,
+            events,
+            (moduleId) => findModule(moduleId)?.manifest.fields,
+          ),
+        );
         setAssessment(result);
         setStatus('done');
         setStep('report');
@@ -1125,9 +1132,9 @@ export const TaxReportScreen = () => {
                     A reader at a tax office has to be able to ask for the
                     statements behind a number, and cannot do that without
                     knowing which accounts produced it. Built from the
-                    sources joined to their events - never from
-                    SourceRecord.config, which is documented as possibly
-                    holding credentials and must not reach a printed page. */}
+                    sources joined to their events; of SourceRecord.config
+                    only public address/xpub fields are read, never
+                    credentials. */}
                 {sourceDirectory.length > 0 && (
                   <div
                     data-testid="source-directory"
@@ -1155,6 +1162,21 @@ export const TaxReportScreen = () => {
                                 {t('Wallets and accounts')}:{' '}
                               </span>
                               {entry.venues.join(' · ')}
+                            </p>
+                          )}
+                          {entry.identities.length > 0 && (
+                            <p>
+                              <span className="font-medium">
+                                {t('Addresses and keys')}:{' '}
+                              </span>
+                              {entry.identities.map((identity, index) => (
+                                <span key={identity}>
+                                  {index > 0 && ' · '}
+                                  <span className="break-all font-mono">
+                                    {identity}
+                                  </span>
+                                </span>
+                              ))}
                             </p>
                           )}
                           <p className="text-muted-foreground">

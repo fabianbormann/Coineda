@@ -1,3 +1,4 @@
+import type { ManifestField } from '@/sources/types';
 import type { LedgerEvent, SourceRecord } from '@/ledger/types';
 
 /**
@@ -19,6 +20,9 @@ export type SourceDirectoryEntry = {
    *  chain source this is the wallet identity: the Cardano translator uses
    *  the account or address as the venue. */
   venues: string[];
+  /** Public wallet identities (addresses, an xpub) from the source's
+   *  config; see `publicIdentities`. Empty for orphans and file sources. */
+  identities: string[];
   eventCount: number;
   firstAt?: number;
   lastAt?: number;
@@ -53,13 +57,46 @@ const absorb = (into: Accumulated, event: LedgerEvent): void => {
 };
 
 /**
+ * The public wallet identities in a source's config, and nothing else.
+ * An allow-list by field type: an unknown or missing manifest yields [].
+ */
+export const publicIdentities = (
+  config: Record<string, string>,
+  fields: ManifestField[] | undefined,
+): string[] => {
+  if (!fields) {
+    return [];
+  }
+  const found: string[] = [];
+  for (const field of fields) {
+    const value = config[field.name];
+    if (typeof value !== 'string') {
+      continue;
+    }
+    if (field.type === 'address') {
+      if (value.trim()) found.push(value.trim());
+    } else if (field.type === 'addressList') {
+      for (const line of value.split('\n')) {
+        if (line.trim()) found.push(line.trim());
+      }
+    } else if (field.type === 'text' && field.name === 'xpub') {
+      if (value.trim()) found.push(value.trim());
+    }
+  }
+  return found;
+};
+
+/**
  * Names the wallets and exchanges every figure in the report came from.
  *
- * Built by joining configured sources to the events they produced, and
- * deliberately NOT from `SourceRecord.config`: that field is documented as
- * possibly holding secrets, and this directory is printed and handed to a
- * tax office. The venue names carry the wallet identity anyway, so nothing
- * is lost by never reading it.
+ * Built by joining configured sources to the events they produced.
+ * `SourceRecord.config` is documented as possibly holding secrets and this
+ * directory is printed and handed to a tax office, so config is never
+ * copied wholesale: only the fields the module manifest types as `address`
+ * or `addressList`, plus a text field named `xpub`, are read (see
+ * `publicIdentities`). Those are public on-chain identities a reader needs
+ * to look the wallet up; API keys, secrets, URLs and project ids never
+ * reach the page.
  *
  * Pure, and takes both lists as arguments rather than reading the database,
  * so it can be tested without one - the same shape the tax modules follow.
@@ -67,6 +104,7 @@ const absorb = (into: Accumulated, event: LedgerEvent): void => {
 export const buildSourceDirectory = (
   sources: SourceRecord[],
   events: LedgerEvent[],
+  fieldsOf: (moduleId: string) => ManifestField[] | undefined,
 ): SourceDirectoryEntry[] => {
   const bySource = new Map<string, Accumulated>();
   const orphans = empty();
@@ -97,6 +135,7 @@ export const buildSourceDirectory = (
       label: source.label,
       moduleId: source.moduleId,
       venues: [...accumulated.venues].sort(),
+      identities: publicIdentities(source.config, fieldsOf(source.moduleId)),
       eventCount: accumulated.eventCount,
       firstAt: accumulated.firstAt,
       lastAt: accumulated.lastAt,
@@ -109,6 +148,7 @@ export const buildSourceDirectory = (
       label: ORPHAN_SOURCE_LABEL,
       moduleId: null,
       venues: [...orphans.venues].sort(),
+      identities: [],
       eventCount: orphans.eventCount,
       firstAt: orphans.firstAt,
       lastAt: orphans.lastAt,

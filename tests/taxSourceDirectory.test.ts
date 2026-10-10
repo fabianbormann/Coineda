@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildSourceDirectory } from '@/tax/sourceDirectory';
+import { buildSourceDirectory, publicIdentities } from '@/tax/sourceDirectory';
+import type { ManifestField } from '@/sources/types';
 import type { LedgerEvent, SourceRecord } from '@/ledger/types';
 
 const source = (overrides: Partial<SourceRecord> = {}): SourceRecord => ({
@@ -44,6 +45,7 @@ describe('buildSourceDirectory', () => {
         eventFrom('s1', 'spot / main', Date.UTC(2025, 1, 1)),
         eventFrom('s1', 'staking', Date.UTC(2025, 2, 1)),
       ],
+      () => undefined,
     );
 
     expect(entries).toHaveLength(1);
@@ -61,6 +63,7 @@ describe('buildSourceDirectory', () => {
         eventFrom('s1', 'spot / main', Date.UTC(2023, 0, 1)),
         eventFrom('s1', 'spot / main', Date.UTC(2024, 0, 1)),
       ],
+      () => undefined,
     );
 
     expect(entries[0].firstAt).toBe(Date.UTC(2023, 0, 1));
@@ -72,7 +75,11 @@ describe('buildSourceDirectory', () => {
     // this directory is printed. The whole entry is serialised rather than
     // checking a named field, so a future field that happens to carry
     // config through is caught too.
-    const entries = buildSourceDirectory([source()], [eventFrom('s1', 'spot')]);
+    const entries = buildSourceDirectory(
+      [source()],
+      [eventFrom('s1', 'spot')],
+      () => undefined,
+    );
 
     expect(JSON.stringify(entries)).not.toContain('cg-secret-value');
     expect(JSON.stringify(entries)).not.toContain('apiKey');
@@ -87,6 +94,7 @@ describe('buildSourceDirectory', () => {
     const entries = buildSourceDirectory(
       [],
       [eventFrom('deleted-source', 'wallet-a')],
+      () => undefined,
     );
 
     expect(entries).toHaveLength(1);
@@ -99,6 +107,7 @@ describe('buildSourceDirectory', () => {
     const entries = buildSourceDirectory(
       [source()],
       [eventFrom('s1', 'spot'), eventFrom('gone', 'wallet-a')],
+      () => undefined,
     );
 
     expect(entries.map((entry) => entry.sourceId)).toEqual(['s1', null]);
@@ -108,11 +117,63 @@ describe('buildSourceDirectory', () => {
     // A source added but never synced is still part of what the report
     // covers - and its absence from the directory would read as "this
     // wallet was not included", which is a different and alarming claim.
-    const entries = buildSourceDirectory([source()], []);
+    const entries = buildSourceDirectory([source()], [], () => undefined);
 
     expect(entries).toHaveLength(1);
     expect(entries[0].eventCount).toBe(0);
     expect(entries[0].venues).toEqual([]);
     expect(entries[0].firstAt).toBeUndefined();
+  });
+});
+
+const field = (name: string, type: ManifestField['type']): ManifestField => ({
+  name,
+  label: name,
+  type,
+  help: name,
+});
+
+describe('publicIdentities', () => {
+  const fields = [
+    field('baseUrl', 'text'),
+    field('projectId', 'text'),
+    field('xpub', 'text'),
+    field('address', 'address'),
+    field('more', 'addressList'),
+    field('apiKey', 'apiKey'),
+    field('secret', 'secret'),
+  ];
+  const config = {
+    baseUrl: 'https://node.example',
+    projectId: 'proj-secret',
+    xpub: 'xpub6abc',
+    address: 'addr1abc',
+    more: 'addr1x\n\n  addr1y  \n',
+    apiKey: 'key-secret',
+    secret: 'sec-secret',
+  };
+
+  it('keeps only addresses, address lists and an xpub', () => {
+    expect(publicIdentities(config, fields)).toEqual([
+      'xpub6abc',
+      'addr1abc',
+      'addr1x',
+      'addr1y',
+    ]);
+  });
+
+  it('yields nothing without a field list', () => {
+    expect(publicIdentities(config, undefined)).toEqual([]);
+  });
+
+  it('carries identities on directory entries, none on orphans', () => {
+    const entries = buildSourceDirectory(
+      [source({ moduleId: 'm', config })],
+      [eventFrom('s1', 'v'), eventFrom('gone', 'v')],
+      (id) => (id === 'm' ? fields : undefined),
+    );
+    expect(entries[0].identities).toContain('addr1abc');
+    expect(JSON.stringify(entries)).not.toContain('secret');
+    expect(entries[1].identities).toEqual([]);
   });
 });

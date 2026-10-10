@@ -1335,6 +1335,45 @@ describe('where the figures come from', () => {
     expect(directory.textContent).toMatch(/2 events/);
   });
 
+  it('prints a chain source address but nothing for a CSV source', async () => {
+    await putSource({
+      id: 's1',
+      moduleId: 'cardano-blockfrost',
+      label: 'My wallet',
+      config: {
+        projectId: 'proj-secret-value',
+        address: 'addr1qpublicidentity',
+      },
+    });
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+
+    const directory = await screen.findByTestId('source-directory');
+    expect(directory.textContent).toMatch(/addresses and keys/i);
+    expect(directory.textContent).toContain('addr1qpublicidentity');
+    expect(directory.textContent).not.toContain('proj-secret-value');
+  });
+
+  it('prints no identities line for a CSV source', async () => {
+    await putSource({
+      id: 's1',
+      moduleId: 'kraken-csv',
+      label: 'My Kraken account',
+      config: { apiKey: 'cg-secret-value' },
+    });
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+
+    renderScreen();
+    await runReport('2025');
+
+    const directory = await screen.findByTestId('source-directory');
+    expect(directory.textContent).not.toMatch(/addresses and keys/i);
+  });
+
   it('never prints a source credential', async () => {
     await putSource({
       id: 's1',
