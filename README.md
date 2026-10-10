@@ -159,6 +159,8 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org/); the
 version number are generated from them. See [CONTRIBUTING.md](CONTRIBUTING.md) for how pull requests
 are reviewed, and the [code of conduct](CODE_OF_CONDUCT.md) for how we treat each other.
 
+What Coineda stores, what it sends and how to report a vulnerability: [SECURITY.md](SECURITY.md).
+
 ## License
 
 [GPL-3.0](LICENSE). Your data is yours, and so is the code.

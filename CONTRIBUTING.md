@@ -5,6 +5,8 @@ We welcome and appreciate contributions to Coineda! 🎉 Whether it's fixing bug
 When contributing to this repository, please first describe the change you wish to make [via an issue](https://github.com/fabianbormann/Coineda/issues/new) before making a change. For every other form of discussion use the [discussions section](https://github.com/fabianbormann/Coineda/discussions) of this repo.
 Please note we have a [code of conduct](https://github.com/fabianbormann/Coineda/blob/main/CODE_OF_CONDUCT.md), please follow it in all your interactions with the project.
 
+Security vulnerabilities are not reported as issues: see [SECURITY.md](SECURITY.md).
+
 ## Issues and pull requests
 
 ### 🪲 Bug reports
