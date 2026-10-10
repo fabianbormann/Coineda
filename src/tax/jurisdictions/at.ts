@@ -97,6 +97,17 @@ const AUSTRIAN_RULED_KINDS: ReadonlySet<RewardKind> = new Set<RewardKind>([
   'fork',
 ]);
 
+/** On an income row whose reward had a fee leg: §27a Abs. 1 taxes the
+ *  gross income at the flat rate, and §20 Abs. 2 EStG allows no
+ *  Werbungskosten against income taxed at it. */
+const FEE_NOT_DEDUCTIBLE_NOTE =
+  'Fees on income are not deductible under the flat tax.';
+
+/**
+ * A reward's fee legs are disposals of the fee coins at market, as in
+ * classifyTrade - the coins left the holding - and nothing else: there is
+ * no deduction against the income, which the income row's note says.
+ */
 const classifyReward = (event: LedgerEvent): TaxEvent[] => {
   const leg = event.legs.find(
     (one) => one.role === 'principal' && one.direction === 'in',
@@ -113,6 +124,8 @@ const classifyReward = (event: LedgerEvent): TaxEvent[] => {
     // as income by default.
     return [];
   }
+  const fees = event.legs.filter((one) => one.role === 'fee');
+  const feeDisposals = fees.flatMap((one) => legToTaxEvent(event, one));
 
   const acquisition: TaxEvent = {
     sourceEventId: event.id,
@@ -127,6 +140,7 @@ const classifyReward = (event: LedgerEvent): TaxEvent[] => {
     // Coins from a fork have no acquisition cost.
     return [
       { ...acquisition, consideration: { assetId: leg.assetId, amount: '0' } },
+      ...feeDisposals,
     ];
   }
 
@@ -137,8 +151,9 @@ const classifyReward = (event: LedgerEvent): TaxEvent[] => {
     amount: leg.amount,
     timestamp: event.timestamp,
     venue: leg.venue,
+    ...(fees.length === 0 ? {} : { note: FEE_NOT_DEDUCTIBLE_NOTE }),
   };
-  return [income, acquisition];
+  return [income, acquisition, ...feeDisposals];
 };
 
 /**

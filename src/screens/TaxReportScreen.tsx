@@ -2258,6 +2258,17 @@ export const TaxReportScreen = () => {
                               </span>
                             )}
                           </p>
+                          {/* The fee paid to receive the reward, where the
+                              jurisdiction deducts it (Germany). */}
+                          {row.costs !== undefined && (
+                            <p>
+                              {t('Expenses')}:{' '}
+                              <Money
+                                value={Number(row.costs)}
+                                currency={baseCurrency}
+                              />
+                            </p>
+                          )}
                           {row.note !== undefined && (
                             <p className="text-muted-foreground">
                               {t(row.note)}

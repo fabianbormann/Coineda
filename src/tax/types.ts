@@ -409,6 +409,14 @@ export type TaxAssessment = {
     exemptGain: string;
     income: string;
     /**
+     * The costs deducted from the year's income, as a positive decimal
+     * string: Germany deducts a fee paid to receive a reward as
+     * Werbungskosten against that reward's §22 Nr. 3 income, never more
+     * than the reward's own value. Absent when no income carried a cost -
+     * Austria never sets it, the flat tax allowing no deduction.
+     */
+    incomeCosts?: string;
+    /**
      * The year's loss, as a POSITIVE number, or '0'.
      *
      * Deliberately kept OUT of `taxableGain`, which stays "what is
@@ -553,6 +561,12 @@ export type ReportedIncome = {
   venue: string;
   value: string;
   priceSource?: string;
+  /**
+   * The valued costs on the income event, summed (Germany: a fee paid to
+   * receive the reward). Absent when the jurisdiction attached none, or
+   * none could be valued.
+   */
+  costs?: string;
   note?: string;
   /** From the ledger event, when the host can find it. */
   rewardKind?: RewardKind;

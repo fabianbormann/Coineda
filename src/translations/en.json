@@ -324,6 +324,8 @@
     "Income": "Income",
     "No income in this year.": "No income in this year.",
     "Value at receipt": "Value at receipt",
+    "Fees on income are not deductible under the flat tax.": "Fees on income are not deductible under the flat tax.",
+    "The fee exceeds the value of this reward. Only up to that value is deducted, so the income counts as 0.": "The fee exceeds the value of this reward. Only up to that value is deducted, so the income counts as 0.",
     "Estimated tax liability": "Estimated tax liability",
     "Thresholds": "Thresholds",
     "This is a Freigrenze: once the limit is reached, the entire gain becomes taxable, not just the excess.": "This is a Freigrenze: once the limit is reached, the entire gain becomes taxable, not just the excess.",

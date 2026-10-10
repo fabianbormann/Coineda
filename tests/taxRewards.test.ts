@@ -3,8 +3,9 @@ import 'fake-indexeddb/auto';
 import { openLedger, putEvents } from '@/ledger/db';
 import { runTaxReport } from '@/tax/runTaxReport';
 import germanTax from '@/tax/jurisdictions/de';
+import austrianTax from '@/tax/jurisdictions/at';
 import type { LedgerEvent, Leg, RewardKind } from '@/ledger/types';
-import { flatRange } from './priceRangeStub';
+import { flatRange, rangeStub } from './priceRangeStub';
 
 /**
  * Reward kinds end to end through the real German module: the kind a source
@@ -199,5 +200,163 @@ describe('reward kinds end to end', () => {
     expect(report.lines).toHaveLength(1);
     expect(report.lines[0].gain).toBe('500');
     expect(report.totals.taxableGain).toBe('0');
+  });
+});
+
+describe('a fee paid to receive a reward', () => {
+  // 0.4 EUR per whole ADA: 100 ADA is 40, a 0.2 ADA fee is 0.08.
+  const ADA_FEE = '200000';
+  const BTC = 'bitcoin:native';
+
+  const feeReward = (principal: Leg, fee: Leg): LedgerEvent => ({
+    id: 'stake',
+    sourceId: 's1',
+    externalId: 'stake',
+    timestamp: Date.UTC(2025, 3, 1),
+    kind: 'reward',
+    origin: 'derived',
+    rewardKind: 'staking',
+    legs: [fee, principal],
+  });
+
+  const adaFee = leg({
+    assetId: ADA,
+    amount: ADA_FEE,
+    direction: 'out',
+    role: 'fee',
+  });
+
+  // Earlier ADA, so a fee larger than the reward has coins to come from.
+  const buyAda: LedgerEvent = {
+    id: 'buy',
+    sourceId: 's1',
+    externalId: 'buy',
+    timestamp: Date.UTC(2025, 0, 10),
+    kind: 'trade',
+    origin: 'derived',
+    legs: [
+      leg({ assetId: EUR, amount: '4', direction: 'out' }),
+      leg({ assetId: ADA, amount: ada(10), direction: 'in' }),
+    ],
+  };
+
+  const incomeEntry = (
+    report: Awaited<ReturnType<typeof runGermany>>,
+    label: string,
+  ) =>
+    report.filing?.sections
+      .find((section) => section.title === 'Other income (§22 Nr. 3 EStG)')
+      ?.entries.find((entry) => entry.label === label)?.amount;
+
+  beforeEach(() => {
+    // BTC at 50000 EUR, everything else (ADA) at 0.4 EUR.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        rangeStub(() => (url.includes('/coins/bitcoin/') ? 50000 : 0.4))(url),
+      ),
+    );
+  });
+
+  it('disposes of the fee coins and deducts their value from the income', async () => {
+    await putEvents([
+      feeReward(
+        leg({ assetId: ADA, amount: ada(100), direction: 'in' }),
+        adaFee,
+      ),
+    ]);
+
+    const report = await runGermany();
+
+    expect(report.income).toHaveLength(1);
+    expect(report.income[0]).toMatchObject({ value: '40', costs: '0.08' });
+    expect(report.income[0].note).toBeUndefined();
+    expect(report.lines).toHaveLength(1);
+    expect(report.lines[0]).toMatchObject({ assetId: ADA, proceeds: '0.08' });
+    expect(report.totals.incomeCosts).toBe('0.08');
+    expect(incomeThreshold(report)).toMatchObject({
+      actual: '39.92',
+      exceeded: false,
+    });
+    expect(incomeEntry(report, 'Sum of the receipts')).toBe('40');
+    expect(incomeEntry(report, 'Expenses related to the receipts')).toBe(
+      '0.08',
+    );
+    expect(incomeEntry(report, 'Result of the other income')).toBe('39.92');
+    expect(report.register.find((row) => row.kind === 'income')?.costs).toBe(
+      '0.08',
+    );
+  });
+
+  it('floors the income at zero and notes the excess when the fee is larger', async () => {
+    await putEvents([
+      buyAda,
+      feeReward(
+        leg({ assetId: ADA, amount: '100000', direction: 'in' }),
+        adaFee,
+      ),
+    ]);
+
+    const report = await runGermany();
+
+    expect(report.income).toHaveLength(1);
+    expect(report.income[0]).toMatchObject({ value: '0.04', costs: '0.08' });
+    expect(report.income[0].note).toMatch(/exceeds/);
+    expect(report.register.find((row) => row.kind === 'income')?.note).toMatch(
+      /exceeds/,
+    );
+    // Only what the income can absorb is deducted.
+    expect(report.totals.incomeCosts).toBe('0.04');
+    expect(incomeThreshold(report)).toMatchObject({ actual: '0' });
+    expect(incomeEntry(report, 'Expenses related to the receipts')).toBe(
+      '0.04',
+    );
+    expect(incomeEntry(report, 'Result of the other income')).toBe('0');
+  });
+
+  it('disposes of the fee asset and values the cost in it when the reward is another asset', async () => {
+    await putEvents([
+      buyAda,
+      feeReward(
+        leg({ assetId: BTC, amount: '100000', direction: 'in' }),
+        adaFee,
+      ),
+    ]);
+
+    const report = await runGermany();
+
+    expect(report.income).toHaveLength(1);
+    expect(report.income[0]).toMatchObject({
+      assetId: BTC,
+      value: '50',
+      costs: '0.08',
+    });
+    expect(report.lines).toHaveLength(1);
+    expect(report.lines[0]).toMatchObject({ assetId: ADA, proceeds: '0.08' });
+    expect(report.totals.incomeCosts).toBe('0.08');
+  });
+
+  it('disposes of the fee coins in Austria and deducts nothing', async () => {
+    await putEvents([
+      feeReward(
+        leg({ assetId: ADA, amount: ada(100), direction: 'in' }),
+        adaFee,
+      ),
+    ]);
+
+    const report = await runTaxReport(austrianTax, {
+      year: 2025,
+      baseCurrency: 'eur',
+    });
+
+    expect(report.income).toHaveLength(1);
+    expect(report.income[0].value).toBe('40');
+    expect(report.income[0].costs).toBeUndefined();
+    expect(report.income[0].note).toBe(
+      'Fees on income are not deductible under the flat tax.',
+    );
+    expect(report.totals.incomeCosts).toBeUndefined();
+    expect(report.lines).toHaveLength(1);
+    expect(report.lines[0]).toMatchObject({ assetId: ADA, proceeds: '0.08' });
   });
 });

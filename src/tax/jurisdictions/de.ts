@@ -11,6 +11,7 @@ import {
 import { isFiatAsset } from '@/ledger/balances';
 import { fiatConsiderationOf } from '@/tax/consideration';
 import { linesFor } from '@/tax/jurisdictions/de.forms';
+import { costsOf } from '@/tax/matching';
 import { rewardKindOf } from '@/tax/rewardKinds';
 import type { Leg, LedgerEvent, RewardKind } from '@/ledger/types';
 import type {
@@ -219,6 +220,24 @@ const classifyTrade = (event: LedgerEvent): TaxEvent[] => {
   ];
 };
 
+/**
+ * A reward's fee legs - the network fee of a claim, a pool's withdrawal
+ * charge - get the trade branch's two treatments, for the same reasons.
+ *
+ * The fee coins leave the holding, so a crypto fee is a disposal at market
+ * (`feeDisposals`, exactly as in classifyTrade), realising whatever the fee
+ * coins gained since purchase. And the fee is an expense of earning the
+ * reward, so its value is Werbungskosten against that event's §22 Nr. 3
+ * income (§9 Abs. 1, §22 Nr. 3 EStG): it rides on the income event as
+ * `costs`, the host values it like any other cost, and `assess` deducts it
+ * - never below zero, since the reward is the only income it was spent on.
+ * Not on the acquisition: the fee bought the right to the reward, not the
+ * coins, so it is no Anschaffungsnebenkosten. A fiat fee has no holding
+ * and is only the deduction.
+ *
+ * Before this, both were dropped: the fee coins never left the lot ledger
+ * and the fee reduced nothing.
+ */
 const classifyReward = (event: LedgerEvent): TaxEvent[] => {
   // The reward's own leg: the principal that arrived. A fee leg on the
   // same event is not the reward.
@@ -234,6 +253,8 @@ const classifyReward = (event: LedgerEvent): TaxEvent[] => {
     // the host lists it rather than this guessing.
     return [];
   }
+  const fees = event.legs.filter((one) => one.role === 'fee');
+  const feeDisposals = fees.flatMap((one) => legToTaxEvent(event, one));
 
   const acquisition: TaxEvent = {
     sourceEventId: event.id,
@@ -249,12 +270,18 @@ const classifyReward = (event: LedgerEvent): TaxEvent[] => {
     // letter carries the ORIGINAL lot's acquisition date over; the ledger
     // cannot link a fork to its parent lot yet, so the fork date is used,
     // which is the shorter holding period and so the conservative side.
+    // No income to deduct a fee from, but its coins still left.
     return [
       { ...acquisition, consideration: { assetId: leg.assetId, amount: '0' } },
+      ...feeDisposals,
     ];
   }
 
   const note = REWARD_NOTES[kind];
+  const costs = fees.map((one) => ({
+    assetId: one.assetId,
+    amount: one.amount,
+  }));
   const income: TaxEvent = {
     sourceEventId: event.id,
     kind: 'income',
@@ -263,8 +290,24 @@ const classifyReward = (event: LedgerEvent): TaxEvent[] => {
     timestamp: event.timestamp,
     venue: leg.venue,
     ...(note === undefined ? {} : { note }),
+    ...(costs.length === 0 ? {} : { costs }),
   };
-  return [income, acquisition];
+  return [income, acquisition, ...feeDisposals];
+};
+
+/**
+ * One income event's figures: its value, the costs deducted from it, and
+ * what is left. The deduction is capped at the value, so a fee larger than
+ * the reward leaves the income at 0 rather than negative; the host notes
+ * the excess on the row.
+ */
+const netIncome = (
+  event: TaxEvent,
+): { value: string; deducted: string; net: string } => {
+  const value = event.value ?? '0';
+  const costs = costsOf(event);
+  const deducted = compareAmounts(costs, value) > 0 ? value : costs;
+  return { value, deducted, net: subtractAmounts(value, deducted) };
 };
 
 /**
@@ -560,7 +603,12 @@ const buildFiling = (
   }
 
   if (input.income.length > 0) {
-    const sum = sumAmounts(input.income.map((event) => event.value ?? '0'));
+    // Gross receipts and the Werbungskosten separately, as the form asks;
+    // the result is the same net sum the Freigrenze is tested on.
+    const figures = input.income.map(netIncome);
+    const sum = sumAmounts(figures.map((one) => one.value));
+    const expenses = sumAmounts(figures.map((one) => one.deducted));
+    const result = sumAmounts(figures.map((one) => one.net));
     const income = forms?.income;
     sections.push({
       title: FILING_TITLE_INCOME,
@@ -583,12 +631,12 @@ const buildFiling = (
         },
         {
           label: 'Expenses related to the receipts',
-          amount: '0',
+          amount: expenses,
           ...ref('Anlage SO', income?.expenses),
         },
         {
           label: 'Result of the other income',
-          amount: sum,
+          amount: result,
           ...ref('Anlage SO', income?.result),
         },
       ],
@@ -697,8 +745,14 @@ const assess = (input: AssessInput): TaxAssessment => {
   };
 
   // §22 Nr. 3 EStG's own €256 Freigrenze, assessed independently of §23 -
-  // a private-sale loss must never reduce it.
-  const incomeSum = sumAmounts(input.income.map((event) => event.value ?? '0'));
+  // a private-sale loss must never reduce it. Tested on the income net of
+  // its Werbungskosten (a fee paid to receive a reward), per event.
+  const incomeFigures = input.income.map(netIncome);
+  const incomeSum = sumAmounts(incomeFigures.map((one) => one.net));
+  const hasIncomeCosts = input.income.some(
+    (event) => (event.costs ?? []).length > 0,
+  );
+  const incomeCosts = sumAmounts(incomeFigures.map((one) => one.deducted));
   const incomeLimit = '256';
   const incomeExceeded = compareAmounts(incomeSum, incomeLimit) >= 0;
   const income = incomeExceeded ? incomeSum : '0';
@@ -815,6 +869,7 @@ const assess = (input: AssessInput): TaxAssessment => {
       taxableGain,
       exemptGain,
       income,
+      ...(hasIncomeCosts ? { incomeCosts } : {}),
       loss,
       // The host (runTaxReport) recomputes `omitted` from what it could not
       // resolve; this module only knows the disposals it was handed.
@@ -847,8 +902,14 @@ const germanTax: TaxModule = {
     jurisdiction: 'Germany',
     contributor: 'Fabian Bormann',
     rulesCheckedOn: '2026-10-10',
-    rulesVersion: '1.5.0',
+    rulesVersion: '1.6.0',
     changelog: [
+      {
+        version: '1.6.0',
+        date: '2026-10-10',
+        summary:
+          'Fees paid to receive a reward are disposed and deducted as Werbungskosten.',
+      },
       {
         version: '1.5.0',
         date: '2026-10-10',

@@ -46,8 +46,10 @@ const proportion = (
  * skipped: resolveValues has already listed it as unpriced, and this is
  * where "not deducted" is made true - the same choice `matchFifo` makes for
  * an acquisition with no value, which never becomes a lot of cost zero.
+ * Exported for the income side, where the same rule decides what a fee
+ * paid to receive a reward deducts.
  */
-const costsOf = (event: TaxEvent): string =>
+export const costsOf = (event: TaxEvent): string =>
   sumAmounts(
     (event.costs ?? []).flatMap((cost) =>
       cost.value === undefined ? [] : [cost.value],

@@ -966,6 +966,135 @@ describe('german reward kinds', () => {
     );
     expect(events.find((e) => e.kind === 'income')?.amount).toBe('100');
   });
+
+  describe('a fee paid to receive it', () => {
+    const TOKEN = 'cardano:deadbeef.HOSKY';
+    const feeLeg = (assetId: string, amount = '1') => ({
+      assetId,
+      amount,
+      direction: 'out' as const,
+      venue: 'w',
+      role: 'fee' as const,
+    });
+    const principal = (assetId: string) => ({
+      assetId,
+      amount: '100',
+      direction: 'in' as const,
+      venue: 'w',
+      role: 'principal' as const,
+    });
+
+    it('disposes of the fee coins and puts their cost on the income', () => {
+      const events = germanTax.classify(
+        reward('staking', [feeLeg('cardano:lovelace'), principal(TOKEN)]),
+      );
+      expect(events.find((e) => e.kind === 'income')).toMatchObject({
+        assetId: TOKEN,
+        amount: '100',
+        costs: [{ assetId: 'cardano:lovelace', amount: '1' }],
+      });
+      expect(events.filter((e) => e.kind === 'disposal')).toEqual([
+        expect.objectContaining({
+          assetId: 'cardano:lovelace',
+          amount: '1',
+          venue: 'w',
+        }),
+      ]);
+      // The acquisition carries no cost: the fee is Werbungskosten of the
+      // income, not an Anschaffungsnebenkosten of the coins.
+      expect(
+        events.find((e) => e.kind === 'acquisition')?.costs,
+      ).toBeUndefined();
+    });
+
+    it('deducts a fiat fee without disposing of anything', () => {
+      const events = germanTax.classify(
+        reward('staking', [feeLeg('fiat:eur'), principal('cardano:lovelace')]),
+      );
+      expect(events.filter((e) => e.kind === 'disposal')).toEqual([]);
+      expect(events.find((e) => e.kind === 'income')?.costs).toEqual([
+        { assetId: 'fiat:eur', amount: '1' },
+      ]);
+    });
+
+    it('still disposes of the fee coins on a fork', () => {
+      const events = germanTax.classify(
+        reward('fork', [feeLeg('cardano:lovelace'), principal(TOKEN)]),
+      );
+      expect(events.map((e) => e.kind).sort()).toEqual([
+        'acquisition',
+        'disposal',
+      ]);
+    });
+
+    it('nets the costs per event, floored at zero, before the Freigrenze', () => {
+      const income = (id: string, value: string, costs?: string): TaxEvent => ({
+        sourceEventId: id,
+        kind: 'income',
+        assetId: 'cardano:lovelace',
+        amount: '1',
+        timestamp: Date.UTC(2025, 5, 1),
+        venue: 'w',
+        value,
+        ...(costs === undefined
+          ? {}
+          : {
+              costs: [
+                { assetId: 'cardano:lovelace', amount: '1', value: costs },
+              ],
+            }),
+      });
+      const result = germanTax.assess({
+        year: 2025,
+        matched: [],
+        income: [
+          income('a', '300', '10'),
+          // Costs above the value deduct only the value.
+          income('b', '5', '8'),
+          income('c', '20'),
+        ],
+        capital: [],
+      });
+      expect(result.totals.incomeCosts).toBe('15');
+      expect(result.totals.income).toBe('310');
+      const threshold = result.thresholds.find((one) =>
+        one.label.includes('§22'),
+      );
+      expect(threshold).toMatchObject({ actual: '310', exceeded: true });
+      const entries = result.filing?.sections.find(
+        (section) => section.title === 'Other income (§22 Nr. 3 EStG)',
+      )?.entries;
+      const amount = (label: string) =>
+        entries?.find((entry) => entry.label === label)?.amount;
+      expect(amount('Sum of the receipts')).toBe('325');
+      expect(amount('Expenses related to the receipts')).toBe('15');
+      expect(amount('Result of the other income')).toBe('310');
+    });
+
+    it('leaves the totals without incomeCosts when no income has a cost', () => {
+      const result = germanTax.assess({
+        year: 2025,
+        matched: [],
+        income: [],
+        capital: [],
+      });
+      expect(result.totals.incomeCosts).toBeUndefined();
+    });
+
+    it('is disposed of in Austria with nothing deducted, and says so', () => {
+      const events = austrianTax.classify(
+        reward('staking', [feeLeg('cardano:lovelace'), principal(TOKEN)]),
+      );
+      const income = events.find((e) => e.kind === 'income');
+      expect(income?.costs).toBeUndefined();
+      expect(income?.note).toBe(
+        'Fees on income are not deductible under the flat tax.',
+      );
+      expect(events.filter((e) => e.kind === 'disposal')).toEqual([
+        expect.objectContaining({ assetId: 'cardano:lovelace', amount: '1' }),
+      ]);
+    });
+  });
 });
 
 describe('german derivatives', () => {

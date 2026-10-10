@@ -583,10 +583,10 @@ describe('the rule-set version', () => {
     // reader at the Finanzamt. The disclaimer prints at once, the method
     // sheet only once the run is over - so wait for both.
     await waitFor(() =>
-      expect(screen.getAllByText(/rule set germany 1\.5\.0/i)).toHaveLength(2),
+      expect(screen.getAllByText(/rule set germany 1\.6\.0/i)).toHaveLength(2),
     );
     expect(
-      screen.getByText(/rule set germany 1\.5\.0, checked on/i),
+      screen.getByText(/rule set germany 1\.6\.0, checked on/i),
     ).toBeInTheDocument();
     expect(screen.queryByText(/rule set de\b/i)).toBeNull();
   });
@@ -615,7 +615,7 @@ describe('the rule-set version', () => {
         await screen.findByRole('button', { name: /deutschland/i }),
       );
       expect(
-        await screen.findByText(/regelwerk deutschland 1\.5\.0, geprüft am/i),
+        await screen.findByText(/regelwerk deutschland 1\.6\.0, geprüft am/i),
       ).toBeInTheDocument();
     } finally {
       await i18n.changeLanguage('en');
@@ -1951,6 +1951,46 @@ describe('the form and the report are separate steps', () => {
     expect(
       within(section).getByText(/gewerbliche Einkünfte/),
     ).toBeInTheDocument();
+  });
+
+  it('shows the expenses of an income event that had a fee', async () => {
+    taxRegistry.push(germanTax);
+    await putEvents([
+      ledgerEvent({
+        id: 'reward',
+        externalId: 'reward',
+        kind: 'reward',
+        rewardKind: 'staking',
+        timestamp: Date.UTC(new Date().getUTCFullYear(), 0, 2),
+        legs: [
+          {
+            assetId: 'fiat:eur',
+            amount: '1',
+            direction: 'out',
+            venue: 'stake-venue',
+            role: 'fee',
+          },
+          {
+            assetId: 'fiat:eur',
+            amount: '5',
+            direction: 'in',
+            venue: 'stake-venue',
+            role: 'principal',
+          },
+        ],
+      }),
+    ]);
+
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /germany/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /run report/i }),
+    );
+
+    const section = await screen.findByTestId('income-lines');
+    expect(within(section).getByText(/^expenses/i)).toBeInTheDocument();
   });
 });
 

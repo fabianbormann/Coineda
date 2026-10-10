@@ -107,4 +107,47 @@ describe('filing figures end to end', () => {
     expect(amountAt(1, 20)).toBe('5');
     expect(filing?.sections).toHaveLength(2);
   });
+
+  it('enters a fee paid to receive a reward as the expenses of the income', async () => {
+    vi.stubGlobal('fetch', flatRange(0.4));
+    await putEvents([
+      event({
+        id: 'reward',
+        externalId: 'reward',
+        kind: 'reward',
+        rewardKind: 'staking',
+        timestamp: Date.UTC(2025, 3, 1),
+        legs: [
+          leg({
+            assetId: ADA,
+            amount: '200000',
+            direction: 'out',
+            role: 'fee',
+            venue: 'stake1',
+          }),
+          leg({
+            assetId: ADA,
+            amount: ada(100),
+            direction: 'in',
+            venue: 'stake1',
+          }),
+        ],
+      }),
+    ]);
+
+    const report = await runTaxReport(germanTax, {
+      year: 2025,
+      baseCurrency: 'eur',
+    });
+    const income = report.filing?.sections.find(
+      (section) => section.title === 'Other income (§22 Nr. 3 EStG)',
+    );
+    const amountAt = (line: number) =>
+      income?.entries.find((e) => e.reference?.line === line)?.amount;
+
+    expect(amountAt(18)).toBe('40');
+    expect(amountAt(19)).toBe('0.08');
+    expect(amountAt(20)).toBe('39.92');
+    expect(report.totals.incomeCosts).toBe('0.08');
+  });
 });

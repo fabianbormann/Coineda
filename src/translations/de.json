@@ -324,6 +324,8 @@
     "Income": "Einkünfte",
     "No income in this year.": "Keine Einkünfte in diesem Jahr.",
     "Value at receipt": "Wert bei Zufluss",
+    "Fees on income are not deductible under the flat tax.": "Gebühren auf Einkünfte sind unter der Pauschalbesteuerung nicht abziehbar.",
+    "The fee exceeds the value of this reward. Only up to that value is deducted, so the income counts as 0.": "Die Gebühr übersteigt den Wert dieser Belohnung. Abgezogen wird nur bis zu diesem Wert, die Einkunft zählt daher mit 0.",
     "Estimated tax liability": "Geschätzte Steuerschuld",
     "Thresholds": "Freigrenzen und Freibeträge",
     "This is a Freigrenze: once the limit is reached, the entire gain becomes taxable, not just the excess.": "Das ist eine Freigrenze: Sobald die Grenze erreicht ist, wird der gesamte Gewinn steuerpflichtig, nicht nur der übersteigende Teil.",
