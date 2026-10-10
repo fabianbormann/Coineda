@@ -194,6 +194,32 @@ describe('registerToCsv', () => {
   });
 });
 
+describe('a token name that looks like a formula', () => {
+  const name = '=HYPERLINK("//x.io")';
+  const hex = Array.from(new TextEncoder().encode(name))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  const asset = `cardano:${'ab'.repeat(28)}${hex}`;
+
+  it('is defused with a leading quote and survives the round trip', () => {
+    const rows = buildRegister({
+      year: 2025,
+      valued: [taxEvent({ assetId: asset, amount: '-5' })],
+      internalTransfers: [],
+      residuals: [],
+      unresolved: [],
+    });
+    expect(rows[0].symbol).toBe(name);
+    const csv = registerToCsv(rows);
+    expect(csv).toContain(`"'=HYPERLINK(""//x.io"")"`);
+    // A negative decimal is a number, not a formula: left alone.
+    expect(csv).toContain(',-5,');
+    const parsed = readCsv(csv).rows[0];
+    expect(parsed.symbol).toBe(`'${name}`);
+    expect(parsed.amount).toBe('-5');
+  });
+});
+
 describe('reportToJson and filenames', () => {
   it('is self-describing JSON', () => {
     const register = build();

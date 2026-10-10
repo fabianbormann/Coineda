@@ -211,9 +211,20 @@ const COLUMNS: { key: keyof RegisterRow; header: string }[] = [
   { key: 'note', header: 'note' },
 ];
 
-/** RFC 4180: a cell with a comma, quote or line break is quoted, quotes doubled. */
+/**
+ * One CSV cell.
+ *
+ * First the OWASP formula rule: text starting with `=`, `+`, `-`, `@`, TAB
+ * or CR gets a leading `'`, so a spreadsheet shows it rather than running
+ * it - a token's name is chosen by whoever minted it, and
+ * `=HYPERLINK(...)` is a valid Cardano asset name. A plain decimal is
+ * exempt, so a negative amount stays a number. Then RFC 4180: a cell with a
+ * comma, quote or line break is quoted, quotes doubled.
+ */
 const cell = (value: string | undefined): string => {
-  const text = value ?? '';
+  const raw = value ?? '';
+  const text =
+    /^[=+\-@\t\r]/.test(raw) && !/^-?\d+(\.\d+)?$/.test(raw) ? `'${raw}` : raw;
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
 
