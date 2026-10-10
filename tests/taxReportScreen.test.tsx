@@ -2787,3 +2787,146 @@ describe('the client on the screen and the printout', () => {
     ).not.toBeNull();
   });
 });
+
+describe('the DATEV settings card', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const openModule = async (mod: TaxModule, name: RegExp) => {
+    taxRegistry.push(mod);
+    renderScreen();
+    await userEvent.click(await screen.findByRole('button', { name }));
+  };
+
+  const labels = [
+    /^advisor number/i,
+    /^client number/i,
+    /^account number length/i,
+    /^clearing account/i,
+    /^account for §23 gains/i,
+    /^account for §23 losses/i,
+    /^account for §22 nr\. 3 income/i,
+  ];
+
+  it('appears for Germany', async () => {
+    await openModule(germanTax, /germany/i);
+    expect(await screen.findByText('DATEV')).toBeInTheDocument();
+    for (const label of labels) {
+      expect(screen.getByLabelText(label)).toBeInTheDocument();
+    }
+    expect(screen.getByLabelText(/^account number length/i)).toHaveValue('4');
+  });
+
+  it('is absent for Austria', async () => {
+    const { default: austrianTax } = await import('@/tax/jurisdictions/at');
+    await openModule(austrianTax, /austria/i);
+    await screen.findByLabelText(/tax year/i);
+    expect(screen.queryByText('DATEV')).toBeNull();
+    expect(screen.queryByLabelText(/^advisor number/i)).toBeNull();
+  });
+
+  it('writes the whole object on each blur', async () => {
+    await openModule(germanTax, /germany/i);
+    const spy = vi.spyOn(settingsStore, 'putSettings');
+    await userEvent.type(
+      await screen.findByLabelText(/^advisor number/i),
+      '1234567',
+    );
+    await userEvent.type(screen.getByLabelText(/^client number/i), '12345');
+    await userEvent.type(screen.getByLabelText(/^clearing account/i), '1200');
+    await userEvent.type(
+      screen.getByLabelText(/^account for §23 gains/i),
+      '2300',
+    );
+    await userEvent.type(
+      screen.getByLabelText(/^account for §23 losses/i),
+      '2310',
+    );
+    await userEvent.type(
+      screen.getByLabelText(/^account for §22 nr\. 3 income/i),
+      '2320',
+    );
+    await userEvent.tab();
+    expect(spy.mock.calls.at(-1)?.[0]).toEqual({
+      datev: {
+        beraternummer: '1234567',
+        mandantennummer: '12345',
+        sachkontenlaenge: 4,
+        konten: {
+          verrechnung: '1200',
+          gewinn23: '2300',
+          verlust23: '2310',
+          einkuenfte22: '2320',
+        },
+      },
+    });
+    // One write per blur: five fields were left by clicking the next, plus
+    // the final tab.
+    expect(spy).toHaveBeenCalledTimes(6);
+    await waitFor(async () =>
+      expect((await getSettings())?.datev?.konten.gewinn23).toBe('2300'),
+    );
+  });
+
+  it('flags an account of the wrong length once the field is left', async () => {
+    await openModule(germanTax, /germany/i);
+    const field = await screen.findByLabelText(/^clearing account/i);
+    await userEvent.type(field, '12');
+    expect(screen.queryByText('Must be 4 digits')).toBeNull();
+    await userEvent.tab();
+    expect(await screen.findByText('Must be 4 digits')).toBeInTheDocument();
+  });
+
+  it('disables every input in review mode and writes nothing', async () => {
+    await putSettings({
+      datev: {
+        beraternummer: '99',
+        mandantennummer: '1',
+        sachkontenlaenge: 5,
+        konten: {
+          verrechnung: '12000',
+          gewinn23: '23000',
+          verlust23: '23100',
+          einkuenfte22: '23200',
+        },
+      },
+    });
+    taxRegistry.push(germanTax);
+    const spy = vi.spyOn(settingsStore, 'putSettings');
+    render(
+      <MemoryRouter>
+        <ClientProvider
+          client={{
+            id: 'c-1',
+            label: 'Müller GmbH',
+            dbName: 'db-1',
+            kind: 'review',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            review: {
+              fingerprint: 'abcdef0123456789abcdef',
+              omittedEventCount: 0,
+              file: 'mueller.coineda',
+              verdict: 'match',
+            },
+          }}
+          onChange={vi.fn()}
+        >
+          <TaxReportScreen />
+        </ClientProvider>
+      </MemoryRouter>,
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /germany/i }),
+    );
+    const advisor = await screen.findByLabelText(/^advisor number/i);
+    await waitFor(() => expect(advisor).toHaveValue('99'));
+    for (const label of labels) {
+      expect(screen.getByLabelText(label)).toBeDisabled();
+    }
+    expect(spy).not.toHaveBeenCalled();
+  });
+});

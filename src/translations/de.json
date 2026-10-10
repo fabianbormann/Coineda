@@ -607,6 +607,19 @@
     "no fingerprint stored": "kein Fingerprint gespeichert",
     "Review of {{file}} — read-only — fingerprint {{fingerprint}} ({{verdict}})": "Prüfung von {{file}} — nur lesen — Fingerprint {{fingerprint}} ({{verdict}})",
     "This permanently deletes {{label}} and all its data from this device. Type the label to confirm": "Dadurch wird {{label}} mit allen Daten unwiderruflich von diesem Gerät gelöscht. Gib zur Bestätigung die Bezeichnung ein",
-    "The review ledger was incomplete and has been removed.": "Die Prüfungs-Datenbank war unvollständig und wurde entfernt."
+    "The review ledger was incomplete and has been removed.": "Die Prüfungs-Datenbank war unvollständig und wurde entfernt.",
+    "DATEV": "DATEV",
+    "Advisor number": "Beraternummer",
+    "Client number": "Mandantennummer",
+    "Account number length": "Sachkontenlänge",
+    "Clearing account": "Verrechnungskonto",
+    "Account for §23 gains": "Konto Gewinne §23",
+    "Account for §23 losses": "Konto Verluste §23",
+    "Account for §22 Nr. 3 income": "Konto Einkünfte §22 Nr. 3",
+    "Must be {{length}} digits": "Muss {{length}} Ziffern haben",
+    "Must be 1–7 digits": "Muss 1–7 Ziffern haben",
+    "Must be 1–5 digits": "Muss 1–5 Ziffern haben",
+    "Must be 4–8 digits": "Muss 4–8 Ziffern haben",
+    "Your DATEV advisor and client numbers and the accounts to book §23 results and §22 Nr. 3 income to. Coineda ships no defaults; the export stays disabled until all are set.": "Deine DATEV-Berater- und Mandantennummer und die Konten, auf die §23-Ergebnisse und §22-Nr.-3-Einkünfte gebucht werden. Coineda liefert keine Vorgaben; der Export bleibt deaktiviert, bis alles gesetzt ist."
   }
 }

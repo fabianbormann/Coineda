@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { DatevSettingsCard } from '@/datev/DatevSettingsCard';
 import markBlack from '@/assets/logo/coineda-mark-black.svg';
 import { findModule } from '@/sources/registry';
 import { taxRegistry } from '@/tax/registry';
@@ -1081,6 +1082,7 @@ export const TaxReportScreen = () => {
                       disabled={status === 'loading' || readOnly}
                     />
                   </div>
+                  {module?.manifest.id === 'de' && <DatevSettingsCard />}
                 </div>
 
                 {status === 'loading' && (

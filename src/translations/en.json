@@ -607,6 +607,19 @@
     "no fingerprint stored": "no fingerprint stored",
     "Review of {{file}} — read-only — fingerprint {{fingerprint}} ({{verdict}})": "Review of {{file}} — read-only — fingerprint {{fingerprint}} ({{verdict}})",
     "This permanently deletes {{label}} and all its data from this device. Type the label to confirm": "This permanently deletes {{label}} and all its data from this device. Type the label to confirm",
-    "The review ledger was incomplete and has been removed.": "The review ledger was incomplete and has been removed."
+    "The review ledger was incomplete and has been removed.": "The review ledger was incomplete and has been removed.",
+    "DATEV": "DATEV",
+    "Advisor number": "Advisor number",
+    "Client number": "Client number",
+    "Account number length": "Account number length",
+    "Clearing account": "Clearing account",
+    "Account for §23 gains": "Account for §23 gains",
+    "Account for §23 losses": "Account for §23 losses",
+    "Account for §22 Nr. 3 income": "Account for §22 Nr. 3 income",
+    "Must be {{length}} digits": "Must be {{length}} digits",
+    "Must be 1–7 digits": "Must be 1–7 digits",
+    "Must be 1–5 digits": "Must be 1–5 digits",
+    "Must be 4–8 digits": "Must be 4–8 digits",
+    "Your DATEV advisor and client numbers and the accounts to book §23 results and §22 Nr. 3 income to. Coineda ships no defaults; the export stays disabled until all are set.": "Your DATEV advisor and client numbers and the accounts to book §23 results and §22 Nr. 3 income to. Coineda ships no defaults; the export stays disabled until all are set."
   }
 }
