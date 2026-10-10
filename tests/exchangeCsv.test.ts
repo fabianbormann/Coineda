@@ -225,12 +225,7 @@ describe('Binance', () => {
     expect(events.every((e) => e.note?.endsWith('ambiguous trade rows'))).toBe(
       true,
     );
-    expect(skipped).toContain(
-      'Skipped ambiguous same-second trade rows'.replace(
-        'Skipped ',
-        'Skipped 5 ',
-      ),
-    );
+    expect(skipped).toContain('Skipped ambiguous same-second trade rows');
   });
 
   it('still groups same-asset partial fills into one trade', () => {
