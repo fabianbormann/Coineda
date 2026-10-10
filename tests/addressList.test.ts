@@ -1,3 +1,4 @@
+import { migrateAddressConfig, readAddresses } from '@/sources/addresses';
 import { describe, it, expect } from 'vitest';
 import {
   MAX_ADDRESSES,
@@ -58,5 +59,42 @@ describe('addressListProblem', () => {
       '\n',
     );
     expect(addressListProblem(exact)).toBeNull();
+  });
+});
+
+describe('readAddresses - the single-address migration on read', () => {
+  it('reads a config saved with one address as a list of one', () => {
+    expect(readAddresses({ address: 'a' })).toEqual(['a']);
+    expect(readAddresses({ address: '  a \n' })).toEqual(['a']);
+  });
+
+  it('reads an address list one per line', () => {
+    expect(readAddresses({ addressList: 'a\nb' })).toEqual(['a', 'b']);
+  });
+
+  it('prefers the list over a stale single address', () => {
+    expect(readAddresses({ addressList: 'b', address: 'a' })).toEqual(['b']);
+    expect(readAddresses({ addressList: '', address: 'a' })).toEqual([]);
+  });
+
+  it('reads nothing configured as no addresses', () => {
+    expect(readAddresses({})).toEqual([]);
+    expect(readAddresses({ address: '  ' })).toEqual([]);
+  });
+});
+
+describe('migrateAddressConfig', () => {
+  it('moves a single address into addressList and drops the old key', () => {
+    expect(
+      migrateAddressConfig(['baseUrl', 'addressList'], {
+        baseUrl: 'x',
+        address: 'a',
+      }),
+    ).toEqual({ baseUrl: 'x', addressList: 'a' });
+  });
+
+  it('leaves a module without an addressList field alone (Esplora keeps `address`)', () => {
+    const config = { address: 'a\nb' };
+    expect(migrateAddressConfig(['address', 'xpub'], config)).toBe(config);
   });
 });

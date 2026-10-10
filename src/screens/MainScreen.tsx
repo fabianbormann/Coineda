@@ -526,6 +526,11 @@ export const MainScreen = ({ onReset }: Props) => {
           source,
           report.inserted === 0 && report.updated === 0,
         );
+        // Not failures - a listed address with no history yet, say - but
+        // worth saying, or that address looks silently ignored.
+        for (const note of report.notes ?? []) {
+          notify.info(t(note.message, { ...note.params }));
+        }
       }
     } finally {
       controllersRef.current.delete(source.id);
@@ -669,6 +674,11 @@ export const MainScreen = ({ onReset }: Props) => {
           source,
           report.inserted === 0 && report.updated === 0,
         );
+        // Not failures - a listed address with no history yet, say - but
+        // worth saying, or that address looks silently ignored.
+        for (const note of report.notes ?? []) {
+          notify.info(t(note.message, { ...note.params }));
+        }
       }
     } finally {
       controllersRef.current.delete(source.id);

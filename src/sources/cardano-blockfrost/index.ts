@@ -112,10 +112,13 @@ export const cardanoBlockfrost: SourceModule = {
         help: 'The project id from your Blockfrost dashboard. It only ever reads the chain - it cannot move funds - and it is stored on this device, encrypted inside any checkpoint you create.',
       },
       {
-        name: 'address',
-        label: 'Cardano address',
-        type: 'address',
-        help: 'The address to track. Coineda only ever reads this address - it never asks for a private key.',
+        // A list since Phase 7, under its own config key. A source saved
+        // with the old single `address` is read as a one-element list (see
+        // src/sources/addresses.ts), so nothing needs re-entering.
+        name: 'addressList',
+        label: 'Addresses (one per line)',
+        type: 'addressList',
+        help: 'The addresses to track, one per line - payment addresses or a stake address. Where the provider can look up the wallet behind an address, its other addresses are tracked as well. Coineda only ever reads these addresses - it never asks for a private key.',
       },
     ],
     needsRelay: false,

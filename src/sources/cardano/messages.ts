@@ -18,6 +18,8 @@ export const CARDANO_MESSAGES = {
     'This instance answered, but it cannot list this wallet’s transactions. Point the base URL at an instance with the Blockfrost-compatible API enabled, or use a provider that has it.',
   stakeAddressNeedsAccountApi:
     'That looks like a stake address, and this instance cannot look up an account. Enter one of the wallet’s payment addresses instead.',
+  listedStakeAddressNeedsAccountApi:
+    'Address {{line}} in the list looks like a stake address, and this instance cannot look up an account. Enter the wallet’s payment addresses instead.',
   hostShape:
     'The base URL should be the host only, without an API path - for example {{example}}.',
 } as const;

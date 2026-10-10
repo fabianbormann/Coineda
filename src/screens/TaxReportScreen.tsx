@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/dialog';
 import markBlack from '@/assets/logo/coineda-mark-black.svg';
 import { findModule } from '@/sources/registry';
+import { migrateAddressConfig } from '@/sources/addresses';
 import { taxRegistry } from '@/tax/registry';
 import { runTaxReport } from '@/tax/runTaxReport';
 import { registerFilename, registerToCsv, reportToJson } from '@/tax/register';
@@ -586,7 +587,18 @@ export const TaxReportScreen = () => {
         }
         setSourceDirectory(
           buildSourceDirectory(
-            sources,
+            // A source saved with the single `address` of before address
+            // lists still names its wallet: read in the current shape, the
+            // same migration the modules themselves apply on read.
+            sources.map((source) => ({
+              ...source,
+              config: migrateAddressConfig(
+                findModule(source.moduleId)?.manifest.fields.map(
+                  (field) => field.name,
+                ) ?? [],
+                source.config,
+              ),
+            })),
             events,
             (moduleId) => findModule(moduleId)?.manifest.fields,
           ),

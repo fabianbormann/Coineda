@@ -12,7 +12,10 @@ import {
 } from './http';
 import { amountString, assetIdOf, type TxUtxos, type UtxoEntry } from './utxo';
 import { CARDANO_MESSAGES } from './messages';
-import { configuredAddress, resolveTarget } from './tier';
+import { configuredAddress, configuredAddresses, resolveTarget } from './tier';
+import { fetchListPage } from './list';
+import { MAX_ADDRESSES } from '@/sources/addressList';
+import { TOO_MANY_ADDRESSES } from '@/sources/addresses';
 import {
   ACCOUNT_HISTORY_PAGE_SIZE,
   PAGE_SIZE,
@@ -263,6 +266,18 @@ export const probeCardano = async (
     // as an actionable message on this row, not as an unhandled rejection.
     const root = apiRoot(provider, config);
 
+    const configured = configuredAddresses(config);
+    if (configured.length > MAX_ADDRESSES) {
+      return {
+        ok: false,
+        message: TOO_MANY_ADDRESSES,
+        messageParams: { max: String(MAX_ADDRESSES) },
+      };
+    }
+    if (configured.length > 1) {
+      return await probeList(provider, config, root, configured, signal);
+    }
+
     // `resolveTarget` is the whole probe, for every shape of address. It
     // asks the one question that matters - can this instance serve what
     // this source would drain - by requesting the routes the drain itself
@@ -302,6 +317,50 @@ export const probeCardano = async (
     // malformed host (above) or a caller's abort.
     return { ok: false, message: provider.probeMessage(0) };
   }
+};
+
+/**
+ * The probe for a list: every address resolved as the drain will resolve
+ * it, and the FIRST one that cannot be served reported by its line.
+ *
+ * "Never seen" is not a failure in a list - the drain reads it as no
+ * transactions yet for that address (the deferred 404 rule) - unless it is
+ * true of every address, which says the list as a whole tracks nothing.
+ */
+const probeList = async (
+  provider: CardanoProvider,
+  config: Record<string, string>,
+  root: string,
+  configured: string[],
+  signal?: AbortSignal,
+): Promise<ProbeResult> => {
+  let unseen = 0;
+  for (const [index, address] of configured.entries()) {
+    const target = await resolveTarget(provider, config, root, signal, address);
+    if (target.tier !== 'refused') {
+      continue;
+    }
+    if (target.message === CARDANO_MESSAGES.addressNeverSeen) {
+      unseen += 1;
+      continue;
+    }
+    const line = String(index + 1);
+    return target.message === CARDANO_MESSAGES.stakeAddressNeedsAccountApi
+      ? {
+          ok: false,
+          message: CARDANO_MESSAGES.listedStakeAddressNeedsAccountApi,
+          messageParams: { line },
+        }
+      : {
+          ok: false,
+          message: target.message,
+          messageParams: { ...target.messageParams, line },
+        };
+  }
+  if (unseen === configured.length) {
+    return { ok: false, message: CARDANO_MESSAGES.addressNeverSeen };
+  }
+  return { ok: true, readOnly: true };
 };
 
 /**
@@ -443,6 +502,35 @@ export const fetchCardanoEvents = async (
   signal?: AbortSignal,
 ): Promise<FetchPage> => {
   const root = apiRoot(provider, config);
+
+  // Several addresses take the list path (list.ts); one keeps everything
+  // below unchanged, cursors included.
+  const configured = configuredAddresses(config);
+  if (configured.length > 1) {
+    const listPage = (from: string | null) =>
+      fetchListPage({
+        provider,
+        config,
+        root,
+        configured,
+        cursor: from,
+        signal,
+        rewardsFor: (account) =>
+          fetchRewardEvents(provider, config, account, signal),
+      });
+    try {
+      return await listPage(cursor);
+    } catch (error) {
+      // The same recovery as a resumed single-address account cursor:
+      // an instance that stopped serving the account routes starts the
+      // drain over, which resolves every address afresh.
+      if (cursor === null || !isAccountRouteAbsent(error)) {
+        throw error;
+      }
+      return listPage(null);
+    }
+  }
+
   const decoded = decodeCursor(cursor);
 
   // The tier is decided ONCE per drain. Later pages read it back out of the

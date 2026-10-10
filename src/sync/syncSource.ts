@@ -1,7 +1,7 @@
 import { MAX_PAGES } from '@/sources/conformance';
 import { findModule } from '@/sources/registry';
 import { findFileModule } from '@/sources/csv/registry';
-import type { DerivedEvent } from '@/sources/types';
+import type { DerivedEvent, SourceNote } from '@/sources/types';
 import { EgressRefusedError, prepareRun } from '@/sources/egress';
 import {
   LedgerSwitchedError,
@@ -35,6 +35,12 @@ export type SyncReport = {
    * `error`.
    */
   cancelled?: boolean;
+  /**
+   * What the module noted along the way that is not a failure - a listed
+   * address with no history yet, say. Translation keys plus params (see
+   * `SourceNote`); absent when there were none.
+   */
+  notes?: SourceNote[];
 };
 
 /**
@@ -222,6 +228,9 @@ const drain = async (
       report.inserted += inserted;
       report.updated += updated;
       report.pages += 1;
+      if (result.notes !== undefined && result.notes.length > 0) {
+        report.notes = [...(report.notes ?? []), ...result.notes];
+      }
 
       // Persist the cursor only after this page's events have actually
       // landed, and do it before looping again. If the next page throws, the

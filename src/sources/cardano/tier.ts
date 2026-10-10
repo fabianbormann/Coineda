@@ -3,6 +3,7 @@ import { probeRoute } from './http';
 import { CARDANO_MESSAGES } from './messages';
 import { ADDRESS_PAGE_SIZE, PAGE_SIZE } from './cursor';
 import { stakeAddressOf } from './shelley';
+import { readAddresses } from '@/sources/addresses';
 
 /**
  * A Cardano wallet is an account - one stake address - spread across many
@@ -52,10 +53,33 @@ export const isStakeAddress = (address: string): boolean =>
  */
 const BECH32_ADDRESS = /^(addr|addr_test|stake|stake_test)1/i;
 
-export const configuredAddress = (config: Record<string, string>): string => {
-  const trimmed = (config.address ?? '').trim();
+export const normaliseAddress = (value: string): string => {
+  const trimmed = value.trim();
   return BECH32_ADDRESS.test(trimmed) ? trimmed.toLowerCase() : trimmed;
 };
+
+/**
+ * Every configured address, normalised and deduped in list order: the
+ * stored `addressList`, or a source saved with the single `address` of
+ * before Phase 7, read as a list of one (see readAddresses).
+ */
+export const configuredAddresses = (
+  config: Record<string, string>,
+): string[] => {
+  const result: string[] = [];
+  for (const raw of readAddresses(config)) {
+    const address = normaliseAddress(raw);
+    if (address !== '' && !result.includes(address)) {
+      result.push(address);
+    }
+  }
+  return result;
+};
+
+/** The first configured address - the whole configuration of a source with
+ *  one address - or '' when there is none. */
+export const configuredAddress = (config: Record<string, string>): string =>
+  configuredAddresses(config)[0] ?? '';
 
 /**
  * What this source should drain, and how.
@@ -160,9 +184,11 @@ export const resolveTarget = async (
   config: Record<string, string>,
   root: string,
   signal?: AbortSignal,
+  /** One address of a list; the configured address when omitted. */
+  address?: string,
 ): Promise<Target> => {
   const headers = provider.headers(config);
-  const configured = configuredAddress(config);
+  const configured = address ?? configuredAddress(config);
 
   if (isStakeAddress(configured)) {
     const tier = await accountTier(root, headers, configured, signal);

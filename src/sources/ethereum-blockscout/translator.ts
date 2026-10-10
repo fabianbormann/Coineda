@@ -3,7 +3,17 @@ import Big from 'big.js';
 import type { DerivedEvent, FetchPage, ProbeResult } from '@/sources/types';
 import type { Leg } from '@/ledger/types';
 import { REQUEST_TIMEOUT_MS, errorName, signalFor } from '@/sources/http';
-import { configuredAddress, normaliseAddress } from './address';
+import {
+  configuredAddress,
+  configuredAddresses,
+  normaliseAddress,
+} from './address';
+import {
+  ADDRESS_NO_TRANSACTIONS_YET,
+  TOO_MANY_ADDRESSES,
+  readAddresses,
+} from '@/sources/addresses';
+import { MAX_ADDRESSES } from '@/sources/addressList';
 
 /**
  * Blockscout's v2 API (https://github.com/blockscout/blockscout).
@@ -43,7 +53,22 @@ export const ETHEREUM_MESSAGES = {
     'Could not reach this Blockscout instance. Check the URL, or try again later.',
   notBlockscout:
     'That URL answered, but not like a Blockscout API. Check that it is the API host rather than the web interface.',
+  invalidListedAddress:
+    'Line {{line}} of the address list is not an Ethereum address - each line needs 0x followed by 40 hex characters.',
+  listedAddressUnreachable:
+    'This Blockscout instance did not answer for address {{line}} in the list. Check the URL, or try again later.',
 } as const;
+
+/**
+ * The tracked addresses as a set, for the "is this party us?" test.
+ *
+ * A single string is still accepted: the row translators are exported and
+ * called with one address directly, and one address is a set of one.
+ */
+export type Ours = string | ReadonlySet<string>;
+
+const asSet = (ours: Ours): ReadonlySet<string> =>
+  typeof ours === 'string' ? new Set([ours]) : ours;
 
 export const baseUrlOf = (config: Record<string, string>): string => {
   const configured = (config.baseUrl ?? '').trim();
@@ -83,6 +108,17 @@ export const probe = async (
   config: Record<string, string>,
   signal?: AbortSignal,
 ): Promise<ProbeResult> => {
+  const { addresses, invalidLine } = configuredAddresses(config);
+  if (addresses.length > MAX_ADDRESSES) {
+    return {
+      ok: false,
+      message: TOO_MANY_ADDRESSES,
+      messageParams: { max: String(MAX_ADDRESSES) },
+    };
+  }
+  if (readAddresses(config).length > 1) {
+    return probeList(config, addresses, invalidLine, signal);
+  }
   const address = configuredAddress(config);
   if (address === null) {
     return { ok: false, message: ETHEREUM_MESSAGES.missingAddress };
@@ -119,6 +155,67 @@ export const probe = async (
   // No credential exists to be read-only or otherwise, so `readOnly` is
   // left undefined rather than claimed - the same choice the other
   // keyless chain modules make.
+  return { ok: true };
+};
+
+/**
+ * The probe for a list of addresses: every line has to be an address, and
+ * the instance has to answer like a Blockscout for each of them.
+ *
+ * A 404 for one listed address is an address Blockscout has never seen - a
+ * fresh one, no history yet - and is accepted, the same way the drain reads
+ * it as an empty page. A 404 for EVERY one of them is far more likely a
+ * wrong base URL than a list of unused addresses, and is refused as such.
+ * Any other failure names the line it happened on.
+ */
+const probeList = async (
+  config: Record<string, string>,
+  addresses: string[],
+  invalidLine: number | null,
+  signal?: AbortSignal,
+): Promise<ProbeResult> => {
+  if (invalidLine !== null) {
+    return {
+      ok: false,
+      message: ETHEREUM_MESSAGES.invalidListedAddress,
+      messageParams: { line: String(invalidLine) },
+    };
+  }
+  let unseen = 0;
+  for (const [index, address] of addresses.entries()) {
+    const line = String(index + 1);
+    let fetched: Fetched;
+    try {
+      fetched = await request(config, `/api/v2/addresses/${address}`, signal);
+    } catch {
+      return {
+        ok: false,
+        message: ETHEREUM_MESSAGES.listedAddressUnreachable,
+        messageParams: { line },
+      };
+    }
+    if (fetched.status === 404) {
+      unseen += 1;
+      continue;
+    }
+    if (fetched.status < 200 || fetched.status >= 300) {
+      return {
+        ok: false,
+        message: ETHEREUM_MESSAGES.listedAddressUnreachable,
+        messageParams: { line },
+      };
+    }
+    const body = asJson(fetched, 'the address lookup') as Record<
+      string,
+      unknown
+    >;
+    if (typeof body !== 'object' || body === null || !('hash' in body)) {
+      return { ok: false, message: ETHEREUM_MESSAGES.notBlockscout };
+    }
+  }
+  if (unseen === addresses.length) {
+    return { ok: false, message: ETHEREUM_MESSAGES.unreachable };
+  }
   return { ok: true };
 };
 
@@ -184,8 +281,9 @@ export type TransactionRow = {
  */
 export const transactionToEvent = (
   row: TransactionRow,
-  ours: string,
+  ours: Ours,
 ): DerivedEvent | { skipped: string } => {
+  const owned = asSet(ours);
   const hash = str(row.hash);
   if (hash === null) {
     throw new Error(
@@ -206,22 +304,28 @@ export const transactionToEvent = (
   // `value` field populated - measured: status "error" with value
   // 100000000000000 - and booking it would invent ether the user never
   // received or spent.
+  //
+  // Each leg's venue is ITS address - venues stay per address when several
+  // are tracked - and both sides of a transfer between two tracked
+  // addresses are built, so the event is the same whichever address's
+  // drain lists it, and the upsert on (sourceId, externalId) is a no-op
+  // rather than one address's view overwriting the other's.
   if (succeeded && isPositive(value)) {
-    if (from === ours) {
+    if (from !== null && owned.has(from)) {
       legs.push({
         assetId: 'eth:native',
         amount: value,
         direction: 'out',
-        venue: ours,
+        venue: from,
         role: 'principal',
       });
     }
-    if (to === ours) {
+    if (to !== null && owned.has(to)) {
       legs.push({
         assetId: 'eth:native',
         amount: value,
         direction: 'in',
-        venue: ours,
+        venue: to,
         role: 'principal',
       });
     }
@@ -230,12 +334,12 @@ export const transactionToEvent = (
   // Gas is paid by the sender whether the transaction succeeded or not,
   // and on a zero-value contract call it is the ONLY thing that moved. Omit
   // it and a wallet's balance drifts upward by every fee it ever paid.
-  if (from === ours && isPositive(fee)) {
+  if (from !== null && owned.has(from) && isPositive(fee)) {
     legs.push({
       assetId: 'eth:native',
       amount: fee!,
       direction: 'out',
-      venue: ours,
+      venue: from,
       role: 'fee',
     });
   }
@@ -276,8 +380,9 @@ export type InternalRow = {
  */
 export const internalToEvent = (
   row: InternalRow,
-  ours: string,
+  ours: Ours,
 ): DerivedEvent | { skipped: string } => {
+  const owned = asSet(ours);
   const hash = str(row.transaction_hash);
   const index = str(row.index);
   if (hash === null || index === null) {
@@ -307,21 +412,21 @@ export const internalToEvent = (
   const from = hashOf(row.from);
   const to = hashOf(row.to);
   const legs: Leg[] = [];
-  if (from === ours) {
+  if (from !== null && owned.has(from)) {
     legs.push({
       assetId: 'eth:native',
       amount: value,
       direction: 'out',
-      venue: ours,
+      venue: from,
       role: 'principal',
     });
   }
-  if (to === ours) {
+  if (to !== null && owned.has(to)) {
     legs.push({
       assetId: 'eth:native',
       amount: value,
       direction: 'in',
-      venue: ours,
+      venue: to,
       role: 'principal',
     });
   }
@@ -411,16 +516,26 @@ const queryOf = (params: Record<string, unknown> | null): string => {
   return query === '' ? '' : `?${query}`;
 };
 
-export const fetchEvents = async (
+/** A listing that answered a non-2xx status, kept typed so a list can read
+ *  a 404 as "no transactions yet" for that one address. */
+class ListingStatusError extends Error {
+  constructor(
+    readonly route: string,
+    readonly status: number,
+  ) {
+    super(`ethereum-blockscout: listing ${route} failed with status ${status}`);
+  }
+}
+
+/** One page of one address's drain - the whole of `fetchEvents` before
+ *  address lists, with the tracked set passed in. */
+const fetchAddressPage = async (
   config: Record<string, string>,
+  address: string,
+  owned: ReadonlySet<string>,
   cursor: string | null,
   signal?: AbortSignal,
 ): Promise<FetchPage> => {
-  const address = configuredAddress(config);
-  if (address === null) {
-    throw new Error(ETHEREUM_MESSAGES.missingAddress);
-  }
-
   const { phase, params } = decodeCursor(cursor);
   const fetched = await request(
     config,
@@ -428,9 +543,7 @@ export const fetchEvents = async (
     signal,
   );
   if (fetched.status < 200 || fetched.status >= 300) {
-    throw new Error(
-      `ethereum-blockscout: listing ${ROUTES[phase]} failed with status ${fetched.status}`,
-    );
+    throw new ListingStatusError(ROUTES[phase], fetched.status);
   }
 
   const body = asJson(fetched, `the ${ROUTES[phase]} list`) as {
@@ -449,8 +562,8 @@ export const fetchEvents = async (
   for (const row of body.items) {
     const result =
       phase === 'transactions'
-        ? transactionToEvent(row as TransactionRow, address)
-        : internalToEvent(row as InternalRow, address);
+        ? transactionToEvent(row as TransactionRow, owned)
+        : internalToEvent(row as InternalRow, owned);
     if ('skipped' in result) {
       continue;
     }
@@ -479,6 +592,125 @@ export const fetchEvents = async (
     events,
     cursor: next === null ? null : encodeCursor('internal', next),
   };
+};
+
+/**
+ * The cursor for a LIST of addresses: `ethm:` plus a base64 JSON map from
+ * each address to its own single-address cursor - absent for not started,
+ * `null` for drained. One address is drained at a time, in list order, so
+ * the map is what lets a resumed drain pick up the right address at the
+ * right page.
+ *
+ * A single address keeps the plain `eth:` cursor, so a source that was
+ * mid-sync when lists arrived resumes where it stopped.
+ */
+export type ListCursor = Record<string, string | null>;
+
+export const encodeListCursor = (state: ListCursor): string =>
+  `ethm:${btoa(JSON.stringify(state))}`;
+
+export const decodeListCursor = (
+  cursor: string | null,
+  addresses: string[],
+): ListCursor => {
+  if (cursor === null || !cursor.startsWith('ethm:')) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(atob(cursor.slice('ethm:'.length))) as unknown;
+    if (typeof parsed !== 'object' || parsed === null) {
+      return {};
+    }
+    const state: ListCursor = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      // An address no longer in the list means the list changed under a
+      // stored cursor - start over rather than resume a different wallet.
+      if (!addresses.includes(key)) {
+        return {};
+      }
+      if (value === null || typeof value === 'string') {
+        state[key] = value;
+      }
+    }
+    return state;
+  } catch {
+    return {};
+  }
+};
+
+const fetchListPage = async (
+  config: Record<string, string>,
+  addresses: string[],
+  cursor: string | null,
+  signal?: AbortSignal,
+): Promise<FetchPage> => {
+  const state = decodeListCursor(cursor, addresses);
+  const owned = new Set(addresses);
+  const index = addresses.findIndex((address) => state[address] !== null);
+  if (index < 0) {
+    return { events: [], cursor: null };
+  }
+  const address = addresses[index];
+  const inner = state[address] ?? null;
+
+  let page: FetchPage;
+  try {
+    page = await fetchAddressPage(config, address, owned, inner, signal);
+  } catch (error) {
+    // The deferred 404 rule: in a list, an address Blockscout has never
+    // seen is an empty history for THAT address, and the others carry on.
+    // Only on its first request - a 404 halfway through a drain is not "no
+    // transactions yet", and stays an error.
+    if (
+      !(error instanceof ListingStatusError) ||
+      error.status !== 404 ||
+      inner !== null
+    ) {
+      throw error;
+    }
+    page = {
+      events: [],
+      cursor: null,
+      notes: [
+        {
+          message: ADDRESS_NO_TRANSACTIONS_YET,
+          params: { line: String(index + 1) },
+        },
+      ],
+    };
+  }
+
+  const next: ListCursor = { ...state, [address]: page.cursor };
+  const done = addresses.every((each) => next[each] === null);
+  return {
+    events: page.events,
+    cursor: done ? null : encodeListCursor(next),
+    ...(page.notes === undefined ? {} : { notes: page.notes }),
+  };
+};
+
+export const fetchEvents = async (
+  config: Record<string, string>,
+  cursor: string | null,
+  signal?: AbortSignal,
+): Promise<FetchPage> => {
+  const { addresses, invalidLine } = configuredAddresses(config);
+  if (readAddresses(config).length > 1) {
+    if (invalidLine !== null) {
+      // Names the line, never the address - see the error-message rule on
+      // SourceModule.
+      throw new Error(
+        `ethereum-blockscout: line ${invalidLine} of the address list is not an Ethereum address`,
+      );
+    }
+    return fetchListPage(config, addresses, cursor, signal);
+  }
+
+  const address = configuredAddress(config);
+  if (address === null) {
+    throw new Error(ETHEREUM_MESSAGES.missingAddress);
+  }
+  return fetchAddressPage(config, address, new Set([address]), cursor, signal);
 };
 
 export { REQUEST_TIMEOUT_MS };

@@ -16,6 +16,7 @@ import {
   normaliseAddress,
 } from '@/sources/ethereum-blockscout/address';
 import { runConformance } from '@/sources/conformance';
+import { ADDRESS_NO_TRANSACTIONS_YET } from '@/sources/addresses';
 import type { DerivedEvent } from '@/sources/types';
 
 /**
@@ -567,5 +568,165 @@ describe('against the recorded response shape', () => {
     for (const recorded of [transactions, internals]) {
       expect(JSON.stringify(recorded)).toContain('_synthetic');
     }
+  });
+});
+
+describe('a list of addresses', () => {
+  const A = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const B = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+  const listConfig = { addressList: `${A}\n${B}` };
+
+  const tx = (hash: string, from: string, to: string) => ({
+    hash,
+    timestamp: '2026-01-01T00:00:00.000000Z',
+    value: '1000',
+    fee: { value: '10' },
+    status: 'ok',
+    from: { hash: from },
+    to: { hash: to },
+  });
+
+  const BASE = 'https://eth.blockscout.com/api/v2/addresses';
+  const table = (): Record<string, { status: number; body: unknown }> => ({
+    [`${BASE}/${A}/transactions`]: {
+      status: 200,
+      body: {
+        items: [tx('0xin', THEM, A), tx('0xself', A, B)],
+        next_page_params: null,
+      },
+    },
+    [`${BASE}/${A}/internal-transactions`]: {
+      status: 200,
+      body: { items: [], next_page_params: null },
+    },
+    [`${BASE}/${B}/transactions`]: {
+      status: 200,
+      body: { items: [tx('0xself', A, B)], next_page_params: null },
+    },
+    [`${BASE}/${B}/internal-transactions`]: {
+      status: 200,
+      body: { items: [], next_page_params: null },
+    },
+  });
+
+  const serve = (routes: Record<string, { status: number; body: unknown }>) => {
+    const asked: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        asked.push(String(url));
+        const hit = routes[String(url)];
+        return hit === undefined
+          ? respond(404, { message: 'Not found' })
+          : respond(hit.status, hit.body);
+      }),
+    );
+    return asked;
+  };
+
+  const drain = async () => {
+    const pages: Awaited<ReturnType<typeof ethereum.fetchEvents>>[] = [];
+    let cursor: string | null = null;
+    for (let guard = 0; guard < 10; guard += 1) {
+      const page = await ethereum.fetchEvents(listConfig, cursor);
+      pages.push(page);
+      cursor = page.cursor;
+      if (cursor === null) break;
+    }
+    return pages;
+  };
+
+  it('drains every address in list order, each with its own cursor', async () => {
+    const asked = serve(table());
+    const pages = await drain();
+    expect(asked.map((url) => url.replace(BASE, ''))).toEqual([
+      `/${A}/transactions`,
+      `/${A}/internal-transactions`,
+      `/${B}/transactions`,
+      `/${B}/internal-transactions`,
+    ]);
+    // The cursor is a map keyed per address, and moves one address at a
+    // time.
+    const states = pages
+      .slice(0, -1)
+      .map((page) => JSON.parse(atob(page.cursor!.slice('ethm:'.length))));
+    expect(states).toEqual([
+      { [A]: 'eth:internal:' },
+      { [A]: null },
+      { [A]: null, [B]: 'eth:internal:' },
+    ]);
+    expect(pages.at(-1)?.cursor).toBeNull();
+  });
+
+  it('keeps venues per address and builds both sides of a transfer between them', async () => {
+    serve(table());
+    const events = (await drain()).flatMap((page) => page.events);
+    const incoming = events.find((event) => event.externalId === '0xin');
+    expect(incoming?.legs.map((leg) => leg.venue)).toEqual([A]);
+    // Listed under A and under B: identical either way, so the second
+    // upsert is a no-op rather than one side overwriting the other.
+    const selves = events.filter((event) => event.externalId === '0xself');
+    expect(selves).toHaveLength(2);
+    expect(selves[0]).toEqual(selves[1]);
+    expect(
+      selves[0].legs.map((leg) => [leg.direction, leg.venue, leg.role]),
+    ).toEqual([
+      ['out', A, 'principal'],
+      ['in', B, 'principal'],
+      ['out', A, 'fee'],
+    ]);
+  });
+
+  it('reads a 404 for one listed address as no transactions yet, with a note', async () => {
+    const routes = table();
+    delete routes[`${BASE}/${B}/transactions`];
+    serve(routes);
+    const pages = await drain();
+    expect(
+      pages.flatMap((page) => page.events).map((event) => event.externalId),
+    ).toEqual(['0xin', '0xself']);
+    expect(pages.flatMap((page) => page.notes ?? [])).toEqual([
+      { message: ADDRESS_NO_TRANSACTIONS_YET, params: { line: '2' } },
+    ]);
+    expect(pages.at(-1)?.cursor).toBeNull();
+  });
+
+  it('keeps a single address on the 404-is-an-error rule', async () => {
+    serve({});
+    await expect(ethereum.fetchEvents(config, null)).rejects.toThrow(
+      /listing transactions failed with status 404/,
+    );
+  });
+
+  it('probes every address and reports the first failing line', async () => {
+    serve({
+      [`${BASE}/${A}`]: { status: 200, body: { hash: A } },
+      [`${BASE}/${B}`]: { status: 500, body: {} },
+    });
+    expect(await ethereum.probe(listConfig)).toEqual({
+      ok: false,
+      message: ETHEREUM_MESSAGES.listedAddressUnreachable,
+      messageParams: { line: '2' },
+    });
+    expect(await ethereum.probe({ addressList: `${A}\nnonsense` })).toEqual({
+      ok: false,
+      message: ETHEREUM_MESSAGES.invalidListedAddress,
+      messageParams: { line: '2' },
+    });
+  });
+
+  it('accepts a listed address Blockscout has not seen yet', async () => {
+    serve({ [`${BASE}/${A}`]: { status: 200, body: { hash: A } } });
+    expect(await ethereum.probe(listConfig)).toEqual({ ok: true });
+  });
+
+  it('still drains a source saved with the single address of before', async () => {
+    serve(table());
+    const page = await ethereum.fetchEvents({ address: A }, null);
+    expect(page.cursor).toBe('eth:internal:');
+    expect(page.events.map((event) => event.externalId)).toEqual([
+      '0xin',
+      '0xself',
+    ]);
   });
 });

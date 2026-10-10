@@ -685,3 +685,108 @@ describe('editing a source', () => {
     expect(stored.label).toBe('Renamed');
   });
 });
+
+describe('a source saved with the single address of before address lists', () => {
+  /** The shape the Ethereum and Cardano modules have now: `addressList`. */
+  const listShapedModule = {
+    ...cardanoShapedModule,
+    manifest: {
+      ...cardanoShapedModule.manifest,
+      id: 'test-list-shaped',
+      fields: [
+        cardanoShapedModule.manifest.fields[0],
+        {
+          name: 'addressList',
+          label: 'Addresses (one per line)',
+          type: 'addressList' as const,
+          help: 'The addresses to track',
+        },
+        cardanoShapedModule.manifest.fields[2],
+      ],
+    },
+  };
+
+  const seedLegacy = async () => {
+    await putSource({
+      id: 'cfg-1',
+      moduleId: 'test-list-shaped',
+      label: 'Main',
+      config: { baseUrl: '', address: 'addr1_payment', apiKey: 'secret-val' },
+    });
+    await putCursor('cfg-1', 'page-5');
+  };
+
+  it('opens with the stored address as a one-line list', async () => {
+    registry.length = 0;
+    registry.push({ ...listShapedModule, fetchEvents: fetchEventsStub() });
+    await seedLegacy();
+    renderScreen();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /edit main/i }),
+    );
+    expect(
+      await screen.findByLabelText('Addresses (one per line)'),
+    ).toHaveValue('addr1_payment');
+  });
+
+  it('saves addressList without the old address key, and an unchanged list is no re-drain', async () => {
+    const syncSpy = vi.spyOn(syncSourceModule, 'syncSource');
+    registry.length = 0;
+    registry.push({ ...listShapedModule, fetchEvents: fetchEventsStub() });
+    await seedLegacy();
+    renderScreen();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /edit main/i }),
+    );
+    const labelInput = await screen.findByLabelText(/^Label$/i);
+    await userEvent.clear(labelInput);
+    await userEvent.type(labelInput, 'Renamed');
+    await userEvent.click(
+      await screen.findByRole('button', { name: /^Save$/ }),
+    );
+
+    expect(await screen.findByText('Renamed')).toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(syncSpy).not.toHaveBeenCalled();
+
+    const db = await openLedger();
+    const [stored] = await db.getAll('sources');
+    expect(stored.config).toEqual({
+      baseUrl: '',
+      addressList: 'addr1_payment',
+      apiKey: 'secret-val',
+    });
+    expect('address' in stored.config).toBe(false);
+    syncSpy.mockRestore();
+  });
+
+  it('adding a second address confirms, then full-resyncs', async () => {
+    const fetchEvents = fetchEventsStub();
+    registry.length = 0;
+    registry.push({ ...listShapedModule, fetchEvents });
+    await seedLegacy();
+    renderScreen();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /edit main/i }),
+    );
+    const box = await screen.findByLabelText('Addresses (one per line)');
+    await userEvent.type(box, '{enter}addr1_second');
+    await userEvent.click(
+      await screen.findByRole('button', { name: /^Save$/ }),
+    );
+    const dialog = await screen.findByRole('alertdialog');
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: /save and resync/i }),
+    );
+
+    await waitFor(() => expect(fetchEvents).toHaveBeenCalled());
+    expect(fetchEvents.mock.calls[0][1]).toBeNull();
+    expect(fetchEvents.mock.calls[0][0].addressList).toBe(
+      'addr1_payment\naddr1_second',
+    );
+    expect(fetchEvents.mock.calls[0][0].address).toBeUndefined();
+  });
+});

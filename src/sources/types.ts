@@ -103,7 +103,22 @@ export type ProbeResult = {
  */
 export type DerivedEvent = Omit<LedgerEvent, 'id' | 'sourceId'>;
 
-export type FetchPage = { events: DerivedEvent[]; cursor: Cursor };
+/**
+ * Something a page wants the user to know that is not a failure - a listed
+ * address with no history yet, say. `message` is a translation key and
+ * `params` its interpolation values; by the same rule as an error message,
+ * neither may carry anything from `config` (an address is named by its line
+ * in the list instead).
+ */
+export type SourceNote = { message: string; params?: Record<string, string> };
+
+export type FetchPage = {
+  events: DerivedEvent[];
+  cursor: Cursor;
+  /** Optional, and absent on almost every page. Collected into the
+   *  sync report by syncSource. */
+  notes?: SourceNote[];
+};
 
 /**
  * Passed to `probe` and `fetchEvents` so a sync can be stopped and so a

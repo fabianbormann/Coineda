@@ -1,3 +1,5 @@
+import { readAddresses } from '@/sources/addresses';
+
 /**
  * Ethereum addresses, validated by shape.
  *
@@ -31,9 +33,35 @@ export const isAddress = (value: string): boolean => ADDRESS.test(value.trim());
 export const normaliseAddress = (value: string): string =>
   value.trim().toLowerCase();
 
+/**
+ * The configured addresses, normalised and deduped in list order - the
+ * stored `addressList`, or a source saved before lists existed read as a
+ * one-element list (see readAddresses).
+ *
+ * `invalidLine` is the 1-based line of the first entry that is not an
+ * address at all, or null. A malformed line is reported rather than
+ * silently dropped: dropping it would track fewer addresses than the user
+ * listed, with nothing saying so.
+ */
+export const configuredAddresses = (
+  config: Record<string, string>,
+): { addresses: string[]; invalidLine: number | null } => {
+  const raw = readAddresses(config);
+  const invalid = raw.findIndex((value) => !isAddress(value));
+  const addresses: string[] = [];
+  for (const value of raw) {
+    const normalised = normaliseAddress(value);
+    if (isAddress(value) && !addresses.includes(normalised)) {
+      addresses.push(normalised);
+    }
+  }
+  return { addresses, invalidLine: invalid < 0 ? null : invalid + 1 };
+};
+
+/** The first configured address, or null when it is missing or malformed. */
 export const configuredAddress = (
   config: Record<string, string>,
 ): string | null => {
-  const raw = (config.address ?? '').trim();
+  const raw = readAddresses(config)[0] ?? '';
   return isAddress(raw) ? normaliseAddress(raw) : null;
 };

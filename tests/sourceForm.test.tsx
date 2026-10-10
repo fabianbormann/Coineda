@@ -4,6 +4,9 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { SourceForm } from '@/screens/SourceForm';
 import type { SourceModule } from '@/sources/types';
+import ethereumBlockscout from '@/sources/ethereum-blockscout';
+import cardanoYaci from '@/sources/cardano-yaci';
+import cardanoBlockfrost from '@/sources/cardano-blockfrost';
 
 /**
  * The advanced disclosure.
@@ -114,4 +117,44 @@ describe('SourceForm advanced fields', () => {
       screen.queryByRole('button', { name: /advanced/i }),
     ).not.toBeInTheDocument();
   });
+});
+
+describe('address lists for the Ethereum and Cardano modules', () => {
+  const modules = [ethereumBlockscout, cardanoYaci, cardanoBlockfrost].map(
+    (module) => [module.manifest.id, module] as const,
+  );
+
+  it.each(modules)(
+    '%s declares one addressList field and no single address',
+    (_id, module) => {
+      const fields = module.manifest.fields;
+      expect(
+        fields.filter((field) => field.type === 'addressList'),
+      ).toMatchObject([
+        { name: 'addressList', label: 'Addresses (one per line)' },
+      ]);
+      expect(fields.some((field) => field.type === 'address')).toBe(false);
+      expect(fields.some((field) => field.name === 'address')).toBe(false);
+    },
+  );
+
+  it.each(modules)(
+    '%s renders the list as a multi-line box, one address per line',
+    (_id, module) => {
+      render(
+        <SourceForm
+          module={module}
+          label="Main"
+          config={{ addressList: 'first\nsecond' }}
+          fieldErrors={{}}
+          secretsOptional={false}
+          onLabelChange={vi.fn()}
+          onConfigChange={vi.fn()}
+        />,
+      );
+      const box = screen.getByLabelText('Addresses (one per line)');
+      expect(box.tagName).toBe('TEXTAREA');
+      expect(box).toHaveValue('first\nsecond');
+    },
+  );
 });

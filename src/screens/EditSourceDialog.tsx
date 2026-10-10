@@ -19,6 +19,7 @@ import { putSource } from '@/ledger/db';
 import type { SourceRecord } from '@/ledger/types';
 import { findModule } from '@/sources/registry';
 import { parseAddressList } from '@/sources/addressList';
+import { migrateAddressConfig } from '@/sources/addresses';
 import type { SourceModule } from '@/sources/types';
 import { SourceForm } from './SourceForm';
 
@@ -62,10 +63,27 @@ const isCredentialField = (type: string): boolean =>
  *  into the DOM is exactly the thing this dialog exists to never do. Every
  *  other field is pre-filled from the stored config so the user is editing
  *  what is actually there, not starting over. */
-const buildInitialConfig = (
+const fieldNamesOf = (module: SourceModule): string[] =>
+  module.manifest.fields.map((field) => field.name);
+
+/**
+ * The stored config as the current manifest names it. A source saved when
+ * its module took one `address` opens with that address as a one-line
+ * `addressList` (see src/sources/addresses.ts), and is compared and saved
+ * in that shape - so opening and saving it unchanged neither loses the
+ * address nor counts as a change worth a re-drain.
+ */
+const currentShape = (
   module: SourceModule,
   storedConfig: Record<string, string>,
+): Record<string, string> =>
+  migrateAddressConfig(fieldNamesOf(module), storedConfig);
+
+const buildInitialConfig = (
+  module: SourceModule,
+  rawStoredConfig: Record<string, string>,
 ): Record<string, string> => {
+  const storedConfig = currentShape(module, rawStoredConfig);
   const config: Record<string, string> = {};
   for (const field of module.manifest.fields) {
     config[field.name] = isCredentialField(field.type)
@@ -94,7 +112,10 @@ const mergeConfig = (
       merged[field.name] = stored[field.name] ?? '';
     }
   }
-  return merged;
+  // Saving writes the list and drops the legacy single address, so the
+  // stored record holds one source of truth rather than two that can
+  // disagree.
+  return migrateAddressConfig(fieldNamesOf(module), merged);
 };
 
 const sameList = (a: string[], b: string[]): boolean =>
@@ -268,7 +289,11 @@ export const EditSourceDialog = ({
         }
       }
 
-      const full = needsRedrain(module, source.config, merged);
+      const full = needsRedrain(
+        module,
+        currentShape(module, source.config),
+        merged,
+      );
       if (full) {
         const proceed = await confirm({
           title: t('Save and re-sync {{label}} from scratch?', {

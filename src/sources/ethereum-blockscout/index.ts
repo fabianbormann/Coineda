@@ -35,10 +35,13 @@ export const ethereumBlockscout: SourceModule = {
         optional: true,
       },
       {
-        name: 'address',
-        label: 'Ethereum address',
-        type: 'address',
-        help: 'The address to track, as 0x followed by 40 hex characters. Only this address is tracked: ether in another address of yours stays invisible to Coineda until you add it as well. Reading an address reveals nothing private - it is public on the chain - and Coineda can only read.',
+        // A list since Phase 7, under its own config key. A source saved
+        // with the old single `address` is read as a one-element list (see
+        // src/sources/addresses.ts), so nothing needs re-entering.
+        name: 'addressList',
+        label: 'Addresses (one per line)',
+        type: 'addressList',
+        help: 'The addresses to track, one per line, each as 0x followed by 40 hex characters. Only the addresses listed here are tracked: ether in another address of yours stays invisible to Coineda until you add it as well. Reading an address reveals nothing private - it is public on the chain - and Coineda can only read.',
       },
     ],
     needsRelay: false,
