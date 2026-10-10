@@ -416,3 +416,42 @@ a missing key), and the one shape that is **assumed** to match Yaci's
 because recording it needs a credential. Hand-writing a fixture to fill
 that gap is not an acceptable substitute — a fabricated fixture tests that
 your code agrees with your guess.
+
+## A preset for an exchange is a saved mapping
+
+You do not need a module to support another exchange's CSV. The Other CSV
+importer saves what the user mapped as a `CsvMapping`
+(`src/sources/mapped-csv/types.ts`), and a community preset is simply that
+JSON:
+
+```ts
+type CsvMapping = {
+  version: 1;
+  venueLabel: string;
+  delimiter: 'auto' | ',' | ';' | '\t';
+  columns: {
+    date: string;
+    asset: string;
+    amount: string;
+    type?: string;
+    fee?: string;
+    feeAsset?: string;
+    counterAsset?: string;
+    counterAmount?: string;
+    price?: string; // price = counter per unit
+    tradeId?: string;
+    txHash?: string;
+  };
+  dateFormat: 'iso' | 'ymd' | 'dmy' | 'mdy' | 'unix-s' | 'unix-ms';
+  timeZone: string; // 'UTC' or an IANA name; applied only when the value has no zone
+  decimal: 'dot' | 'comma';
+  direction: { mode: 'sign' } | { mode: 'type'; in: string[]; out: string[] };
+  kinds: Record<string, EventKind>; // type value -> kind
+  fiatCounter: boolean;
+};
+```
+
+If you contribute one, the suggested home is a `presets/` directory under
+`src/sources/mapped-csv`. That directory does not exist yet and nothing
+loads presets from it; for now a preset is a mapping a user can recreate in
+the dialog.

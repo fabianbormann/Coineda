@@ -69,9 +69,22 @@ when you are done except the tab.
 | Coinbase          | CSV export                               |
 | Kraken            | CSV export                               |
 | Ledger Live       | Operation history CSV export             |
+| Other CSV         | Any CSV, through a column mapping        |
 
 Modules ship in the bundle and arrive by reviewed pull request, never by download at runtime: a
 source module runs beside your exchange keys, and that is not a place for code nobody has read.
+
+### Other CSV
+
+For an exchange without its own module, choose Other CSV and tell Coineda what the columns mean:
+which column holds the date, asset and amount, optionally type, fee, counter asset, price, trade id
+and transaction hash, plus the date format, time zone, decimal separator, how direction is read (by
+sign, or by tagged type values) and what kind of event each type value is. Nothing is guessed. A row
+that does not fit the mapping is skipped and counted under its reason, tickers that cannot be
+resolved are listed, and a mapping that only covers one direction of a sign convention raises a
+warning. The mapping is saved per venue label and pre-filled the next time; saving a changed mapping
+replaces that venue's events. Binance trades are also paired now: Buy, Spend and Fee rows from the
+same second become one trade.
 
 ## Tax jurisdictions
 
