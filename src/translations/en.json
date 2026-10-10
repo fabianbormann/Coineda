@@ -687,6 +687,21 @@
     "A short animation of your holdings over time.": "A short animation of your holdings over time.",
     "Notifications": "Notifications",
     "Welcome": "Welcome",
-    "Close": "Close"
+    "Close": "Close",
+    "Data endpoints": "Data endpoints",
+    "Price history": "Price history",
+    "Spot prices": "Spot prices",
+    "Exchange rates": "Exchange rates",
+    "Token registry": "Token registry",
+    "Bitcoin indexer": "Bitcoin indexer",
+    "Ethereum indexer": "Ethereum indexer",
+    "Cardano (Yaci)": "Cardano (Yaci)",
+    "Must be an https URL": "Must be an https URL",
+    "This build fixes the endpoints; they cannot be changed here.": "This build fixes the endpoints; they cannot be changed here.",
+    "Default": "Default",
+    "Egress: {{mode}}": "Egress: {{mode}}",
+    "public": "public",
+    "restricted": "restricted",
+    "These endpoints apply to every client on this device.": "These endpoints apply to every client on this device."
   }
 }

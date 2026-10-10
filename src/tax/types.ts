@@ -525,6 +525,13 @@ export type ReportMethod = {
    *  link carried) and coins paid to somebody else in the same transaction
    *  (`:residual-paid-out`) are not fees and are not counted here. */
   transferResiduals: number;
+  /** Whether this client could reach the public data providers
+   *  (`public`) or only the hosts an operator configured (`restricted`). */
+  egress: 'public' | 'restricted';
+  /** The hosts the report's data came from, by endpoint key. Host names
+   *  only (no path, no key); in restricted mode only configured services
+   *  appear. */
+  endpoints: Record<string, string>;
 };
 
 /**

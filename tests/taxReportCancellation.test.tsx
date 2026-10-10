@@ -72,6 +72,8 @@ const germanAssessment: TaxReport = {
     eventsConsidered: 1,
     internalTransfersNetted: 0,
     transferResiduals: 0,
+    egress: 'public',
+    endpoints: {},
   },
 };
 

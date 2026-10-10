@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { EndpointsSettingsCard } from '@/screens/EndpointsSettingsCard';
 import { DatevSettingsCard } from '@/datev/DatevSettingsCard';
 import {
   buchungsstapel,
@@ -1203,6 +1204,7 @@ export const TaxReportScreen = () => {
                   {module?.manifest.id === 'de' && (
                     <DatevSettingsCard value={datev} onChange={setDatev} />
                   )}
+                  <EndpointsSettingsCard />
                 </div>
 
                 {status === 'loading' && (
@@ -1296,6 +1298,23 @@ export const TaxReportScreen = () => {
                         <span className="font-mono break-all">
                           {assessment.method.fingerprint}
                         </span>
+                      </p>
+                      <p>
+                        <span className="font-medium">
+                          {t('Egress: {{mode}}', {
+                            mode: t(assessment.method.egress),
+                          })}
+                        </span>
+                        {assessment.method.egress === 'restricted' &&
+                          Object.keys(assessment.method.endpoints).length >
+                            0 && (
+                            <>
+                              {' · '}
+                              {Object.values(assessment.method.endpoints).join(
+                                ' · ',
+                              )}
+                            </>
+                          )}
                       </p>
                       <p className="text-muted-foreground">
                         {t(

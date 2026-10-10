@@ -492,3 +492,38 @@ describe('reportToJson and filenames', () => {
     );
   });
 });
+
+describe('reportToJson egress', () => {
+  it('carries the egress mode and host names only', () => {
+    const parsed = JSON.parse(
+      reportToJson(
+        {
+          year: 2025,
+          jurisdiction: 'de',
+          method: {
+            fingerprint: 'ab'.repeat(32),
+            baseCurrency: 'eur',
+            egress: 'public',
+            endpoints: {
+              fx: 'api.frankfurter.dev',
+              priceHistory: 'coins.llama.fi',
+            },
+          },
+          totals: {},
+          thresholds: [],
+          lines: [],
+          income: [],
+          capital: [],
+          omittedDisposals: [],
+          unresolved: [],
+          register: [],
+        } as unknown as TaxReport,
+        { generatedAt: '2026-10-10T08:00:00.000Z' },
+      ),
+    );
+    expect(parsed.method.egress).toBe('public');
+    for (const host of Object.values(parsed.method.endpoints as object)) {
+      expect(host).not.toMatch(/[/?]/);
+    }
+  });
+});

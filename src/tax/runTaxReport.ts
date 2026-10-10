@@ -23,6 +23,8 @@ import {
 } from './residualOrigin';
 import { buildRegister } from './register';
 import { resolveValues } from './resolveValues';
+import { egressMode } from '@/config/endpoints';
+import { activeEndpoints, endpointHosts } from '@/config/egress';
 import { rewardKindOf } from '@/tax/rewardKinds';
 import { APP_VERSION } from '@/global/version';
 import type {
@@ -552,6 +554,8 @@ export const runTaxReport = async (
     transferResiduals: residuals.filter((event) =>
       event.id.endsWith(FEE_RESIDUAL_SUFFIX),
     ).length,
+    egress: egressMode(),
+    endpoints: endpointHosts(activeEndpoints()),
   };
 
   // The events dropped as internal transfers: the single-event shape and

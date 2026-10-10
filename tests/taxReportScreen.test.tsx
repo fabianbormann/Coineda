@@ -20,6 +20,7 @@ import {
   listClients,
   type ClientRecord,
 } from '@/clients/registry';
+import { writeDeviceEgress, writeDeviceEndpoints } from '@/config/deviceConfig';
 import { flatRange } from './priceRangeStub';
 import type {
   AssessInput,
@@ -254,6 +255,10 @@ describe('downloading the register', () => {
     expect(json.jurisdiction).toBe('test-jurisdiction');
     expect(Number.isNaN(Date.parse(json.generatedAt))).toBe(false);
     expect(Array.isArray(json.sourceDirectory)).toBe(true);
+    expect(json.method.egress).toBe('public');
+    for (const host of Object.values(json.method.endpoints as object)) {
+      expect(host).not.toMatch(/[/?]/);
+    }
   });
 });
 
@@ -3332,10 +3337,8 @@ describe('accessibility of the report steps', () => {
         ],
       }),
     ]);
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => new Promise<Response>(() => {})),
-    );
+    const hanging = vi.fn(() => new Promise<Response>(() => {}));
+    vi.stubGlobal('fetch', hanging);
     renderScreen();
     await userEvent.click(
       await screen.findByRole('button', { name: /testland/i }),
@@ -3349,6 +3352,10 @@ describe('accessibility of the report steps', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(
       /running your tax report/i,
     );
+    // The loading line shows before the lookup is issued. Ending the test
+    // there let the lookup fire after afterEach restored the real fetch,
+    // reaching DefiLlama and Frankfurter from the NEXT test.
+    await waitFor(() => expect(hanging).toHaveBeenCalled());
   });
 
   it('tells the browser what the taxpayer fields hold', async () => {
@@ -3365,5 +3372,35 @@ describe('accessibility of the report steps', () => {
       'autocomplete',
       'off',
     );
+  });
+});
+
+describe('the egress line on the method sheet', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  it('states the public mode without a host list', async () => {
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+    renderScreen();
+    await runReport('2025');
+
+    expect(screen.getByText('Egress: public')).toBeInTheDocument();
+    expect(screen.queryByText(/yaci|blockstream/i)).toBeNull();
+  });
+
+  it('states the restricted mode and lists the configured host', async () => {
+    writeDeviceEgress('restricted');
+    writeDeviceEndpoints({ fx: 'https://fx.example.gov/v1' });
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+    renderScreen();
+    await runReport('2025');
+
+    const line = screen.getByText('Egress: restricted');
+    expect(line.parentElement).toHaveTextContent('fx.example.gov');
+    expect(line.parentElement).not.toHaveTextContent('/v1');
   });
 });

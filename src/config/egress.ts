@@ -58,3 +58,24 @@ export const activeEndpoints = (config?: EgressConfig): Endpoints => {
   }
   return active;
 };
+
+/**
+ * Key -> host name (`new URL(x).host`, port included) for every endpoint
+ * that is in use: never a path, a query or a credential, so it is safe in a
+ * document handed to a tax office. Blank (restricted, unconfigured) and
+ * unparsable values are omitted.
+ */
+export const endpointHosts = (endpoints: Endpoints): Record<string, string> => {
+  const hosts: Record<string, string> = {};
+  for (const [key, value] of Object.entries(endpoints)) {
+    if (!value) {
+      continue;
+    }
+    try {
+      hosts[key] = new URL(value).host;
+    } catch {
+      // Not a URL: nothing to name.
+    }
+  }
+  return hosts;
+};

@@ -687,6 +687,21 @@
     "A short animation of your holdings over time.": "Eine kurze Animation deiner Bestände über die Zeit.",
     "Notifications": "Benachrichtigungen",
     "Welcome": "Willkommen",
-    "Close": "Schließen"
+    "Close": "Schließen",
+    "Data endpoints": "Datenendpunkte",
+    "Price history": "Preishistorie",
+    "Spot prices": "Spotpreise",
+    "Exchange rates": "Wechselkurse",
+    "Token registry": "Token-Register",
+    "Bitcoin indexer": "Bitcoin-Indexer",
+    "Ethereum indexer": "Ethereum-Indexer",
+    "Cardano (Yaci)": "Cardano (Yaci)",
+    "Must be an https URL": "Muss eine https-URL sein",
+    "This build fixes the endpoints; they cannot be changed here.": "Dieser Build legt die Endpunkte fest; sie können hier nicht geändert werden.",
+    "Default": "Standard",
+    "Egress: {{mode}}": "Ausgehende Verbindungen: {{mode}}",
+    "public": "öffentlich",
+    "restricted": "eingeschränkt",
+    "These endpoints apply to every client on this device.": "Diese Endpunkte gelten für alle Mandanten auf diesem Gerät."
   }
 }
