@@ -485,6 +485,20 @@ describe('the rule-set version', () => {
     expect(screen.queryByText(/rule set de\b/i)).toBeNull();
   });
 
+  it('prints the ledger fingerprint on the method sheet', async () => {
+    vi.stubGlobal('fetch', flatRange(1));
+    taxRegistry.push(germanTax);
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /germany/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: /run report/i }),
+    );
+    expect(await screen.findByText(/ledger fingerprint/i)).toBeInTheDocument();
+    expect(await screen.findByText(/^[0-9a-f]{64}$/)).toBeInTheDocument();
+  });
+
   it('names the jurisdiction in German on a German sheet', async () => {
     vi.stubGlobal('fetch', flatRange(1));
     taxRegistry.push(germanTax);

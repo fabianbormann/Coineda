@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { APP_VERSION } from '@/global/version';
 import { runTaxReport, taxYearOf } from '@/tax/runTaxReport';
-import { openLedger, putEvents } from '@/ledger/db';
+import { getAllEvents, openLedger, putEvents } from '@/ledger/db';
+import { fingerprintEvents } from '@/ledger/fingerprint';
 import austrianTax from '@/tax/jurisdictions/at';
 import type { LedgerEvent } from '@/ledger/types';
 import type { TaxModule, TaxEvent } from '@/tax/types';
@@ -746,6 +747,16 @@ describe('the method sheet', () => {
       'CoinGecko',
     ]);
     expect(report.method.eventsConsidered).toBe(1);
+  });
+
+  it('fingerprints the events it read', async () => {
+    const report = await runTaxReport(stubModule, {
+      year: 2025,
+      baseCurrency: 'eur',
+    });
+    expect(report.method.fingerprint).toBe(
+      await fingerprintEvents(await getAllEvents()),
+    );
   });
 
   it('reports the matching method actually used, not the module default', async () => {

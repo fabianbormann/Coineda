@@ -463,6 +463,8 @@ export type ReportMethod = {
   valuation: 'utc-day';
   priceSources: string[];
   appVersion: string;
+  /** SHA-256 over every ledger event this report read (src/ledger/fingerprint.ts). */
+  fingerprint: string;
   /** The jurisdiction's rule-set version this report was produced under. */
   rulesVersion: string;
   /** Ledger events the jurisdiction was asked to classify, after internal

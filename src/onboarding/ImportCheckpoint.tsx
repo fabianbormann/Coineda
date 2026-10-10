@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { notify } from '@/lib/notify';
+import { shortFingerprint } from '@/ledger/fingerprint';
 import {
   normalizeTransferSecret,
   openCheckpoint,
@@ -156,6 +157,7 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
    * over.
    */
   const [omitted, setOmitted] = useState(0);
+  const [fingerprint, setFingerprint] = useState('');
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -355,10 +357,17 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
       // that should definitely already be in the restored language.
       notify.success(i18n.t('Checkpoint restored. Welcome back!'));
       const missing = checkpoint.omittedEventCount ?? 0;
+      const restoredFingerprint = checkpoint.fingerprint ?? '';
       if (missing > 0) {
         setOmitted(missing);
+        setFingerprint(restoredFingerprint);
         setStep('restored');
         return;
+      }
+      if (restoredFingerprint !== '') {
+        notify.info(
+          `${i18n.t('Fingerprint')}: ${shortFingerprint(restoredFingerprint)}`,
+        );
       }
       onComplete();
     } catch (error) {
@@ -386,6 +395,11 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
               { count: omitted },
             )}
           </p>
+          {fingerprint !== '' && (
+            <p className="text-muted-foreground">
+              {t('Fingerprint')}: {shortFingerprint(fingerprint)}
+            </p>
+          )}
           <div className="flex flex-col gap-1">
             <h3 className="font-medium">{t('Let your sources refetch it')}</h3>
             <p className="text-muted-foreground">

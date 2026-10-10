@@ -1,4 +1,5 @@
 import { getLinkedEvents } from '@/ledger/manualLinks';
+import { fingerprintEvents } from '@/ledger/fingerprint';
 import {
   foldDisposals,
   isInternalTransfer,
@@ -542,6 +543,7 @@ export const runTaxReport = async (
     // what fetchHistory actually tries, in the order it tries them.
     priceSources: ['DefiLlama', 'ECB', 'CoinGecko'],
     appVersion: APP_VERSION,
+    fingerprint: await fingerprintEvents(allEvents),
     rulesVersion: module.manifest.rulesVersion,
     eventsConsidered: survivors.length,
     internalTransfersNetted: allEvents.length - survivors.length,

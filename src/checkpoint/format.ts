@@ -32,6 +32,7 @@ import {
   manualLinkRow,
   type ManualTransferLink,
 } from '@/ledger/manualLinks';
+import { fingerprintEvents } from '@/ledger/fingerprint';
 import type { LedgerEvent, SourceRecord } from '@/ledger/types';
 import {
   getSettings,
@@ -114,6 +115,13 @@ export type Checkpoint = {
    * settings and credentials with it.
    */
   transferLinks?: ManualTransferLink[];
+  /**
+   * SHA-256 over exactly the events this checkpoint carries: authored plus
+   * derived for a backup, authored only for a handover. Optional for the
+   * same reason as `transferLinks`: older checkpoints have none, and the
+   * version stays 1.
+   */
+  fingerprint?: string;
 };
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
@@ -163,11 +171,15 @@ export const buildCheckpoint = async (
     );
   }
   const derived = events.filter((event) => event.origin === 'derived');
+  const authored = events.filter((event) => event.origin === 'authored');
+  const fingerprint = await fingerprintEvents(
+    scope === 'backup' ? [...authored, ...derived] : authored,
+  );
   return {
     v: CURRENT_VERSION,
     settings,
     sources: sources.map(portableSource),
-    authoredEvents: events.filter((event) => event.origin === 'authored'),
+    authoredEvents: authored,
     // One of the two, never both and never neither: a handover states what
     // it left behind, a backup carries it. A payload with both fields set
     // would be claiming to omit what it also contains.
@@ -175,6 +187,7 @@ export const buildCheckpoint = async (
       ? { derivedEvents: derived }
       : { omittedEventCount: derived.length }),
     transferLinks,
+    fingerprint,
   };
 };
 
@@ -215,7 +228,9 @@ export const openCheckpoint = async (
     // but not an array is not, and letting it through would reach the
     // restore's `for ... of` as a crash mid-transaction.
     (checkpoint.transferLinks !== undefined &&
-      !Array.isArray(checkpoint.transferLinks))
+      !Array.isArray(checkpoint.transferLinks)) ||
+    (checkpoint.fingerprint !== undefined &&
+      typeof checkpoint.fingerprint !== 'string')
   ) {
     throw new Error('malformed checkpoint: unexpected shape after decrypting');
   }

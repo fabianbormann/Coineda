@@ -1087,6 +1087,19 @@ export const TaxReportScreen = () => {
                           version: assessment.method.rulesVersion,
                         })}
                       </p>
+                      <p>
+                        <span className="font-medium">
+                          {t('Ledger fingerprint')}:{' '}
+                        </span>
+                        <span className="font-mono break-all">
+                          {assessment.method.fingerprint}
+                        </span>
+                      </p>
+                      <p className="text-muted-foreground">
+                        {t(
+                          'SHA-256 over every recorded event this report read. A checkpoint exported from the same ledger carries the same fingerprint.',
+                        )}
+                      </p>
                       <p className="text-muted-foreground">
                         {t(
                           '{{count}} ledger events were considered; {{netted}} movements between your own wallets were netted out rather than treated as sales.',

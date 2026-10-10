@@ -17,6 +17,7 @@ import {
   generateTransferSecret,
   sealCheckpoint,
 } from '@/checkpoint/format';
+import { shortFingerprint } from '@/ledger/fingerprint';
 
 type Props = {
   open: boolean;
@@ -41,6 +42,8 @@ type Ready = {
   backup: Uint8Array;
   /** Recorded transactions the handover leaves behind. */
   omitted: number;
+  /** Over every event the backup carries. */
+  fingerprint: string;
 };
 
 const checkpointFilename = (): string => {
@@ -135,6 +138,7 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
           qrDataUrl: dataUrl,
           backup: sealedBackup,
           omitted: handover.omittedEventCount ?? 0,
+          fingerprint: backup.fingerprint ?? '',
         });
         setStatus('ready');
       } catch {
@@ -294,6 +298,16 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
               >
                 {t('Download checkpoint')}
               </Button>
+              {ready.fingerprint !== '' && (
+                <details className="text-sm text-muted-foreground">
+                  <summary className="cursor-pointer">
+                    {t('Fingerprint')}: {shortFingerprint(ready.fingerprint)}
+                  </summary>
+                  <p className="mt-1 font-mono text-xs break-all select-all">
+                    {ready.fingerprint}
+                  </p>
+                </details>
+              )}
             </div>
 
             {/* No code to sit beside: the file is the only route, and

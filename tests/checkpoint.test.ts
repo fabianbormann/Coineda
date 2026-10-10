@@ -9,6 +9,7 @@ import {
   putEvents,
   putSource,
 } from '@/ledger/db';
+import { fingerprintEvents } from '@/ledger/fingerprint';
 import {
   buildCheckpoint,
   chooseChannel,
@@ -132,6 +133,45 @@ describe('what the checkpoint carries', () => {
     expect(reopened.settings).toEqual({ language: 'de', baseCurrency: 'eur' });
     expect(reopened.sources[0].config.projectId).toBe('secret-project-id');
     expect(reopened.authoredEvents).toHaveLength(1);
+  });
+
+  it('fingerprints exactly the events it carries, and round-trips it', async () => {
+    await putSettings({ language: 'de', baseCurrency: 'eur' });
+    const derived: LedgerEvent = {
+      ...authored('synced-1'),
+      origin: 'derived',
+      sourceId: 'cfg-1',
+    };
+    await putEvents([authored('bank-1'), derived]);
+
+    const backup = await buildCheckpoint('backup');
+    expect(backup.fingerprint).toBe(
+      await fingerprintEvents(await getAllEvents()),
+    );
+    const handover = await buildCheckpoint('handover');
+    expect(handover.fingerprint).toBe(
+      await fingerprintEvents(handover.authoredEvents),
+    );
+    expect(handover.fingerprint).not.toBe(backup.fingerprint);
+
+    const secret = generateTransferSecret();
+    const reopened = await openCheckpoint(
+      await sealCheckpoint(backup, secret),
+      secret,
+    );
+    expect(reopened.fingerprint).toBe(backup.fingerprint);
+  });
+
+  it('still opens a checkpoint written without a fingerprint', async () => {
+    await putSettings({ language: 'de', baseCurrency: 'eur' });
+    const { fingerprint: _omit, ...legacy } = await buildCheckpoint();
+    void _omit;
+    const secret = generateTransferSecret();
+    const reopened = await openCheckpoint(
+      await sealCheckpoint(legacy, secret),
+      secret,
+    );
+    expect(reopened.fingerprint).toBeUndefined();
   });
 });
 
