@@ -434,3 +434,52 @@ describe('resolving tickers through the asset catalogue', () => {
     ).toBe(true);
   });
 });
+
+describe('fiat other than euro in the exchange importers', () => {
+  it('Coinbase books a USD-priced buy with a fiat:usd counter and fee leg', () => {
+    const row =
+      'abc-10,2024-10-01T00:00:00Z,Buy,BTC,0.01000000,USD,50000.00,500.00,501.50,1.50,Bought\n';
+    const { events } = coinbaseCsv.parse(COINBASE + row);
+    const bought = events.find((event) => event.externalId === 'abc-10');
+    expect(bought?.legs).toEqual([
+      {
+        assetId: 'bitcoin:native',
+        amount: '1000000',
+        direction: 'in',
+        venue: 'coinbase',
+        role: 'principal',
+      },
+      {
+        assetId: 'fiat:usd',
+        amount: '500',
+        direction: 'out',
+        venue: 'coinbase',
+        role: 'principal',
+      },
+      {
+        assetId: 'fiat:usd',
+        amount: '1.5',
+        direction: 'out',
+        venue: 'coinbase',
+        role: 'fee',
+      },
+    ]);
+  });
+
+  it('Binance books a USD fiat deposit as fiat-in, in whole units with cents', () => {
+    const row =
+      '12345678,2024-10-01 00:00:00,Spot,Fiat Deposit,USD,100.25000000,\n';
+    const { events } = binanceCsv.parse(BINANCE + row);
+    const deposit = events.find(
+      (event) =>
+        event.kind === 'fiat-in' &&
+        event.legs.some((leg) => leg.assetId === 'fiat:usd'),
+    );
+    expect(deposit?.legs).toHaveLength(1);
+    expect(deposit?.legs[0]).toMatchObject({
+      assetId: 'fiat:usd',
+      amount: '100.25',
+      direction: 'in',
+    });
+  });
+});

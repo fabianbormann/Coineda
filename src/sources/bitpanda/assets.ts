@@ -1,7 +1,7 @@
 import Big from 'big.js';
 import { normaliseAmount } from '@/ledger/amount';
 import { isFiatAsset } from '@/ledger/balances';
-import { ASSET_DECIMALS, NIGHT_ASSET_ID } from '@/prices/scale';
+import { ASSET_DECIMALS } from '@/prices/scale';
 import { resolveTicker, tickerMap } from '@/sources/csv/resolveTicker';
 
 /**
@@ -14,22 +14,17 @@ import { resolveTicker, tickerMap } from '@/sources/csv/resolveTicker';
  * the rest of the app can already scale and price appear here; every other
  * holding is reported as unsupported rather than stored wrong.
  *
+ * NIGHT needs no entry of its own: the catalogue carries exactly one NIGHT,
+ * the Cardano policy id, and refuses the bare ticker only where two entries
+ * share it.
+ *
  * Adding one means adding its ASSET_DECIMALS entry in the same commit, which
  * `baseUnits` below enforces rather than trusts.
  */
-const BITPANDA_EXPLICIT: Record<string, string> = {
-  // Stated with certainty rather than inferred: the owner's account holds
-  // NIGHT, and the id below is its Cardano policy plus asset name, resolved
-  // through CoinGecko's own platform record. The catalogue refuses the bare
-  // ticker - CoinGecko lists two different coins as NIGHT.
-  NIGHT: NIGHT_ASSET_ID,
-};
-
-export const BITPANDA_ASSETS: Record<string, string> =
-  tickerMap(BITPANDA_EXPLICIT);
+export const BITPANDA_ASSETS: Record<string, string> = tickerMap();
 
 export const assetIdForSymbol = (symbol: string): string | null =>
-  resolveTicker(symbol, {}, BITPANDA_EXPLICIT);
+  resolveTicker(symbol);
 
 /** Thrown rather than returned, because every caller is mid-drain and there
  *  is no sensible amount to carry on with. */

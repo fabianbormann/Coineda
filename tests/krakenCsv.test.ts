@@ -803,3 +803,10 @@ describe('resolving tickers through the asset catalogue', () => {
     });
   });
 });
+
+describe('Kraken X-prefixed codes for the catalogue natives', () => {
+  it('maps XLTC and XXRP to their native assets', () => {
+    expect(assetIdForCode('XLTC')).toBe('litecoin:native');
+    expect(assetIdForCode('XXRP')).toBe('xrp:native');
+  });
+});

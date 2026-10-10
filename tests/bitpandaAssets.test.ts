@@ -79,6 +79,11 @@ describe('assetIdForSymbol', () => {
     expect(baseUnits('1', 'solana:native')).toBe('1000000000');
   });
 
+  it('resolves USD to fiat:usd and keeps its cents unscaled', () => {
+    expect(assetIdForSymbol('USD')).toBe('fiat:usd');
+    expect(baseUnits('100.25', 'fiat:usd')).toBe('100.25');
+  });
+
   it('refuses a symbol it cannot state with certainty', () => {
     // Bitpanda offers 880 symbols including gold, silver, platinum and
     // palladium. A symbol is ambiguous across chains, so a guess merges two
