@@ -1,6 +1,7 @@
 import markOnDark from '@/assets/logo/coineda-mark-on-dark.svg';
 import markOnLight from '@/assets/logo/coineda-mark-on-light.svg';
 import { Link } from 'react-router-dom';
+import { ClientMenu } from '@/clients/ClientMenu';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 
 /**
@@ -56,6 +57,7 @@ export const AppHeader = () => (
       <h1 className="truncate font-serif text-lg">Coineda</h1>
     </Link>
     <div className="flex-1" />
+    <ClientMenu />
     <ThemeToggle />
   </header>
 );

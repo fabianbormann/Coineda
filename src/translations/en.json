@@ -583,6 +583,17 @@
     "Other foreign capital income you have is added on this line as well.": "Other foreign capital income you have is added on this line as well.",
     "These figures are incomplete: {{count}} items were omitted or left unresolved (see the Result card). Resolve them before you type anything in.": "These figures are incomplete: {{count}} items were omitted or left unresolved (see the Result card). Resolve them before you type anything in.",
     "The German forms take euros; this report is in {{currency}}, so no filing figures are shown.": "The German forms take euros; this report is in {{currency}}, so no filing figures are shown.",
-    "Line numbers verified against {{source}} on {{date}}.": "Line numbers verified against {{source}} on {{date}}."
+    "Line numbers verified against {{source}} on {{date}}.": "Line numbers verified against {{source}} on {{date}}.",
+    "Clients": "Clients",
+    "New client": "New client",
+    "Rename": "Rename",
+    "Delete client": "Delete client",
+    "Type the label to confirm": "Type the label to confirm",
+    "The last client cannot be deleted": "The last client cannot be deleted",
+    "read-only": "read-only",
+    "My portfolio": "My portfolio",
+    "Open a checkpoint for review": "Open a checkpoint for review",
+    "Create": "Create",
+    "This permanently deletes {{label}} and all its data from this device. Type the label to confirm": "This permanently deletes {{label}} and all its data from this device. Type the label to confirm"
   }
 }

@@ -4,7 +4,13 @@ import userEvent from '@testing-library/user-event';
 import 'fake-indexeddb/auto';
 import App from '../src/App';
 import { notify } from '@/lib/notify';
-import { openLedger } from '@/ledger/db';
+import {
+  DEFAULT_LEDGER_NAME,
+  openLedger,
+  putSource,
+  setActiveLedger,
+} from '@/ledger/db';
+import { createClient, listClients } from '@/clients/registry';
 import { isOnboarded, setOnboarded } from '@/settings/settingsStore';
 
 beforeEach(async () => {
@@ -28,6 +34,7 @@ beforeEach(async () => {
   // App.tsx now gates the shell on isOnboarded() (Task 10). These tests are
   // about the shell, not onboarding, so they start from an already-onboarded
   // install - onboarding itself is covered by tests/onboarding.test.tsx.
+  await setActiveLedger(DEFAULT_LEDGER_NAME);
   const db = await openLedger();
   for (const store of ['events', 'sources', 'cursors', 'settings'] as const) {
     await db.clear(store);
@@ -65,6 +72,38 @@ describe('App', () => {
 
     expect(await screen.findByText(/welcome to coineda/i)).toBeInTheDocument();
     expect(await isOnboarded()).toBe(false);
+  });
+
+  it('shows the active client label in the header', async () => {
+    render(<App />);
+    expect(
+      await screen.findByRole('button', { name: /clients/i }),
+    ).toHaveTextContent('My portfolio');
+  });
+
+  it('remounts the app against the other ledger when a client is picked', async () => {
+    // Make sure the default client exists, then give its ledger a marker.
+    listClients();
+    await putSource({
+      id: 'cfg-a',
+      moduleId: 'test-exchange',
+      label: 'Marker of client A',
+      config: {},
+    });
+    createClient('Client B');
+
+    render(<App />);
+    expect(await screen.findByText('Marker of client A')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /clients/i }));
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: /client b/i }),
+    );
+
+    // B is a fresh database: not onboarded, so the gate re-ran isOnboarded()
+    // against it and shows the welcome flow, and A's marker is gone.
+    expect(await screen.findByText(/welcome to coineda/i)).toBeInTheDocument();
+    expect(screen.queryByText('Marker of client A')).not.toBeInTheDocument();
   });
 
   it('mounts a Toaster subscribed to notify.*, unconditionally rather than nested inside a route', async () => {

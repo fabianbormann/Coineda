@@ -583,6 +583,17 @@
     "Other foreign capital income you have is added on this line as well.": "Andere ausländische Kapitalerträge, die du hast, kommen ebenfalls in diese Zeile.",
     "These figures are incomplete: {{count}} items were omitted or left unresolved (see the Result card). Resolve them before you type anything in.": "Diese Zahlen sind unvollständig: {{count}} Posten wurden ausgelassen oder blieben ungeklärt (siehe Ergebnis-Karte). Kläre sie, bevor du etwas einträgst.",
     "The German forms take euros; this report is in {{currency}}, so no filing figures are shown.": "Die deutschen Formulare nehmen Euro; dieser Bericht ist in {{currency}}, deshalb werden keine Formularzahlen gezeigt.",
-    "Line numbers verified against {{source}} on {{date}}.": "Zeilennummern geprüft gegen {{source}} am {{date}}."
+    "Line numbers verified against {{source}} on {{date}}.": "Zeilennummern geprüft gegen {{source}} am {{date}}.",
+    "Clients": "Mandanten",
+    "New client": "Neuer Mandant",
+    "Rename": "Umbenennen",
+    "Delete client": "Mandant löschen",
+    "Type the label to confirm": "Gib zur Bestätigung die Bezeichnung ein",
+    "The last client cannot be deleted": "Der letzte Mandant kann nicht gelöscht werden",
+    "read-only": "nur lesen",
+    "My portfolio": "Mein Portfolio",
+    "Open a checkpoint for review": "Checkpoint zur Prüfung öffnen",
+    "Create": "Erstellen",
+    "This permanently deletes {{label}} and all its data from this device. Type the label to confirm": "Dadurch wird {{label}} mit allen Daten unwiderruflich von diesem Gerät gelöscht. Gib zur Bestätigung die Bezeichnung ein"
   }
 }

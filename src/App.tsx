@@ -9,6 +9,13 @@ import { OnboardingFlow } from '@/onboarding/OnboardingFlow';
 import { MainScreen } from '@/screens/MainScreen';
 import { TaxReportScreen } from '@/screens/TaxReportScreen';
 import { isOnboarded } from '@/settings/settingsStore';
+import { setActiveLedger } from '@/ledger/db';
+import { ClientProvider, useClient } from '@/clients/ClientContext';
+import {
+  activeClient,
+  setActiveClient,
+  type ClientRecord,
+} from '@/clients/registry';
 
 type OnboardState = 'checking' | 'pending' | 'onboarded';
 
@@ -19,20 +26,25 @@ type OnboardState = 'checking' | 'pending' | 'onboarded';
  * would flash it and then immediately swap to the other for every single
  * load, onboarded or not.
  */
-const App = () => {
+const Gate = () => {
+  const { client } = useClient();
   const [state, setState] = useState<OnboardState>('checking');
 
   useEffect(() => {
     let active = true;
-    void isOnboarded().then((done) => {
-      if (active) {
-        setState(done ? 'onboarded' : 'pending');
-      }
-    });
+    // The switch must land before the first read: isOnboarded() goes to
+    // whichever database is active when it runs.
+    void setActiveLedger(client.dbName)
+      .then(() => isOnboarded())
+      .then((done) => {
+        if (active) {
+          setState(done ? 'onboarded' : 'pending');
+        }
+      });
     return () => {
       active = false;
     };
-  }, []);
+  }, [client.dbName]);
 
   if (state === 'checking') {
     return (
@@ -83,6 +95,24 @@ const App = () => {
         <Toaster />
       </ConfirmProvider>
     </ThemeProvider>
+  );
+};
+
+/**
+ * The provider is keyed on the client id, so picking another client remounts
+ * the gate and the router: onboarding is re-checked against the new
+ * database and no screen keeps state read from the previous one.
+ */
+const App = () => {
+  const [client, setClient] = useState<ClientRecord>(() => activeClient());
+  const switchTo = async (id: string) => {
+    await setActiveClient(id);
+    setClient(activeClient());
+  };
+  return (
+    <ClientProvider key={client.id} client={client} onChange={switchTo}>
+      <Gate />
+    </ClientProvider>
   );
 };
 
