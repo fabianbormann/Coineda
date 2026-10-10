@@ -360,10 +360,42 @@ export const NON_TEXT = 3;
  * @property {string} label
  * @property {string} fg     a token (`--x`) or a literal colour
  * @property {string[]} on   layers over the page background, bottom first;
- *                           `--x / 0.6` is the token at that opacity
+ *                           `--x / 0.6` is the token at that opacity, and
+ *                           `--x / 0.6 * --y` multiplies in a numeric token
  * @property {string[]} [darkOn] a different stack in dark mode
  * @property {number} min
  */
+
+/**
+ * Coloured text sitting straight on the page (an error line, a gain figure
+ * outside a card) over the centre of each blob of the `lumen-backdrop`
+ * wash in src/styles/lumen.css. Each blob is a radial gradient from
+ * `color-mix(in oklch, <blob> N%, transparent)` - the blob colour at N%
+ * alpha - to transparent, and the whole layer is drawn at `--lm-blob`
+ * opacity, so its centre is the blob colour at N% x --lm-blob over the
+ * page. Each colour is taken at the strongest stop it is drawn with.
+ * @returns {Pair[]}
+ */
+function washPairs() {
+  const blobs = [
+    ['seaglass', '--lm-g1', 0.6],
+    ['lilac', '--lm-g2', 0.55],
+    ['blush', '--lm-g3', 0.45],
+  ];
+  const texts = [
+    ['Gain', '--gain'],
+    ['Loss', '--loss'],
+    ['Destructive text', '--destructive'],
+  ];
+  return texts.flatMap(([name, fg]) =>
+    blobs.map(([blob, token, stop]) => ({
+      label: `${name} over the ${blob} wash`,
+      fg: String(fg),
+      on: [`${token} / ${stop} * --lm-blob`],
+      min: TEXT,
+    })),
+  );
+}
 
 /**
  * Each pair is a foreground painted over a stack of layers. The bottom layer
@@ -425,7 +457,63 @@ export const PAIRS = [
     on: ['--primary'],
     min: TEXT,
   },
-  { label: 'Focus ring on page', fg: '--ring', on: [], min: NON_TEXT },
+  // The 2px `:focus-visible` outline in src/index.css, drawn 2px outside
+  // the control, so it sits on whatever the control sits on.
+  { label: 'Focus outline on page', fg: '--ring', on: [], min: NON_TEXT },
+  {
+    label: 'Focus outline on card',
+    fg: '--ring',
+    on: ['--card'],
+    min: NON_TEXT,
+  },
+  {
+    label: 'Focus outline on popover',
+    fg: '--ring',
+    on: ['--popover'],
+    min: NON_TEXT,
+  },
+  {
+    // The focus outline is non-text: it needs 3:1 against the surface it
+    // is drawn over even at the darkest point of the page wash.
+    label: 'Focus outline over the lilac wash',
+    fg: '--ring',
+    on: ['--lm-g2 / 0.55 * --lm-blob'],
+    min: NON_TEXT,
+  },
+  // Menu and select items (`[data-highlighted]` in src/index.css). The
+  // highlight is the only thing that says which item the arrow keys are
+  // on, so it is measured against the menu surface like any other state.
+  {
+    label: 'Highlighted menu item on popover',
+    fg: '--lm-highlight',
+    on: ['--popover'],
+    min: NON_TEXT,
+  },
+  {
+    label: 'Text on highlighted menu item',
+    fg: '--lm-on-highlight',
+    on: ['--popover', '--lm-highlight'],
+    min: TEXT,
+  },
+  {
+    label: 'Highlighted destructive item on popover',
+    fg: '--lm-highlight-destructive',
+    on: ['--popover'],
+    min: NON_TEXT,
+  },
+  {
+    label: 'Text on highlighted destructive item',
+    fg: '--lm-on-highlight-destructive',
+    on: ['--popover', '--lm-highlight-destructive'],
+    min: TEXT,
+  },
+  {
+    // The inset bar on a checked item that is not the highlighted one.
+    label: 'Checked item marker on popover',
+    fg: '--ring',
+    on: ['--popover'],
+    min: NON_TEXT,
+  },
   {
     // The only boundary an input or select has (`border-input`).
     label: 'Input border on page',
@@ -433,6 +521,7 @@ export const PAIRS = [
     on: [],
     min: NON_TEXT,
   },
+  ...washPairs(),
 ];
 
 /**
@@ -449,9 +538,16 @@ const layer = (tokens, ref) => {
   } else {
     base = parseCssColor(name);
   }
-  return opacity === undefined
-    ? base
-    : { ...base, a: base.a * parseFloat(opacity) };
+  if (opacity === undefined) return base;
+  const factor = opacity
+    .split('*')
+    .map((part) => part.trim())
+    .reduce((product, part) => {
+      if (!part.startsWith('--')) return product * parseFloat(part);
+      if (!(part in tokens)) throw new Error(`Token ${part} not found`);
+      return product * parseFloat(tokens[part]);
+    }, 1);
+  return { ...base, a: base.a * factor };
 };
 
 /**

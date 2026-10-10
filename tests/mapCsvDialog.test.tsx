@@ -169,6 +169,32 @@ describe('the mapping dialog', () => {
     ).toBeDisabled();
   });
 
+  it('announces every direction chip as a toggle, pressed or not, from the start', async () => {
+    const user = userEvent.setup();
+    render(
+      <MapCsvDialog
+        open
+        onOpenChange={onOpenChange}
+        file={file()}
+        onImport={onImport}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Venue label'), 'Bison');
+    await user.click(within(dialog).getByRole('button', { name: 'Continue' }));
+    await user.selectOptions(field(dialog, 'Type column'), 'Typ');
+    await user.click(
+      within(dialog).getByRole('radio', { name: 'By type value' }),
+    );
+    const chips = within(dialog).getAllByRole('button', {
+      name: /^(Incoming|Outgoing): /,
+    });
+    expect(chips.length).toBeGreaterThan(0);
+    for (const chip of chips) {
+      expect(chip).toHaveAttribute('aria-pressed', 'false');
+    }
+  });
+
   it('moves a type value to the other direction instead of tagging it both ways', async () => {
     const user = userEvent.setup();
     render(

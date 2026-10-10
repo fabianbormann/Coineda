@@ -40,6 +40,16 @@ describe('document language', () => {
   });
 });
 
+describe('the toast region', () => {
+  it('is named in the interface language', async () => {
+    await i18n.changeLanguage('de');
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: 'Übersicht' });
+    const region = document.querySelector('section[aria-label]');
+    expect(region?.getAttribute('aria-label')).toMatch(/^Benachrichtigungen/);
+  });
+});
+
 describe('page identity and focus', () => {
   it('gives the overview one h1 and a title', async () => {
     render(<App />);

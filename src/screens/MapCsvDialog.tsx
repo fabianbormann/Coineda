@@ -655,7 +655,7 @@ export const MapCsvDialog = ({
                           variant={
                             draft.tags[value]?.in ? 'default' : 'outline'
                           }
-                          aria-pressed={draft.tags[value]?.in}
+                          aria-pressed={draft.tags[value]?.in === true}
                           aria-label={`${t('Incoming')}: ${value}`}
                           onClick={() => tag(value, 'in')}
                         >
@@ -667,7 +667,7 @@ export const MapCsvDialog = ({
                           variant={
                             draft.tags[value]?.out ? 'default' : 'outline'
                           }
-                          aria-pressed={draft.tags[value]?.out}
+                          aria-pressed={draft.tags[value]?.out === true}
                           aria-label={`${t('Outgoing')}: ${value}`}
                           onClick={() => tag(value, 'out')}
                         >

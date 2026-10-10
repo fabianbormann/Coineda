@@ -128,6 +128,7 @@ const Gate = () => {
  * database and no screen keeps state read from the previous one.
  */
 const App = () => {
+  const { t } = useTranslation();
   const [client, setClient] = useState<ClientRecord>(() => activeClient());
   // Stable, so the gate's effect does not re-run on every render.
   const switchTo = useCallback(async (id: string) => {
@@ -142,7 +143,8 @@ const App = () => {
       <ClientProvider key={client.id} client={client} onChange={switchTo}>
         <Gate />
       </ClientProvider>
-      <Toaster />
+      {/* sonner names its region "Notifications" in English otherwise. */}
+      <Toaster containerAriaLabel={t('Notifications')} />
     </ThemeProvider>
   );
 };

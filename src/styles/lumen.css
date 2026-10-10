@@ -9,7 +9,14 @@
    (0.3 -> 0.5 light, 0.32 -> 0.4 dark). It is the only boundary an input
    or select has (`--input`), and at the export's alpha it measured 1.96:1
    and 2.68:1 against the page - under WCAG 1.4.11's 3:1. See
-   docs/accessibility.md and tests/contrast.test.ts. */
+   docs/accessibility.md and tests/contrast.test.ts.
+   And `--lm-blob` is lower (0.62 -> 0.5 light, 0.35 -> 0.3 dark): coloured
+   text that sits straight on the page (an error line, a gain figure) is
+   read against the wash at a blob's centre, and at the export's strength
+   gain, loss and destructive measured 3.4-4.4:1 there in light mode and
+   destructive 4.44:1 in dark, under the 4.5:1 text needs. The semantic
+   colours were darkened as well (src/index.css); the pairs are in
+   tests/contrast.test.ts as "... over the <blob> wash". */
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -61,7 +68,7 @@
   --lm-fill: #3a3c45;
   --lm-on-fill: #f6f7fa;
   --lm-shadow: rgb(40 40 90 / 0.16);
-  --lm-blob: 0.62;
+  --lm-blob: 0.5;
   --lm-glow-strength: 45%;
   --lm-rim-angle: 200deg;
 }
@@ -83,7 +90,7 @@
   --lm-fill: rgb(255 255 255 / 0.92);
   --lm-on-fill: #0b0c10;
   --lm-shadow: rgb(0 0 0 / 0.65);
-  --lm-blob: 0.35;
+  --lm-blob: 0.3;
 }
 
 :root,

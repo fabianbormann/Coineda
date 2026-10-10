@@ -134,21 +134,41 @@ describe('JourneyDialog', () => {
 
     const pause = await screen.findByRole('button', { name: 'Pause' });
     expect(pause).toHaveAttribute('aria-pressed', 'false');
+    // The canvas is an image named by the sentence; the visible copy of
+    // that sentence is hidden from assistive tech so it is not read twice.
     expect(
-      screen.getByText('A short animation of your holdings over time.'),
+      screen.getByRole('img', {
+        name: 'A short animation of your holdings over time.',
+      }),
     ).toBeInTheDocument();
 
+    // A toggle button keeps its name and flips only its pressed state:
+    // "Play, pressed" would describe the opposite of what is happening.
     cancel.mockClear();
     await user.click(pause);
-    const play = screen.getByRole('button', { name: 'Play' });
-    expect(play).toHaveAttribute('aria-pressed', 'true');
+    expect(pause).toHaveAccessibleName('Pause');
+    expect(pause).toHaveAttribute('aria-pressed', 'true');
     expect(cancel).toHaveBeenCalled();
 
-    await user.click(play);
-    expect(screen.getByRole('button', { name: 'Pause' })).toHaveAttribute(
-      'aria-pressed',
-      'false',
-    );
+    await user.click(pause);
+    expect(pause).toHaveAccessibleName('Pause');
+    expect(pause).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('exposes which privacy mode is selected', async () => {
+    const user = userEvent.setup();
+    render(<JourneyDialog open={true} onOpenChange={() => {}} />);
+    const shareable = await screen.findByRole('button', {
+      name: 'Shareable (hide my balance)',
+    });
+    const full = screen.getByRole('button', {
+      name: 'Full detail (show my balance)',
+    });
+    expect(shareable).toHaveAttribute('aria-pressed', 'true');
+    expect(full).toHaveAttribute('aria-pressed', 'false');
+    await user.click(full);
+    expect(shareable).toHaveAttribute('aria-pressed', 'false');
+    expect(full).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('keeps the dialog open and shows the message when the series fails to build', async () => {

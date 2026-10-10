@@ -323,6 +323,7 @@ export const JourneyDialog = ({ open, onOpenChange }: Props) => {
               <Button
                 type="button"
                 variant={mode === 'relative' ? 'default' : 'outline'}
+                aria-pressed={mode === 'relative'}
                 onClick={() => setMode('relative')}
                 disabled={recording}
               >
@@ -331,6 +332,7 @@ export const JourneyDialog = ({ open, onOpenChange }: Props) => {
               <Button
                 type="button"
                 variant={mode === 'absolute' ? 'default' : 'outline'}
+                aria-pressed={mode === 'absolute'}
                 onClick={() => setMode('absolute')}
                 disabled={recording}
               >
@@ -341,10 +343,14 @@ export const JourneyDialog = ({ open, onOpenChange }: Props) => {
               ref={canvasRef}
               width={CANVAS_WIDTH}
               height={CANVAS_HEIGHT}
+              role="img"
               aria-label={t('A short animation of your holdings over time.')}
               className="w-full rounded-md border bg-black"
             />
-            <p className="text-sm text-muted-foreground">
+            {/* The canvas already carries this sentence as its name; the
+                visible copy is for sighted users and would otherwise be
+                read a second time. */}
+            <p className="text-sm text-muted-foreground" aria-hidden="true">
               {t('A short animation of your holdings over time.')}
             </p>
             <div>
@@ -360,7 +366,10 @@ export const JourneyDialog = ({ open, onOpenChange }: Props) => {
                 ) : (
                   <PauseIcon className="size-4" aria-hidden="true" />
                 )}
-                {paused ? t('Play') : t('Pause')}
+                {/* A toggle keeps its name and flips only aria-pressed:
+                    "Play, pressed" would describe the opposite of what is
+                    happening. The icon still shows what a press does. */}
+                {t('Pause')}
               </Button>
             </div>
             {recordError && (

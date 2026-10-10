@@ -155,6 +155,43 @@ describe.each(['light', 'dark'] as const)(
   },
 );
 
+describe('the measured pairs cover what the stylesheet paints', () => {
+  const labels = measure(css, 'light').map((row) => row.label);
+  // Unlayered, so these beat the `outline-none` / `outline-hidden`
+  // utilities the vendored components carry (Tailwind puts those in
+  // @layer utilities, and any unlayered rule outranks a layered one).
+  const unlayered = css.slice(css.indexOf('/* Focus you can see.'));
+
+  it('draws a full-strength 2px focus outline in --ring', () => {
+    expect(unlayered).toMatch(
+      /:focus-visible\s*\{\s*outline:\s*2px solid var\(--ring\);\s*outline-offset:\s*2px;/,
+    );
+    expect(labels).toContain('Focus outline on page');
+    expect(labels).toContain('Focus outline on card');
+    expect(labels).toContain('Focus outline on popover');
+  });
+
+  it('paints highlighted and checked menu items in measured colours', () => {
+    expect(unlayered).toMatch(
+      /\[data-highlighted\][^{]*\{[^}]*background:\s*var\(--lm-highlight\)/,
+    );
+    expect(unlayered).toMatch(/\[data-state='checked'\]/);
+    expect(labels).toContain('Highlighted menu item on popover');
+    expect(labels).toContain('Text on highlighted menu item');
+    expect(labels).toContain('Highlighted destructive item on popover');
+    expect(labels).toContain('Text on highlighted destructive item');
+    expect(labels).toContain('Checked item marker on popover');
+  });
+
+  it('measures coloured text over the centre of every wash blob', () => {
+    for (const fg of ['Gain', 'Loss', 'Destructive text']) {
+      for (const blob of ['seaglass', 'lilac', 'blush']) {
+        expect(labels).toContain(`${fg} over the ${blob} wash`);
+      }
+    }
+  });
+});
+
 describe('scripts/contrast.mjs', () => {
   it('prints exactly the table the typed module computes', () => {
     const out = execFileSync(process.execPath, ['scripts/contrast.mjs'], {

@@ -119,10 +119,13 @@
      - blush would read as "pretty" where this has to read as "wrong". The
      destructive red and the gain/loss pair stay as they were.
      Every pair below is measured in tests/contrast.test.ts
-     (`npm run contrast` prints the table). The destructive red is a step
-     darker than shadcn's 0.577: on Lumen's grey-blue page that one gave
-     4.30:1, under the 4.5:1 text needs. */
-  --destructive: oklch(0.55 0.245 27.3);
+     (`npm run contrast` prints the table). The destructive red is darker
+     than shadcn's 0.577: on Lumen's grey-blue page that one gave 4.30:1,
+     under the 4.5:1 text needs, and 0.55 still fell to 3.5:1 over the
+     centre of a wash blob. Gain and loss were darkened for the same
+     reason (0.52 -> 0.45 / 0.47): text that sits straight on the page is
+     read against the wash, not against the flat page colour. */
+  --destructive: oklch(0.47 0.245 27.3);
   --destructive-foreground: oklch(0.985 0 0);
 
   --border: var(--lm-faint);
@@ -133,8 +136,20 @@
      already clears it (see .dark). */
   --ring: oklch(0.6 0.22 278);
 
-  --gain: oklch(0.52 0.13 163.2);
-  --loss: oklch(0.52 0.2 25.3);
+  --gain: oklch(0.45 0.13 163.2);
+  --loss: oklch(0.47 0.2 25.3);
+
+  /* The highlighted menu or select item (`[data-highlighted]`, below).
+     shadcn paints it `bg-accent`, which here is glass-2 - a 55% white film
+     laid on glass-3's 72% one, about 1.02:1 against the menu: the item the
+     arrow keys are on could not be seen. The primary fill is the one
+     surface already built to carry text and to stand off every glass
+     tier, so the highlight inverts the item onto it. A destructive item
+     inverts onto the destructive red instead, so it still reads as one. */
+  --lm-highlight: var(--lm-fill);
+  --lm-on-highlight: var(--lm-on-fill);
+  --lm-highlight-destructive: var(--destructive);
+  --lm-on-highlight-destructive: white;
 
   --chart-1: oklch(0.596 0.145 163.2);
   --chart-2: oklch(0.6 0.118 220);
@@ -170,6 +185,10 @@
 
   --gain: oklch(0.78 0.16 163.2);
   --loss: oklch(0.72 0.19 25.3);
+
+  /* White on the light dark-mode red is under 3:1; its own dark
+     foreground is what it was made to carry. */
+  --lm-on-highlight-destructive: var(--destructive-foreground);
 
   --chart-1: oklch(0.765 0.177 163.2);
   --chart-2: oklch(0.7 0.13 220);
@@ -520,6 +539,87 @@
   [data-print='notice'] {
     color: #444;
   }
+}
+
+/* Focus you can see.
+   The vendored components draw keyboard focus as `ring-[3px] ring-ring/50`,
+   a half-strength halo that measured 1.87:1 on the light page and 2.99:1
+   on the dark one - under the 3:1 a focus indicator needs (WCAG 1.4.11,
+   2.4.7). Rather than re-edit every file in src/components/ui (and again
+   after each shadcn regenerate), one outline here covers them all: the
+   full-strength `--ring`, 2px wide and 2px off the control, measured in
+   tests/contrast.test.ts on the page, a card, a popover and the wash.
+   These rules are deliberately UNLAYERED. Tailwind emits `outline-none`
+   and `outline-hidden` inside @layer utilities, and an unlayered rule
+   outranks any layered one whatever its specificity. Elements focused
+   only by script (`tabindex='-1'`: the route h1, `main`) are left out. */
+:where(
+  button,
+  a[href],
+  input,
+  select,
+  textarea,
+  summary,
+  [role='button'],
+  [role='checkbox'],
+  [role='radio'],
+  [role='switch'],
+  [role='tab'],
+  [tabindex]:not([tabindex='-1'])
+):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Menu and select items. Radix moves focus between them and marks the
+   current one `data-highlighted`; an outline 2px outside would be clipped
+   by the menu's overflow, so the item itself inverts onto the highlight
+   (measured against the menu surface, see --lm-highlight) and carries an
+   inset outline in its own text colour. */
+:is(
+  [data-slot='dropdown-menu-item'],
+  [data-slot='dropdown-menu-checkbox-item'],
+  [data-slot='dropdown-menu-radio-item'],
+  [data-slot='dropdown-menu-sub-trigger'],
+  [data-slot='select-item']
+)[data-highlighted] {
+  background: var(--lm-highlight);
+  color: var(--lm-on-highlight);
+  outline: 2px solid var(--lm-on-highlight);
+  outline-offset: -2px;
+}
+:is(
+    [data-slot='dropdown-menu-item'],
+    [data-slot='dropdown-menu-checkbox-item'],
+    [data-slot='dropdown-menu-radio-item'],
+    [data-slot='dropdown-menu-sub-trigger'],
+    [data-slot='select-item']
+  )[data-highlighted]
+  svg {
+  color: inherit;
+}
+[data-slot='dropdown-menu-item'][data-variant='destructive'][data-highlighted] {
+  background: var(--lm-highlight-destructive);
+  color: var(--lm-on-highlight-destructive);
+  outline-color: var(--lm-on-highlight-destructive);
+}
+/* The destructive item's icon is coloured by an `!important` utility,
+   which a normal rule cannot override (and an unlayered `!important` loses
+   to a layered one); lucide strokes with currentColor, so the stroke is
+   set directly instead. */
+[data-slot='dropdown-menu-item'][data-variant='destructive'][data-highlighted]
+  svg {
+  stroke: var(--lm-on-highlight-destructive);
+}
+/* The chosen value of an open select (or a checked menu item) when the
+   arrow keys are elsewhere: an inset bar in the focus colour beside the
+   check mark, so "chosen" and "highlighted" never look the same. */
+:is(
+    [data-slot='dropdown-menu-checkbox-item'],
+    [data-slot='dropdown-menu-radio-item'],
+    [data-slot='select-item']
+  )[data-state='checked']:not([data-highlighted]) {
+  box-shadow: inset 3px 0 0 var(--ring);
 }
 
 /* Honour the reduced-motion preference for every animation the app owns:

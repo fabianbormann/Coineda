@@ -3265,3 +3265,105 @@ describe('downloading the DATEV Buchungsstapel', () => {
     expect((await getSettings())?.datev).toBeUndefined();
   });
 });
+
+describe('accessibility of the report steps', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps the route h1 off paper, where the letterhead names the report', async () => {
+    renderScreen();
+    const h1 = await screen.findByRole('heading', { level: 1 });
+    expect(h1).toHaveClass('sr-only');
+    expect(h1).toHaveClass('print:hidden');
+    expect(h1).not.toHaveClass('print:not-sr-only');
+  });
+
+  it('moves focus to the step heading on choosing, going back and finishing a run', async () => {
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+    renderScreen();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /testland/i }),
+    );
+    const chosen = await screen.findByRole('heading', {
+      level: 2,
+      name: 'Testland',
+    });
+    await waitFor(() => expect(document.activeElement).toBe(chosen));
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /^choose a jurisdiction$/i }),
+    );
+    const picker = await screen.findByRole('heading', {
+      level: 2,
+      name: /create tax report/i,
+    });
+    await waitFor(() => expect(document.activeElement).toBe(picker));
+
+    await runReport('2025');
+    await screen.findAllByText(/test threshold/i);
+    const reportHeading = screen.getByRole('heading', {
+      level: 2,
+      name: 'Testland',
+    });
+    await waitFor(() => expect(document.activeElement).toBe(reportHeading));
+  });
+
+  it('announces the running line as a status', async () => {
+    taxRegistry.push(makeModule());
+    // A coin, not euros, so the run has to look up a historical price; a
+    // lookup that never answers keeps it on its loading line.
+    await (await openLedger()).clear('prices');
+    await putEvents([
+      ledgerEvent({
+        id: 'btc-in',
+        externalId: 'btc-in',
+        legs: [
+          {
+            assetId: 'bitcoin:native',
+            amount: '100000000',
+            direction: 'in',
+            venue: 'wallet-a',
+            role: 'principal',
+          },
+        ],
+      }),
+    ]);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => {})),
+    );
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /testland/i }),
+    );
+    const yearInput = await screen.findByLabelText(/tax year/i);
+    await userEvent.clear(yearInput);
+    await userEvent.type(yearInput, '2025');
+    await userEvent.click(
+      await screen.findByRole('button', { name: /run report/i }),
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      /running your tax report/i,
+    );
+  });
+
+  it('tells the browser what the taxpayer fields hold', async () => {
+    taxRegistry.push(makeModule());
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /testland/i }),
+    );
+    expect(await screen.findByLabelText('Your name')).toHaveAttribute(
+      'autocomplete',
+      'name',
+    );
+    expect(screen.getByLabelText('Tax number')).toHaveAttribute(
+      'autocomplete',
+      'off',
+    );
+  });
+});

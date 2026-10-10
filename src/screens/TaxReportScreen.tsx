@@ -239,6 +239,16 @@ const UnresolvedGroups = ({
 export const TaxReportScreen = () => {
   const { t, i18n } = useTranslation();
   const headingRef = useRouteAnnounce(t('Tax report'));
+  // The step heading (the jurisdiction picker's or the chosen
+  // jurisdiction's h2). Choosing, going back and finishing a run each
+  // unmount or disable the control that had focus, which would drop focus
+  // to <body> and send the next Tab back to the top of the document; the
+  // tick asks the effect below to land it on the new step's heading.
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null);
+  const [stepFocus, setStepFocus] = useState(0);
+  useEffect(() => {
+    if (stepFocus > 0) stepHeadingRef.current?.focus();
+  }, [stepFocus]);
   // Optional: the screen is also rendered without a provider in isolation.
   const clientCtx = useContext(ClientContext);
   const readOnly = clientCtx?.readOnly ?? false;
@@ -461,12 +471,14 @@ export const TaxReportScreen = () => {
     // Switching jurisdiction abandons any run in flight, for the same
     // reason reopening does: its result was computed under different rules.
     setRequest(null);
+    setStepFocus((n) => n + 1);
   };
 
   const goBack = () => {
     setModule(null);
     setDisclaimer(null);
     setRequest(null);
+    setStepFocus((n) => n + 1);
   };
 
   const handleRun = () => {
@@ -581,6 +593,7 @@ export const TaxReportScreen = () => {
         setAssessment(result);
         setStatus('done');
         setStep('report');
+        setStepFocus((n) => n + 1);
       } catch (caught) {
         if (cancelled) {
           return;
@@ -811,7 +824,9 @@ export const TaxReportScreen = () => {
       data-print="document"
       className="mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-6 p-6"
     >
-      <h1 ref={headingRef} tabIndex={-1} className="sr-only print:not-sr-only">
+      {/* Hidden on paper too: the letterhead already names the report, and
+          a bare "Tax report" line above it printed the title twice. */}
+      <h1 ref={headingRef} tabIndex={-1} className="sr-only print:hidden">
         {t('Tax report')}
       </h1>
       <div className="flex min-w-0 flex-col gap-4">
@@ -829,7 +844,11 @@ export const TaxReportScreen = () => {
                   {t('Back to overview')}
                 </Link>
               </Button>
-              <h2 className="text-xl font-semibold">
+              <h2
+                ref={stepHeadingRef}
+                tabIndex={-1}
+                className="text-xl font-semibold"
+              >
                 {t('Create tax report')}
               </h2>
               <p className="text-sm text-muted-foreground">
@@ -902,7 +921,11 @@ export const TaxReportScreen = () => {
                   <div data-print="rule" aria-hidden="true" />
                 </div>
               )}
-              <h2 className="text-xl font-semibold">
+              <h2
+                ref={stepHeadingRef}
+                tabIndex={-1}
+                className="text-xl font-semibold"
+              >
                 {t(module.manifest.jurisdiction)}
               </h2>
               {/* Print only: the document's own header.
@@ -1153,6 +1176,7 @@ export const TaxReportScreen = () => {
                     <Input
                       id="tax-report-taxpayer-name"
                       value={taxpayerName}
+                      autoComplete="name"
                       onChange={(event) => setTaxpayerName(event.target.value)}
                       onBlur={persistTaxpayer}
                       disabled={status === 'loading' || readOnly}
@@ -1170,6 +1194,7 @@ export const TaxReportScreen = () => {
                     <Input
                       id="tax-report-tax-number"
                       value={taxNumber}
+                      autoComplete="off"
                       onChange={(event) => setTaxNumber(event.target.value)}
                       onBlur={persistTaxpayer}
                       disabled={status === 'loading' || readOnly}
@@ -1181,7 +1206,10 @@ export const TaxReportScreen = () => {
                 </div>
 
                 {status === 'loading' && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div
+                    role="status"
+                    className="flex items-center gap-2 text-sm text-muted-foreground"
+                  >
                     <Loader2Icon
                       className="size-4 animate-spin"
                       aria-hidden="true"
