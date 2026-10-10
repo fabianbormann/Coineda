@@ -6,6 +6,8 @@ import { normaliseAmount } from '@/ledger/amount';
 import { ASSET_CATALOGUE } from '@/assets/catalogue';
 import { NIGHT_ASSET_ID, USDC_ASSET_ID, USDT_ASSET_ID } from '@/assets/ids';
 
+export { NIGHT_ASSET_ID, USDT_ASSET_ID, USDC_ASSET_ID };
+
 /**
  * How many decimals an asset's ledger amount carries, i.e. how many base
  * units make one whole unit of the thing a price is quoted in.
@@ -45,10 +47,7 @@ import { NIGHT_ASSET_ID, USDC_ASSET_ID, USDT_ASSET_ID } from '@/assets/ids';
  * `baseUnits` scales by THIS number on the way in, so the two cannot
  * disagree. A real Ethereum chain module would report wei already and must
  * not scale again.
- */
-export { NIGHT_ASSET_ID, USDT_ASSET_ID, USDC_ASSET_ID };
-
-/**
+ *
  * Derived from ASSET_CATALOGUE (src/assets/catalogue.ts), which carries each
  * row's provenance; fiat is excluded because it has no base-unit scale here.
  *

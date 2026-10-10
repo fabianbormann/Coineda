@@ -34,6 +34,19 @@ describe('asset catalogue', () => {
     );
   });
 
+  it('honours a chain hint strictly', () => {
+    expect(resolveSymbol('USDT', { chain: 'tron' })).toBeUndefined();
+    expect(resolveSymbol('USDT', { chain: 'eth' })?.id).toBe(USDT_ASSET_ID);
+    expect(resolveSymbol('BTC')?.id).toBe('bitcoin:native');
+    expect(resolveSymbol('GRAM')?.id).toBe('ton:native');
+  });
+
+  it('prices the legacy MATIC ERC-20 as POL', () => {
+    expect(
+      COINGECKO_IDS['eth:0x7d1afa7b718fb893db30a3abc0cfc608aacfebb0'],
+    ).toBe('polygon-ecosystem-token');
+  });
+
   it('gives every non-fiat entry decimals and a coingeckoId', () => {
     for (const e of ASSET_CATALOGUE.filter((x) => x.kind !== 'fiat')) {
       expect(Number.isInteger(e.decimals)).toBe(true);

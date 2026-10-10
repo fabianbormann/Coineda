@@ -81,7 +81,7 @@ const fiat = (iso: string, name: string, decimals: number): AssetEntry => ({
   verified: { source: 'ISO 4217 minor units', checkedOn: CHECKED_ON },
 });
 
-export const ASSET_CATALOGUE: readonly AssetEntry[] = [
+const ENTRIES: AssetEntry[] = [
   native('bitcoin:native', 'BTC', 'Bitcoin', 8, 'bitcoin', 'bitcoin'),
   native('eth:native', 'ETH', 'Ether', 18, 'eth', 'ethereum'),
   native('cardano:lovelace', 'ADA', 'Cardano', 6, 'cardano', 'cardano'),
@@ -148,7 +148,9 @@ export const ASSET_CATALOGUE: readonly AssetEntry[] = [
   native('aptos:native', 'APT', 'Aptos', 8, 'aptos', 'aptos'),
   // CoinGecko has since relabelled this coin's ticker GRAM; the id is
   // unchanged and the market still calls it TON, so TON stays the symbol.
-  native('ton:native', 'TON', 'Toncoin', 9, 'ton', 'the-open-network'),
+  native('ton:native', 'TON', 'Toncoin', 9, 'ton', 'the-open-network', [
+    'GRAM',
+  ]),
   {
     ...ethToken(USDT_ASSET_ID.slice(4), 'USDT', 'Tether', 6, 'tether'),
     id: USDT_ASSET_ID,
@@ -257,14 +259,15 @@ export const ASSET_CATALOGUE: readonly AssetEntry[] = [
   ),
   // CoinGecko's matic-network no longer lists any platform (it is flagged
   // "migrated to POL"), so contract and decimals were read from Ethereum
-  // Blockscout instead; the id is still listed and still priced.
+  // Blockscout instead. It is priced as POL (the migration is 1:1), because
+  // the matic-network feed is thin and stale.
   ethToken(
     '0x7d1afa7b718fb893db30a3abc0cfc608aacfebb0',
     'MATIC',
     'Polygon (MATIC, ERC-20)',
     18,
-    'matic-network',
-    'CoinGecko /coins/list + Ethereum Blockscout token (decimals, symbol)',
+    'polygon-ecosystem-token',
+    'contract and decimals via Ethereum Blockscout; priced as POL (1:1 migration), CoinGecko polygon-ecosystem-token',
   ),
   ethToken(
     '0xae7ab96520de3a18e5e111b5eaab095312d7fe84',
@@ -292,6 +295,9 @@ export const ASSET_CATALOGUE: readonly AssetEntry[] = [
   fiat('AUD', 'Australian Dollar', 2),
 ];
 
+export const ASSET_CATALOGUE: ReadonlyArray<Readonly<AssetEntry>> =
+  Object.freeze(ENTRIES.map((e) => Object.freeze(e)));
+
 const BY_ID = new Map(ASSET_CATALOGUE.map((e) => [e.id, e]));
 
 export const assetById = (id: string): AssetEntry | undefined => BY_ID.get(id);
@@ -306,23 +312,20 @@ const entriesFor = (symbol: string): AssetEntry[] => {
 
 /**
  * The entry for a ticker, or undefined when the ticker is unknown or
- * ambiguous. With several candidates, a `chain` hint picks the one entry on
- * that chain; anything still not exactly one is undefined rather than a
- * guess.
+ * ambiguous. With a `chain` hint only an entry on that chain may be
+ * returned, even when the ticker is otherwise unique: USDT hinted 'tron' is
+ * not the Ethereum USDT. Anything not exactly one is undefined, not a guess.
  */
 export const resolveSymbol = (
   symbol: string,
   hint?: { chain?: string },
 ): AssetEntry | undefined => {
   const found = entriesFor(symbol);
-  if (found.length === 1) {
-    return found[0];
-  }
-  if (found.length > 1 && hint?.chain) {
+  if (hint?.chain) {
     const onChain = found.filter((e) => e.chain === hint.chain);
     return onChain.length === 1 ? onChain[0] : undefined;
   }
-  return undefined;
+  return found.length === 1 ? found[0] : undefined;
 };
 
 /** Upper-cased symbols and aliases carried by more than one entry. */
