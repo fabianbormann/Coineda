@@ -1,0 +1,12 @@
+Operation Date,Status,Currency Ticker,Operation Type,Operation Amount,Operation Fees,Operation Hash,Account Name,Account xpub,Countervalue Ticker,Countervalue at Operation Date,Countervalue at CSV Export
+2025-01-10T09:00:00.000Z,Confirmed,BTC,IN,0.5,0,aaa111,Bitcoin 1,xpub6BtcExample,EUR,45000,47000
+2025-02-01T10:00:00.000Z,Confirmed,BTC,OUT,0.1,0.0001,bbb222,Bitcoin 1,xpub6BtcExample,EUR,9000,9400
+2025-03-05T12:00:00.000Z,Confirmed,ETH,OUT,0,0.002,ccc333,Ethereum 1,0xAbCdEf0123456789AbCdEf0123456789AbCdEf01,EUR,0,0
+2025-03-05T12:00:00.000Z,Confirmed,USDT,OUT,250,,ccc333,Tether USD,0xAbCdEf0123456789AbCdEf0123456789AbCdEf01,EUR,230,231
+2025-04-01T00:00:00.000Z,Confirmed,ADA,REWARD,12.3,0,ddd444,Cardano 1,addr1qxyzExample,EUR,5,6
+2025-04-02T00:00:00.000Z,Confirmed,DOT,DELEGATE,0,0.0156,eee555,Polkadot 1,1DotExampleAddress,EUR,0,0
+2025-04-03T00:00:00.000Z,Confirmed,SOL,FEES,0.000005,0.000005,fff666,Solana 1,SoLExampleAddress,EUR,0,0
+2025-05-01T00:00:00.000Z,Confirmed,ETH,NFT_IN,1,0,ggg777,Ethereum 1,0xAbCdEf0123456789AbCdEf0123456789AbCdEf01,EUR,0,0
+2025-06-01T00:00:00.000Z,Failed,BTC,OUT,0.2,0.0002,hhh888,Bitcoin 1,xpub6BtcExample,EUR,0,0
+2025-07-01T00:00:00.000Z,Confirmed,SOL,IN,"1,25",0,iii999,Solana 1,SoLExampleAddress,EUR,0,0
+2025-08-01T00:00:00.000Z,Confirmed,DOT,VOTE,0,0,jjj000,Polkadot 1,1DotExampleAddress,EUR,0,0
