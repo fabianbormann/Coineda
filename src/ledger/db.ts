@@ -87,14 +87,36 @@ interface LedgerSchema extends DBSchema {
   };
 }
 
-const DB_NAME = 'coineda-v2';
+export const DEFAULT_LEDGER_NAME = 'coineda-v2';
 const DB_VERSION = 6;
 
+let activeName = DEFAULT_LEDGER_NAME;
 let connection: Promise<IDBPDatabase<LedgerSchema>> | null = null;
 
-export const openLedger = (): Promise<IDBPDatabase<LedgerSchema>> => {
+export class LedgerSwitchedError extends Error {
+  constructor(expected: string, active: string) {
+    super(
+      `ledger switched from ${expected} to ${active}; the write was dropped`,
+    );
+    this.name = 'LedgerSwitchedError';
+  }
+}
+
+export const activeLedgerName = (): string => activeName;
+
+/**
+ * The connection for the active database. A write that captured
+ * `activeLedgerName()` before a long await passes it as `expected`, so it
+ * is refused rather than landing in whichever database is active by then.
+ */
+export const openLedger = (
+  expected?: string,
+): Promise<IDBPDatabase<LedgerSchema>> => {
+  if (expected !== undefined && expected !== activeName) {
+    return Promise.reject(new LedgerSwitchedError(expected, activeName));
+  }
   if (!connection) {
-    connection = openDB<LedgerSchema>(DB_NAME, DB_VERSION, {
+    connection = openDB<LedgerSchema>(activeName, DB_VERSION, {
       upgrade(db, oldVersion) {
         // Guarded on oldVersion: a user who installed after Task 3 already
         // has version 1 and must upgrade in place rather than hit "object
@@ -143,6 +165,30 @@ export const openLedger = (): Promise<IDBPDatabase<LedgerSchema>> => {
   return connection;
 };
 
+export const closeLedger = async (): Promise<void> => {
+  const open = connection;
+  connection = null;
+  if (open) (await open).close();
+};
+
+export const setActiveLedger = async (dbName: string): Promise<void> => {
+  if (dbName === activeName && connection) return;
+  await closeLedger();
+  activeName = dbName;
+};
+
+export const deleteLedgerDatabase = async (dbName: string): Promise<void> => {
+  if (dbName === activeName) await closeLedger();
+  await new Promise<void>((resolve, reject) => {
+    const req = indexedDB.deleteDatabase(dbName);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+    // Closed above; a block means another tab holds it, and the deletion
+    // completes when it closes.
+    req.onblocked = () => resolve();
+  });
+};
+
 /** Exported because Task 9's restoreCheckpoint writes authored events inside
  *  its own transaction and must apply exactly these rules, not a second copy
  *  of them that could drift. */
@@ -166,11 +212,12 @@ export const assertValidEvent = (event: LedgerEvent): void => {
 export const putEvents = async (
   events: LedgerEvent[],
 ): Promise<{ inserted: number; updated: number }> => {
+  const name = activeLedgerName();
   for (const event of events) {
     assertValidEvent(event);
   }
 
-  const db = await openLedger();
+  const db = await openLedger(name);
   const tx = db.transaction('events', 'readwrite');
   const index = tx.store.index('identity');
   // Operation counts, not distinct-row counts: if a batch carries two events
@@ -222,11 +269,12 @@ export const putEventsIfSourceExists = async (
   sourceId: string,
   events: LedgerEvent[],
 ): Promise<{ written: boolean; inserted: number; updated: number }> => {
+  const name = activeLedgerName();
   for (const event of events) {
     assertValidEvent(event);
   }
 
-  const db = await openLedger();
+  const db = await openLedger(name);
   const tx = db.transaction(['sources', 'events'], 'readwrite');
   const existing = await tx.objectStore('sources').get(sourceId);
   if (!existing) {
@@ -440,7 +488,8 @@ export const putCursorIfSourceExists = async (
   sourceId: string,
   cursor: Cursor,
 ): Promise<boolean> => {
-  const db = await openLedger();
+  const name = activeLedgerName();
+  const db = await openLedger(name);
   const tx = db.transaction(['sources', 'cursors'], 'readwrite');
   const existing = await tx.objectStore('sources').get(sourceId);
   if (existing) {

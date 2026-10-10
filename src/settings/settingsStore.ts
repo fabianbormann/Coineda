@@ -1,4 +1,4 @@
-import { openLedger } from '@/ledger/db';
+import { activeLedgerName, openLedger } from '@/ledger/db';
 import type { CarryForward } from '@/tax/types';
 
 /**
@@ -84,7 +84,8 @@ export const getSettings = async (): Promise<Settings | null> => {
 export const putSettings = async (
   partial: Partial<Settings>,
 ): Promise<void> => {
-  const db = await openLedger();
+  const name = activeLedgerName();
+  const db = await openLedger(name);
   const existing = await db.get('settings', SETTINGS_KEY);
   const merged = {
     ...(existing?.value as Partial<Settings> | undefined),
