@@ -33,6 +33,7 @@ import {
   type ManualTransferLink,
 } from '@/ledger/manualLinks';
 import { fingerprintLedger } from '@/ledger/fingerprint';
+import { PUBLIC_IDENTITY_KEYS } from '@/tax/sourceDirectory';
 import type { LedgerEvent, SourceRecord } from '@/ledger/types';
 import {
   getSettings,
@@ -281,9 +282,18 @@ export const restoreCheckpoint = async (
   options: { stripCredentials?: boolean } = {},
 ): Promise<void> => {
   // Only the review path strips: a backup restored through onboarding keeps
-  // its credentials, while a review copy must never hold them.
+  // its credentials, while a review copy must never hold them. The public
+  // identities stay, so the review's printed source directory names the
+  // same wallets as the client's own report.
   const sources = options.stripCredentials
-    ? checkpoint.sources.map((s) => ({ ...s, config: {} }))
+    ? checkpoint.sources.map((s) => ({
+        ...s,
+        config: Object.fromEntries(
+          Object.entries(s.config).filter(([key]) =>
+            PUBLIC_IDENTITY_KEYS.includes(key),
+          ),
+        ),
+      }))
     : checkpoint.sources;
   const events = [
     ...checkpoint.authoredEvents,

@@ -60,6 +60,26 @@ const absorb = (into: Accumulated, event: LedgerEvent): void => {
 };
 
 /**
+ * The config keys a public identity is stored under in every shipped
+ * module. A review copy keeps exactly these when credentials are stripped
+ * (restoreCheckpoint), so its printed source directory names the same
+ * wallets as the client's own. A test holds every manifest field that
+ * `isPublicIdentityField` accepts to one of these names.
+ */
+export const PUBLIC_IDENTITY_KEYS: readonly string[] = [
+  'address',
+  'addressList',
+  'xpub',
+];
+
+/** Whether a manifest field holds a public identity: an address, a list of
+ *  them, or an xpub. Everything else (keys, secrets, URLs) is not. */
+export const isPublicIdentityField = (field: ManifestField): boolean =>
+  field.type === 'address' ||
+  field.type === 'addressList' ||
+  (field.type === 'text' && field.name === 'xpub');
+
+/**
  * The public wallet identities in a source's config, and nothing else.
  * An allow-list by field type: an unknown or missing manifest yields none.
  * Each identity once, in field order, however often it was entered; and
@@ -76,7 +96,7 @@ export const publicIdentities = (
   let hasXpub = false;
   for (const field of fields) {
     const value = config[field.name];
-    if (typeof value !== 'string') {
+    if (typeof value !== 'string' || !isPublicIdentityField(field)) {
       continue;
     }
     if (field.type === 'address') {
@@ -85,11 +105,10 @@ export const publicIdentities = (
       for (const line of value.split('\n')) {
         if (line.trim()) found.push(line.trim());
       }
-    } else if (field.type === 'text' && field.name === 'xpub') {
-      if (value.trim()) {
-        found.push(value.trim());
-        hasXpub = true;
-      }
+    } else if (value.trim()) {
+      // The xpub, the only text field isPublicIdentityField accepts.
+      found.push(value.trim());
+      hasXpub = true;
     }
   }
   return { identities: [...new Set(found)], hasXpub };

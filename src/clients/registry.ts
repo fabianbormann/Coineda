@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next';
 import {
   DEFAULT_LEDGER_NAME,
   deleteLedgerDatabase,
@@ -22,6 +23,14 @@ export type ClientRecord = {
 };
 
 export const CLIENTS_KEY = 'coineda.clients';
+/** The label the first client is seeded with. Stored untranslated, so it
+ *  is translated wherever it is shown (`labelOf`). */
+export const DEFAULT_CLIENT_LABEL = 'My portfolio';
+
+/** A client's label as the user should read it: the seeded default in the
+ *  current language, anything the user typed exactly as typed. */
+export const labelOf = (client: ClientRecord, t: TFunction): string =>
+  client.label === DEFAULT_CLIENT_LABEL ? t('My portfolio') : client.label;
 export const ACTIVE_CLIENT_KEY = 'coineda.activeClient';
 
 export class LastClientError extends Error {
@@ -83,7 +92,7 @@ export const listClients = (): ClientRecord[] => {
     records = [
       {
         id: newClientId(),
-        label: 'My portfolio',
+        label: DEFAULT_CLIENT_LABEL,
         dbName: DEFAULT_LEDGER_NAME,
         kind: 'client',
         createdAt: new Date().toISOString(),

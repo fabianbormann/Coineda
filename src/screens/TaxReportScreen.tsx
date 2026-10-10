@@ -19,6 +19,7 @@ import { DERIVATIVE_KIND_LABELS } from '@/tax/derivativeKinds';
 import { buildDisclaimer, type Disclaimer } from '@/tax/disclaimer';
 import { getSettings, putSettings } from '@/settings/settingsStore';
 import { ClientContext } from '@/clients/ClientContext';
+import { labelOf, listClients } from '@/clients/registry';
 import { shortFingerprint } from '@/ledger/fingerprint';
 import { activeLedgerName, getAllEvents, getSources } from '@/ledger/db';
 import {
@@ -218,7 +219,15 @@ export const TaxReportScreen = () => {
   // Optional: the screen is also rendered without a provider in isolation.
   const clientCtx = useContext(ClientContext);
   const readOnly = clientCtx?.readOnly ?? false;
-  const clientLabel = clientCtx?.client.label ?? '';
+  // Named on the printout only when there is someone to tell apart: a sole
+  // client (the migrated single user) prints no client line and no footer
+  // label, while a review always names itself.
+  const clientLabel =
+    clientCtx &&
+    (clientCtx.client.kind === 'review' ||
+      listClients().filter((c) => c.kind === 'client').length > 1)
+      ? labelOf(clientCtx.client, t)
+      : '';
   const navigate = useNavigate();
   /**
    * Whether to hide unresolved items dated outside the tax year.

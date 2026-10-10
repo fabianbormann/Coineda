@@ -23,6 +23,7 @@ import { ClientContext } from './ClientContext';
 import { OpenForReviewDialog } from './OpenForReviewDialog';
 import {
   createClient,
+  labelOf as translatedLabel,
   listClients,
   removeClient,
   renameClient,
@@ -44,8 +45,7 @@ export const ClientMenu = () => {
 
   // The seeded default label is a translation key; anything a user typed is
   // shown verbatim.
-  const labelOf = (c: ClientRecord) =>
-    c.label === 'My portfolio' ? t('My portfolio') : c.label;
+  const labelOf = (c: ClientRecord) => translatedLabel(c, t);
 
   const clients = listClients();
   const isLast =

@@ -14,7 +14,12 @@ import type { Settings } from '@/settings/settingsStore';
 import { getSettings, putSettings } from '@/settings/settingsStore';
 import type { LedgerEvent } from '@/ledger/types';
 import { ClientProvider } from '@/clients/ClientContext';
-import type { ClientRecord } from '@/clients/registry';
+import {
+  createClient,
+  labelOf,
+  listClients,
+  type ClientRecord,
+} from '@/clients/registry';
 import { flatRange } from './priceRangeStub';
 import type {
   AssessInput,
@@ -2617,6 +2622,9 @@ describe('the filing aid', () => {
 });
 
 describe('the client on the screen and the printout', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -2700,22 +2708,54 @@ describe('the client on the screen and the printout', () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
-  it('prints a client line when the label differs from the taxpayer', async () => {
+  it('names neither the client nor its label for a sole client', async () => {
+    // The migrated single user: their only client still carries the seeded
+    // 'My portfolio'. Naming it would add an untranslated line and footer
+    // prefix to every existing user's tax document.
+    taxRegistry.push(makeModule());
+    await putEvents([acquisitionEvent, disposalEvent]);
+    await putSettings({ taxpayer: { name: 'Max Mustermann', taxNumber: '' } });
+    const { container } = renderFor(listClients()[0]);
+    await runReport('2025');
+    const header = await screen.findByTestId('report-header');
+    await waitFor(() => expect(header).toHaveTextContent('Max Mustermann'));
+    expect(header).not.toHaveTextContent('Client:');
+    const footer = container.querySelector('[data-print="page-footer"]');
+    expect(footer).not.toHaveTextContent('My portfolio');
+    expect(footer).toHaveTextContent(/^Tax year: 2025 · [0-9a-f]{12}$/);
+  });
+
+  it('prints a client line, with the translated label, when there are several', async () => {
     taxRegistry.push(makeModule());
     await putEvents([acquisitionEvent, disposalEvent]);
     await putSettings({ taxpayer: { name: 'Hans Müller', taxNumber: '' } });
-    renderFor(record());
+    const seeded = listClients()[0];
+    createClient('Müller GmbH');
+    const { container } = renderFor(seeded);
     await runReport('2025');
     const header = await screen.findByTestId('report-header');
     await waitFor(() => expect(header).toHaveTextContent('Hans Müller'));
-    expect(header).toHaveTextContent('Client: Müller GmbH');
+    expect(header).toHaveTextContent('Client: My portfolio');
+    expect(
+      container.querySelector('[data-print="page-footer"]'),
+    ).toHaveTextContent(/^My portfolio · Tax year: 2025/);
+  });
+
+  it('translates the seeded label and leaves a chosen one alone', () => {
+    const de = i18n.getFixedT('de');
+    expect(labelOf(record({ label: 'My portfolio' }), de)).toBe(
+      'Mein Portfolio',
+    );
+    expect(labelOf(record(), de)).toBe('Müller GmbH');
   });
 
   it('omits the client line when the label is the taxpayer name', async () => {
     taxRegistry.push(makeModule());
     await putEvents([acquisitionEvent, disposalEvent]);
     await putSettings({ taxpayer: { name: 'Hans Müller', taxNumber: '' } });
-    renderFor(record({ label: 'Hans Müller' }));
+    listClients();
+    const second = createClient('Hans Müller');
+    renderFor(second);
     await runReport('2025');
     const header = await screen.findByTestId('report-header');
     await waitFor(() => expect(header).toHaveTextContent('Hans Müller'));

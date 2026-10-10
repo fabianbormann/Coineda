@@ -1079,6 +1079,35 @@ describe('for a review client', () => {
     ).toBeInTheDocument();
   });
 
+  it('says so in the verdict sentence when the checkpoint had no fingerprint', async () => {
+    render(
+      <ThemeProvider>
+        <ConfirmProvider>
+          <MemoryRouter>
+            <ClientProvider
+              client={{
+                ...reviewRecord,
+                review: {
+                  omittedEventCount: 0,
+                  file: 'old.coineda',
+                  verdict: 'none',
+                },
+              }}
+              onChange={vi.fn()}
+            >
+              <AppHeader />
+            </ClientProvider>
+          </MemoryRouter>
+        </ConfirmProvider>
+      </ThemeProvider>,
+    );
+    expect(
+      await screen.findByText(
+        'Review of old.coineda — read-only — fingerprint — (no fingerprint stored)',
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('keeps the controls for an ordinary client', async () => {
     renderScreen();
     expect(

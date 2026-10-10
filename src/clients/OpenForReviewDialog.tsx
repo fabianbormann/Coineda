@@ -12,6 +12,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { normalizeTransferSecret } from '@/checkpoint/format';
+import { describeOpenError } from '@/checkpoint/errors';
 import { useClient } from './ClientContext';
 import { HandoverNotReviewableError, openForReview } from './review';
 
@@ -52,11 +53,7 @@ export const OpenForReviewDialog = ({
           ? t(
               'This is a handover checkpoint without the derived events; ask for a backup checkpoint to review the report.',
             )
-          : err instanceof Error && err.name === 'OperationError'
-            ? t('That transfer secret is wrong. Check it and try again.')
-            : t(
-                "This checkpoint could not be opened. The file may be corrupted or isn't a valid Coineda checkpoint.",
-              ),
+          : describeOpenError(err, t),
       );
     } finally {
       setBusy(false);

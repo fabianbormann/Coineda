@@ -73,7 +73,7 @@ beforeEach(async () => {
     id: 'kraken',
     moduleId: 'kraken-csv',
     label: 'Kraken',
-    config: { apiKey: 'sekrit' },
+    config: { apiKey: 'sekrit', address: 'addr1' },
   });
   await putManualLink({
     sourceId: 'kraken',
@@ -97,7 +97,7 @@ describe('openForReview', () => {
     expect(activeClient().id).toBe(record.id);
     expect(activeLedgerName()).toMatch(/^coineda-review-/);
     expect(await getAllEvents()).toEqual(source);
-    expect((await getSources())[0].config).toEqual({});
+    expect((await getSources())[0].config).toEqual({ address: 'addr1' });
   });
 
   it('refuses a handover before creating any client', async () => {
@@ -132,6 +132,16 @@ describe('openForReview', () => {
     const b = await openForReview(bytes, secret, 'client.coineda');
     expect(a.id).not.toBe(b.id);
     expect(listClients().filter((c) => c.kind === 'review')).toHaveLength(2);
+  });
+
+  it('labels the review with the bare file name, capped at 80 characters', async () => {
+    const bytes = await seal('backup');
+    const long = `C:\\fakepath\\../${'a'.repeat(200)}.coineda`;
+    const record = await openForReview(bytes, secret, long);
+    expect(record.label).toBe('a'.repeat(80));
+    expect(record.review?.file).toBe(record.label);
+    const plain = await openForReview(bytes, secret, '/tmp/x/client.coineda');
+    expect(plain.label).toBe('client.coineda');
   });
 
   it('creates nothing when the secret is wrong', async () => {
@@ -182,6 +192,19 @@ describe('OpenForReviewDialog', () => {
     expect(
       await screen.findByText('Fingerprint matches the checkpoint.'),
     ).toBeInTheDocument();
+  });
+
+  it('asks for an update when the checkpoint comes from a newer version', async () => {
+    const switchTo = vi.fn();
+    renderDialog(switchTo);
+    await fill(
+      await seal('backup', (c) => {
+        (c as { v: number }).v = 99;
+      }),
+      'new.coineda',
+    );
+    expect(await screen.findByText(/newer version/i)).toBeInTheDocument();
+    expect(switchTo).not.toHaveBeenCalled();
   });
 
   it('explains why a handover cannot be reviewed', async () => {

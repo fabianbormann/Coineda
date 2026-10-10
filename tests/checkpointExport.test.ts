@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import 'fake-indexeddb/auto';
+import { registry } from '@/sources/registry';
+import {
+  PUBLIC_IDENTITY_KEYS,
+  isPublicIdentityField,
+} from '@/tax/sourceDirectory';
 import jsQR from 'jsqr';
 import QRCode from 'qrcode';
 import {
@@ -515,17 +520,36 @@ describe('what each scope carries', () => {
 });
 
 describe('restoreCheckpoint stripCredentials', () => {
-  it('blanks every source config only when asked', async () => {
-    await putSource({
-      id: 'k',
-      moduleId: 'kraken-csv',
-      label: 'K',
-      config: { apiKey: 'sekrit' },
-    });
+  it('keeps only the public identities, and only when asked', async () => {
+    // address and xpub are what the printed source directory lists
+    // (publicIdentities); a review report without them would not show an
+    // official which wallets were covered. Keys and secrets never travel.
+    const config = {
+      apiKey: 'k',
+      secret: 's',
+      address: 'addr1',
+      xpub: 'xpub6',
+    };
+    await putSource({ id: 'k', moduleId: 'kraken-csv', label: 'K', config });
     const checkpoint = await buildCheckpoint('backup');
     await restoreCheckpoint(checkpoint);
-    expect((await getSources())[0].config).toEqual({ apiKey: 'sekrit' });
+    expect((await getSources())[0].config).toEqual(config);
     await restoreCheckpoint(checkpoint, { stripCredentials: true });
-    expect((await getSources())[0].config).toEqual({});
+    expect((await getSources())[0].config).toEqual({
+      address: 'addr1',
+      xpub: 'xpub6',
+    });
+  });
+
+  it('names every public identity field a shipped module has', () => {
+    // The strip keeps keys by name; publicIdentities reads by field type.
+    // Every field the latter would print must carry a kept name.
+    for (const module of registry) {
+      for (const field of module.manifest.fields) {
+        if (isPublicIdentityField(field)) {
+          expect(PUBLIC_IDENTITY_KEYS).toContain(field.name);
+        }
+      }
+    }
   });
 });

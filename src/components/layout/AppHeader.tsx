@@ -4,6 +4,7 @@ import { useContext } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { ClientContext } from '@/clients/ClientContext';
+import { labelOf } from '@/clients/registry';
 import { shortFingerprint } from '@/ledger/fingerprint';
 import { ClientMenu } from '@/clients/ClientMenu';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
@@ -71,23 +72,23 @@ export const AppHeader = () => {
       </header>
       {ctx?.readOnly && (
         <p role="status" className="bg-muted px-4 py-1 text-sm print:hidden">
-          {review?.fingerprint
-            ? t(
-                'Review of {{file}} — read-only — fingerprint {{fingerprint}} ({{verdict}})',
-                {
-                  file: review.file,
-                  fingerprint: shortFingerprint(review.fingerprint),
-                  verdict:
-                    review.verdict === 'match'
-                      ? t('matches')
-                      : review.verdict === 'mismatch'
-                        ? t('does NOT match')
-                        : t('no fingerprint stored'),
-                },
-              )
-            : t('Review of {{file}} — read-only', {
-                file: review?.file ?? ctx.client.label,
-              })}
+          {/* Always the verdict sentence: a record with no fingerprint
+              says so in words rather than dropping the verdict. */}
+          {t(
+            'Review of {{file}} — read-only — fingerprint {{fingerprint}} ({{verdict}})',
+            {
+              file: review?.file ?? labelOf(ctx.client, t),
+              fingerprint: review?.fingerprint
+                ? shortFingerprint(review.fingerprint)
+                : '—',
+              verdict:
+                review?.fingerprint && review.verdict === 'match'
+                  ? t('matches')
+                  : review?.fingerprint && review.verdict === 'mismatch'
+                    ? t('does NOT match')
+                    : t('no fingerprint stored'),
+            },
+          )}
         </p>
       )}
     </>
