@@ -271,6 +271,8 @@ and JSON exports are built by the host from what `classify` returned and from
 the ledger. A module does not produce, return or format any of it; there is
 nothing to implement.
 
+A module never sees which client a ledger belongs to; it reads the active ledger only.
+
 ## Checklist before opening the PR
 
 - [ ] `manifest.contributor`, `manifest.rulesCheckedOn`, `manifest.references`,

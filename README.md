@@ -48,6 +48,11 @@ when you are done except the tab.
 - **Moves between devices without a cloud.** A checkpoint carries your settings, sources, keys and
   every event, encrypted with a one-time secret, as a QR code when it fits and a file when it does
   not. It is also your backup.
+- **Keeps clients apart, and lets a reviewer check them.** One device can hold several client
+  ledgers, each in its own database, switched from the header. A reviewer opens a backup checkpoint
+  with its secret as a read-only ledger, with exchange credentials stripped, and sees whether the
+  recomputed fingerprint matches the checkpoint's. Handover checkpoints are refused, since they
+  carry no derived events. Closing the review deletes that ledger.
 - **Tells the story.** The journey video pours every purchase into a jar as a coin along a timeline
   of your history, and exports as a clip. Shareable mode never shows an amount.
 
