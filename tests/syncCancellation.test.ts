@@ -63,6 +63,7 @@ beforeEach(async () => {
       label: 'Cancellable',
       fields: [],
       needsRelay: false,
+      selfHostable: true,
       emits: ['reward'],
       docsUrl: 'https://example.org',
     },

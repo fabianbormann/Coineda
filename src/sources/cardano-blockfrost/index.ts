@@ -118,6 +118,8 @@ export const cardanoBlockfrost: SourceModule = {
       },
     ],
     needsRelay: false,
+    selfHostable: true,
+    endpoint: 'cardanoBlockfrost',
     // 'reward' as well as 'transfer': the shared translator emits a
     // staking reward per epoch (fetchRewardEvents), and conformance.ts
     // rejects a kind a manifest does not declare. The gate only ever

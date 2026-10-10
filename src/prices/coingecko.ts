@@ -48,7 +48,9 @@ export const fetchSpotPrices = async (
   }
 
   const result = new Map<string, string>();
-  if (assetsByCoinId.size === 0) {
+  // An empty endpoint means no spot service is available (restricted
+  // egress): every asset stays unpriced and lands in `missing`.
+  if (assetsByCoinId.size === 0 || endpoints.spotPrices === '') {
     return result;
   }
 
@@ -185,7 +187,7 @@ export const fetchHistoricalPrices = async (
 ): Promise<Map<string, string>> => {
   const prices = new Map<string, string>();
   const coinId = COINGECKO_IDS[assetId];
-  if (!coinId || isoDates.length === 0) {
+  if (!coinId || isoDates.length === 0 || endpoints.spotPrices === '') {
     return prices;
   }
 
@@ -269,7 +271,7 @@ export const fetchHistoricalPrice = async (
   endpoints: Endpoints = defaultEndpoints(),
 ): Promise<string | null> => {
   const coinId = COINGECKO_IDS[assetId];
-  if (!coinId) {
+  if (!coinId || endpoints.spotPrices === '') {
     return null;
   }
 

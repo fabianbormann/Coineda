@@ -8,6 +8,7 @@ import {
 import { fetchHistory } from '@/prices/history';
 import { valueOf } from '@/prices/scale';
 import { getSettings } from '@/settings/settingsStore';
+import { activeEndpoints } from '@/config/egress';
 import { isFiatAsset } from '@/ledger/balances';
 import { isZeroAmount, normaliseAmount } from '@/ledger/amount';
 import type { TaxCost, TaxEvent, TaxReason, UnresolvedItem } from '@/tax/types';
@@ -148,7 +149,15 @@ const lookUp = async (
     prices: fetched,
     sources,
     failures,
-  } = await fetchHistory(missing, currency, apiKey);
+  } = await fetchHistory(
+    missing,
+    currency,
+    apiKey,
+    undefined,
+    // The client's own overrides and egress mode: in restricted mode an
+    // unconfigured service is blank, and its prices come back missing.
+    activeEndpoints(settings),
+  );
 
   // Still matches the CoinGecko path: with a key, no day is refused locally.
   const cutoff = apiKey ? Number.NEGATIVE_INFINITY : freeTierCutoff();

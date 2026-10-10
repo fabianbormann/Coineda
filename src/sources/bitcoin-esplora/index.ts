@@ -53,6 +53,8 @@ export const bitcoinEsplora: SourceModule = {
       },
     ],
     needsRelay: false,
+    selfHostable: true,
+    endpoint: 'bitcoinEsplora',
     emits: ['transfer'],
     docsUrl: 'https://github.com/Blockstream/esplora/blob/master/API.md',
   },

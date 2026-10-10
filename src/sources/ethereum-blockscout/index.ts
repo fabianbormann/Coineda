@@ -42,6 +42,8 @@ export const ethereumBlockscout: SourceModule = {
       },
     ],
     needsRelay: false,
+    selfHostable: true,
+    endpoint: 'ethereumBlockscout',
     emits: ['transfer'],
     docsUrl: 'https://docs.blockscout.com/devs/apis/rest',
   },

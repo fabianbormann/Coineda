@@ -10,6 +10,7 @@ const manifest = {
     { name: 'address', label: 'Address', type: 'address' as const, help: 'h' },
   ],
   needsRelay: false,
+  selfHostable: true,
   // Declares both kinds the tests below emit legitimately. The
   // "does not declare" test deliberately emits 'fee', which is absent here -
   // note checkEvent tests the manifest BEFORE it tests trade directions, so a

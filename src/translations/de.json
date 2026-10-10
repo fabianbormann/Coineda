@@ -245,6 +245,7 @@
     "Could not reach the provider": "Der Anbieter konnte nicht erreicht werden",
     "Data source added": "Datenquelle hinzugefügt",
     "This API key isn't read-only": "Dieser API-Schlüssel ist nicht nur lesend",
+    "This source points at a host outside the configured endpoints.": "Diese Quelle zeigt auf einen Host außerhalb der konfigurierten Endpunkte.",
     "This credential has more than read access. For your safety, create a strictly read-only key and use that one instead.": "Dieser Zugangsschlüssel hat mehr als nur Lesezugriff. Erstelle zu deiner Sicherheit einen streng lesenden Schlüssel und verwende stattdessen diesen.",
     "Add anyway": "Trotzdem hinzufügen",
     "Cardano (Yaci Store)": "Cardano (Yaci Store)",

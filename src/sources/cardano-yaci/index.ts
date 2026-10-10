@@ -58,6 +58,8 @@ export const cardanoYaci: SourceModule = {
       },
     ],
     needsRelay: false,
+    selfHostable: true,
+    endpoint: 'cardanoYaci',
     // 'reward' as well as 'transfer': the shared translator emits a
     // staking reward per epoch (fetchRewardEvents), and conformance.ts
     // rejects a kind a manifest does not declare. The gate only ever

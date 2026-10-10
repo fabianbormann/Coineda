@@ -90,6 +90,11 @@ export const fetchUsdHistory = async (
   endpoints: Endpoints = defaultEndpoints(),
 ): Promise<Map<string, string>> => {
   const prices = new Map<string, string>();
+  // No price-history service available (restricted egress): nothing is
+  // priced here, and the caller reports every pair missing.
+  if (endpoints.priceHistory === '') {
+    return prices;
+  }
 
   // Timestamps are requested in seconds, and the day each one belongs to is
   // remembered here so the response can be matched back without re-deriving

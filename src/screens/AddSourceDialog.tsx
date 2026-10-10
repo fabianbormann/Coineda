@@ -1,5 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  EGRESS_REFUSED,
+  EgressRefusedError,
+  prepareRun,
+} from '@/sources/egress';
 import { ExternalLink } from '@/components/ExternalLink';
 import {
   Dialog,
@@ -14,7 +19,9 @@ import { useConfirm } from '@/components/confirm/ConfirmProvider';
 import { notify } from '@/lib/notify';
 import { putSource } from '@/ledger/db';
 import type { SourceRecord } from '@/ledger/types';
-import { registry } from '@/sources/registry';
+import { visibleModules } from '@/sources/registry';
+import { egressMode, resolveEndpoints } from '@/config/endpoints';
+import { getSettings, type Settings } from '@/settings/settingsStore';
 import { fileRegistry } from '@/sources/csv/registry';
 import type { FileSourceModule } from '@/sources/csv/types';
 import { FileDropArea } from '@/components/files/FileDropArea';
@@ -85,6 +92,37 @@ export const AddSourceDialog = ({
   const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  /**
+   * The client's settings, for the egress mode and endpoints that decide
+   * which modules may be offered. Until they load, the build's own defaults
+   * apply - which already hide everything a build-time
+   * VITE_EGRESS=restricted forbids.
+   */
+  const [egressSettings, setEgressSettings] = useState<Settings | null>(null);
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    let active = true;
+    getSettings()
+      .then((settings) => {
+        if (active) {
+          setEgressSettings(settings);
+        }
+      })
+      .catch(() => {
+        // Keep the build defaults.
+      });
+    return () => {
+      active = false;
+    };
+  }, [open]);
+  // Computed every render rather than memoised: `registry` is a mutable
+  // array (tests swap its contents) and filtering five entries is free.
+  const modules = visibleModules(
+    egressMode(egressSettings),
+    resolveEndpoints(egressSettings),
+  );
 
   // Reset to the module-picker step every time the dialog is (re)opened,
   // rather than leaving stale field values from a previous attempt. This is
@@ -168,7 +206,20 @@ export const AddSourceDialog = ({
     setFormError(null);
     setSaving(true);
     try {
-      const result = await module.probe(config);
+      let probeConfig: Record<string, string>;
+      try {
+        // Same host-side preparation a sync gets: the client's endpoint
+        // defaults filled in, and in restricted egress a host outside them
+        // refused before any request.
+        probeConfig = await prepareRun(module, config);
+      } catch (error) {
+        if (error instanceof EgressRefusedError) {
+          setFormError(t(EGRESS_REFUSED));
+          return;
+        }
+        throw error;
+      }
+      const result = await module.probe(probeConfig);
       if (!result.ok) {
         // `message` is a translation key supplied by the module (see
         // ProbeResult in src/sources/types.ts) - never a raw diagnostic,
@@ -253,14 +304,14 @@ export const AddSourceDialog = ({
                   <p className="text-sm font-medium">
                     {t('Connect automatically')}
                   </p>
-                  {registry.length === 0 ? (
+                  {modules.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                       {t(
                         'No source types are available yet. Check back after an update adds one.',
                       )}
                     </p>
                   ) : (
-                    registry.map((candidate) => (
+                    modules.map((candidate) => (
                       <Button
                         key={candidate.manifest.id}
                         type="button"

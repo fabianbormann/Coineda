@@ -245,6 +245,7 @@
     "Could not reach the provider": "Could not reach the provider",
     "Data source added": "Data source added",
     "This API key isn't read-only": "This API key isn't read-only",
+    "This source points at a host outside the configured endpoints.": "This source points at a host outside the configured endpoints.",
     "This credential has more than read access. For your safety, create a strictly read-only key and use that one instead.": "This credential has more than read access. For your safety, create a strictly read-only key and use that one instead.",
     "Add anyway": "Add anyway",
     "Cardano (Yaci Store)": "Cardano (Yaci Store)",

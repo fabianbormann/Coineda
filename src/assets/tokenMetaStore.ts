@@ -2,6 +2,8 @@ import { openLedger, type WriteOptions } from '@/ledger/db';
 import { fetchTokenMeta, subjectsOf, type TokenMeta } from './tokenRegistry';
 import { parseCardanoAsset } from './cardanoAsset';
 import { measureLogoLuminance } from './logoLuminance';
+import { currentEndpoints } from '@/config/egress';
+import type { Endpoints } from '@/config/endpoints';
 
 /**
  * Cached Cardano token metadata.
@@ -86,6 +88,8 @@ export const writeCached = async (
 export const resolveTokenMeta = async (
   assetIds: string[],
   signal?: AbortSignal,
+  /** The hosts to ask; defaults to the open client's own settings. */
+  endpoints?: Endpoints,
 ): Promise<Map<string, TokenMeta>> => {
   const byAssetId = new Map<string, TokenMeta>();
   const subjects = subjectsOf(assetIds);
@@ -101,9 +105,16 @@ export const resolveTokenMeta = async (
     // An unopenable cache is not a reason to skip the network.
   }
 
-  if (stale.length > 0) {
+  // No registry available (restricted egress without one configured):
+  // serve the cache and nothing else. Skipped HERE rather than relying on
+  // fetchTokenMeta's own empty answer, because that answer would be
+  // written back below as a recorded miss for every subject, hiding their
+  // metadata for a month after a registry is configured.
+  const hosts =
+    stale.length > 0 ? (endpoints ?? (await currentEndpoints())) : null;
+  if (hosts !== null && hosts.tokenRegistry !== '') {
     try {
-      const fetched = await fetchTokenMeta(stale, signal);
+      const fetched = await fetchTokenMeta(stale, signal, hosts);
       // Measured once, here, and cached with the metadata. Doing it at
       // render time instead would decode a PNG on every paint and make the
       // plate appear a frame late.

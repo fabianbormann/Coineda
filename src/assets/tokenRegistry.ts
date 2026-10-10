@@ -133,7 +133,9 @@ export const fetchTokenMeta = async (
 ): Promise<Map<string, TokenMeta>> => {
   const result = new Map<string, TokenMeta>();
   const wanted = [...new Set(subjects.map((s) => s.toLowerCase()))];
-  if (wanted.length === 0) {
+  // No registry available (restricted egress without one configured): no
+  // decoration, and no request to anybody.
+  if (wanted.length === 0 || endpoints.tokenRegistry === '') {
     return result;
   }
 

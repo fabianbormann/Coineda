@@ -2,6 +2,7 @@ import { MAX_PAGES } from '@/sources/conformance';
 import { findModule } from '@/sources/registry';
 import { findFileModule } from '@/sources/csv/registry';
 import type { DerivedEvent } from '@/sources/types';
+import { EgressRefusedError, prepareRun } from '@/sources/egress';
 import {
   LedgerSwitchedError,
   activeLedgerName,
@@ -138,6 +139,24 @@ const drain = async (
     return report;
   }
 
+  // The client's settings decide which hosts this run may contact. In
+  // restricted egress a source that would reach anything else is refused
+  // before a single request (and before a full resync wipes anything), and
+  // the refusal is recorded like any other failure so the row says why.
+  // A left-empty baseUrl is filled from the client's endpoints too, so a
+  // per-client override reaches the module (see prepareRun).
+  let config: Record<string, string>;
+  try {
+    config = await prepareRun(module, source.config);
+  } catch (error) {
+    if (!(error instanceof EgressRefusedError)) {
+      throw error;
+    }
+    report.error = error.message;
+    await putSourceStatus(source.id, { lastError: report.error }, ledger);
+    return report;
+  }
+
   if (options?.full) {
     await deleteDerivedEvents(source.id, ledger);
     // Persist the reset, not just the local variable below: if the first
@@ -166,11 +185,7 @@ const drain = async (
     }
     try {
       const requestedCursor = cursor;
-      const result = await module.fetchEvents(
-        source.config,
-        cursor,
-        options?.signal,
-      );
+      const result = await module.fetchEvents(config, cursor, options?.signal);
 
       // A module that keeps handing back the cursor it was just given is
       // making no progress. Dedupe means this can't duplicate rows, but left

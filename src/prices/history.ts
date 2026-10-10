@@ -99,11 +99,21 @@ export const fetchHistory = async (
   // sequential requests.
   let usd = new Map<string, string>();
   let rates = new Map<string, string>();
+  // An empty endpoint is an unavailable service (restricted egress, see
+  // activeEndpoints in src/config/egress.ts). A dollar quote without its
+  // rate is useless, so neither leg is asked when the other cannot answer
+  // (a USD base needs no rate); the CoinGecko fallback below skips itself
+  // the same way.
+  const primaryAvailable =
+    endpoints.priceHistory !== '' &&
+    (endpoints.fx !== '' || currency.toLowerCase() === 'usd');
   try {
-    [usd, rates] = await Promise.all([
-      fetchUsdHistory(crypto, signal, endpoints),
-      fetchUsdRates(everyDay, currency, signal, endpoints),
-    ]);
+    if (primaryAvailable) {
+      [usd, rates] = await Promise.all([
+        fetchUsdHistory(crypto, signal, endpoints),
+        fetchUsdRates(everyDay, currency, signal, endpoints),
+      ]);
+    }
   } catch {
     // Either leg failing drops the whole primary path to the fallback, and
     // the error itself is deliberately dropped with it. A price without its

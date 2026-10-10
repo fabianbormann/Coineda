@@ -77,6 +77,7 @@ beforeEach(async () => {
       label: 'Fake',
       fields: [],
       needsRelay: false,
+      selfHostable: true,
       emits: ['reward'],
       docsUrl: 'https://example.invalid',
     },

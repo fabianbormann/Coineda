@@ -81,6 +81,13 @@ export const fetchRates = async (
     return rates;
   }
 
+  // An empty endpoint means no FX service is available (restricted egress,
+  // see activeEndpoints in src/config/egress.ts): every day stays missing
+  // and nothing is asked of any other host.
+  if (endpoints.fx === '') {
+    return rates;
+  }
+
   // The range starts before the earliest day asked for, so a Monday at the
   // very start of the span can still carry back to the Friday before it.
   const start = isoDay(

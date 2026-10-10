@@ -9,6 +9,8 @@ import type { Holding } from '@/ledger/balances';
 import { fetchSpotPrices } from './coingecko';
 import { fetchRates } from './ecb';
 import { valueOf } from './scale';
+import { currentEndpoints } from '@/config/egress';
+import type { Endpoints } from '@/config/endpoints';
 import type { PriceKey } from './types';
 
 export type { PriceKey };
@@ -79,6 +81,9 @@ const todayUtc = (): string => new Date().toISOString().slice(0, 10);
 export const resolveSpotPrices = async (
   assetIds: string[],
   currency: string,
+  /** The hosts to ask; defaults to the open client's own settings (its
+   *  per-client overrides and egress mode - see activeEndpoints). */
+  endpoints?: Endpoints,
 ): Promise<Map<string, string>> => {
   const date = todayUtc();
   const result = new Map<string, string>();
@@ -102,12 +107,21 @@ export const resolveSpotPrices = async (
     }
   }
 
+  // Resolved only once a request is actually needed: a fully cached run
+  // reads no settings at all.
+  const hosts =
+    fiatMisses.length > 0 || misses.length > 0
+      ? (endpoints ?? (await currentEndpoints()))
+      : undefined;
+
   for (const assetId of fiatMisses) {
     try {
       const rates = await fetchRates(
         [date],
         assetId.slice('fiat:'.length),
         currency,
+        undefined,
+        hosts,
       );
       const rate = rates.get(date);
       if (rate !== undefined) {
@@ -125,7 +139,7 @@ export const resolveSpotPrices = async (
 
   let fetched: Map<string, string>;
   try {
-    fetched = await fetchSpotPrices(misses, currency);
+    fetched = await fetchSpotPrices(misses, currency, hosts);
   } catch {
     // Provider outage: whatever was already cached is still valid and
     // usable. Nothing here should throw into the UI.

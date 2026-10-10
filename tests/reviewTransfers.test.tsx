@@ -34,6 +34,7 @@ const stubModule = {
     fields: [],
     requiredScopes: [],
     needsRelay: false,
+    selfHostable: true,
     emits: ['transfer' as const],
     docsUrl: 'https://example.invalid/docs',
   },

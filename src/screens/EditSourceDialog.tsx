@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  EGRESS_REFUSED,
+  EgressRefusedError,
+  prepareRun,
+} from '@/sources/egress';
+import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -225,7 +230,20 @@ export const EditSourceDialog = ({
     setFormError(null);
     setSaving(true);
     try {
-      const result = await module.probe(merged);
+      let probeConfig: Record<string, string>;
+      try {
+        // Same host-side preparation a sync gets: the client's endpoint
+        // defaults filled in, and in restricted egress a host outside them
+        // refused before any request.
+        probeConfig = await prepareRun(module, merged);
+      } catch (error) {
+        if (error instanceof EgressRefusedError) {
+          setFormError(t(EGRESS_REFUSED));
+          return;
+        }
+        throw error;
+      }
+      const result = await module.probe(probeConfig);
       if (!result.ok) {
         setFormError(
           t(result.message ?? 'Could not reach the provider', {

@@ -81,6 +81,7 @@ describe('switching the active ledger', () => {
         label: 'Slow',
         fields: [],
         needsRelay: false,
+        selfHostable: true,
         emits: ['reward'],
         docsUrl: 'https://example.org',
       },

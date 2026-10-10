@@ -21,6 +21,7 @@ const moduleWith = (fields: SourceModule['manifest']['fields']): SourceModule =>
       label: 'Test Advanced',
       fields,
       needsRelay: false,
+      selfHostable: true,
       emits: ['transfer'],
       docsUrl: 'https://example.org',
     },

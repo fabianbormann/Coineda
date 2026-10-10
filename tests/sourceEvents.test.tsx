@@ -31,6 +31,7 @@ const exchangeModule = {
     fields: [],
     requiredScopes: ['Read Info'],
     needsRelay: false,
+    selfHostable: true,
     emits: ['trade' as const],
     docsUrl: 'https://example.invalid/docs',
   },

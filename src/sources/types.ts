@@ -1,4 +1,5 @@
 import type { Cursor, EventKind, LedgerEvent } from '@/ledger/types';
+import type { Endpoints } from '@/config/endpoints';
 
 export type ManifestField = {
   name: string;
@@ -51,6 +52,21 @@ export type SourceManifest = {
    *  go through the signing relay. Declared from the start so the relay
    *  milestone does not reshape this interface. */
   needsRelay: boolean;
+  /**
+   * True when an operator can run the provider's API themselves (an
+   * Esplora, Blockscout or Yaci instance), false for a hosted service only
+   * its vendor runs (an exchange API). Restricted egress hides a module
+   * whose value is false: it could only ever reach a third party.
+   */
+  selfHostable: boolean;
+  /**
+   * The `Endpoints` field that supplies this module's base URL when its
+   * `baseUrl` field is left empty. The host fills that default in before
+   * probing or syncing (src/sources/egress.ts), so a per-client override in
+   * `Settings.endpoints` takes effect, and in restricted mode a module
+   * whose service is not configured is hidden.
+   */
+  endpoint?: keyof Endpoints;
   /** Which kinds this source can produce, so the UI can state coverage
    *  honestly instead of implying completeness. */
   emits: EventKind[];
