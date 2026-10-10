@@ -7,6 +7,12 @@ import {
   isConfigured,
   resolveEndpoints,
 } from '@/config/endpoints';
+import {
+  readDeviceEgress,
+  readDeviceEndpoints,
+  writeDeviceEgress,
+  writeDeviceEndpoints,
+} from '@/config/deviceConfig';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -75,34 +81,46 @@ describe('defaultEndpoints', () => {
 });
 
 describe('resolveEndpoints', () => {
-  it('is the defaults without settings', () => {
+  it('is the defaults without device overrides', () => {
+    localStorage.clear();
     expect(resolveEndpoints()).toEqual(defaultEndpoints());
     expect(resolveEndpoints({})).toEqual(defaultEndpoints());
   });
 
   it('overrides exactly the fields a setting names', () => {
-    expect(
-      resolveEndpoints({
-        endpoints: { priceHistory: 'https://p.example.gov' },
-      }),
-    ).toEqual({ ...PUBLIC_ENDPOINTS, priceHistory: 'https://p.example.gov' });
+    expect(resolveEndpoints({ priceHistory: 'https://p.example.gov' })).toEqual(
+      { ...PUBLIC_ENDPOINTS, priceHistory: 'https://p.example.gov' },
+    );
   });
 
   it('normalises a setting the same way as the build configuration', () => {
-    expect(
-      resolveEndpoints({ endpoints: { fx: ' https://fx.example.gov/ ' } }).fx,
-    ).toBe('https://fx.example.gov');
+    expect(resolveEndpoints({ fx: ' https://fx.example.gov/ ' }).fx).toBe(
+      'https://fx.example.gov',
+    );
   });
 
-  it('applies settings over the build configuration', () => {
+  it('lets the build configuration win over the device', () => {
     vi.stubEnv('VITE_ENDPOINTS', '{"fx":"https://fx.example.gov"}');
     expect(
-      resolveEndpoints({ endpoints: { spotPrices: 'https://s.example.gov' } }),
+      resolveEndpoints({
+        fx: 'https://device-fx.example.gov',
+        spotPrices: 'https://s.example.gov',
+      }),
     ).toEqual({
       ...PUBLIC_ENDPOINTS,
       fx: 'https://fx.example.gov',
       spotPrices: 'https://s.example.gov',
     });
+  });
+
+  it("reads the device's stored overrides by default", () => {
+    localStorage.clear();
+    writeDeviceEndpoints({ spotPrices: 'https://s.example.gov' });
+    try {
+      expect(resolveEndpoints().spotPrices).toBe('https://s.example.gov');
+    } finally {
+      localStorage.clear();
+    }
   });
 });
 
@@ -110,7 +128,7 @@ describe('egressMode', () => {
   it('is public by default', () => {
     vi.stubEnv('VITE_EGRESS', '');
     expect(egressMode()).toBe('public');
-    expect(egressMode({})).toBe('public');
+    expect(egressMode('public')).toBe('public');
   });
 
   it('is restricted when the build says so', () => {
@@ -118,16 +136,16 @@ describe('egressMode', () => {
     expect(egressMode()).toBe('restricted');
   });
 
-  it('lets the setting restrict a public build', () => {
+  it('lets the device restrict a public build', () => {
     vi.stubEnv('VITE_EGRESS', '');
-    expect(egressMode({ egress: 'restricted' })).toBe('restricted');
+    expect(egressMode('restricted')).toBe('restricted');
     vi.stubEnv('VITE_EGRESS', 'public');
-    expect(egressMode({ egress: 'restricted' })).toBe('restricted');
+    expect(egressMode('restricted')).toBe('restricted');
   });
 
-  it('never lets a setting loosen a build pinned restricted', () => {
+  it('never lets the device loosen a build pinned restricted', () => {
     vi.stubEnv('VITE_EGRESS', 'restricted');
-    expect(egressMode({ egress: 'public' })).toBe('restricted');
+    expect(egressMode('public')).toBe('restricted');
   });
 });
 
@@ -214,11 +232,12 @@ describe('empty overrides', () => {
     expect(defaultEndpoints()).toEqual(PUBLIC_ENDPOINTS);
   });
 
-  it('keeps the default when a setting is cleared', () => {
+  it('keeps the default when a device field is cleared', () => {
     vi.stubEnv('VITE_ENDPOINTS', '{"fx":"https://fx.example.gov"}');
-    expect(
-      resolveEndpoints({ endpoints: { fx: '  ', priceHistory: '' } }),
-    ).toEqual({ ...PUBLIC_ENDPOINTS, fx: 'https://fx.example.gov' });
+    expect(resolveEndpoints({ fx: '  ', priceHistory: '' })).toEqual({
+      ...PUBLIC_ENDPOINTS,
+      fx: 'https://fx.example.gov',
+    });
   });
 });
 
@@ -243,5 +262,65 @@ describe('env parse memoisation', () => {
     vi.stubEnv('VITE_ENDPOINTS', '{"fx":"https://c.example.gov"}');
     defaultEndpoints().fx = 'mutated';
     expect(defaultEndpoints().fx).toBe('https://c.example.gov');
+  });
+});
+
+describe('device configuration', () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it('is public with no overrides on a fresh device', () => {
+    localStorage.clear();
+    expect(readDeviceEgress()).toBe('public');
+    expect(readDeviceEndpoints()).toEqual({});
+  });
+
+  it('round-trips the mode and the overrides', () => {
+    writeDeviceEgress('restricted');
+    writeDeviceEndpoints({ fx: 'https://fx.example.gov' });
+    expect(readDeviceEgress()).toBe('restricted');
+    expect(readDeviceEndpoints()).toEqual({ fx: 'https://fx.example.gov' });
+    vi.stubEnv('VITE_EGRESS', '');
+    expect(egressMode()).toBe('restricted');
+  });
+
+  it('replaces the overrides rather than merging them', () => {
+    writeDeviceEndpoints({ fx: 'https://fx.example.gov' });
+    writeDeviceEndpoints({ spotPrices: 'https://s.example.gov' });
+    expect(readDeviceEndpoints()).toEqual({
+      spotPrices: 'https://s.example.gov',
+    });
+  });
+
+  it('ignores garbage in storage', () => {
+    localStorage.setItem('coineda.egress', '{not json');
+    localStorage.setItem('coineda.endpoints', '["x"]');
+    expect(readDeviceEgress()).toBe('public');
+    expect(readDeviceEndpoints()).toEqual({});
+    localStorage.setItem(
+      'coineda.endpoints',
+      '{"fx":1,"spotPrices":"https://s.example.gov"}',
+    );
+    expect(readDeviceEndpoints()).toEqual({
+      spotPrices: 'https://s.example.gov',
+    });
+  });
+
+  it('keeps working in memory when localStorage throws', () => {
+    const setItem = vi
+      .spyOn(Storage.prototype, 'setItem')
+      .mockImplementation(() => {
+        throw new Error('quota');
+      });
+    const getItem = vi
+      .spyOn(Storage.prototype, 'getItem')
+      .mockImplementation(() => {
+        throw new Error('denied');
+      });
+    writeDeviceEgress('restricted');
+    expect(readDeviceEgress()).toBe('restricted');
+    setItem.mockRestore();
+    getItem.mockRestore();
   });
 });

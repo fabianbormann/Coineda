@@ -9,7 +9,7 @@ import type { Holding } from '@/ledger/balances';
 import { fetchSpotPrices } from './coingecko';
 import { fetchRates } from './ecb';
 import { valueOf } from './scale';
-import { currentEndpoints } from '@/config/egress';
+import { activeEndpoints } from '@/config/egress';
 import type { Endpoints } from '@/config/endpoints';
 import type { PriceKey } from './types';
 
@@ -111,7 +111,7 @@ export const resolveSpotPrices = async (
   // reads no settings at all.
   const hosts =
     fiatMisses.length > 0 || misses.length > 0
-      ? (endpoints ?? (await currentEndpoints()))
+      ? (endpoints ?? activeEndpoints())
       : undefined;
 
   for (const assetId of fiatMisses) {

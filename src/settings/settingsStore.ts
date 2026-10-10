@@ -1,6 +1,5 @@
 import { openLedger, openLedgerForWrite, type WriteOptions } from '@/ledger/db';
 import type { CarryForward } from '@/tax/types';
-import type { Endpoints } from '@/config/endpoints';
 
 /**
  * Freeform app settings backed by the 'settings' store (schema version 3).
@@ -69,19 +68,9 @@ export type Settings = {
    * their leading zeros).
    */
   datev?: DatevSettings;
-  /**
-   * Per-client overrides of the outbound hosts, over the build's defaults
-   * (src/config/endpoints.ts, `resolveEndpoints`). Absent fields keep the
-   * default. Not normalised here; resolveEndpoints trims each value and
-   * strips trailing slashes when it reads them.
-   */
-  endpoints?: Partial<Endpoints>;
-  /**
-   * 'restricted' keeps the app to its configured endpoints. Defaults to
-   * 'public'. A build pinned `VITE_EGRESS=restricted` ignores a 'public'
-   * here (see `egressMode`).
-   */
-  egress?: 'public' | 'restricted';
+  // The egress mode and endpoint overrides are deliberately NOT here: they
+  // are per device, not per client (src/config/deviceConfig.ts), so a
+  // review client's settings cannot carry a mode of their own.
 };
 
 /**

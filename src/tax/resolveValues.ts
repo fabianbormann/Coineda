@@ -154,9 +154,9 @@ const lookUp = async (
     currency,
     apiKey,
     undefined,
-    // The client's own overrides and egress mode: in restricted mode an
+    // The device's endpoints and egress mode: in restricted mode an
     // unconfigured service is blank, and its prices come back missing.
-    activeEndpoints(settings),
+    activeEndpoints(),
   );
 
   // Still matches the CoinGecko path: with a key, no day is refused locally.

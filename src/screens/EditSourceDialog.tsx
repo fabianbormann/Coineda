@@ -235,7 +235,7 @@ export const EditSourceDialog = ({
         // Same host-side preparation a sync gets: the client's endpoint
         // defaults filled in, and in restricted egress a host outside them
         // refused before any request.
-        probeConfig = await prepareRun(module, merged);
+        probeConfig = prepareRun(module, merged);
       } catch (error) {
         if (error instanceof EgressRefusedError) {
           setFormError(t(EGRESS_REFUSED));

@@ -1,10 +1,5 @@
-import {
-  allowedHosts,
-  egressMode,
-  resolveEndpoints,
-  type Endpoints,
-} from '@/config/endpoints';
-import { getSettings, type Settings } from '@/settings/settingsStore';
+import { allowedHosts, type Endpoints } from '@/config/endpoints';
+import { egressOf, type EgressConfig } from '@/config/egress';
 import type { SourceModule } from './types';
 
 /**
@@ -29,10 +24,10 @@ const hasBaseUrlField = (module: SourceModule): boolean =>
 
 /**
  * The config a module is actually run with: a left-empty `baseUrl` filled
- * from the client's endpoints (`manifest.endpoint`), so a per-client
- * override in `Settings.endpoints` reaches the module instead of the
- * module's own build-time fallback. The stored config is never rewritten -
- * an empty field keeps following the settings if they change later.
+ * from the device's endpoints (`manifest.endpoint`), so an override
+ * there reaches the module instead of the module's own build-time
+ * fallback. The stored config is never rewritten - an empty field keeps
+ * following the endpoints if they change later.
  */
 export const effectiveConfig = (
   module: SourceModule,
@@ -64,20 +59,25 @@ const effectiveBase = (
  * Restricted egress only: refuses, with EgressRefusedError, a module that
  * cannot be self-hosted or whose effective host is not one of the
  * configured endpoints' hosts. Public mode never refuses.
+ *
+ * Compared on `URL.host` - host name AND port - exactly as `allowedHosts`
+ * collects them: an operator who configured `indexer.example:8443` has not
+ * thereby allowed whatever else listens on that machine's other ports.
+ * Mode and endpoints are the device's (or `egress`, in tests), never a
+ * client's settings.
  */
 export const assertEgressAllowed = (
   module: SourceModule,
   config: Record<string, string>,
-  settings?: Pick<Settings, 'endpoints' | 'egress'> | null,
+  egress?: EgressConfig,
 ): void => {
-  const mode = egressMode(settings);
+  const { mode, endpoints } = egressOf(egress);
   if (mode !== 'restricted') {
     return;
   }
   if (!module.manifest.selfHostable) {
     throw new EgressRefusedError();
   }
-  const endpoints = resolveEndpoints(settings);
   let host: string;
   try {
     host = new URL(effectiveBase(module, config, endpoints)).host;
@@ -91,22 +91,16 @@ export const assertEgressAllowed = (
 
 /**
  * Everything the host does before handing a config to `probe` or
- * `fetchEvents`: reads the open client's settings, refuses in restricted
- * egress (EgressRefusedError), and returns the config with a left-empty
- * `baseUrl` filled from the client's endpoints. An unreadable settings row
- * falls back to the build's defaults, which still honour a build-time
- * `VITE_EGRESS=restricted`.
+ * `fetchEvents`: refuses in restricted egress (EgressRefusedError), and
+ * returns the config with a left-empty `baseUrl` filled from the device's
+ * endpoints. Synchronous and settings-free, so no failed read can fall
+ * back to a looser mode.
  */
-export const prepareRun = async (
+export const prepareRun = (
   module: SourceModule,
   config: Record<string, string>,
-): Promise<Record<string, string>> => {
-  let settings: Settings | null = null;
-  try {
-    settings = await getSettings();
-  } catch {
-    // Build defaults.
-  }
-  assertEgressAllowed(module, config, settings);
-  return effectiveConfig(module, config, resolveEndpoints(settings));
+  egress?: EgressConfig,
+): Record<string, string> => {
+  assertEgressAllowed(module, config, egress);
+  return effectiveConfig(module, config, egressOf(egress).endpoints);
 };

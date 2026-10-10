@@ -1,4 +1,4 @@
-import type { Settings } from '@/settings/settingsStore';
+import { readDeviceEgress, readDeviceEndpoints } from './deviceConfig';
 
 /**
  * Every outbound host the app talks to, in one place.
@@ -12,8 +12,9 @@ import type { Settings } from '@/settings/settingsStore';
  *
  * Resolution, lowest to highest precedence:
  *   1. PUBLIC_ENDPOINTS - today's public hosts, verbatim;
- *   2. `import.meta.env.VITE_ENDPOINTS` - a JSON object fixed at build time;
- *   3. `Settings.endpoints` - per-client overrides at runtime.
+ *   2. the device's overrides (src/config/deviceConfig.ts), at runtime;
+ *   3. `import.meta.env.VITE_ENDPOINTS` - a JSON object fixed at build time,
+ *      which wins: an operator's build is not loosened from a settings card.
  * With neither 2 nor 3 set, behaviour is byte-identical to the constants
  * this replaced.
  */
@@ -75,9 +76,12 @@ const overlay = (base: Endpoints, partial: unknown): Endpoints => {
   return result;
 };
 
-const parseEnv = (raw: string | undefined): Endpoints => {
+/** The build's VITE_ENDPOINTS, parsed but not yet overlaid. Unset gives
+ *  `{}`; malformed warns and gives `{}` too, so the public set (and the
+ *  device's overrides) stay in force rather than the app breaking at boot. */
+const parseEnv = (raw: string | undefined): object => {
   if (raw === undefined || raw.trim() === '') {
-    return { ...PUBLIC_ENDPOINTS };
+    return {};
   }
   let parsed: unknown;
   try {
@@ -87,50 +91,61 @@ const parseEnv = (raw: string | undefined): Endpoints => {
       'VITE_ENDPOINTS is not valid JSON; using the public endpoints.',
       error,
     );
-    return { ...PUBLIC_ENDPOINTS };
+    return {};
   }
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
     console.warn(
       'VITE_ENDPOINTS must be a JSON object; using the public endpoints.',
     );
-    return { ...PUBLIC_ENDPOINTS };
+    return {};
   }
-  return overlay(PUBLIC_ENDPOINTS, parsed);
+  return parsed;
 };
 
 /** The last parse, keyed by the raw env string: the value is fixed at build
  *  time, so it is parsed (and a malformed one warned about) once. Keyed
  *  rather than a plain flag so `vi.stubEnv` in tests still takes effect. */
-let memo: { raw: string | undefined; endpoints: Endpoints } | null = null;
+let memo: { raw: string | undefined; parsed: object } | null = null;
+
+/** The build's VITE_ENDPOINTS as an object (`{}` when unset or invalid). */
+const envOverrides = (): object => {
+  const raw = import.meta.env.VITE_ENDPOINTS;
+  if (memo === null || memo.raw !== raw) {
+    memo = { raw, parsed: parseEnv(raw) };
+  }
+  return memo.parsed;
+};
 
 /** PUBLIC_ENDPOINTS overlaid by the build's VITE_ENDPOINTS. A malformed
  *  value warns once and falls back to the public set rather than breaking
  *  the app at boot. Returns a fresh copy each call. */
-export const defaultEndpoints = (): Endpoints => {
-  const raw = import.meta.env.VITE_ENDPOINTS;
-  if (memo === null || memo.raw !== raw) {
-    memo = { raw, endpoints: parseEnv(raw) };
-  }
-  return { ...memo.endpoints };
-};
+export const defaultEndpoints = (): Endpoints =>
+  overlay(PUBLIC_ENDPOINTS, envOverrides());
 
-/** The defaults overlaid by the client's own `Settings.endpoints`. */
+/**
+ * The endpoints in force: the public defaults, overlaid by the device's
+ * overrides, overlaid by the build's VITE_ENDPOINTS. `device` defaults to
+ * what this device stores; tests pass it explicitly.
+ */
 export const resolveEndpoints = (
-  settings?: Pick<Settings, 'endpoints'> | null,
-): Endpoints => overlay(defaultEndpoints(), settings?.endpoints);
+  device: Partial<Endpoints> = readDeviceEndpoints(),
+): Endpoints => overlay(overlay(PUBLIC_ENDPOINTS, device), envOverrides());
 
 /**
  * A build pinned `VITE_EGRESS=restricted` stays restricted whatever the
- * setting says - an operator's guarantee must not be loosened by a user.
- * Otherwise the setting applies, and the default is 'public'.
+ * device says - an operator's guarantee must not be loosened by a user.
+ * Otherwise the device's mode applies (src/config/deviceConfig.ts), and the
+ * default is 'public'. It is the same for every client on the device, a
+ * review client included. `device` defaults to the stored mode; tests pass
+ * it explicitly.
  */
 export const egressMode = (
-  settings?: Pick<Settings, 'egress'> | null,
+  device: EgressMode = readDeviceEgress(),
 ): EgressMode => {
   if (import.meta.env.VITE_EGRESS?.trim() === 'restricted') {
     return 'restricted';
   }
-  return settings?.egress === 'restricted' ? 'restricted' : 'public';
+  return device === 'restricted' ? 'restricted' : 'public';
 };
 
 /**

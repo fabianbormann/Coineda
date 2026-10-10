@@ -19,7 +19,15 @@ import {
 } from '@/sources/egress';
 import { syncSource } from '@/sync/syncSource';
 import { getSources, openLedger, putSource } from '@/ledger/db';
-import { putSettings, type Settings } from '@/settings/settingsStore';
+import { putSettings } from '@/settings/settingsStore';
+import { writeDeviceEgress, writeDeviceEndpoints } from '@/config/deviceConfig';
+import type { EgressConfig } from '@/config/egress';
+import { resolveSpotPrices } from '@/prices/priceStore';
+import {
+  DEFAULT_LEDGER_NAME,
+  setActiveLedger,
+  setLedgerReadOnly,
+} from '@/ledger/db';
 import type { SourceRecord } from '@/ledger/types';
 import type { TaxEvent } from '@/tax/types';
 
@@ -32,7 +40,7 @@ import type { TaxEvent } from '@/tax/types';
 const GOV_PRICES = 'https://prices.gov.example';
 const GOV_INDEXER = 'https://indexer.gov.example';
 
-const restricted: Partial<Settings> = {
+const restricted: EgressConfig = {
   egress: 'restricted',
   endpoints: { priceHistory: GOV_PRICES, ethereumBlockscout: GOV_INDEXER },
 };
@@ -71,7 +79,14 @@ const guardedFetch = (
   return { calls, stub };
 };
 
+/** The device, not a client, is restricted (src/config/deviceConfig.ts). */
+const restrictDevice = () => {
+  writeDeviceEgress('restricted');
+  writeDeviceEndpoints(restricted.endpoints ?? {});
+};
+
 beforeEach(async () => {
+  localStorage.clear();
   const db = await openLedger();
   for (const store of ['prices', 'settings', 'sources', 'tokenMeta'] as const) {
     await db.clear(store);
@@ -107,9 +122,10 @@ const renderDialog = () =>
 
 describe('the module list', () => {
   it('hides Bitpanda and every module whose service is unconfigured', () => {
-    const ids = visibleModules('restricted', resolveEndpoints(restricted)).map(
-      (m) => m.manifest.id,
-    );
+    const ids = visibleModules(
+      'restricted',
+      resolveEndpoints(restricted.endpoints),
+    ).map((m) => m.manifest.id);
     expect(ids).not.toContain('bitpanda');
     expect(ids).toContain('ethereum-blockscout');
     expect(ids).not.toContain('bitcoin-esplora');
@@ -122,10 +138,9 @@ describe('the module list', () => {
   });
 
   it('leaves Bitpanda out of the add-source picker when restricted', async () => {
-    await putSettings(restricted);
+    restrictDevice();
     renderDialog();
     const dialog = await screen.findByRole('dialog');
-    // Settings load asynchronously; wait for the filtered list.
     await vi.waitFor(() =>
       expect(
         within(dialog).queryByRole('button', { name: /^Bitpanda$/i }),
@@ -157,8 +172,8 @@ describe('active endpoints', () => {
   });
 
   it('is the resolved set in public mode', () => {
-    const settings = { endpoints: { fx: GOV_PRICES } };
-    expect(activeEndpoints(settings)).toEqual(resolveEndpoints(settings));
+    const config = { endpoints: { fx: GOV_PRICES } };
+    expect(activeEndpoints(config)).toEqual(resolveEndpoints(config.endpoints));
   });
 });
 
@@ -172,7 +187,7 @@ describe('token metadata', () => {
   });
 
   it('skips the decoration when restricted without a registry', async () => {
-    await putSettings(restricted);
+    restrictDevice();
     const { stub } = guardedFetch();
     const result = await resolveTokenMeta([`cardano:${POLICY}41`]);
     expect(result.size).toBe(0);
@@ -220,7 +235,7 @@ describe('prices', () => {
   });
 
   it('reports the tax run price missing in restricted mode without FX', async () => {
-    await putSettings(restricted);
+    restrictDevice();
     const { calls } = guardedFetch(() => new Response('{}', { status: 500 }));
     const event: TaxEvent = {
       sourceEventId: 'e1',
@@ -235,8 +250,8 @@ describe('prices', () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("sends a tax run's price history to the client's own override", async () => {
-    await putSettings({ endpoints: { priceHistory: GOV_PRICES } });
+  it("sends a tax run's price history to the device's override", async () => {
+    writeDeviceEndpoints({ priceHistory: GOV_PRICES });
     const calls: string[] = [];
     vi.stubGlobal(
       'fetch',
@@ -270,7 +285,7 @@ describe('syncing a source', () => {
   };
 
   it('refuses a host outside the configured endpoints', async () => {
-    await putSettings(restricted);
+    restrictDevice();
     await putSource(source);
     const { stub } = guardedFetch();
 
@@ -313,12 +328,12 @@ describe('syncing a source', () => {
     const module = findModule('ethereum-blockscout')!;
     expect(() => assertEgressAllowed(module, source.config, {})).not.toThrow();
     expect(() =>
-      assertEgressAllowed(findModule('bitpanda')!, { apiKey: 'k' }, null),
+      assertEgressAllowed(findModule('bitpanda')!, { apiKey: 'k' }),
     ).not.toThrow();
   });
 
-  it("syncs from the client's configured default when no URL is given", async () => {
-    await putSettings(restricted);
+  it("syncs from the device's configured default when no URL is given", async () => {
+    restrictDevice();
     const blank: SourceRecord = { ...source, config: { address: ETH_ADDRESS } };
     await putSource(blank);
     const { calls } = guardedFetch(
@@ -327,5 +342,49 @@ describe('syncing a source', () => {
     await syncSource(blank);
     expect(calls.length).toBeGreaterThan(0);
     expect(calls.every((url) => url.startsWith(`${GOV_INDEXER}/`))).toBe(true);
+  });
+});
+
+describe('device-level egress', () => {
+  it('ignores a client settings row that asks for public egress', async () => {
+    restrictDevice();
+    // An old client row, or a checkpoint from somebody else, may still
+    // carry the removed per-client fields. They must change nothing.
+    await putSettings({
+      egress: 'public',
+      endpoints: { spotPrices: 'https://api.coingecko.com/api/v3' },
+    } as never);
+    const { stub } = guardedFetch();
+    const prices = await resolveSpotPrices(['cardano:lovelace'], 'eur');
+    expect(prices.size).toBe(0);
+    expect(stub).not.toHaveBeenCalled();
+    expect(() =>
+      assertEgressAllowed(findModule('bitpanda')!, { apiKey: 'k' }),
+    ).toThrow(EgressRefusedError);
+  });
+
+  it('applies to a review client too', async () => {
+    restrictDevice();
+    // A review client: another database, opened read-only, whose settings
+    // came from someone else's checkpoint and say 'public'.
+    await setActiveLedger('coineda-review-egress-test');
+    await putSettings({ egress: 'public' } as never);
+    setLedgerReadOnly(true);
+    try {
+      const { stub } = guardedFetch();
+      renderDialog();
+      const dialog = await screen.findByRole('dialog');
+      expect(
+        within(dialog).getByRole('button', { name: /Ethereum/i }),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).queryByRole('button', { name: /^Bitpanda$/i }),
+      ).not.toBeInTheDocument();
+      await resolveSpotPrices(['cardano:lovelace', 'fiat:usd'], 'eur');
+      await resolveTokenMeta([`cardano:${POLICY}41`]);
+      expect(stub).not.toHaveBeenCalled();
+    } finally {
+      await setActiveLedger(DEFAULT_LEDGER_NAME);
+    }
   });
 });

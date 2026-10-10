@@ -2,7 +2,7 @@ import { openLedger, type WriteOptions } from '@/ledger/db';
 import { fetchTokenMeta, subjectsOf, type TokenMeta } from './tokenRegistry';
 import { parseCardanoAsset } from './cardanoAsset';
 import { measureLogoLuminance } from './logoLuminance';
-import { currentEndpoints } from '@/config/egress';
+import { activeEndpoints } from '@/config/egress';
 import type { Endpoints } from '@/config/endpoints';
 
 /**
@@ -110,8 +110,7 @@ export const resolveTokenMeta = async (
   // fetchTokenMeta's own empty answer, because that answer would be
   // written back below as a recorded miss for every subject, hiding their
   // metadata for a month after a registry is configured.
-  const hosts =
-    stale.length > 0 ? (endpoints ?? (await currentEndpoints())) : null;
+  const hosts = stale.length > 0 ? (endpoints ?? activeEndpoints()) : null;
   if (hosts !== null && hosts.tokenRegistry !== '') {
     try {
       const fetched = await fetchTokenMeta(stale, signal, hosts);
