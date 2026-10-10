@@ -113,7 +113,7 @@ describe('Binance', () => {
     // margin interest charge into a disposal.
     const { skipped } = binanceCsv.parse(BINANCE);
     expect(skipped.join(' ')).toMatch(/mystery operation/i);
-    expect(skipped.join(' ')).toMatch(/DOGE/);
+    expect(skipped.join(' ')).not.toMatch(/DOGE/); // DOGE now resolves via the catalogue
   });
 
   it('names the kind of every reward', () => {
@@ -276,7 +276,7 @@ describe('Coinbase', () => {
   it('skips a type it has no rule for, and an asset it cannot name', () => {
     const { skipped } = coinbaseCsv.parse(COINBASE);
     expect(skipped.join(' ')).toMatch(/mystery/i);
-    expect(skipped.join(' ')).toMatch(/DOGE/);
+    expect(skipped.join(' ')).not.toMatch(/DOGE/); // DOGE now resolves via the catalogue
   });
 
   it('says what it found when handed the wrong file', () => {
@@ -409,5 +409,28 @@ describe('Binance stablecoins', () => {
     );
     expect(events[0].legs[0].assetId).toBe(BINANCE_ASSETS['USDT']);
     expect(events[0].legs[0].amount).toBe('12500000');
+  });
+});
+
+describe('resolving tickers through the asset catalogue', () => {
+  it('Binance resolves a catalogue-only ticker the old map skipped', () => {
+    const row = '12345678,2024-10-01 00:00:00,Spot,Deposit,SOL,2.00000000,\n';
+    const { events } = binanceCsv.parse(BINANCE + row);
+    expect(
+      events.some((event) =>
+        event.legs.some((leg) => leg.assetId === 'solana:native'),
+      ),
+    ).toBe(true);
+  });
+
+  it('Coinbase resolves a catalogue-only ticker the old map skipped', () => {
+    const row =
+      'abc-9,2024-10-01T00:00:00Z,Receive,SOL,2.00000000,EUR,,,,,Received\n';
+    const { events } = coinbaseCsv.parse(COINBASE + row);
+    expect(
+      events.some((event) =>
+        event.legs.some((leg) => leg.assetId === 'solana:native'),
+      ),
+    ).toBe(true);
   });
 });

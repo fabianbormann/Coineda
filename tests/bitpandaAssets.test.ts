@@ -74,12 +74,17 @@ describe('assetIdForSymbol', () => {
     expect(assetIdForSymbol(' ada ')).toBe('cardano:lovelace');
   });
 
+  it('resolves a catalogue-only symbol the old map skipped', () => {
+    expect(assetIdForSymbol('SOL')).toBe('solana:native');
+    expect(baseUnits('1', 'solana:native')).toBe('1000000000');
+  });
+
   it('refuses a symbol it cannot state with certainty', () => {
     // Bitpanda offers 880 symbols including gold, silver, platinum and
     // palladium. A symbol is ambiguous across chains, so a guess merges two
     // different assets into one position with nothing to show for it.
     expect(assetIdForSymbol('XAU')).toBeNull();
-    expect(assetIdForSymbol('DOGE')).toBeNull();
+    expect(assetIdForSymbol('DOGE')).toBe('dogecoin:native'); // catalogue now knows it
     expect(assetIdForSymbol('')).toBeNull();
   });
 

@@ -1,7 +1,8 @@
 import Big from 'big.js';
 import { normaliseAmount } from '@/ledger/amount';
 import { isFiatAsset } from '@/ledger/balances';
-import { ASSET_DECIMALS, USDC_ASSET_ID, USDT_ASSET_ID } from '@/prices/scale';
+import { ASSET_DECIMALS } from '@/prices/scale';
+import { resolveTicker } from '@/sources/csv/resolveTicker';
 
 /**
  * Kraken's asset codes to Coineda asset ids.
@@ -26,33 +27,18 @@ import { ASSET_DECIMALS, USDC_ASSET_ID, USDT_ASSET_ID } from '@/prices/scale';
  * 855 assets; a code this app cannot both scale and price is reported as
  * skipped rather than stored wrong.
  */
-export const KRAKEN_ASSETS: Record<string, string> = {
-  XXBT: 'bitcoin:native',
-  XBT: 'bitcoin:native',
-  BTC: 'bitcoin:native',
-  XETH: 'eth:native',
-  ETH: 'eth:native',
-  ADA: 'cardano:lovelace',
-  USDT: USDT_ASSET_ID,
-  USDC: USDC_ASSET_ID,
-  ZEUR: 'fiat:eur',
-  EUR: 'fiat:eur',
-  // The other fiat currencies Kraken trades against that the ECB also
-  // publishes a reference rate for, so a dollar or pound pair is valued at
-  // what was actually paid, converted at that day's rate, rather than
-  // being skipped row by row and leaving a crypto-only event valued at
-  // market. Stored as decimals like the euro (see baseUnits).
-  ZUSD: 'fiat:usd',
-  USD: 'fiat:usd',
-  ZGBP: 'fiat:gbp',
-  GBP: 'fiat:gbp',
-  CHF: 'fiat:chf',
-  ZCAD: 'fiat:cad',
-  CAD: 'fiat:cad',
-  ZAUD: 'fiat:aud',
-  AUD: 'fiat:aud',
-  ZJPY: 'fiat:jpy',
-  JPY: 'fiat:jpy',
+/** Kraken's own spellings, to catalogue symbols. Everything else (ADA, SOL,
+ *  USDT, CHF ...) is looked up in the catalogue under its plain ticker. */
+export const KRAKEN_ALIASES: Record<string, string> = {
+  XXBT: 'BTC',
+  XBT: 'BTC',
+  XETH: 'ETH',
+  ZEUR: 'EUR',
+  ZUSD: 'USD',
+  ZGBP: 'GBP',
+  ZCAD: 'CAD',
+  ZAUD: 'AUD',
+  ZJPY: 'JPY',
 };
 
 /**
@@ -73,7 +59,7 @@ export const stripWalletSuffix = (code: string): string =>
   code.replace(/\.(HOLD|S|M|B|F|P)\d*$/i, '');
 
 export const assetIdForCode = (code: string): string | null =>
-  KRAKEN_ASSETS[stripWalletSuffix(code.trim()).toUpperCase()] ?? null;
+  resolveTicker(stripWalletSuffix(code.trim()), KRAKEN_ALIASES);
 
 /** Thrown rather than returned: every caller is mid-parse and there is no
  *  sensible amount to carry on with. */

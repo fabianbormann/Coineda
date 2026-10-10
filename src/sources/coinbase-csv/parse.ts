@@ -1,5 +1,6 @@
 import Big from 'big.js';
 import { readCsvRows } from '@/sources/csv/readCsv';
+import { resolveTicker } from '@/sources/csv/resolveTicker';
 import { makeSkipLog, toBaseUnits } from '@/sources/csv/ledgerShape';
 import type { ParseResult } from '@/sources/csv/types';
 import type { DerivedEvent } from '@/sources/types';
@@ -29,12 +30,8 @@ import type { EventKind, Leg, RewardKind } from '@/ledger/types';
  */
 const REQUIRED = ['transaction type', 'asset', 'quantity transacted'] as const;
 
-const COINBASE_ASSETS: Record<string, string> = {
-  BTC: 'bitcoin:native',
-  ETH: 'eth:native',
-  ADA: 'cardano:lovelace',
-  EUR: 'fiat:eur',
-};
+const coinbaseAssetId = (ticker: string): string | null =>
+  resolveTicker(ticker);
 
 /** Which way the asset moved, per Coinbase transaction type. `null` means
  *  recognised but not a movement of its own. */
@@ -120,7 +117,7 @@ export const parse = (input: string): ParseResult => {
       return;
     }
 
-    const assetId = COINBASE_ASSETS[asset.trim().toUpperCase()];
+    const assetId = coinbaseAssetId(asset) ?? undefined;
     if (assetId === undefined) {
       skipped.note(`holdings in ${asset || '(no asset)'}`);
       return;
@@ -164,7 +161,7 @@ export const parse = (input: string): ParseResult => {
     const currency =
       at(row, 'price currency') || at(row, 'spot price currency');
     const subtotal = at(row, 'subtotal');
-    const counterAsset = COINBASE_ASSETS[currency.trim().toUpperCase()];
+    const counterAsset = coinbaseAssetId(currency) ?? undefined;
     if (movement.kind === 'trade' && counterAsset && subtotal !== '') {
       try {
         const paid = new Big(subtotal.replace(/[^0-9.-]/g, ''));

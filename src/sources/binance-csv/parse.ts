@@ -1,7 +1,7 @@
 import Big from 'big.js';
 import { readCsv, type CsvRow } from '@/sources/csv/readCsv';
 import { makeSkipLog, toBaseUnits } from '@/sources/csv/ledgerShape';
-import { USDC_ASSET_ID, USDT_ASSET_ID } from '@/prices/scale';
+import { resolveTicker, tickerMap } from '@/sources/csv/resolveTicker';
 import type { ParseResult } from '@/sources/csv/types';
 import type { DerivedEvent } from '@/sources/types';
 import type {
@@ -33,14 +33,12 @@ import type {
  */
 const REQUIRED = ['utc_time', 'operation', 'coin', 'change'] as const;
 
-export const BINANCE_ASSETS: Record<string, string> = {
-  BTC: 'bitcoin:native',
-  ETH: 'eth:native',
-  ADA: 'cardano:lovelace',
-  EUR: 'fiat:eur',
-  USDT: USDT_ASSET_ID,
-  USDC: USDC_ASSET_ID,
-};
+/** Binance uses plain tickers, so there are no aliases: the catalogue is
+ *  consulted under the ticker as written. */
+export const BINANCE_ASSETS: Record<string, string> = tickerMap();
+
+export const binanceAssetId = (coin: string): string | null =>
+  resolveTicker(coin);
 
 /**
  * Binance operation names to event kinds.
@@ -197,7 +195,7 @@ export const parse = (input: string): ParseResult => {
       return;
     }
 
-    const assetId = BINANCE_ASSETS[coin.trim().toUpperCase()];
+    const assetId = binanceAssetId(coin) ?? undefined;
     if (assetId === undefined) {
       skipped.note(`holdings in ${coin || '(no coin)'}`);
       return;

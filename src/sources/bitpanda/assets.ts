@@ -2,6 +2,7 @@ import Big from 'big.js';
 import { normaliseAmount } from '@/ledger/amount';
 import { isFiatAsset } from '@/ledger/balances';
 import { ASSET_DECIMALS, NIGHT_ASSET_ID } from '@/prices/scale';
+import { resolveTicker, tickerMap } from '@/sources/csv/resolveTicker';
 
 /**
  * Bitpanda symbol to Coineda asset id.
@@ -16,20 +17,19 @@ import { ASSET_DECIMALS, NIGHT_ASSET_ID } from '@/prices/scale';
  * Adding one means adding its ASSET_DECIMALS entry in the same commit, which
  * `baseUnits` below enforces rather than trusts.
  */
-export const BITPANDA_ASSETS: Record<string, string> = {
-  BTC: 'bitcoin:native',
-  ETH: 'eth:native',
-  ADA: 'cardano:lovelace',
-  EUR: 'fiat:eur',
+const BITPANDA_EXPLICIT: Record<string, string> = {
   // Stated with certainty rather than inferred: the owner's account holds
   // NIGHT, and the id below is its Cardano policy plus asset name, resolved
-  // through CoinGecko's own platform record. Mapping the TICKER would have
-  // been wrong - CoinGecko lists two different coins as NIGHT.
+  // through CoinGecko's own platform record. The catalogue refuses the bare
+  // ticker - CoinGecko lists two different coins as NIGHT.
   NIGHT: NIGHT_ASSET_ID,
 };
 
+export const BITPANDA_ASSETS: Record<string, string> =
+  tickerMap(BITPANDA_EXPLICIT);
+
 export const assetIdForSymbol = (symbol: string): string | null =>
-  BITPANDA_ASSETS[symbol.trim().toUpperCase()] ?? null;
+  resolveTicker(symbol, {}, BITPANDA_EXPLICIT);
 
 /** Thrown rather than returned, because every caller is mid-drain and there
  *  is no sensible amount to carry on with. */

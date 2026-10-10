@@ -788,3 +788,18 @@ describe('Kraken margin and rollover rows', () => {
     ]);
   });
 });
+
+describe('resolving tickers through the asset catalogue', () => {
+  it('resolves a catalogue-only ticker the old hand-written map skipped', () => {
+    const row =
+      '"LSOL01-AAAAA-BBBBB","RSOL01-AAAAA-BBBBB","2024-10-01 00:00:00.0000","deposit","","currency","SOL","spot / main","2.0000","0.0000","2.0000"\n';
+    const { events } = krakenCsv.parse(LEDGER + row);
+    const sol = events.find((event) =>
+      event.legs.some((leg) => leg.assetId === 'solana:native'),
+    );
+    expect(sol?.legs[0]).toMatchObject({
+      assetId: 'solana:native',
+      amount: '2000000000',
+    });
+  });
+});
