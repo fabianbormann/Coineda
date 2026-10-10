@@ -28,7 +28,7 @@ const datev: DatevSettings = {
 const disposal = (o: Partial<ReportedDisposal>): ReportedDisposal =>
   ({
     disposalEventId: 'evt-abc123def456xyz',
-    assetId: 'btc',
+    assetId: 'bitcoin:native',
     timestamp: Date.UTC(2025, 2, 7, 10),
     proceeds: '0',
     costBasis: '0',
@@ -36,7 +36,7 @@ const disposal = (o: Partial<ReportedDisposal>): ReportedDisposal =>
     exempt: '0',
     taxable: '0',
     costs: '0',
-    amount: '0.5',
+    amount: '50000000',
     venue: 'kraken',
     consumed: [],
     reason: { key: 'x' },
@@ -49,8 +49,8 @@ const report = (lines: ReportedDisposal[]): TaxReport =>
     income: [
       {
         sourceEventId: 'inc-1',
-        assetId: 'ada',
-        amount: '12.3',
+        assetId: 'cardano:lovelace',
+        amount: '12300000',
         timestamp: Date.UTC(2025, 4, 1),
         venue: 'wallet',
         value: '12.3',
@@ -142,7 +142,7 @@ describe('buchungsstapel', () => {
     expect(text.endsWith('\r\n')).toBe(true);
     expect(lines).toHaveLength(6);
     expect(lines[0]).toBe(
-      '"EXTF";700;21;"Buchungsstapel";13;20251010123456789;;"CO";"Coineda 1.0.0";;1234567;00123;20250101;4;20250101;20251231;"Coineda §23/§22 2025 abcdef123456";;1;0;0;"EUR";;;;;;;;;',
+      '"EXTF";700;21;"Buchungsstapel";13;20251010123456789;;"CO";"Coineda 1.0.0";;1234567;00123;20250101;4;20250101;20251231;"Coineda 2025 abcdef123456";;1;0;0;"EUR";;;;;;;;;',
     );
     expect(lines[0].split(';')).toHaveLength(31);
     expect(DATEV_COLUMNS).toHaveLength(125);
@@ -165,7 +165,7 @@ describe('encodeCp1252', () => {
 
 describe('validateDatevSettings', () => {
   it('lists what is missing', () => {
-    expect(validateDatevSettings(undefined)).toHaveLength(7);
+    expect(validateDatevSettings(undefined)).toHaveLength(3);
     expect(validateDatevSettings(datev)).toEqual([]);
     const bad = validateDatevSettings({
       ...datev,

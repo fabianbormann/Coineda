@@ -1,5 +1,8 @@
 import Big from 'big.js';
-import { normaliseAmount } from '@/ledger/amount';
+import {
+  symbolOf as knownSymbolOf,
+  toWholeUnits,
+} from '@/components/money/asset';
 import type { DatevSettings } from '@/settings/settingsStore';
 import type { TaxReport } from '@/tax/types';
 import { DATEV_COLUMNS } from './columns';
@@ -53,8 +56,17 @@ const amountDe = (value: string): string | null => {
   return cents.toFixed(2).replace('.', ',');
 };
 
-const plainDe = (value: string): string =>
-  normaliseAmount(value).replace(/^-/, '').replace('.', ',');
+/** Plain decimal comma, no exponent, no trailing zeros; `maxDecimals`
+ *  rounds half-up first. */
+const plainDe = (value: string, maxDecimals?: number): string => {
+  let big = new Big(value).abs();
+  if (maxDecimals !== undefined) big = big.round(maxDecimals, 1);
+  const fixed = big.toFixed();
+  const trimmed = fixed.includes('.')
+    ? fixed.replace(/0+$/, '').replace(/\.$/, '')
+    : fixed;
+  return trimmed.replace('.', ',');
+};
 
 const pad = (n: number, width = 2): string => String(n).padStart(width, '0');
 
@@ -77,16 +89,48 @@ const capitalise = (text: string): string => {
   return clean.charAt(0).toUpperCase() + clean.slice(1);
 };
 
-const symbolOf = (assetId: string): string =>
-  (assetId.split(':').pop() ?? assetId).toUpperCase();
+/** The register's symbol; an id with no known symbol (an ERC-20) falls
+ *  back to its shortened address. */
+const symbolOf = (assetId: string): string => {
+  const symbol = knownSymbolOf(assetId);
+  if (symbol !== assetId) return symbol;
+  const last = assetId.split(':').pop() ?? assetId;
+  return last.length > 12 ? `${last.slice(0, 6)}…${last.slice(-3)}` : last;
+};
+
+const MAX_TEXT = 60;
+
+/** `<label> <amount> <SYMBOL> [venue]`, within 60 characters: the amount
+ *  loses decimals first (down to 8), then the venue is shortened. */
+const bookingText = (
+  label: string,
+  amountBase: string,
+  assetId: string,
+  venue?: string,
+): string => {
+  const whole = toWholeUnits(amountBase, assetId);
+  const symbol = symbolOf(assetId);
+  const venueLabel = venue === undefined ? '' : capitalise(venue);
+  const build = (amount: string, v: string): string =>
+    cleanText([label, amount, symbol, v].filter(Boolean).join(' '));
+  let amount = plainDe(whole);
+  let text = build(amount, venueLabel);
+  if (text.length > MAX_TEXT) {
+    amount = plainDe(whole, 8);
+    text = build(amount, venueLabel);
+  }
+  if (text.length > MAX_TEXT && venueLabel) {
+    const room = MAX_TEXT - build(amount, '').length - 1;
+    text = build(amount, room > 0 ? venueLabel.slice(0, room).trim() : '');
+  }
+  return text.slice(0, MAX_TEXT);
+};
 
 const belegfeld1Of = (eventId: string): string =>
   eventId
     .slice(0, 12)
     .replace(/[^A-Za-z0-9$&%*+\-/]/g, '')
     .slice(0, 36);
-
-const buchungstextOf = (text: string): string => cleanText(text).slice(0, 60);
 
 export const postingsFromReport = (
   report: TaxReport,
@@ -106,8 +150,11 @@ export const postingsFromReport = (
       gegenkonto: loss ? verlust23 : gewinn23,
       belegdatum: ddmm(line.timestamp),
       belegfeld1: belegfeld1Of(line.disposalEventId),
-      buchungstext: buchungstextOf(
-        `Verkauf ${plainDe(line.amount)} ${symbolOf(line.assetId)} ${capitalise(line.venue)}`,
+      buchungstext: bookingText(
+        'Verkauf',
+        line.amount,
+        line.assetId,
+        line.venue,
       ),
     });
   }
@@ -123,9 +170,7 @@ export const postingsFromReport = (
       gegenkonto: einkuenfte22,
       belegdatum: ddmm(income.timestamp),
       belegfeld1: belegfeld1Of(income.sourceEventId),
-      buchungstext: buchungstextOf(
-        `${label} ${plainDe(income.amount)} ${symbolOf(income.assetId)}`,
-      ),
+      buchungstext: bookingText(label, income.amount, income.assetId),
     });
   }
 
@@ -164,7 +209,7 @@ export const buchungsstapel = (
     String(datev.sachkontenlaenge),
     `${year}0101`,
     `${year}1231`,
-    quote(`Coineda §23/§22 ${year} ${fingerprint12(meta.fingerprint)}`),
+    quote(`Coineda ${year} ${fingerprint12(meta.fingerprint)}`),
     '',
     '1',
     '0',
@@ -224,6 +269,7 @@ export const validateDatevSettings = (
   if (!lengthOk) {
     issues.push({ field: 'sachkontenlaenge', key: 'Must be 4–8 digits' });
   }
+  if (!lengthOk) return issues;
   for (const name of [
     'verrechnung',
     'gewinn23',
@@ -231,15 +277,12 @@ export const validateDatevSettings = (
     'einkuenfte22',
   ] as const) {
     const v = d?.konten?.[name];
-    const ok =
-      typeof v === 'string' &&
-      DIGITS.test(v) &&
-      (lengthOk ? v.length === length : true);
+    const ok = typeof v === 'string' && DIGITS.test(v) && v.length === length;
     if (!ok) {
       issues.push({
         field: `konten.${name}`,
         key: 'Must be {{length}} digits',
-        params: { length: lengthOk ? length : 0 },
+        params: { length },
       });
     }
   }
