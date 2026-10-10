@@ -10,8 +10,8 @@ import { fetchEvents, probe } from './translator';
  *
  * The translation itself lives in src/sources/bitcoin-esplora/translator.ts,
  * including the fallback for an empty base URL (`baseUrlOf`, which reads
- * `resolveEndpoints().bitcoinEsplora` from src/config/endpoints.ts - the one
- * place every outbound host is defined).
+ * `fallbackBaseUrl('bitcoinEsplora')` - the restricted-aware endpoints,
+ * whose hosts are all defined in src/config/endpoints.ts).
  */
 export const bitcoinEsplora: SourceModule = {
   manifest: {

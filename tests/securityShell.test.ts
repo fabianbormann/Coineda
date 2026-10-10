@@ -30,6 +30,9 @@ describe('shell security gate', () => {
     'nodeIntegration: false',
     'sandbox: true',
     'webSecurity: true',
+    // Electron's spellchecker downloads hunspell dictionaries from a Google
+    // CDN (Linux, and Windows with hunspell): an egress outside the inventory.
+    'spellcheck: false',
     'setWindowOpenHandler',
     'shell.openExternal',
     'will-navigate',

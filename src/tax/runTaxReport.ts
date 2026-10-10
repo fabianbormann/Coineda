@@ -286,7 +286,7 @@ export const runTaxReport = async (
     taxEvents.push(...produced);
   }
 
-  const { valued, unpriced, queried } = await resolveValues(
+  const { valued, unpriced, contacted } = await resolveValues(
     taxEvents,
     options.baseCurrency,
     endpointSnapshot,
@@ -576,20 +576,15 @@ export const runTaxReport = async (
       event.id.endsWith(FEE_RESIDUAL_SUFFIX),
     ).length,
     egress: snapshotMode,
-    // Restricted: every configured service. Public: only what this run
-    // asked - the price and rate services, and only if a price was fetched.
-    endpoints: endpointHosts(
-      snapshotMode === 'restricted'
-        ? endpointSnapshot
-        : queried
-          ? {
-              ...BLANK_ENDPOINTS,
-              priceHistory: endpointSnapshot.priceHistory,
-              spotPrices: endpointSnapshot.spotPrices,
-              fx: endpointSnapshot.fx,
-            }
-          : BLANK_ENDPOINTS,
-    ),
+    // In either mode, exactly the services this run sent a request to: a
+    // configured indexer or token registry is never one (a tax run contacts
+    // neither), nor is a provider the fallback chain never reached.
+    endpoints: endpointHosts({
+      ...BLANK_ENDPOINTS,
+      ...Object.fromEntries(
+        [...contacted].map((key) => [key, endpointSnapshot[key]]),
+      ),
+    }),
   };
 
   // The events dropped as internal transfers: the single-event shape and

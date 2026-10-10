@@ -1310,9 +1310,12 @@ export const TaxReportScreen = () => {
                             0 && (
                             <>
                               {' · '}
-                              {Object.values(assessment.method.endpoints).join(
-                                ' · ',
-                              )}
+                              {/* Several services on one gateway name it once. */}
+                              {[
+                                ...new Set(
+                                  Object.values(assessment.method.endpoints),
+                                ),
+                              ].join(' · ')}
                             </>
                           )}
                       </p>

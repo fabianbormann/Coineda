@@ -97,7 +97,7 @@ const lookUp = async (
   pairs: Map<string, { assetId: string; date: string }>,
   currency: string,
   endpoints: Endpoints,
-  onQuery: () => void,
+  contacted: Set<keyof Endpoints>,
 ): Promise<Map<string, DayResult>> => {
   const settings = await getSettings();
   const apiKey = settings?.coingeckoApiKey;
@@ -148,13 +148,11 @@ const lookUp = async (
   // free tier refuses anything older than 365 days, and an acquisition
   // three years before its disposal is exactly the figure a cost basis
   // needs.
-  if (missing.size > 0) {
-    onQuery();
-  }
   const {
     prices: fetched,
     sources,
     failures,
+    contacted: asked,
   } = await fetchHistory(
     missing,
     currency,
@@ -164,6 +162,9 @@ const lookUp = async (
     // is blank, and its prices come back missing.
     endpoints,
   );
+  for (const key of asked) {
+    contacted.add(key);
+  }
 
   // Still matches the CoinGecko path: with a key, no day is refused locally.
   const cutoff = apiKey ? Number.NEGATIVE_INFINITY : freeTierCutoff();
@@ -227,11 +228,12 @@ export const resolveValues = async (
 ): Promise<{
   valued: TaxEvent[];
   unpriced: UnresolvedItem[];
-  /** Whether any price provider was asked (a fully cached or base-currency
-   *  run asks none), so the report names only the hosts it used. */
-  queried: boolean;
+  /** The endpoint keys a request was actually sent to (a fully cached or
+   *  base-currency run sends none), so the report names only the hosts it
+   *  used. */
+  contacted: Set<keyof Endpoints>;
 }> => {
-  let queried = false;
+  const contacted = new Set<keyof Endpoints>();
   const baseFiatAssetId = `fiat:${currency}`;
 
   // Every (asset, day) pair the run needs, deduplicated: each event's own
@@ -269,9 +271,7 @@ export const resolveValues = async (
   const results =
     pairs.size === 0
       ? new Map<string, DayResult>()
-      : await lookUp(pairs, currency, endpoints, () => {
-          queried = true;
-        });
+      : await lookUp(pairs, currency, endpoints, contacted);
 
   /** The base-currency value of `amount` of `assetId` on the event's day,
    *  or the reason there is none. */
@@ -371,5 +371,5 @@ export const resolveValues = async (
     valued.push({ ...taxEvent, value: own.value, priceSource, costs });
   }
 
-  return { valued, unpriced, queried };
+  return { valued, unpriced, contacted };
 };

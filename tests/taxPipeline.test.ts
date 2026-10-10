@@ -1346,6 +1346,40 @@ describe('the egress statement of a run', () => {
     expect(report.method.endpoints.priceHistory).toBe('prices.start.example');
   });
 
+  it('lists only the services a request was sent to', async () => {
+    // A fiat-only run in another fiat currency: the ECB rate is the only
+    // request, so neither price provider may be named.
+    await putEvents([
+      ledgerEvent({
+        id: 'usd',
+        externalId: 'usd',
+        legs: [
+          {
+            assetId: 'fiat:usd',
+            amount: '10',
+            direction: 'in',
+            venue: 'wallet-a',
+            role: 'principal',
+          },
+        ],
+      }),
+    ]);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ rates: { '2025-06-01': { EUR: 0.9 } } }),
+          ),
+      ),
+    );
+    const report = await runTaxReport(stubModule, {
+      year: 2025,
+      baseCurrency: 'eur',
+    });
+    expect(report.method.endpoints).toEqual({ fx: 'api.frankfurter.dev' });
+  });
+
   it('lists no data host when no price was fetched', async () => {
     await putEvents([
       ledgerEvent({

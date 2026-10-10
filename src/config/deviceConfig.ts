@@ -15,7 +15,8 @@ import type { EgressMode, Endpoints } from './endpoints';
  * Precedence is applied by src/config/endpoints.ts: a build's
  * `VITE_EGRESS=restricted` beats the device mode, and a build's
  * `VITE_ENDPOINTS` beats the device endpoints, which beat the public
- * defaults.
+ * defaults - and a build pinned restricted ignores the device endpoints
+ * altogether.
  */
 export const EGRESS_KEY = 'coineda.egress';
 export const ENDPOINTS_KEY = 'coineda.endpoints';

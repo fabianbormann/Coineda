@@ -1,11 +1,12 @@
 /// <reference types="vitest/config" />
 import path from 'node:path';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv, type UserConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import { cspPlugin } from './src/security/cspPlugin';
+import { validateEgressEnv } from './src/config/validateEnv';
 
 /**
  * TLS on the dev server, for testing on a real phone over the LAN.
@@ -26,7 +27,7 @@ import { cspPlugin } from './src/security/cspPlugin';
  */
 const devHttps = process.env.COINEDA_DEV_HTTPS === '1';
 
-export default defineConfig({
+const config = {
   // Relative base: one build has to work from Electron's file:// window AND
   // from the /Coineda/ subpath on GitHub Pages. Combined with HashRouter this
   // means no server-side rewrites are ever needed.
@@ -138,4 +139,14 @@ export default defineConfig({
      */
     env: { TZ: 'America/New_York' },
   },
+} satisfies UserConfig;
+
+export default defineConfig(({ mode }) => {
+  // An operator's egress settings are checked here, at build time: at
+  // runtime a mistyped VITE_EGRESS silently ships a public build and a
+  // malformed VITE_ENDPOINTS only warns in the user's console. loadEnv
+  // merges .env files with process.env (process.env wins), matching what
+  // the app itself will see in import.meta.env.
+  validateEgressEnv(loadEnv(mode, process.cwd(), 'VITE_'));
+  return config;
 });

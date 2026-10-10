@@ -1,5 +1,6 @@
 import Big from 'big.js';
-import { defaultEndpoints, type Endpoints } from '@/config/endpoints';
+import type { Endpoints } from '@/config/endpoints';
+import { activeEndpoints } from '@/config/egress';
 
 /**
  * Euro-area reference rates, for turning DefiLlama's USD quotes into the
@@ -64,7 +65,7 @@ export const fetchRates = async (
   from: string,
   to: string,
   signal?: AbortSignal,
-  endpoints: Endpoints = defaultEndpoints(),
+  endpoints: Endpoints = activeEndpoints(),
 ): Promise<Map<string, string>> => {
   const rates = new Map<string, string>();
   const days = [...new Set(isoDates)].sort();
@@ -138,6 +139,6 @@ export const fetchUsdRates = (
   isoDates: string[],
   currency: string,
   signal?: AbortSignal,
-  endpoints: Endpoints = defaultEndpoints(),
+  endpoints: Endpoints = activeEndpoints(),
 ): Promise<Map<string, string>> =>
   fetchRates(isoDates, 'usd', currency, signal, endpoints);

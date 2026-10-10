@@ -1,9 +1,10 @@
 import Big from 'big.js';
-import { defaultEndpoints, type Endpoints } from '@/config/endpoints';
+import type { Endpoints } from '@/config/endpoints';
+import { activeEndpoints } from '@/config/egress';
 import { COINGECKO_IDS } from './coingecko';
 
 /**
- * DefiLlama's coins API (https://coins.llama.fi), as the historical price
+ * DefiLlama's coins API (coins.llama.fi), as the historical price
  * source for days CoinGecko's free tier refuses.
  *
  * Measured live on 2026-10-05, and four facts chose it over the
@@ -87,7 +88,7 @@ export const pairKey = (assetId: string, date: string): string =>
 export const fetchUsdHistory = async (
   wanted: Map<string, string[]>,
   signal?: AbortSignal,
-  endpoints: Endpoints = defaultEndpoints(),
+  endpoints: Endpoints = activeEndpoints(),
 ): Promise<Map<string, string>> => {
   const prices = new Map<string, string>();
   // No price-history service available (restricted egress): nothing is

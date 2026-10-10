@@ -183,13 +183,24 @@ the `OPTIONS` preflight for requests with a custom header or a JSON body:
 Services must be served over **HTTPS**: the app's Content-Security-Policy (`public/csp.json`) allows
 `connect-src 'self' https:`, so an `http://` endpoint is refused by the browser. Port numbers are fine.
 
+That `connect-src 'self' https:` is the floor shipped for the public build, not a fence around your hosts:
+it admits any HTTPS host. For an authority build, narrow it in your copy of `public/csp.json` to `'self'`
+plus exactly your service origins (for example `connect-src 'self' https://prices.internal.example
+https://fx.internal.example`) before you build. The browser then enforces the same list restricted mode
+keeps to, independently of the app's own code. The PWA's meta tag and the desktop shell's header are both
+generated from that file.
+
 ## Building an authority build
 
 Two build-time variables, both read by Vite and baked into the bundle:
 
-- `VITE_ENDPOINTS` - a JSON object with any subset of the keys above. Unknown keys and empty values are
-  ignored; invalid JSON logs a warning and falls back to the public defaults (so check the build output).
-- `VITE_EGRESS=restricted` - pins restricted mode. A user cannot switch a restricted build back to public.
+- `VITE_ENDPOINTS` - a JSON object with any subset of the keys above, each value an `https://` URL. The
+  build fails on an invalid value: invalid JSON, a non-object, an unknown key or a value that is not an
+  `https://` URL stops `npm run build` with an error naming the problem.
+- `VITE_EGRESS=restricted` - pins restricted mode. A user cannot switch a restricted build back to public,
+  and the device's own endpoint overrides are ignored entirely: only the keys in `VITE_ENDPOINTS` are
+  contacted. The build fails on an invalid value: only `public`, `restricted` or unset are accepted, so a
+  typo such as `Restricted` cannot silently produce a public build.
 
 ```bash
 export VITE_ENDPOINTS='{
@@ -250,7 +261,10 @@ else is ever contacted:
 ## What the method sheet shows
 
 Every tax report's method sheet carries an **Egress** line. A public build prints `Egress: public`. A
-restricted build prints `Egress: restricted` followed by the host of each configured service the report
-used (host names only - no paths, no keys). The JSON register export carries the same as `method.egress`
-and `method.endpoints`, so an auditor can confirm from the report itself that it was produced without
-third-party calls, and against which services.
+restricted build prints `Egress: restricted` followed by the host of each service the run actually sent
+a request to (host names only - no paths, no keys; a gateway serving several services is named once). A
+configured service the run never reached - an indexer, the token registry, a fallback price provider that
+was not needed - is not listed, and prices served from the local cache add no host. The JSON register
+export carries the same as `method.egress` and `method.endpoints` (keyed by service, in both modes), so an
+auditor can confirm from the report itself that it was produced without third-party calls, and against
+which services.

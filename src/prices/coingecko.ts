@@ -1,5 +1,6 @@
 import { ASSET_CATALOGUE } from '@/assets/catalogue';
-import { defaultEndpoints, type Endpoints } from '@/config/endpoints';
+import type { Endpoints } from '@/config/endpoints';
+import { activeEndpoints } from '@/config/egress';
 
 /**
  * CoinGecko is the only price provider. Native `fetch` only - `axios` was
@@ -37,7 +38,7 @@ export const COINGECKO_IDS: Record<string, string> = Object.fromEntries(
 export const fetchSpotPrices = async (
   assetIds: string[],
   currency: string,
-  endpoints: Endpoints = defaultEndpoints(),
+  endpoints: Endpoints = activeEndpoints(),
 ): Promise<Map<string, string>> => {
   const assetsByCoinId = new Map<string, string>();
   for (const assetId of assetIds) {
@@ -183,7 +184,7 @@ export const fetchHistoricalPrices = async (
   currency: string,
   isoDates: string[],
   apiKey?: string,
-  endpoints: Endpoints = defaultEndpoints(),
+  endpoints: Endpoints = activeEndpoints(),
 ): Promise<Map<string, string>> => {
   const prices = new Map<string, string>();
   const coinId = COINGECKO_IDS[assetId];
@@ -268,7 +269,7 @@ export const fetchHistoricalPrice = async (
   currency: string,
   isoDate: string,
   apiKey?: string,
-  endpoints: Endpoints = defaultEndpoints(),
+  endpoints: Endpoints = activeEndpoints(),
 ): Promise<string | null> => {
   const coinId = COINGECKO_IDS[assetId];
   if (!coinId || endpoints.spotPrices === '') {

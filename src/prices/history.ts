@@ -1,9 +1,19 @@
 import Big from 'big.js';
-import { fetchHistoricalPrices } from './coingecko';
-import { fetchUsdHistory, pairKey } from './defillama';
+import {
+  COINGECKO_IDS,
+  fetchHistoricalPrices,
+  freeTierCutoff,
+} from './coingecko';
+import {
+  defillamaCoin,
+  fetchUsdHistory,
+  pairKey,
+  utcMidnight,
+} from './defillama';
 import { fetchRates, fetchUsdRates } from './ecb';
 import { isFiatAsset } from '@/ledger/balances';
-import { defaultEndpoints, type Endpoints } from '@/config/endpoints';
+import type { Endpoints } from '@/config/endpoints';
+import { activeEndpoints } from '@/config/egress';
 
 export { pairKey };
 
@@ -37,6 +47,11 @@ export type HistoryResult = {
    *  caller can explain why a day is missing. Absent when a source simply
    *  had no data, which is a different thing from a source that failed. */
   failures: Map<string, unknown>;
+  /** The endpoint keys this call sent at least one request to - not the
+   *  ones it merely could have used. A run's method sheet names exactly
+   *  these hosts. Each entry is added where the request is issued, under
+   *  the same conditions the fetcher itself checks before it fetches. */
+  contacted: Set<keyof Endpoints>;
 };
 
 /**
@@ -54,14 +69,15 @@ export const fetchHistory = async (
   currency: string,
   apiKey?: string,
   signal?: AbortSignal,
-  endpoints: Endpoints = defaultEndpoints(),
+  endpoints: Endpoints = activeEndpoints(),
 ): Promise<HistoryResult> => {
   const prices = new Map<string, string>();
   const sources = new Map<string, PriceSource>();
   const failures = new Map<string, unknown>();
+  const contacted = new Set<keyof Endpoints>();
 
   if (wanted.size === 0) {
-    return { prices, sources, failures };
+    return { prices, sources, failures, contacted };
   }
 
   // Fiat assets first and separately: a `fiat:usd` consideration is priced
@@ -75,6 +91,14 @@ export const fetchHistory = async (
       continue;
     }
     const ccy = assetId.slice('fiat:'.length);
+    // fetchRates asks nobody for the same currency or without a service.
+    if (
+      dates.length > 0 &&
+      ccy.toLowerCase() !== currency.toLowerCase() &&
+      endpoints.fx !== ''
+    ) {
+      contacted.add('fx');
+    }
     try {
       const rates = await fetchRates(dates, ccy, currency, signal, endpoints);
       for (const date of dates) {
@@ -89,7 +113,7 @@ export const fetchHistory = async (
     }
   }
   if (crypto.size === 0) {
-    return { prices, sources, failures };
+    return { prices, sources, failures, contacted };
   }
 
   const everyDay = [...new Set([...crypto.values()].flat())];
@@ -107,6 +131,16 @@ export const fetchHistory = async (
   const primaryAvailable =
     endpoints.priceHistory !== '' &&
     (endpoints.fx !== '' || currency.toLowerCase() === 'usd');
+  if (primaryAvailable) {
+    // fetchUsdHistory asks only for assets DefiLlama can name, and a USD
+    // base needs no rate request.
+    if ([...crypto.keys()].some((assetId) => defillamaCoin(assetId) !== null)) {
+      contacted.add('priceHistory');
+    }
+    if (currency.toLowerCase() !== 'usd') {
+      contacted.add('fx');
+    }
+  }
   try {
     if (primaryAvailable) {
       [usd, rates] = await Promise.all([
@@ -145,6 +179,17 @@ export const fetchHistory = async (
     if (outstanding.length === 0) {
       continue;
     }
+    // fetchHistoricalPrices declines locally - without a request - an asset
+    // it cannot name, a missing service, and (keyless) every day older than
+    // the free tier.
+    const cutoff = apiKey ? Number.NEGATIVE_INFINITY : freeTierCutoff();
+    if (
+      COINGECKO_IDS[assetId] &&
+      endpoints.spotPrices !== '' &&
+      outstanding.some((date) => utcMidnight(date) >= cutoff)
+    ) {
+      contacted.add('spotPrices');
+    }
     try {
       const fetched = await fetchHistoricalPrices(
         assetId,
@@ -169,5 +214,5 @@ export const fetchHistory = async (
     }
   }
 
-  return { prices, sources, failures };
+  return { prices, sources, failures, contacted };
 };

@@ -1,4 +1,5 @@
-import { defaultEndpoints, resolveEndpoints } from '@/config/endpoints';
+import { defaultEndpoints } from '@/config/endpoints';
+import { fallbackBaseUrl } from '@/sources/egress';
 import type { SourceModule } from '@/sources/types';
 import {
   fetchCardanoEvents,
@@ -30,7 +31,7 @@ const provider: CardanoProvider = {
   // Handles all three states an optional field can be stored in - empty
   // string, whitespace, or absent from config entirely. See the `optional`
   // doc comment on ManifestField.
-  host: (config) => config.baseUrl?.trim() || resolveEndpoints().cardanoYaci,
+  host: (config) => config.baseUrl?.trim() || fallbackBaseUrl('cardanoYaci'),
   apiPath: '/api/v1',
   headers: () => ({}),
   exampleHost: defaultEndpoints().cardanoYaci,

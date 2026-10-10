@@ -15,6 +15,10 @@ import { readDeviceEgress, readDeviceEndpoints } from './deviceConfig';
  *   2. the device's overrides (src/config/deviceConfig.ts), at runtime;
  *   3. `import.meta.env.VITE_ENDPOINTS` - a JSON object fixed at build time,
  *      which wins: an operator's build is not loosened from a settings card.
+ * A build pinned `VITE_EGRESS=restricted` drops layer 2 entirely: only the
+ * operator's VITE_ENDPOINTS and the public defaults (which restricted mode
+ * treats as unconfigured) remain, so nothing stored on the device can add a
+ * host the operator did not name.
  * With neither 2 nor 3 set, behaviour is byte-identical to the constants
  * this replaced.
  */
@@ -122,14 +126,27 @@ const envOverrides = (): object => {
 export const defaultEndpoints = (): Endpoints =>
   overlay(PUBLIC_ENDPOINTS, envOverrides());
 
+/** Whether the build pins `VITE_EGRESS=restricted` (vite.config.ts refuses
+ *  any value but `public`, `restricted` or unset, so no case variant ships). */
+export const buildPinsRestricted = (): boolean =>
+  import.meta.env.VITE_EGRESS?.trim() === 'restricted';
+
 /**
  * The endpoints in force: the public defaults, overlaid by the device's
  * overrides, overlaid by the build's VITE_ENDPOINTS. `device` defaults to
- * what this device stores; tests pass it explicitly.
+ * what this device stores; tests pass it explicitly. In a build pinned
+ * restricted the device layer is ignored entirely (whatever is passed or
+ * stored): an operator's build names every host it may contact.
  */
-export const resolveEndpoints = (
-  device: Partial<Endpoints> = readDeviceEndpoints(),
-): Endpoints => overlay(overlay(PUBLIC_ENDPOINTS, device), envOverrides());
+export const resolveEndpoints = (device?: Partial<Endpoints>): Endpoints => {
+  if (buildPinsRestricted()) {
+    return defaultEndpoints();
+  }
+  return overlay(
+    overlay(PUBLIC_ENDPOINTS, device ?? readDeviceEndpoints()),
+    envOverrides(),
+  );
+};
 
 /**
  * A build pinned `VITE_EGRESS=restricted` stays restricted whatever the
@@ -142,23 +159,39 @@ export const resolveEndpoints = (
 export const egressMode = (
   device: EgressMode = readDeviceEgress(),
 ): EgressMode => {
-  if (import.meta.env.VITE_EGRESS?.trim() === 'restricted') {
+  if (buildPinsRestricted()) {
     return 'restricted';
   }
   return device === 'restricted' ? 'restricted' : 'public';
+};
+
+/** A base URL in comparable form: scheme and host lower-cased and a
+ *  default port dropped (both by `URL`), trailing slashes stripped. An
+ *  unparsable value is only trimmed and stripped. */
+const canonical = (value: string): string => {
+  const trimmed = normalise(value);
+  try {
+    const url = new URL(trimmed);
+    return normalise(`${url.protocol}//${url.host}${url.pathname}`);
+  } catch {
+    return trimmed;
+  }
 };
 
 /**
  * Whether `key` points somewhere an operator chose, rather than at the
  * public default. In restricted mode a public default counts as "not
  * configured": the build (or the user) has not named a service for it.
+ * Compared in canonical form, so an upper-case host, a default port or a
+ * trailing slash on a public default is still the public default, not an
+ * operator's choice.
  */
 export const isConfigured = (
   endpoints: Endpoints,
   key: keyof Endpoints,
 ): boolean => {
   const value = normalise(endpoints[key] ?? '');
-  return value !== '' && value !== PUBLIC_ENDPOINTS[key];
+  return value !== '' && canonical(value) !== canonical(PUBLIC_ENDPOINTS[key]);
 };
 
 /** The hosts (`host`, port included) the endpoints point at. In restricted

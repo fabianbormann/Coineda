@@ -1,5 +1,5 @@
 import { allowedHosts, type Endpoints } from '@/config/endpoints';
-import { egressOf, type EgressConfig } from '@/config/egress';
+import { activeEndpoints, egressOf, type EgressConfig } from '@/config/egress';
 import type { SourceModule } from './types';
 
 /**
@@ -18,6 +18,21 @@ export class EgressRefusedError extends Error {
     this.name = 'EgressRefusedError';
   }
 }
+
+/**
+ * A module's own base URL when its config leaves `baseUrl` empty - the
+ * fallback for a call that skipped `prepareRun`. Read from the
+ * restricted-aware `activeEndpoints()`, so in restricted mode an
+ * unconfigured service refuses (before any request) instead of falling
+ * back to its public host or becoming a relative URL.
+ */
+export const fallbackBaseUrl = (key: keyof Endpoints): string => {
+  const base = activeEndpoints()[key];
+  if (base === '') {
+    throw new EgressRefusedError();
+  }
+  return base;
+};
 
 const hasBaseUrlField = (module: SourceModule): boolean =>
   module.manifest.fields.some((field) => field.name === 'baseUrl');

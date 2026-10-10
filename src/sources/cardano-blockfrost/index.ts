@@ -1,4 +1,5 @@
-import { defaultEndpoints, resolveEndpoints } from '@/config/endpoints';
+import { defaultEndpoints } from '@/config/endpoints';
+import { fallbackBaseUrl } from '@/sources/egress';
 import type { SourceModule } from '@/sources/types';
 import {
   fetchCardanoEvents,
@@ -75,7 +76,7 @@ import {
 
 const provider: CardanoProvider = {
   host: (config) =>
-    config.baseUrl?.trim() || resolveEndpoints().cardanoBlockfrost,
+    config.baseUrl?.trim() || fallbackBaseUrl('cardanoBlockfrost'),
   apiPath: '/api/v0',
   exampleHost: defaultEndpoints().cardanoBlockfrost,
   // The credential goes in a header, never the URL: a project id in a query

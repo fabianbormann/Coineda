@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { ClientContext } from '@/clients/ClientContext';
 import {
   PUBLIC_ENDPOINTS,
+  buildPinsRestricted,
   defaultEndpoints,
   resolveEndpoints,
   type Endpoints,
@@ -47,7 +48,7 @@ const isHttps = (value: string): boolean => {
 export const EndpointsSettingsCard = () => {
   const { t } = useTranslation();
   const readOnly = useContext(ClientContext)?.readOnly ?? false;
-  const pinned = import.meta.env.VITE_EGRESS?.trim() === 'restricted';
+  const pinned = buildPinsRestricted();
   const [values, setValues] = useState<Partial<Endpoints>>(() =>
     readDeviceEndpoints(),
   );

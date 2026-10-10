@@ -1,4 +1,4 @@
-import { resolveEndpoints } from '@/config/endpoints';
+import { fallbackBaseUrl } from '@/sources/egress';
 import type { Leg } from '@/ledger/types';
 import type { DerivedEvent, FetchPage, ProbeResult } from '@/sources/types';
 import { fetchJson, probeRoute } from '@/sources/http';
@@ -81,11 +81,11 @@ export const BITCOIN_ESPLORA_MESSAGES = {
 } as const;
 
 /** The base URL, normalised. Unlike Cardano's providers this is the full API
- *  root already (e.g. `https://blockstream.info/api`) - Esplora has no
+ *  root already (e.g. `blockstream.info/api`) - Esplora has no
  *  separate host/API-path split to validate, so there is no `apiRoot`/
  *  `HostShapeError` use here. */
 export const baseUrlOf = (config: Record<string, string>): string =>
-  (config.baseUrl?.trim() || resolveEndpoints().bitcoinEsplora).replace(
+  (config.baseUrl?.trim() || fallbackBaseUrl('bitcoinEsplora')).replace(
     /\/+$/,
     '',
   );

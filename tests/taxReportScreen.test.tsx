@@ -3391,17 +3391,63 @@ describe('the egress line on the method sheet', () => {
     expect(screen.queryByText(/yaci|blockstream/i)).toBeNull();
   });
 
-  it('states the restricted mode and lists the configured host', async () => {
+  /** A crypto acquisition in mid-2025: priced by a provider, and older
+   *  than CoinGecko's keyless free tier, which declines it locally. */
+  const adaEvent = ledgerEvent({
+    id: 'ada',
+    externalId: 'ada',
+    legs: [
+      {
+        assetId: 'cardano:lovelace',
+        amount: '1000000',
+        direction: 'in',
+        venue: 'wallet-a',
+        role: 'principal',
+      },
+    ],
+  });
+
+  it('states the restricted mode and lists only the configured hosts the run used', async () => {
     writeDeviceEgress('restricted');
-    writeDeviceEndpoints({ fx: 'https://fx.example.gov/v1' });
+    // Price history and FX are asked. Spot prices is configured but never
+    // reached (the day is older than the keyless free tier, declined
+    // locally), and a tax run never contacts an indexer.
+    writeDeviceEndpoints({
+      priceHistory: 'https://prices.example.gov',
+      fx: 'https://fx.example.gov/v1',
+      spotPrices: 'https://cg.example.gov/api/v3',
+      ethereumBlockscout: 'https://indexer.example.gov',
+    });
+    vi.stubGlobal('fetch', flatRange(1));
     taxRegistry.push(makeModule());
-    await putEvents([acquisitionEvent, disposalEvent]);
+    await putEvents([adaEvent]);
     renderScreen();
     await runReport('2025');
 
     const line = screen.getByText('Egress: restricted');
+    expect(line.parentElement).toHaveTextContent('prices.example.gov');
     expect(line.parentElement).toHaveTextContent('fx.example.gov');
     expect(line.parentElement).not.toHaveTextContent('/v1');
+    expect(line.parentElement).not.toHaveTextContent('cg.example.gov');
+    expect(line.parentElement).not.toHaveTextContent('indexer.example.gov');
+  });
+
+  it('names a shared gateway once', async () => {
+    writeDeviceEgress('restricted');
+    writeDeviceEndpoints({
+      priceHistory: 'https://gw.example.gov/llama',
+      fx: 'https://gw.example.gov/fx',
+    });
+    vi.stubGlobal('fetch', flatRange(1));
+    taxRegistry.push(makeModule());
+    await putEvents([adaEvent]);
+    renderScreen();
+    await runReport('2025');
+
+    const line = screen.getByText('Egress: restricted');
+    expect(
+      line.parentElement?.textContent?.match(/gw\.example\.gov/g),
+    ).toHaveLength(1);
   });
 });
 

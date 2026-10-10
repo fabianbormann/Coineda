@@ -1,4 +1,4 @@
-import { resolveEndpoints } from '@/config/endpoints';
+import { fallbackBaseUrl } from '@/sources/egress';
 import Big from 'big.js';
 import type { DerivedEvent, FetchPage, ProbeResult } from '@/sources/types';
 import type { Leg } from '@/ledger/types';
@@ -51,7 +51,7 @@ export const baseUrlOf = (config: Record<string, string>): string => {
   // one, rather than producing `//api/v2/...` for anyone who pasted a URL
   // the way a browser shows it.
   return (
-    configured === '' ? resolveEndpoints().ethereumBlockscout : configured
+    configured === '' ? fallbackBaseUrl('ethereumBlockscout') : configured
   ).replace(/\/+$/, '');
 };
 

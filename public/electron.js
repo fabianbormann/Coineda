@@ -83,6 +83,12 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: true,
       webSecurity: true,
+      // Electron's spellchecker downloads its hunspell dictionaries from a
+      // Google CDN (on Linux, and on Windows when hunspell is used), from the
+      // browser process where the page CSP does not reach: an outbound host
+      // no endpoint setting or restricted build could control. The app has
+      // almost no free-text input, so it is simply off.
+      spellcheck: false,
     },
   });
 

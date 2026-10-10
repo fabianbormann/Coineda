@@ -1,5 +1,6 @@
 import { subjectOf } from './cardanoAsset';
-import { defaultEndpoints, type Endpoints } from '@/config/endpoints';
+import type { Endpoints } from '@/config/endpoints';
+import { activeEndpoints } from '@/config/egress';
 
 /**
  * The Cardano Token Metadata Registry (CIP-26), at tokens.cardano.org.
@@ -129,7 +130,7 @@ const chunk = <T>(items: T[], size: number): T[][] => {
 export const fetchTokenMeta = async (
   subjects: string[],
   signal?: AbortSignal,
-  endpoints: Endpoints = defaultEndpoints(),
+  endpoints: Endpoints = activeEndpoints(),
 ): Promise<Map<string, TokenMeta>> => {
   const result = new Map<string, TokenMeta>();
   const wanted = [...new Set(subjects.map((s) => s.toLowerCase()))];

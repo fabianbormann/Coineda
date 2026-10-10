@@ -149,6 +149,42 @@ describe('egressMode', () => {
   });
 });
 
+describe('a build pinned VITE_EGRESS=restricted', () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it('ignores a device override for a key the build leaves out', () => {
+    vi.stubEnv('VITE_EGRESS', 'restricted');
+    vi.stubEnv('VITE_ENDPOINTS', '{"fx":"https://fx.operator.example"}');
+    const endpoints = resolveEndpoints({ spotPrices: 'https://x.example' });
+    expect(endpoints.spotPrices).toBe(PUBLIC_ENDPOINTS.spotPrices);
+    expect(endpoints.fx).toBe('https://fx.operator.example');
+    expect(isConfigured(endpoints, 'spotPrices')).toBe(false);
+    expect(allowedHosts(endpoints, 'restricted')).toEqual(
+      new Set(['fx.operator.example']),
+    );
+  });
+
+  it('ignores the stored device overrides too', () => {
+    vi.stubEnv('VITE_EGRESS', 'restricted');
+    vi.stubEnv('VITE_ENDPOINTS', '');
+    localStorage.setItem(
+      'coineda.endpoints',
+      JSON.stringify({ spotPrices: 'https://x.example' }),
+    );
+    expect(resolveEndpoints()).toEqual(PUBLIC_ENDPOINTS);
+    expect(allowedHosts(resolveEndpoints(), 'restricted').size).toBe(0);
+  });
+
+  it('still applies the device overrides in an unpinned build', () => {
+    vi.stubEnv('VITE_EGRESS', '');
+    expect(
+      resolveEndpoints({ spotPrices: 'https://x.example' }).spotPrices,
+    ).toBe('https://x.example');
+  });
+});
+
 describe('allowedHosts', () => {
   it('returns the host names of every endpoint', () => {
     expect(allowedHosts(PUBLIC_ENDPOINTS)).toEqual(
@@ -218,6 +254,17 @@ describe('isConfigured', () => {
 
   it('is false for an empty value', () => {
     expect(isConfigured({ ...PUBLIC_ENDPOINTS, fx: '' }, 'fx')).toBe(false);
+  });
+
+  it('sees through a case or trailing-slash variant of the public default', () => {
+    const endpoints = {
+      ...PUBLIC_ENDPOINTS,
+      spotPrices: 'https://API.COINGECKO.COM/api/v3/',
+      priceHistory: 'https://Coins.Llama.FI:443',
+    };
+    expect(isConfigured(endpoints, 'spotPrices')).toBe(false);
+    expect(isConfigured(endpoints, 'priceHistory')).toBe(false);
+    expect(allowedHosts(endpoints, 'restricted').size).toBe(0);
   });
 
   it('sees through a configured value that is the public default', () => {

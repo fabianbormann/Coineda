@@ -528,9 +528,10 @@ export type ReportMethod = {
   /** Whether this client could reach the public data providers
    *  (`public`) or only the hosts an operator configured (`restricted`). */
   egress: 'public' | 'restricted';
-  /** The hosts the report's data came from, by endpoint key. Host names
-   *  only (no path, no key); in restricted mode only configured services
-   *  appear. */
+  /** The hosts this run sent a request to for the report's data, by
+   *  endpoint key - not every service it could have used. Host names only
+   *  (no path, no key); in restricted mode only configured services can
+   *  appear. Prices served from the local cache add none. */
   endpoints: Record<string, string>;
 };
 
