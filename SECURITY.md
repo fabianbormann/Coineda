@@ -6,12 +6,17 @@ und zwar **unverschlüsselt**; eine App-Sperre gibt es nicht. Wer Zugriff auf da
 kann API-Schlüssel, Wallet-Adressen, xpubs, Steuernummer und alle Transaktionen lesen. Netzwerkzugriffe
 gehen direkt vom Gerät an Kurs-Anbieter (CoinGecko, DefiLlama, Frankfurter/EZB, Cardano Token Registry)
 und an die vom Nutzer eingerichteten Datenquellen (Blockchain-Indexer, Bitpanda); diese Anbieter sehen
-dabei IP-Adresse, gehaltene Assets und abgefragte Adressen. Checkpoints (Übergabe/Sicherung) sind mit
-AES-256-GCM verschlüsselt, der Schlüssel wird per PBKDF2-SHA-256 (600.000 Iterationen) aus einem
-8-stelligen Base32-Geheimnis (40 Bit) abgeleitet – ausreichend für eine einmalige Übergabe, aber kein
-dauerhafter Schutz für eine aufbewahrte Sicherungsdatei. Die Desktop-Installer sind derzeit nicht
-signiert. Sicherheitslücken bitte vertraulich über „Report a vulnerability“ (GitHub Security Advisories)
-melden, nicht als öffentliches Issue.
+dabei IP-Adresse, User-Agent, gehaltene Assets, abgefragte Adressen und den `Origin`-Header der App
+(`https://fabianbormann.github.io` bzw. `coineda://app`), aber keine nutzer- oder installationsbezogene
+Kennung; einen `Referer` sendet die App nicht. Checkpoints (Übergabe/Sicherung) sind mit AES-256-GCM
+verschlüsselt, der Schlüssel wird per PBKDF2-SHA-256 (600.000 Iterationen) aus einem 8-stelligen
+Base32-Geheimnis (40 Bit) abgeleitet – ausreichend für eine einmalige Übergabe, aber kein dauerhafter
+Schutz für eine aufbewahrte Sicherungsdatei, die alle Zugangsdaten enthält. Eine Prüfkopie (Review) enthält
+keine API-Schlüssel, aber weiterhin die xpub sowie Name, Steuernummer und DATEV-Nummern der
+Steuerpflichtigen. Die Web-Version aktualisiert sich ohne Rückfrage von der Origin des Betreibers. Die
+Desktop-Installer sind derzeit nicht signiert. Sicherheitslücken bitte vertraulich über „Report a
+vulnerability“ (GitHub Security Advisories) melden, nicht als öffentliches Issue; wir koordinieren die
+Veröffentlichung innerhalb von 90 Tagen.
 
 This document describes what Coineda stores, what it sends, how it protects both, and where it does not.
 Every statement names the file (and, where useful, the function or constant) that implements it, so it
@@ -68,6 +73,7 @@ the browser's profile isolation.
 | Confirmed manual transfer links                                                                                                                       | IndexedDB `transferLinks` (`src/ledger/manualLinks.ts`)                                         | No         |                                                                                                                                                                                                                                    |
 | Client registry: client ids, labels, database names, review metadata (file name, fingerprint, verdict)                                                | localStorage `coineda.clients`, active id in `coineda.activeClient` (`src/clients/registry.ts`) | No         | A client label is free text and may be a person's name. Falls back to memory when localStorage throws.                                                                                                                             |
 | Theme choice                                                                                                                                          | localStorage `coineda.theme` (`src/components/theme/ThemeProvider.tsx`, `public/theme-init.js`) | No         |                                                                                                                                                                                                                                    |
+| Detected UI language                                                                                                                                  | localStorage `i18nextLng` (`src/i18n.js`)                                                       | No         | Cached by `i18next-browser-languagedetector` with its default `caches: ['localStorage']`; `src/i18n.js` sets no `detection` options.                                                                                               |
 
 Deleting data: "reset" (`resetDevice` in `src/settings/resetDevice.ts`) clears every store of the
 **active** client's database in one transaction; other clients' databases are removed one by one through
@@ -78,8 +84,12 @@ is deliberately kept. Clearing IndexedDB does not securely overwrite the underly
 
 All provider URLs below are `https://`. In a production build the Content-Security-Policy restricts
 `connect-src` to `'self' https:` (`public/csp.json`), so a plain `http://` base URL entered by the user is
-refused by the browser. Every request also reveals the device's IP address and a browser or Electron
-user agent to the provider. No request carries a Coineda-specific identifier.
+refused by the browser; a self-hosted indexer must therefore be served over TLS. Every request reveals the
+device's IP address, a browser or Electron user agent and the app's origin to the provider: provider calls
+are cross-origin CORS requests, which carry an `Origin` header (`https://fabianbormann.github.io` on the
+web, `coineda://app` on desktop) that the page cannot suppress. The `Referer` header is suppressed by
+`<meta name="referrer" content="no-referrer" />` in `index.html`. No request carries a user- or
+install-specific identifier.
 
 | Host                                                                             | Code                                                                                           | Trigger                                                                                                                                                                                                                                          | What is sent                                                                                                                                                                                | What it reveals                                                                                 | How to disable                                                                                                             |
 | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
@@ -102,7 +112,8 @@ Notes:
   an error message (`src/sources/types.ts`, doc comment on `SourceModule`). The Bitpanda translator
   additionally runs the response-body excerpt it puts into an error through `redactSecret`
   (`src/sources/bitpanda/translator.ts`, used in `asJson`), which replaces the raw or URL-encoded key with
-  `[redacted]` (tested in `tests/bitpandaErrors.test.ts`). The Blockscout translator echoes an unredacted
+  `[redacted]` before the excerpt is cut to 120 characters, so a key straddling the cut cannot leak in part
+  (tested in `tests/bitpandaErrors.test.ts`). The Blockscout translator echoes an unredacted
   120-character body excerpt (`asJson` in `src/sources/ethereum-blockscout/translator.ts`); its requests
   carry no secret, so there is nothing of the user's to leak there today, but error messages can contain
   provider-controlled text. They are rendered as text, not HTML.
@@ -110,7 +121,9 @@ Notes:
   browser (see [Desktop shell](#desktop-shell)); in the renderer they are rendered by
   `src/components/ExternalLink.tsx` with `rel="noopener noreferrer"`, so no referrer is sent.
 - **Camera.** Scanning a checkpoint QR code uses the camera locally; frames are decoded in the page
-  (`src/onboarding/ImportCheckpoint.tsx`, `src/checkpoint/channel.ts`) and not transmitted.
+  (`src/onboarding/ImportCheckpoint.tsx`, `src/checkpoint/channel.ts`) and not transmitted. The scanner is
+  offered in both shells, so the desktop shell grants the camera (and nothing else) to the app (see
+  [Desktop shell](#desktop-shell)).
 - **Provider responses are trusted as input.** Prices from CoinGecko, DefiLlama and Frankfurter become
   valuations in the tax report (`src/tax/resolveValues.ts`); a wrong or manipulated price produces a
   wrong figure. Mitigations are limited to plausibility rules: a historical point more than 12 hours from
@@ -177,19 +190,25 @@ happens only after successful authentication, reaching it requires the secret.
 ## Review mode
 
 A reviewer (for example a tax advisor) can open a client's **backup** checkpoint as a separate read-only
-client (`openForReview` in `src/clients/review.ts`). A handover is refused
-(`HandoverNotReviewableError`), because it lacks the derived events.
+client (`openForReview` in `src/clients/review.ts`). A checkpoint is refused for review only when it
+omits derived events (`omittedEventCount > 0`, `HandoverNotReviewableError`); a handover from a client
+with no derived events is a complete ledger and opens.
 
 - **What is stripped.** Source configurations are reduced to an allow-list of public identity keys,
   `PUBLIC_IDENTITY_KEYS = ['address', 'addressList', 'xpub']` (`src/tax/sourceDirectory.ts`), applied in
   `restoreCheckpoint` with `stripCredentials: true` (`src/checkpoint/format.ts`). API keys and the
-  Blockfrost project id are dropped; so is a custom `baseUrl`.
+  Blockfrost project id are dropped; so is a custom `baseUrl`. The client's **CoinGecko API key** is
+  removed from the restored settings as well (tested in `tests/openForReview.test.tsx`).
 - **What is kept, on purpose.** Addresses and the Bitcoin **xpub** are kept so that the review's printed
   source directory names the same wallets as the client's own report. An xpub reveals every address of
   that wallet account, past and future.
-- **What is not stripped.** Settings are restored as they are (`normalizeSettings(checkpoint.settings)` in
-  `restoreCheckpoint`), so a review copy contains the client's taxpayer name and tax number, DATEV numbers,
-  loss carry-forward and, if set, the **CoinGecko API key**.
+- **What is not stripped.** The other settings are restored as they are: the client's taxpayer name and
+  tax number, DATEV numbers, loss carry-forward, language and base currency. The reviewer's report needs
+  them.
+- **Side effect on prices.** Without a key, CoinGecko history is requested only within its free-tier
+  window of about 365 days (`FREE_TIER_DAYS`, `freeTierCutoff` in `src/prices/coingecko.ts`); older days
+  are priced from DefiLlama alone or reported as missing. The review client is read-only, so the reviewer
+  cannot enter a key of their own there (`putSettings` throws `LedgerReadOnlyError`).
 - **Integrity.** The fingerprint is recomputed from what was actually written and compared with the one in
   the file (`fingerprintLedger`, verdict `match`/`mismatch`/`none`); a mismatch is shown, not hidden.
 - **What read-only means.** `setActiveClient` sets a module-level flag for review clients
@@ -209,18 +228,33 @@ Implemented in `public/electron.js`:
 - **Content-Security-Policy header** on every `coineda://` response, including error responses
   (`withCsp`), with the policy read from `public/csp.json`.
 - **New windows denied:** `setWindowOpenHandler` always returns `{ action: 'deny' }` and passes only
-  `http:`/`https:` URLs to `shell.openExternal`, so links open in the system browser.
-- **Navigation pinned:** `will-navigate` cancels any navigation whose origin is not `coineda://app`
-  (`http://localhost:3000` in development).
+  `http:`/`https:` URLs to `shell.openExternal`, so links open in the system browser. A failed
+  `openExternal` is caught rather than left as an unhandled rejection.
+- **Navigation pinned:** `will-navigate` cancels any navigation that is not to the app itself
+  (`isAppUrl`): in a packaged build the target must have `protocol === 'coineda:'` and `host === 'app'`;
+  in development its origin must be `http://localhost:3000`. An unparsable target is cancelled. The
+  packaged check compares protocol and host because Node's `URL` reports the origin of any `coineda://`
+  URL as `'null'`.
+- **Permissions:** Electron grants every permission request by default. `setPermissionRequestHandler`
+  allows only `media` with video alone (the camera, for the QR scanner, which the desktop build offers)
+  and only to the app itself; microphone, geolocation, notifications and every other permission are
+  denied. `setPermissionCheckHandler` likewise answers true only for `media` from the app.
 - **No `<webview>`:** `will-attach-webview` is always prevented.
 - **Custom scheme instead of `file://`:** the build is served from `coineda://app/` via
   `protocol.handle`; the scheme is registered as `standard` and `secure`. The handler answers 403 for any
   host other than `app` (preventing a second origin with its own storage) and 403 for any path that
   `path.relative` places outside `build/` (path traversal); malformed escapes get 400.
-- **No application menu** (`setMenu(null)`).
+- **No window menu on Windows and Linux** (`setMenu(null)`). On macOS this call does not remove the
+  application menu, so Electron's default menu (including View → Reload) remains there; Toggle Developer
+  Tools has no effect in a packaged build because `devTools` is off.
 
 These measures are pinned by a textual test, `tests/securityShell.test.ts`, which reads the files and
-asserts the strings; it does not launch Electron.
+asserts the literals that carry the behaviour (for example `{ action: 'deny' }`, `devTools: isDev`,
+`require('./csp.json')`, the CSP on the 403 and 400 responses, the navigation comparison and the
+permission handlers); it does not launch Electron.
+
+**Future work:** Electron fuses (`@electron/fuses`: RunAsNode, NodeOptions and NodeCliInspect off;
+EmbeddedAsarIntegrityValidation and OnlyLoadAppFromAsar on) are not configured yet.
 
 What remains the operating system's job: user-account separation, disk encryption, and protecting the
 Electron user-data directory where IndexedDB and localStorage live.
@@ -228,8 +262,9 @@ Electron user-data directory where IndexedDB and localStorage live.
 **Unsigned installers.** The electron-builder configuration in `package.json` (`build`) contains no
 code-signing or notarisation settings, and `.github/workflows/build.yml` passes no signing certificates.
 Installers are therefore unsigned and, on macOS, not notarised, until the owner's certificates are
-configured for a signed release. Users cannot verify the publisher by signature; compare against the
-GitHub release instead. There is no auto-update: a new version is installed by hand.
+configured for a signed release. Users cannot verify the publisher by signature; obtain installers only
+from the project's GitHub repository, or build them from source. There is no auto-update: a new version is
+installed by hand.
 
 ## Web shell
 
@@ -267,13 +302,24 @@ only in serve mode by `cspFor`).
 
 - **Versioning and releases** are generated by release-please (`.github/workflows/release.yml`,
   `google-github-actions/release-please-action@v3`) from Conventional Commits.
-- **CI.** `test.yml` runs lint, Prettier check, `tsc --noEmit` and the Vitest suite on every branch except
-  `main`. `deploy.yml` runs the same four checks again before building and uploading `build/` to Pages, and
-  runs only for the release-please merge commit or a manual dispatch. `build.yml` builds the Electron
-  installers for Linux, Windows and macOS with `samuelmeuli/action-electron-builder@v1`; electron-builder
-  publishes to GitHub Releases (`"publish": { "provider": "github" }` in `package.json`).
-- **Dependencies** are installed with `npm ci` from `package-lock.json`. GitHub Actions are referenced by
-  version tag, not pinned to a commit SHA.
+- **`test.yml`** runs on pushes and pull requests for every branch except `main`: `npm ci`, then lint,
+  Prettier check, `tsc --noEmit` and `vitest run`.
+- **`release.yml`** runs on pushes to `main` whose head commit is **not** the release-please merge:
+  `npm ci`, `vitest run` (no lint, format or type check), then release-please opens or updates the
+  release PR.
+- **`deploy.yml`** runs on pushes to `main` whose head commit message contains
+  `release-please--branches--main`, or on manual dispatch: `npm ci`, lint, Prettier check,
+  `tsc --noEmit`, `vitest run`, `npm run build`, then uploads `build/` to GitHub Pages.
+- **`build.yml`** runs on the same release-please condition (its job condition reads the head commit
+  message, so a pull-request or manual run skips the job). It checks out, sets up Node 22 and runs
+  `samuelmeuli/action-electron-builder@v1` on Linux, Windows and macOS. It has **no** `npm ci` step and
+  runs **no** tests, lint or type check; dependencies for the installers are installed by that action
+  itself, so the lockfile is not enforced by this workflow. The action's `release` input is
+  `startsWith(github.ref, 'refs/tags/v')`, while the workflow runs on pushes to the `main` branch, where
+  `github.ref` is `refs/heads/main`. Publishing installers to GitHub Releases is therefore not confirmed
+  by the current conditions, although `package.json` names `"publish": { "provider": "github" }`.
+- GitHub Actions are referenced by version tag, not pinned to a commit SHA. `build.yml` declares no
+  `permissions` block, so it runs with the repository's default token scope.
 - **Not in place yet:** no software bill of materials (SBOM) is produced, no dependency-update automation
   is configured in `.github/`, and release artefacts are neither signed nor accompanied by provenance
   attestations.
@@ -286,8 +332,8 @@ only in serve mode by `cspFor`).
    Users should create exchange keys with read-only permissions.
 2. **No app lock.** Anyone who can open the browser profile or the desktop app on an unlocked account sees
    everything.
-3. **Review copies keep the xpub and all settings,** including the CoinGecko API key and the taxpayer's
-   identity ([Review mode](#review-mode)).
+3. **Review copies keep the xpub and the taxpayer's identity and DATEV numbers** (credentials, including
+   the CoinGecko key, are stripped; [Review mode](#review-mode)).
 4. **40-bit checkpoint secret,** shared by the handover and backup of one export; adequate for a
    short-lived handover, weak for a stored backup file ([Checkpoints](#checkpoints)).
 5. **Egress reveals holdings and addresses.** Price providers learn which assets are held and on which
@@ -301,8 +347,8 @@ only in serve mode by `cspFor`).
    in `src/sources/ethereum-blockscout/translator.ts`); Bitpanda's excerpt is redacted.
 9. **The web build updates itself** from the deployer's origin without user confirmation, and its CSP
    cannot enforce `frame-ancestors` ([Web shell](#web-shell)).
-10. **Unsigned desktop installers** and no SBOM ([Desktop shell](#desktop-shell),
-    [Build and release](#build-and-release)).
+10. **Unsigned desktop installers,** no Electron fuses, installers built without a lockfile-enforced
+    install or tests, and no SBOM ([Desktop shell](#desktop-shell), [Build and release](#build-and-release)).
 
 ## Reporting a vulnerability
 
