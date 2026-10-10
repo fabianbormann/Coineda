@@ -104,9 +104,26 @@ describe('client registry', () => {
     const c = createClient('B');
     await setActiveClient(c.id);
     expect(activeLedgerName()).toBe(c.dbName);
+    await putSource(source);
     await removeClient(c.id);
     expect(activeClient().id).toBe(first.id);
     expect(activeLedgerName()).toBe(first.dbName);
+    await setActiveLedger(c.dbName);
+    expect(await (await openLedger()).getAll('sources')).toEqual([]);
+    await setActiveLedger(first.dbName);
+  });
+
+  it('seeds a client next to a registry holding only review records', async () => {
+    const r = createReviewClient('Rev', review);
+    const clients = listClients();
+    expect(clients).toHaveLength(2);
+    const seeded = clients.find((x) => x.kind === 'client');
+    expect(seeded?.dbName).toBe('coineda-v2');
+    expect(listClients()).toHaveLength(2);
+    await setActiveClient(r.id);
+    await removeClient(r.id);
+    expect(activeClient().id).toBe(seeded?.id);
+    expect(activeLedgerName()).toBe('coineda-v2');
   });
 
   it('setActiveClient switches the ledger', async () => {

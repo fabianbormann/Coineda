@@ -78,7 +78,7 @@ export const listClients = (): ClientRecord[] => {
   } catch {
     records = [];
   }
-  if (records.length === 0) {
+  if (!records.some((r) => r.kind === 'client')) {
     records = [
       {
         id: newClientId(),
@@ -87,6 +87,7 @@ export const listClients = (): ClientRecord[] => {
         kind: 'client',
         createdAt: new Date().toISOString(),
       },
+      ...records,
     ];
     write(records);
   }
