@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<carf:CARF_OECD xmlns:carf="urn:oecd:ties:carf:v1" xmlns:stf="urn:oecd:ties:carfstf:v1" version="1.5">
+  <carf:MessageSpec>
+    <carf:TransmittingCountry>DE</carf:TransmittingCountry>
+    <carf:ReceivingCountry>DE</carf:ReceivingCountry>
+    <carf:MessageType>CARF</carf:MessageType>
+    <carf:MessageRefId>DE2026BITPANDA0003</carf:MessageRefId>
+    <carf:MessageTypeIndic>CARF702</carf:MessageTypeIndic>
+    <carf:ReportingPeriod>2026-12-31</carf:ReportingPeriod>
+    <carf:Timestamp>2027-05-02T08:00:00</carf:Timestamp>
+  </carf:MessageSpec>
+  <carf:CARFBody>
+    <carf:RCASP>
+      <carf:RCASP_ID>
+        <carf:Entity>
+          <carf:Name>Bitpanda GmbH</carf:Name>
+        </carf:Entity>
+      </carf:RCASP_ID>
+      <carf:Nexus>RCASP901</carf:Nexus>
+      <carf:DocSpec>
+        <stf:DocTypeIndic>OECD1</stf:DocTypeIndic>
+        <stf:DocRefId>DE2026RCASP03</stf:DocRefId>
+      </carf:DocSpec>
+    </carf:RCASP>
+    <carf:CryptoUsers>
+      <carf:UserID>
+        <carf:Individual>
+          <carf:TIN issuedBy="DE">12 345 678 901</carf:TIN>
+          <carf:Name>
+            <carf:FirstName>Erika</carf:FirstName>
+            <carf:LastName>Mustermann</carf:LastName>
+          </carf:Name>
+        </carf:Individual>
+      </carf:UserID>
+      <carf:RelevantTransactions>
+        <carf:CryptoAsset>BTC</carf:CryptoAsset>
+        <carf:CryptoFiatIn>
+          <carf:NumberofTransactions>3</carf:NumberofTransactions>
+          <carf:Amount currCode="EUR">15000.00</carf:Amount>
+          <carf:NumberofUnits>0.250000</carf:NumberofUnits>
+        </carf:CryptoFiatIn>
+      </carf:RelevantTransactions>
+      <carf:DocSpec>
+        <stf:DocTypeIndic>OECD3</stf:DocTypeIndic>
+        <stf:DocRefId>DE2026U0001-DEL</stf:DocRefId>
+        <stf:CorrDocRefId>DE2026U0001</stf:CorrDocRefId>
+      </carf:DocSpec>
+    </carf:CryptoUsers>
+  </carf:CARFBody>
+</carf:CARF_OECD>

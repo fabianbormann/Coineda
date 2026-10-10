@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dip:dip xmlns:dip="http://www.bzst.de/2009/DIP" version="2.0">
+  <dip:header>
+    <dip:transferticketId>TT-2027-000123</dip:transferticketId>
+  </dip:header>
+  <dip:payload>
+    <carf:CARF_OECD xmlns:carf="urn:oecd:ties:carf:v1" xmlns:stf="urn:oecd:ties:carfstf:v1" xmlns:iso="urn:oecd:ties:isocarftypes:v1" version="1.5">
+      <carf:MessageSpec>
+        <carf:SendingEntityIN>DE999999999</carf:SendingEntityIN>
+        <carf:TransmittingCountry>DE</carf:TransmittingCountry>
+        <carf:ReceivingCountry>DE</carf:ReceivingCountry>
+        <carf:MessageType>CARF</carf:MessageType>
+        <carf:MessageRefId>DE2026BITPANDA0001</carf:MessageRefId>
+        <carf:MessageTypeIndic>CARF701</carf:MessageTypeIndic>
+        <carf:ReportingPeriod>2026-12-31</carf:ReportingPeriod>
+        <carf:Timestamp>2027-03-15T10:20:30</carf:Timestamp>
+      </carf:MessageSpec>
+      <carf:CARFBody>
+        <carf:RCASP>
+          <carf:RCASP_ID>
+            <carf:Entity>
+              <carf:Name>Bitpanda GmbH</carf:Name>
+              <carf:Address>
+                <carf:CountryCode>AT</carf:CountryCode>
+                <carf:AddressFree>Stella-Klein-Löw-Weg 17, 1020 Wien</carf:AddressFree>
+              </carf:Address>
+            </carf:Entity>
+          </carf:RCASP_ID>
+          <carf:Nexus>RCASP901</carf:Nexus>
+          <carf:DocSpec>
+            <stf:DocTypeIndic>OECD1</stf:DocTypeIndic>
+            <stf:DocRefId>DE2026RCASP01</stf:DocRefId>
+          </carf:DocSpec>
+        </carf:RCASP>
+        <carf:CryptoUsers>
+          <carf:UserID>
+            <carf:Individual>
+              <carf:ResCountryCode>DE</carf:ResCountryCode>
+              <carf:TIN issuedBy="DE">12 345 678 901</carf:TIN>
+              <carf:TIN issuedBy="AT">AT-123456789</carf:TIN>
+              <carf:Name>
+                <carf:FirstName>Erika</carf:FirstName>
+                <carf:LastName>Mustermann</carf:LastName>
+              </carf:Name>
+              <carf:Address>
+                <carf:CountryCode>DE</carf:CountryCode>
+                <carf:AddressFree>Heidestraße 17, 51147 Köln</carf:AddressFree>
+              </carf:Address>
+              <carf:BirthInfo>
+                <carf:BirthDate>1964-08-12</carf:BirthDate>
+              </carf:BirthInfo>
+            </carf:Individual>
+          </carf:UserID>
+          <carf:RelevantTransactions>
+            <carf:CryptoAsset>BTC</carf:CryptoAsset>
+            <carf:CryptoFiatIn>
+              <carf:NumberofTransactions>3</carf:NumberofTransactions>
+              <carf:Amount currCode="EUR">15000.00</carf:Amount>
+              <carf:NumberofUnits>0.250000</carf:NumberofUnits>
+            </carf:CryptoFiatIn>
+            <carf:CryptoFiatOut>
+              <carf:NumberofTransactions>1</carf:NumberofTransactions>
+              <carf:Amount currCode="EUR">7000.00</carf:Amount>
+              <carf:NumberofUnits>0.100000</carf:NumberofUnits>
+            </carf:CryptoFiatOut>
+          </carf:RelevantTransactions>
+          <carf:RelevantTransactions>
+            <carf:CryptoAsset>ADA</carf:CryptoAsset>
+            <carf:CryptoToCryptoIn>
+              <carf:ExchangeType>CARF403</carf:ExchangeType>
+              <carf:NumberofTransactions>2</carf:NumberofTransactions>
+              <carf:Amount currCode="EUR">400.00</carf:Amount>
+              <carf:NumberofUnits>1000.000000</carf:NumberofUnits>
+            </carf:CryptoToCryptoIn>
+            <carf:CryptoTransferIn>
+              <carf:TransferType>CARF502</carf:TransferType>
+              <carf:NumberofTransactions>12</carf:NumberofTransactions>
+              <carf:Amount currCode="EUR">36.00</carf:Amount>
+              <carf:NumberofUnits>90.000000</carf:NumberofUnits>
+            </carf:CryptoTransferIn>
+            <carf:CryptoTransferIn>
+              <carf:TransferType>CARF509</carf:TransferType>
+              <carf:NumberofTransactions>1</carf:NumberofTransactions>
+              <carf:Amount currCode="EUR">200.00</carf:Amount>
+              <carf:NumberofUnits>500.000000</carf:NumberofUnits>
+            </carf:CryptoTransferIn>
+            <carf:CryptoTransferOut>
+              <carf:TransferType>CARF606</carf:TransferType>
+              <carf:NumberofTransactions>1</carf:NumberofTransactions>
+              <carf:Amount currCode="EUR">220.00</carf:Amount>
+              <carf:NumberofUnits>500.000000</carf:NumberofUnits>
+            </carf:CryptoTransferOut>
+            <carf:TransferWallet>
+              <carf:Amount currCode="EUR">220.00</carf:Amount>
+              <carf:NumberofUnits>500.000000</carf:NumberofUnits>
+              <carf:AltValuation>CARF301</carf:AltValuation>
+            </carf:TransferWallet>
+          </carf:RelevantTransactions>
+          <carf:RelevantTransactions>
+            <carf:CryptoAsset>NIGHT</carf:CryptoAsset>
+            <carf:CryptoTransferIn>
+              <carf:TransferType>CARF501</carf:TransferType>
+              <carf:NumberofTransactions>1</carf:NumberofTransactions>
+              <carf:Amount currCode="EUR">10.00</carf:Amount>
+              <carf:NumberofUnits>1000.000000</carf:NumberofUnits>
+            </carf:CryptoTransferIn>
+          </carf:RelevantTransactions>
+          <carf:RelevantTransactions>
+            <carf:CryptoAsset>Bitcoin</carf:CryptoAsset>
+            <carf:CryptotoCryptoOut>
+              <carf:NumberofTransactions>1</carf:NumberofTransactions>
+              <carf:Amount currCode="USD">50.00</carf:Amount>
+              <carf:NumberofUnits>0.001000</carf:NumberofUnits>
+            </carf:CryptotoCryptoOut>
+          </carf:RelevantTransactions>
+          <carf:DocSpec>
+            <stf:DocTypeIndic>OECD1</stf:DocTypeIndic>
+            <stf:DocRefId>DE2026U0001</stf:DocRefId>
+          </carf:DocSpec>
+        </carf:CryptoUsers>
+        <carf:CryptoUsers>
+          <carf:UserID>
+            <carf:Entity>
+              <carf:ResCountryCode>DE</carf:ResCountryCode>
+              <carf:TIN issuedBy="DE">99/999/99999</carf:TIN>
+              <carf:Name nameType="OECD207">Beispiel UG</carf:Name>
+              <carf:Address>
+                <carf:CountryCode>DE</carf:CountryCode>
+                <carf:AddressFree>Musterweg 1, 10115 Berlin</carf:AddressFree>
+              </carf:Address>
+            </carf:Entity>
+          </carf:UserID>
+          <carf:RelevantTransactions>
+            <carf:CryptoAsset>ETH</carf:CryptoAsset>
+            <carf:RRPT>
+              <carf:NumberofTransactions>1</carf:NumberofTransactions>
+              <carf:Amount currCode="EUR">60000.00</carf:Amount>
+              <carf:NumberofUnits>20.000000</carf:NumberofUnits>
+            </carf:RRPT>
+          </carf:RelevantTransactions>
+          <carf:DocSpec>
+            <stf:DocTypeIndic>OECD1</stf:DocTypeIndic>
+            <stf:DocRefId>DE2026U0002</stf:DocRefId>
+          </carf:DocSpec>
+        </carf:CryptoUsers>
+      </carf:CARFBody>
+    </carf:CARF_OECD>
+  </dip:payload>
+</dip:dip>
