@@ -92,7 +92,9 @@ export const EndpointsSettingsCard = () => {
   return (
     <Card>
       <CardContent className="flex flex-col gap-4 text-sm">
-        <h3 className="font-semibold">{t('Data endpoints')}</h3>
+        {/* h4: the card sits under the tax report's "Advanced settings"
+            heading (h3). */}
+        <h4 className="font-semibold">{t('Data endpoints')}</h4>
         {pinned && (
           <p className="text-muted-foreground">
             {t('This build fixes the endpoints; they cannot be changed here.')}

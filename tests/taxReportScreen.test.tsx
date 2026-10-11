@@ -204,6 +204,35 @@ const runReport = async (year: string) => {
   );
 };
 
+/** Types `year` into the year field. The form opens on the previous UTC
+ *  year; a fixture dated in the current year (inside CoinGecko's free 365
+ *  days, so a coin can be priced) sets it explicitly. */
+const setYear = async (year: number | string) => {
+  const input = await screen.findByLabelText(/^(tax year|steuerjahr)$/i);
+  await userEvent.clear(input);
+  await userEvent.type(input, String(year));
+};
+
+const thisUtcYear = () => new Date().getUTCFullYear();
+
+/** Opens the form's "Advanced settings", closed by default, where the DATEV
+ *  and endpoint cards live. */
+const openAdvanced = async () =>
+  userEvent.click(
+    await screen.findByRole('button', {
+      name: /advanced settings|erweiterte einstellungen/i,
+    }),
+  );
+
+/** The breadcrumb trail at the top of the screen. */
+const breadcrumbs = () =>
+  screen.getByRole('navigation', { name: /breadcrumb|navigationspfad/i });
+
+/** "Details": back from the report to the form, keeping the report - what
+ *  the bar's "Change your answers" button did before the breadcrumbs. */
+const detailsCrumb = () =>
+  within(breadcrumbs()).getByRole('button', { name: /^(details|angaben)$/i });
+
 describe('downloading the register', () => {
   const originalCreate = URL.createObjectURL;
   const originalRevoke = URL.revokeObjectURL;
@@ -435,6 +464,7 @@ describe('running a report', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: /germany/i }),
     );
+    await setYear(thisUtcYear());
     await userEvent.click(
       await screen.findByRole('button', { name: /run report/i }),
     );
@@ -464,6 +494,7 @@ describe('running a report', () => {
       await userEvent.click(
         await screen.findByRole('button', { name: /deutschland/i }),
       );
+      await setYear(thisUtcYear());
       await userEvent.click(
         await screen.findByRole('button', { name: /report erstellen/i }),
       );
@@ -555,6 +586,7 @@ describe('running a report', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: /germany/i }),
     );
+    await setYear(thisUtcYear());
     await userEvent.click(
       await screen.findByRole('button', { name: /run report/i }),
     );
@@ -684,13 +716,14 @@ describe('the unresolved list', () => {
       await userEvent.click(
         await screen.findByRole('button', { name: /germany/i }),
       );
+      await setYear(thisUtcYear());
       await userEvent.click(
         await screen.findByRole('button', { name: /run report/i }),
       );
       await screen.findByText(/other unresolved items are not disposals/i);
 
       // This test is about React keys, not about years: its fixture is
-      // dated 2025 while the form defaults to the current year, so the
+      // dated 2025 while the form is set to the current year above, so the
       // unresolved list would hide the very items whose keys are under
       // test. Showing everything keeps it rendering exactly what it did
       // before the filter existed.
@@ -995,10 +1028,11 @@ describe('the report is a page, not a dialog', () => {
 
   it('offers a way back to the overview', async () => {
     // A dialog had Escape and a close button for free; a route has to carry
-    // its own exit.
+    // its own exit. Since the breadcrumbs, it is their first step.
     renderScreen();
+    await screen.findByRole('heading', { name: /create tax report/i });
     expect(
-      await screen.findByRole('link', { name: /back to overview/i }),
+      within(breadcrumbs()).getByRole('link', { name: /^overview$/i }),
     ).toHaveAttribute('href', '/');
   });
 
@@ -1049,6 +1083,7 @@ describe('the report is a page, not a dialog', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: /testland/i }),
     );
+    await setYear(thisUtcYear());
     await userEvent.click(
       await screen.findByRole('button', { name: /run report/i }),
     );
@@ -1888,11 +1923,7 @@ describe('the form and the report are separate steps', () => {
 
     renderScreen();
     await runReport('2025');
-    await userEvent.click(
-      screen.getByRole('button', {
-        name: /change your answers|eingaben ändern/i,
-      }),
-    );
+    await userEvent.click(detailsCrumb());
 
     expect(await screen.findByLabelText(/^tax year$/i)).toHaveValue(2025);
     expect(screen.queryByText(/taxable gain/i)).toBeNull();
@@ -1906,11 +1937,7 @@ describe('the form and the report are separate steps', () => {
 
     renderScreen();
     await runReport('2025');
-    await userEvent.click(
-      screen.getByRole('button', {
-        name: /change your answers|eingaben ändern/i,
-      }),
-    );
+    await userEvent.click(detailsCrumb());
     await userEvent.click(
       await screen.findByRole('button', {
         name: /view the report|zum report/i,
@@ -1926,11 +1953,7 @@ describe('the form and the report are separate steps', () => {
 
     renderScreen();
     await runReport('2025');
-    await userEvent.click(
-      screen.getByRole('button', {
-        name: /change your answers|eingaben ändern/i,
-      }),
-    );
+    await userEvent.click(detailsCrumb());
 
     const year = await screen.findByLabelText(/^tax year$/i);
     await userEvent.clear(year);
@@ -1950,11 +1973,7 @@ describe('the form and the report are separate steps', () => {
 
     renderScreen();
     await runReport('2025');
-    await userEvent.click(
-      screen.getByRole('button', {
-        name: /change your answers|eingaben ändern/i,
-      }),
-    );
+    await userEvent.click(detailsCrumb());
     await userEvent.type(
       await screen.findByLabelText(/your name/i),
       'Erika Mustermann',
@@ -1992,6 +2011,7 @@ describe('the form and the report are separate steps', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: /germany/i }),
     );
+    await setYear(thisUtcYear());
     await userEvent.click(
       await screen.findByRole('button', { name: /run report/i }),
     );
@@ -2039,6 +2059,7 @@ describe('the form and the report are separate steps', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: /germany/i }),
     );
+    await setYear(thisUtcYear());
     await userEvent.click(
       await screen.findByRole('button', { name: /run report/i }),
     );
@@ -2254,6 +2275,8 @@ describe('the derivatives section', () => {
 
 describe('the loss carry-forward inputs', () => {
   const thisYear = new Date().getUTCFullYear();
+  // The year the form opens on: the previous one.
+  const formYear = thisYear - 1;
 
   const openGermany = async () => {
     taxRegistry.push(germanTax);
@@ -2278,11 +2301,11 @@ describe('the loss carry-forward inputs', () => {
   it('renders for Germany and not for a module without support', async () => {
     await openGermany();
     // Named as the Bescheid names it: the remaining figure as at the end of
-    // the PREVIOUS year.
+    // the year BEFORE the tax year.
     expect(
       await screen.findByLabelText(
         new RegExp(
-          `^Remaining loss carry-forward under §23 EStG as at 31 Dec ${thisYear - 1} \\(Verlustfeststellungsbescheid\\)$`,
+          `^Remaining loss carry-forward under §23 EStG as at 31 Dec ${formYear - 1} \\(Verlustfeststellungsbescheid\\)$`,
         ),
       ),
     ).toBeInTheDocument();
@@ -2291,7 +2314,7 @@ describe('the loss carry-forward inputs', () => {
     expect(
       screen.getByLabelText(
         new RegExp(
-          `^Remaining loss carry-forward under §20 EStG as at 31 Dec ${thisYear - 1}, excluding losses from selling shares \\(§20 Abs\\. 6 S\\. 4\\)$`,
+          `^Remaining loss carry-forward under §20 EStG as at 31 Dec ${formYear - 1}, excluding losses from selling shares \\(§20 Abs\\. 6 S\\. 4\\)$`,
         ),
       ),
     ).toBeInTheDocument();
@@ -2307,14 +2330,16 @@ describe('the loss carry-forward inputs', () => {
     expect(screen.queryByLabelText(/under §23 EStG/i)).toBeNull();
   });
 
-  it('persists the figure by year and shows a blank for another year', async () => {
+  it('persists the figure by year and shows 0 for another year', async () => {
     await openGermany();
     const input = await screen.findByLabelText(/under §23 EStG/i);
+    await waitFor(() => expect(input).toHaveValue('0'));
+    await userEvent.clear(input);
     await userEvent.type(input, '500');
     await userEvent.tab();
     await waitFor(async () => {
       const settings = await getSettings();
-      expect(settings?.lossCarryForward?.[String(thisYear)]?.privateSales).toBe(
+      expect(settings?.lossCarryForward?.[String(formYear)]?.privateSales).toBe(
         '500',
       );
     });
@@ -2323,20 +2348,20 @@ describe('the loss carry-forward inputs', () => {
     await userEvent.clear(yearInput);
     // No year, no "as at" date to name - so no input to label.
     expect(screen.queryByLabelText(/under §23 EStG/i)).toBeNull();
-    await userEvent.type(yearInput, String(thisYear - 1));
-    expect(screen.getByLabelText(/under §23 EStG/i)).toHaveValue('');
+    await userEvent.type(yearInput, String(formYear - 1));
+    expect(screen.getByLabelText(/under §23 EStG/i)).toHaveValue('0');
     expect(
-      screen.getByLabelText(new RegExp(`as at 31 Dec ${thisYear - 2} \\(`)),
+      screen.getByLabelText(new RegExp(`as at 31 Dec ${formYear - 2} \\(`)),
     ).toBeInTheDocument();
 
     await userEvent.clear(yearInput);
-    await userEvent.type(yearInput, String(thisYear));
+    await userEvent.type(yearInput, String(formYear));
     expect(screen.getByLabelText(/under §23 EStG/i)).toHaveValue('500');
   });
 
   it('seeds the inputs for the year showing when a slow settings read lands', async () => {
     await putSettings({
-      lossCarryForward: { [String(thisYear - 1)]: { privateSales: '700' } },
+      lossCarryForward: { [String(formYear - 1)]: { privateSales: '700' } },
     });
     const stored = await getSettings();
     let release: (value: Settings | null) => void = () => {};
@@ -2352,8 +2377,8 @@ describe('the loss carry-forward inputs', () => {
       // The year changes while the read is still out...
       const yearInput = await screen.findByLabelText(/tax year/i);
       await userEvent.clear(yearInput);
-      await userEvent.type(yearInput, String(thisYear - 1));
-      expect(screen.getByLabelText(/under §23 EStG/i)).toHaveValue('');
+      await userEvent.type(yearInput, String(formYear - 1));
+      expect(screen.getByLabelText(/under §23 EStG/i)).toHaveValue('0');
 
       // ...so the read must seed the year now showing, not the one the
       // screen mounted with.
@@ -2369,7 +2394,7 @@ describe('the loss carry-forward inputs', () => {
 
   it('does not persist an invalid amount on blur, and says why', async () => {
     await putSettings({
-      lossCarryForward: { [String(thisYear)]: { privateSales: '500' } },
+      lossCarryForward: { [String(formYear)]: { privateSales: '500' } },
     });
     await openGermany();
     const input = await screen.findByLabelText(/under §23 EStG/i);
@@ -2381,7 +2406,7 @@ describe('the loss carry-forward inputs', () => {
     expect(await screen.findByText(/enter an amount like/i)).toBeVisible();
     expect(input).toHaveValue('1.000,50');
     const settings = await getSettings();
-    expect(settings?.lossCarryForward?.[String(thisYear)]?.privateSales).toBe(
+    expect(settings?.lossCarryForward?.[String(formYear)]?.privateSales).toBe(
       '500',
     );
   });
@@ -2389,6 +2414,7 @@ describe('the loss carry-forward inputs', () => {
   it('blocks the run on a European-formatted amount', async () => {
     await openGermany();
     const input = await screen.findByLabelText(/under §23 EStG/i);
+    await userEvent.clear(input);
     await userEvent.type(input, '1.000,50');
     await userEvent.click(
       await screen.findByRole('button', { name: /run report/i }),
@@ -2422,10 +2448,11 @@ describe('the loss carry-forward inputs', () => {
       }),
     ]);
     await openGermany();
-    await userEvent.type(
-      await screen.findByLabelText(/under §23 EStG/i),
-      '500',
-    );
+    // Priced inside CoinGecko's free 365 days: the current year.
+    await setYear(thisYear);
+    const carry = await screen.findByLabelText(/under §23 EStG/i);
+    await userEvent.clear(carry);
+    await userEvent.type(carry, '500');
     await userEvent.click(
       await screen.findByRole('button', { name: /run report/i }),
     );
@@ -2481,10 +2508,11 @@ describe('the loss carry-forward inputs', () => {
       }),
     ]);
     await openGermany();
-    await userEvent.type(
-      await screen.findByLabelText(/under §23 EStG/i),
-      '500',
-    );
+    // Priced inside CoinGecko's free 365 days: the current year.
+    await setYear(thisYear);
+    const carry = await screen.findByLabelText(/under §23 EStG/i);
+    await userEvent.clear(carry);
+    await userEvent.type(carry, '500');
     await userEvent.click(
       await screen.findByRole('button', { name: /run report/i }),
     );
@@ -2899,6 +2927,7 @@ describe('the DATEV settings card', () => {
     taxRegistry.push(mod);
     renderScreen();
     await userEvent.click(await screen.findByRole('button', { name }));
+    await openAdvanced();
   };
 
   /** The card's inputs stay disabled until the stored values are read. */
@@ -3028,6 +3057,7 @@ describe('the DATEV settings card', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: /germany/i }),
     );
+    await openAdvanced();
     const advisor = await screen.findByLabelText(/^advisor number/i);
     await waitFor(() => expect(advisor).toHaveValue('99'));
     await waitFor(() => expect(advisor).toBeEnabled());
@@ -3087,10 +3117,18 @@ describe('the DATEV settings card', () => {
 
   it('keeps the card disabled when the stored values cannot be read', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.spyOn(settingsStore, 'getSettings')
-      .mockResolvedValueOnce(null)
-      .mockRejectedValueOnce(new Error('x'));
-    await openModule(germanTax, /germany/i);
+    taxRegistry.push(germanTax);
+    renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /germany/i }),
+    );
+    // The card's own read is the one that fails: it runs when the card
+    // mounts, which is when "Advanced settings" opens. (The screen reads
+    // settings on mount too, now also for the section's DATEV status.)
+    vi.spyOn(settingsStore, 'getSettings').mockRejectedValueOnce(
+      new Error('x'),
+    );
+    await openAdvanced();
     expect(await screen.findByLabelText(/^advisor number/i)).toBeDisabled();
   });
 
@@ -3155,6 +3193,7 @@ describe('downloading the DATEV Buchungsstapel', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: /germany/i }),
     );
+    await setYear(thisUtcYear());
     await userEvent.click(
       await screen.findByRole('button', { name: /run report/i }),
     );
@@ -3224,6 +3263,8 @@ describe('downloading the DATEV Buchungsstapel', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: /germany/i }),
     );
+    await setYear(thisUtcYear());
+    await openAdvanced();
     const advisor = await screen.findByLabelText(/^advisor number/i);
     await waitFor(() => expect(advisor).toBeEnabled());
     await userEvent.type(advisor, '1234567');
@@ -3276,6 +3317,7 @@ describe('downloading the DATEV Buchungsstapel', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: /germany/i }),
     );
+    await setYear(thisUtcYear());
     await userEvent.click(
       await screen.findByRole('button', { name: /run report/i }),
     );
@@ -3331,6 +3373,8 @@ describe('downloading the DATEV Buchungsstapel', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: /germany/i }),
     );
+    await setYear(thisUtcYear());
+    await openAdvanced();
     const advisor = await screen.findByLabelText(/^advisor number/i);
     await waitFor(() => expect(advisor).toBeEnabled());
     await userEvent.type(advisor, '7654321');
@@ -3394,7 +3438,7 @@ describe('accessibility of the report steps', () => {
     await waitFor(() => expect(document.activeElement).toBe(chosen));
 
     await userEvent.click(
-      screen.getByRole('button', { name: /^choose a jurisdiction$/i }),
+      within(breadcrumbs()).getByRole('button', { name: /^tax country$/i }),
     );
     const picker = await screen.findByRole('heading', {
       level: 2,
@@ -3458,11 +3502,10 @@ describe('accessibility of the report steps', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: /testland/i }),
     );
-    expect(await screen.findByLabelText('Your name')).toHaveAttribute(
-      'autocomplete',
-      'name',
-    );
-    expect(screen.getByLabelText('Tax number')).toHaveAttribute(
+    expect(
+      await screen.findByLabelText('Your name (optional)'),
+    ).toHaveAttribute('autocomplete', 'name');
+    expect(screen.getByLabelText('Tax number (optional)')).toHaveAttribute(
       'autocomplete',
       'off',
     );
@@ -3703,9 +3746,7 @@ describe('the DAC8 / CARF reconciliation', () => {
     await runReport('2026');
     await reconcileWithFixture();
 
-    await userEvent.click(
-      screen.getByRole('button', { name: /change your answers/i }),
-    );
+    await userEvent.click(detailsCrumb());
     expect(screen.queryByTestId('carf-reconciliation')).toBeNull();
     await userEvent.click(
       await screen.findByRole('button', { name: /run report/i }),

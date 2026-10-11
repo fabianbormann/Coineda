@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useState, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -36,11 +36,14 @@ type DatevSettingsCardProps = {
   /** Called on every change, so the screen validates what is on screen
    *  rather than what has reached the database. */
   onChange?: (datev: DatevSettings) => void;
+  /** The card's heading, focusable, so the report's "Set up DATEV" can
+   *  move focus here. */
+  headingRef?: Ref<HTMLHeadingElement>;
 };
 
 /**
  * The advisor's DATEV numbers and accounts, per client. Shown on the setup
- * step for Germany only. Written on blur as the whole object (the store
+ * step for Germany only, inside the collapsed "Advanced settings". Written on blur as the whole object (the store
  * replaces `datev` wholesale), and never before the stored value has been
  * read - an early blur must not put the empty defaults over a stored
  * configuration. In review mode the card is editable but writes nothing: the
@@ -49,6 +52,7 @@ type DatevSettingsCardProps = {
 export const DatevSettingsCard = ({
   value,
   onChange,
+  headingRef,
 }: DatevSettingsCardProps) => {
   const { t } = useTranslation();
   const readOnly = useContext(ClientContext)?.readOnly ?? false;
@@ -139,7 +143,15 @@ export const DatevSettingsCard = ({
   return (
     <Card>
       <CardContent className="flex flex-col gap-4">
-        <h3 className="text-base font-medium">{t('DATEV')}</h3>
+        {/* h4: the card sits under the tax report's "Advanced settings"
+            heading (h3). */}
+        <h4
+          ref={headingRef}
+          tabIndex={-1}
+          className="text-base font-medium outline-none"
+        >
+          {t('DATEV')}
+        </h4>
         <p className="text-sm text-muted-foreground">
           {t(
             'Your DATEV advisor and client numbers and the accounts to book §23 results and §22 Nr. 3 income to. Coineda ships no defaults; the export stays disabled until all are set.',

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import 'fake-indexeddb/auto';
 import '@/i18n';
@@ -119,7 +119,14 @@ describe('a tax report abandoned mid-flight', () => {
     // state. Navigating away cannot be tested this way any more and does
     // not need to be - React discards updates to an unmounted tree - but
     // this path has no such protection and relies entirely on the guard.
-    await userEvent.click(screen.getByRole('button', { name: /^back$/i }));
+    // The way back is the breadcrumb trail's "Tax country" step (the bar's
+    // "Back" button went with the breadcrumbs).
+    await userEvent.click(
+      within(screen.getByRole('navigation', { name: /breadcrumb/i })).getByRole(
+        'button',
+        { name: /^tax country$/i },
+      ),
+    );
 
     // Pick Austria this time.
     await userEvent.click(

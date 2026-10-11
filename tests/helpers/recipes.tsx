@@ -404,6 +404,10 @@ const runGermanReport = async () => {
   await putEvents(germanSale());
   vi.stubGlobal('fetch', flatRange(1));
   await openJurisdiction(germanTax, /germany/i);
+  // The form opens on the previous year; the sale is dated in this one.
+  const year = await screen.findByLabelText(/tax year/i);
+  await userEvent.clear(year);
+  await userEvent.type(year, String(new Date().getUTCFullYear()));
   await userEvent.click(
     await screen.findByRole('button', { name: /run report/i }),
   );
@@ -569,10 +573,46 @@ export const recipes: Recipe[] = [
     },
   },
   {
+    name: 'TaxReportScreen setup step (Germany, advanced settings closed)',
+    render: async () => {
+      await freshDevice();
+      // A stored state and number, so the masked input renders with its
+      // format hint and the Bundesland select shows a value.
+      await putSettings({
+        taxpayer: {
+          name: 'Erika Mustermann',
+          taxNumber: '12/345/678',
+          state: 'BY',
+        },
+      });
+      await openJurisdiction(germanTax, /germany/i);
+      await waitFor(() =>
+        expect(screen.getByLabelText(/^tax number/i)).toHaveValue('12/345/678'),
+      );
+      await screen.findByText(/DATEV: not set up/);
+    },
+  },
+  {
+    name: 'TaxReportScreen setup step (Germany, legacy tax number)',
+    render: async () => {
+      await freshDevice();
+      await putSettings({
+        taxpayer: { taxNumber: '12 345 678 901 2', state: 'NW' },
+      });
+      await openJurisdiction(germanTax, /germany/i);
+      await screen.findByText(/does not match the format for/i);
+    },
+  },
+  {
+    // The DATEV card lives in the advanced section, so this is also the
+    // form with that section expanded.
     name: 'DatevSettingsCard within TaxReportScreen setup (Germany)',
     render: async () => {
       await freshDevice();
       await openJurisdiction(germanTax, /germany/i);
+      await userEvent.click(
+        await screen.findByRole('button', { name: /advanced settings/i }),
+      );
       const advisor = await screen.findByLabelText(/^advisor number/i);
       await waitFor(() => expect(advisor).toBeEnabled());
     },
