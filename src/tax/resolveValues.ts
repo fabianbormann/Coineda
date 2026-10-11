@@ -107,24 +107,38 @@ const lookUp = async (
   // Everything already cached, first and without a request. A second run of
   // the same report asks the provider for nothing at all.
   const missing = new Map<string, string[]>();
+  // Rows cached before sources were recorded. A day's price is never
+  // refetched once cached, so without asking again such a row would print
+  // "source not recorded" on every report for good. Asked like a missing
+  // day; the cached price stands, labelled, only if nobody answers.
+  const unsourced = new Map<string, string>();
+  const fromUnsourcedCache = (key: string): DayResult | undefined => {
+    const price = unsourced.get(key);
+    return price === undefined
+      ? undefined
+      : { price, source: 'cache (source not recorded)' };
+  };
   for (const [key, { assetId, date }] of pairs) {
     const cached = await getCachedPrice({ assetId, currency, date });
     if (cached !== null) {
-      results.set(key, {
-        price: cached.price,
-        source: cached.source ?? 'cache (source not recorded)',
-      });
-      continue;
+      if (cached.source !== undefined) {
+        results.set(key, { price: cached.price, source: cached.source });
+        continue;
+      }
+      unsourced.set(key, cached.price);
     }
     // A fiat asset has no CoinGecko id and needs none: fetchHistory prices
     // it by the ECB rate.
     if (!COINGECKO_IDS[assetId] && !isFiatAsset(assetId)) {
-      results.set(key, {
-        reason: {
-          key: PRICE_REASON_KEYS[1],
-          params: { asset: assetId },
+      results.set(
+        key,
+        fromUnsourcedCache(key) ?? {
+          reason: {
+            key: PRICE_REASON_KEYS[1],
+            params: { asset: assetId },
+          },
         },
-      });
+      );
       continue;
     }
     const days = missing.get(assetId);
@@ -177,6 +191,11 @@ const lookUp = async (
         const source = sources.get(key) ?? 'CoinGecko';
         await putCachedPrice({ assetId, currency, date }, price, source);
         results.set(key, { price, source });
+        continue;
+      }
+      const stale = fromUnsourcedCache(key);
+      if (stale !== undefined) {
+        results.set(key, stale);
         continue;
       }
       if (failure !== null) {

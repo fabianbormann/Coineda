@@ -666,17 +666,71 @@ describe('price provenance', () => {
     expect(valued[0].priceSource).toBe('consideration · base currency');
   });
 
-  it('reads a cache row with no source as not recorded', async () => {
+  it('prices a cache row with no source again, and records who priced it', async () => {
+    // Rows cached before sources were recorded would otherwise print
+    // "source not recorded" on every report for good: a day's price is
+    // never refetched once cached.
     const db = await openLedger();
     await db.put('prices', {
       key: 'cardano:lovelace|eur|2026-09-15',
       price: '0.4',
     });
-    const { valued } = await resolveValues(
+    vi.stubGlobal(
+      'fetch',
+      rangeStub(() => 0.35),
+    );
+    const { valued, unpriced } = await resolveValues(
       [event({ amount: '10000000' })],
       'eur',
     );
+    expect(unpriced).toEqual([]);
+    expect(valued[0].priceSource).toBe('CoinGecko');
+    expect(valued[0].value).toBe('3.5');
+    expect(await db.get('prices', 'cardano:lovelace|eur|2026-09-15')).toEqual({
+      key: 'cardano:lovelace|eur|2026-09-15',
+      price: '0.35',
+      source: 'CoinGecko',
+    });
+  });
+
+  it('keeps an unsourced cached price, labelled as such, when it cannot be priced again', async () => {
+    // Offline, restricted, or past the free tier: the cached figure is
+    // still better than listing the event as unpriced.
+    const db = await openLedger();
+    await db.put('prices', {
+      key: 'cardano:lovelace|eur|2026-09-15',
+      price: '0.4',
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('upstream unavailable', { status: 503 })),
+    );
+    const { valued, unpriced } = await resolveValues(
+      [event({ amount: '10000000' })],
+      'eur',
+    );
+    expect(unpriced).toEqual([]);
     expect(valued[0].priceSource).toBe('cache (source not recorded)');
+    expect(valued[0].value).toBe('4');
+  });
+
+  it('keeps an unsourced cached price for an asset it has no provider id for', async () => {
+    const db = await openLedger();
+    await db.put('prices', {
+      key: 'cardano:unlisted|eur|2026-09-15',
+      price: '2',
+    });
+    const fetchMock = vi.fn(async () => {
+      throw new Error('nobody may be asked about an unmapped asset');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { valued, unpriced } = await resolveValues(
+      [event({ assetId: 'cardano:unlisted', amount: '3' })],
+      'eur',
+    );
+    expect(unpriced).toEqual([]);
+    expect(valued[0].priceSource).toBe('cache (source not recorded)');
+    expect(valued[0].value).toBe('6');
   });
 
   it('reads the source off a cache row that has one', async () => {
