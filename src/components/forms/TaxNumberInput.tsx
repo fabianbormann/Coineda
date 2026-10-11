@@ -123,9 +123,35 @@ export const TaxNumberInput = ({
           autoComplete="off"
           value={value}
           onChange={(event) => {
+            if (!state) {
+              return;
+            }
             const raw = event.target.value;
             const caret = event.target.selectionStart ?? raw.length;
-            commit(digitsOf(raw), digitsOf(raw.slice(0, caret)).length);
+            const digits = digitsOf(raw);
+            const before = digitsOf(raw.slice(0, caret)).length;
+            const current = digitsOf(value);
+            const full = digitCountOf(state);
+            if (canonical && digits === current && raw.length < value.length) {
+              // Only a separator went: a deletion the keydown handler did not
+              // see (some mobile keyboards report no key). Remove the digit
+              // before the caret instead, as Backspace over a separator does.
+              if (before > 0) {
+                commit(
+                  digits.slice(0, before - 1) + digits.slice(before),
+                  before - 1,
+                );
+              }
+              return;
+            }
+            if (current.length === full && digits.length > full) {
+              // A full number: a typed digit would push the last one out
+              // unseen, so it is ignored instead.
+              caretRef.current = caretAfterDigits(value, before - 1);
+              onChange(value);
+              return;
+            }
+            commit(digits, before);
           }}
           onKeyDown={handleKeyDown}
           onBlur={onBlur}

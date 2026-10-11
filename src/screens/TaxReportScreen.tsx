@@ -1240,7 +1240,7 @@ export const TaxReportScreen = () => {
 
                     <FormGroup title={t('Calculation')}>
                       <div className="flex flex-col gap-2">
-                        <Label htmlFor="tax-report-year">{t('Tax Year')}</Label>
+                        <Label htmlFor="tax-report-year">{t('Tax year')}</Label>
                         <Input
                           id="tax-report-year"
                           type="number"
@@ -1276,7 +1276,7 @@ export const TaxReportScreen = () => {
                               setRate(event.target.value);
                               invalidateReport();
                             }}
-                            disabled={status === 'loading' || readOnly}
+                            disabled={status === 'loading'}
                             aria-describedby="tax-report-rate-hint"
                           />
                           <p
@@ -1284,7 +1284,7 @@ export const TaxReportScreen = () => {
                             className="text-sm text-muted-foreground"
                           >
                             {t(
-                              'A percentage, e.g. 42. Used only to estimate what you would owe - leave it empty to skip that figure.',
+                              'A percentage, e.g. 42. Used only to estimate what you would owe - clear it to skip that figure.',
                             )}
                           </p>
                         </div>
@@ -1293,9 +1293,14 @@ export const TaxReportScreen = () => {
                         Bescheid's "as at 31 Dec" date, the year before, and
                         a year that cannot be stored under cannot be named. */}
                       {module.manifest.supportsCarryForward && carryYear && (
-                        <>
-                          <div className="flex flex-col gap-2">
-                            <Label htmlFor="tax-report-carry-private">
+                        // A subgrid from md, so the two inputs line up
+                        // although the §20 label wraps to more lines.
+                        <div className="grid gap-4 md:col-span-2 md:grid-cols-2 md:grid-rows-[auto_auto_auto]">
+                          <div className="grid gap-2 md:row-span-3 md:grid-rows-subgrid">
+                            <Label
+                              htmlFor="tax-report-carry-private"
+                              className="md:self-end"
+                            >
                               {t(
                                 'Remaining loss carry-forward under §23 EStG as at 31 Dec {{prevYear}} (Verlustfeststellungsbescheid)',
                                 { prevYear: carryYear.prevYear },
@@ -1314,8 +1319,11 @@ export const TaxReportScreen = () => {
                               disabled={status === 'loading' || readOnly}
                             />
                           </div>
-                          <div className="flex flex-col gap-2">
-                            <Label htmlFor="tax-report-carry-capital">
+                          <div className="grid gap-2 md:row-span-3 md:grid-rows-subgrid">
+                            <Label
+                              htmlFor="tax-report-carry-capital"
+                              className="md:self-end"
+                            >
                               {t(
                                 'Remaining loss carry-forward under §20 EStG as at 31 Dec {{prevYear}}, excluding losses from selling shares (§20 Abs. 6 S. 4)',
                                 { prevYear: carryYear.prevYear },
@@ -1347,7 +1355,7 @@ export const TaxReportScreen = () => {
                               {t('Enter an amount like 1234.56')}
                             </p>
                           )}
-                        </>
+                        </div>
                       )}
                     </FormGroup>
 

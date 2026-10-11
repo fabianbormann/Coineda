@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import '@/i18n';
@@ -109,5 +109,26 @@ describe('the masked tax number input', () => {
     await userEvent.type(input(), '1234567890');
     expect(input()).toHaveValue('12/345/67890');
     expect(screen.queryByText(/does not match the format/i)).toBeNull();
+  });
+
+  it('ignores a digit typed into a full number instead of pushing the last one out', async () => {
+    render(<Harness state="BE" initial="12/345/67890" />);
+    const field = input() as HTMLInputElement;
+    await userEvent.click(field);
+    field.setSelectionRange(3, 3);
+    await userEvent.keyboard('9');
+    expect(field).toHaveValue('12/345/67890');
+  });
+
+  it('deletes the digit before a separator a keyboard removed without a key event', () => {
+    // Some mobile keyboards report no key on keydown, so only the change
+    // arrives: the separator is gone and the digits are unchanged.
+    render(<Harness state="BE" initial="12/345/67890" />);
+    const field = input() as HTMLInputElement;
+    field.focus();
+    fireEvent.change(field, {
+      target: { value: '12345/67890', selectionStart: 2, selectionEnd: 2 },
+    });
+    expect(field).toHaveValue('13/456/7890');
   });
 });

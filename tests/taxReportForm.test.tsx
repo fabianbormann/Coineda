@@ -220,12 +220,20 @@ describe('the breadcrumbs', () => {
       await userEvent.click(
         await screen.findByRole('button', { name: /report erstellen/i }),
       );
-      await screen.findByText('Bericht');
+      // The German UI says "Report" throughout ("Report erstellen",
+      // "Steuerreport"), so the trail does too.
+      await waitFor(() =>
+        expect(
+          within(
+            screen.getByRole('navigation', { name: 'Navigationspfad' }),
+          ).getByText('Report'),
+        ).toHaveAttribute('aria-current', 'page'),
+      );
       expect(
         within(screen.getByRole('navigation', { name: 'Navigationspfad' }))
           .getAllByRole('listitem')
           .map((item) => item.textContent),
-      ).toEqual(['Übersicht', 'Steuerland', 'Angaben', 'Bericht']);
+      ).toEqual(['Übersicht', 'Steuerland', 'Angaben', 'Report']);
     } finally {
       await i18n.changeLanguage('en');
     }
@@ -670,7 +678,7 @@ describe('the tax number for Germany', () => {
     );
   });
 
-  it('is read-only in a review, with the state and the rate', async () => {
+  it('is read-only in a review for the stored state and tax number, but not for the rate', async () => {
     taxRegistry.push(germanTax);
     render(
       <MemoryRouter>
@@ -699,6 +707,8 @@ describe('the tax number for Germany', () => {
       screen.getByRole('combobox', { name: 'Federal state (optional)' }),
     ).toBeDisabled();
     expect(screen.getByLabelText('Tax number (optional)')).toBeDisabled();
-    expect(screen.getByLabelText(/personal tax rate/i)).toBeDisabled();
+    // The rate is never stored, so an advisor reviewing a copy can still
+    // estimate at the client's own rate.
+    expect(screen.getByLabelText(/personal tax rate/i)).toBeEnabled();
   });
 });
