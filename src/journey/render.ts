@@ -59,7 +59,6 @@ const JAR_CORNER = 26;
 /** The tap: a pipe in from the left edge, bending down into a spout over
  *  the middle of the mouth. Coins emerge from the spout's lip. */
 const TAP_Y = 92;
-const TAP_BORE = 12;
 const SPOUT_X = JAR.left + JAR.width / 2;
 const SPOUT_LIP = 118;
 const CAPTION_Y = 104;
@@ -202,52 +201,202 @@ const hexToRgb = (hex: string): string => {
   return `${(value >> 16) & 255},${(value >> 8) & 255},${value & 255}`;
 };
 
-/** The glass outline, bottom corners rounded, open at the top. */
-const traceGlass = (ctx: CanvasRenderingContext2D): void => {
+/*
+ * The glass: a heavy tumbler, drawn as material rather than as an outline.
+ *
+ * The first version was a 2px stroke with one flat reflection, which read
+ * as a box with rounded corners. What says "glass" is the way light treats
+ * it, so that is what is drawn: walls with thickness, brighter at the edges
+ * where the eye looks through more of them (the Fresnel effect) and almost
+ * clear face-on; a thick base; an elliptical mouth, its back half behind
+ * the coins and its front half over them; soft vertical highlights on the
+ * front face; and a shadow on the ground beneath. Coins are packed inside
+ * JAR exactly as before - the walls are built outward from it.
+ */
+const WALL = 6;
+const BASE = 12;
+const MOUTH_RY = 10;
+const OUTER_CORNER = JAR_CORNER + WALL;
+
+/** The inner surface: JAR itself, bottom corners rounded, open at the top. */
+const traceInner = (ctx: CanvasRenderingContext2D): void => {
   const right = JAR.left + JAR.width;
   const bottom = JAR.top + JAR.height;
-  ctx.beginPath();
   ctx.moveTo(JAR.left, JAR.top);
-  if (typeof ctx.arcTo === 'function') {
-    ctx.lineTo(JAR.left, bottom - JAR_CORNER);
-    ctx.arcTo(JAR.left, bottom, JAR.left + JAR_CORNER, bottom, JAR_CORNER);
-    ctx.lineTo(right - JAR_CORNER, bottom);
-    ctx.arcTo(right, bottom, right, bottom - JAR_CORNER, JAR_CORNER);
-  } else {
-    ctx.lineTo(JAR.left, bottom);
-    ctx.lineTo(right, bottom);
-  }
+  ctx.lineTo(JAR.left, bottom - JAR_CORNER);
+  ctx.arcTo(JAR.left, bottom, JAR.left + JAR_CORNER, bottom, JAR_CORNER);
+  ctx.lineTo(right - JAR_CORNER, bottom);
+  ctx.arcTo(right, bottom, right, bottom - JAR_CORNER, JAR_CORNER);
   ctx.lineTo(right, JAR.top);
 };
 
-const drawGlassBack = (ctx: CanvasRenderingContext2D): void => {
-  traceGlass(ctx);
-  if (typeof ctx.createLinearGradient === 'function') {
-    const fill = ctx.createLinearGradient(0, JAR.top, 0, JAR.top + JAR.height);
-    fill.addColorStop(0, 'rgba(255,255,255,0.02)');
-    fill.addColorStop(1, 'rgba(160,190,255,0.08)');
-    ctx.fillStyle = fill;
-  } else {
-    ctx.fillStyle = 'rgba(255,255,255,0.04)';
+/** The outer surface: a wall's thickness out, and a thick base below. */
+const traceOuter = (ctx: CanvasRenderingContext2D): void => {
+  const left = JAR.left - WALL;
+  const right = JAR.left + JAR.width + WALL;
+  const bottom = JAR.top + JAR.height + BASE;
+  ctx.moveTo(left, JAR.top);
+  ctx.lineTo(left, bottom - OUTER_CORNER);
+  ctx.arcTo(left, bottom, left + OUTER_CORNER, bottom, OUTER_CORNER);
+  ctx.lineTo(right - OUTER_CORNER, bottom);
+  ctx.arcTo(right, bottom, right, bottom - OUTER_CORNER, OUTER_CORNER);
+  ctx.lineTo(right, JAR.top);
+};
+
+const canShade = (ctx: CanvasRenderingContext2D): boolean =>
+  typeof ctx.createLinearGradient === 'function' &&
+  typeof ctx.arcTo === 'function';
+
+/** Half of the mouth's ellipse: the far half (`back`) or the near one. */
+const traceMouth = (ctx: CanvasRenderingContext2D, back: boolean): void => {
+  if (typeof ctx.ellipse !== 'function') {
+    ctx.moveTo(JAR.left - WALL, JAR.top);
+    ctx.lineTo(JAR.left + JAR.width + WALL, JAR.top);
+    return;
   }
+  ctx.ellipse(
+    JAR.left + JAR.width / 2,
+    JAR.top,
+    JAR.width / 2 + WALL / 2,
+    MOUTH_RY,
+    0,
+    back ? Math.PI : 0,
+    back ? Math.PI * 2 : Math.PI,
+  );
+};
+
+const drawGlassBack = (ctx: CanvasRenderingContext2D): void => {
+  if (!canShade(ctx)) {
+    return;
+  }
+  const centre = JAR.left + JAR.width / 2;
+  const groundY = JAR.top + JAR.height + BASE + 4;
+  // The shadow it casts, pooled under the base.
+  if (typeof ctx.ellipse === 'function') {
+    const shadow = ctx.createRadialGradient(
+      centre,
+      groundY,
+      0,
+      centre,
+      groundY,
+      JAR.width / 2 + 30,
+    );
+    shadow.addColorStop(0, 'rgba(0,0,0,0.55)');
+    shadow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = shadow;
+    ctx.beginPath();
+    ctx.ellipse(centre, groundY, JAR.width / 2 + 30, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // The far wall seen through the near one: a faint, cool body tint,
+  // denser towards the sides.
+  const body = ctx.createLinearGradient(JAR.left, 0, JAR.left + JAR.width, 0);
+  body.addColorStop(0, 'rgba(170,200,255,0.10)');
+  body.addColorStop(0.5, 'rgba(170,200,255,0.025)');
+  body.addColorStop(1, 'rgba(170,200,255,0.08)');
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  traceInner(ctx);
   ctx.fill();
+  // The far lip of the mouth, behind everything inside.
+  ctx.beginPath();
+  traceMouth(ctx, true);
+  ctx.strokeStyle = 'rgba(210,225,255,0.35)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
 };
 
 const drawGlassFront = (ctx: CanvasRenderingContext2D): void => {
-  traceGlass(ctx);
-  ctx.strokeStyle = 'rgba(190,210,255,0.45)';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  // The rim: a lip either side of the mouth, so the top reads as open.
+  if (!canShade(ctx)) {
+    ctx.beginPath();
+    ctx.moveTo(JAR.left, JAR.top);
+    ctx.lineTo(JAR.left, JAR.top + JAR.height);
+    ctx.lineTo(JAR.left + JAR.width, JAR.top + JAR.height);
+    ctx.lineTo(JAR.left + JAR.width, JAR.top);
+    ctx.strokeStyle = 'rgba(190,210,255,0.45)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    return;
+  }
+  const left = JAR.left - WALL;
+  const right = JAR.left + JAR.width + WALL;
+  const bottom = JAR.top + JAR.height;
+
+  // The walls and the base as one solid: the ring between the two
+  // surfaces, filled even-odd. Brightest at the edges, where the line of
+  // sight runs through the most glass.
+  const wall = ctx.createLinearGradient(left, 0, right, 0);
+  wall.addColorStop(0, 'rgba(225,236,255,0.55)');
+  wall.addColorStop(0.08, 'rgba(200,218,255,0.22)');
+  wall.addColorStop(0.5, 'rgba(200,218,255,0.12)');
+  wall.addColorStop(0.92, 'rgba(200,218,255,0.2)');
+  wall.addColorStop(1, 'rgba(225,236,255,0.45)');
+  ctx.fillStyle = wall;
   ctx.beginPath();
-  ctx.moveTo(JAR.left - 8, JAR.top);
-  ctx.lineTo(JAR.left + JAR.width + 8, JAR.top);
-  ctx.strokeStyle = 'rgba(220,232,255,0.7)';
-  ctx.lineWidth = 3;
+  traceOuter(ctx);
+  traceInner(ctx);
+  ctx.fill('evenodd');
+
+  // The base is the thickest glass there is: the light it catches runs
+  // along its top face as one bright line, fading out towards the curve.
+  const caustic = ctx.createLinearGradient(
+    JAR.left,
+    0,
+    JAR.left + JAR.width,
+    0,
+  );
+  caustic.addColorStop(0, 'rgba(240,246,255,0)');
+  caustic.addColorStop(0.3, 'rgba(240,246,255,0.55)');
+  caustic.addColorStop(0.7, 'rgba(240,246,255,0.35)');
+  caustic.addColorStop(1, 'rgba(240,246,255,0)');
+  ctx.beginPath();
+  ctx.moveTo(JAR.left + JAR_CORNER, bottom + 1.5);
+  ctx.lineTo(JAR.left + JAR.width - JAR_CORNER, bottom + 1.5);
+  ctx.strokeStyle = caustic;
+  ctx.lineWidth = 1.5;
   ctx.stroke();
-  // One reflection down the left side is what says "glass" and not "box".
-  ctx.fillStyle = 'rgba(255,255,255,0.09)';
-  ctx.fillRect(JAR.left + 14, JAR.top + 22, 7, JAR.height - 60);
+
+  // Both surfaces, hairline: the outer one crisp, the inner one softer.
+  ctx.beginPath();
+  traceOuter(ctx);
+  ctx.strokeStyle = 'rgba(235,242,255,0.6)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.beginPath();
+  traceInner(ctx);
+  ctx.strokeStyle = 'rgba(235,242,255,0.22)';
+  ctx.stroke();
+
+  // Highlights on the front face: a broad soft one down the left, a thin
+  // sharp one beside it, and a faint one on the right - the window light
+  // a real glass carries. Each fades out at both ends, as a reflection
+  // on a curved surface does, rather than stopping square.
+  const streak = (x: number, width: number, alpha: number, top: number) => {
+    const from = JAR.top + top;
+    const to = JAR.top + JAR.height - 40;
+    const g = ctx.createLinearGradient(0, from, 0, to);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(0.2, `rgba(255,255,255,${alpha})`);
+    g.addColorStop(0.75, `rgba(255,255,255,${alpha * 0.6})`);
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.beginPath();
+    ctx.moveTo(x, from);
+    ctx.lineTo(x, to);
+    ctx.strokeStyle = g;
+    ctx.lineWidth = width;
+    ctx.stroke();
+  };
+  streak(JAR.left + 16, 16, 0.07, 12);
+  streak(JAR.left + 16, 5, 0.2, 18);
+  streak(JAR.left + 30, 1.5, 0.22, 30);
+  streak(JAR.left + JAR.width - 16, 6, 0.09, 26);
+
+  // The near lip, over the coins: thick and bright, as a rim is.
+  ctx.beginPath();
+  traceMouth(ctx, false);
+  ctx.strokeStyle = 'rgba(235,243,255,0.75)';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
 };
 
 type Movement = { marker: AcquisitionMarker; kind: 'in' | 'out' };
@@ -288,45 +437,113 @@ const settledY = (coin: PlacedCoin, t: number, unit: number): number => {
   return previous.y + (rest.y - previous.y) * easeInOut(u);
 };
 
-/**
- * The tap the coins pour from. Drawn once per frame above the jar, lit at
- * the lip while anything is in flight.
+/*
+ * The tap: a chrome wall tap - flange, pipe, valve with a lever, and a
+ * spout bending down into an aerator - instead of the flat bars it was.
+ *
+ * Chrome is drawn the way it looks: a cylinder is dark at its edges and
+ * bright along one line, so every pipe is stroked several times along the
+ * same path, widest and darkest first, then a white specular line nudged
+ * up and to the left, towards the light. Stroking a path rather than
+ * filling rectangles is what lets the shading follow the elbow round.
+ * The lever stands open while coins are pouring and lies closed when not.
  */
-const drawTap = (ctx: CanvasRenderingContext2D, pouring: boolean): void => {
-  const half = TAP_BORE / 2;
-  if (typeof ctx.createLinearGradient === 'function') {
-    const brushed = ctx.createLinearGradient(0, TAP_Y - half, 0, TAP_Y + half);
-    brushed.addColorStop(0, '#9aa8c4');
-    brushed.addColorStop(0.5, '#e2e8f4');
-    brushed.addColorStop(1, '#5c6a86');
-    ctx.fillStyle = brushed;
-  } else {
-    ctx.fillStyle = '#9aa8c4';
-  }
-  ctx.fillRect(0, TAP_Y - half, SPOUT_X + half, TAP_BORE);
-  if (typeof ctx.createLinearGradient === 'function') {
-    const brushed = ctx.createLinearGradient(
-      SPOUT_X - half,
-      0,
-      SPOUT_X + half,
-      0,
-    );
-    brushed.addColorStop(0, '#5c6a86');
-    brushed.addColorStop(0.5, '#e2e8f4');
-    brushed.addColorStop(1, '#9aa8c4');
-    ctx.fillStyle = brushed;
-  }
-  ctx.fillRect(SPOUT_X - half, TAP_Y, TAP_BORE, SPOUT_LIP - TAP_Y);
-  ctx.fillStyle = '#5c6a86';
-  ctx.fillRect(SPOUT_X - half - 3, SPOUT_LIP - 5, TAP_BORE + 6, 5);
-  // The handle: a stub and a knob, so the pipe reads as a tap.
-  const handleX = SPOUT_X - 56;
-  ctx.fillStyle = '#9aa8c4';
-  ctx.fillRect(handleX - 2, TAP_Y - half - 12, 4, 12);
+const PIPE = 14;
+const ELBOW = 14;
+const AERATOR_TOP = SPOUT_LIP - 9;
+const VALVE_X = SPOUT_X - 40;
+
+const tracePipe = (ctx: CanvasRenderingContext2D, dx: number, dy: number) => {
   ctx.beginPath();
-  ctx.arc(handleX, TAP_Y - half - 14, 6, 0, Math.PI * 2);
-  ctx.fillStyle = '#e2e8f4';
-  ctx.fill();
+  ctx.moveTo(10 + dx, TAP_Y + dy);
+  ctx.lineTo(SPOUT_X - ELBOW + dx, TAP_Y + dy);
+  ctx.arcTo(SPOUT_X + dx, TAP_Y + dy, SPOUT_X + dx, TAP_Y + ELBOW + dy, ELBOW);
+  ctx.lineTo(SPOUT_X + dx, AERATOR_TOP + 1 + dy);
+};
+
+const chromeAcross = (
+  ctx: CanvasRenderingContext2D,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+): CanvasGradient => {
+  const g = ctx.createLinearGradient(x0, y0, x1, y1);
+  g.addColorStop(0, '#3a4252');
+  g.addColorStop(0.3, '#eef2f9');
+  g.addColorStop(0.5, '#aeb8c8');
+  g.addColorStop(0.8, '#6b768a');
+  g.addColorStop(1, '#2f3644');
+  return g;
+};
+
+const drawTap = (ctx: CanvasRenderingContext2D, pouring: boolean): void => {
+  if (!canShade(ctx)) {
+    ctx.fillStyle = '#9aa8c4';
+    ctx.fillRect(0, TAP_Y - PIPE / 2, SPOUT_X + PIPE / 2, PIPE);
+    ctx.fillRect(SPOUT_X - PIPE / 2, TAP_Y, PIPE, SPOUT_LIP - TAP_Y);
+    return;
+  }
+  ctx.save();
+  ctx.lineCap = 'butt';
+  ctx.lineJoin = 'round';
+
+  // The pipe, as a cylinder: dark rim to bright core, then the glint.
+  const layers: [number, string][] = [
+    [PIPE, '#2f3644'],
+    [PIPE - 3, '#6b768a'],
+    [PIPE - 7, '#aeb8c8'],
+    [3, '#dfe5ef'],
+  ];
+  for (const [width, colour] of layers) {
+    tracePipe(ctx, 0, 0);
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = width;
+    ctx.stroke();
+  }
+  tracePipe(ctx, -2, -3);
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Where it comes out of the wall.
+  ctx.fillStyle = chromeAcross(ctx, 0, TAP_Y - 16, 0, TAP_Y + 16);
+  ctx.fillRect(0, TAP_Y - 16, 10, 32);
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fillRect(10, TAP_Y - 16, 1, 32);
+
+  // The valve body on top of the pipe, and its cap.
+  ctx.fillStyle = chromeAcross(ctx, VALVE_X - 8, 0, VALVE_X + 8, 0);
+  ctx.fillRect(VALVE_X - 8, TAP_Y - 20, 16, 14);
+  ctx.fillStyle = chromeAcross(ctx, VALVE_X - 10, 0, VALVE_X + 10, 0);
+  ctx.fillRect(VALVE_X - 10, TAP_Y - 24, 20, 5);
+
+  // The lever, pivoting on the cap: open while pouring.
+  const angle = pouring ? -0.62 : -0.12;
+  const pivotY = TAP_Y - 24;
+  const endX = VALVE_X + Math.cos(angle) * 30;
+  const endY = pivotY + Math.sin(angle) * 30;
+  ctx.lineCap = 'round';
+  for (const [width, colour] of [
+    [7, '#2f3644'],
+    [4.5, '#aeb8c8'],
+    [1.5, '#f4f7fc'],
+  ] as [number, string][]) {
+    ctx.beginPath();
+    ctx.moveTo(VALVE_X, pivotY);
+    ctx.lineTo(endX, endY);
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = width;
+    ctx.stroke();
+  }
+
+  // The aerator: a short, wider nozzle, dark inside.
+  ctx.fillStyle = chromeAcross(ctx, SPOUT_X - 9, 0, SPOUT_X + 9, 0);
+  ctx.fillRect(SPOUT_X - 9, AERATOR_TOP, 18, SPOUT_LIP - AERATOR_TOP);
+  ctx.fillStyle = '#151a23';
+  ctx.fillRect(SPOUT_X - 7, SPOUT_LIP - 2, 14, 2);
+  ctx.restore();
+
   if (pouring) {
     drawGlow(ctx, {
       x: SPOUT_X,
