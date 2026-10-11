@@ -796,6 +796,25 @@
     "New": "Neu",
     "Corrected": "Korrigiert",
     "Deleted": "Gelöscht",
-    "Test": "Test"
+    "Test": "Test",
+    "Format {{example}}": "Format {{example}}",
+    "Choose your state first": "Wähle zuerst dein Bundesland",
+    "Does not match the format for {{state}}": "Passt nicht zum Format für {{state}}",
+    "Baden-Württemberg": "Baden-Württemberg",
+    "Bavaria": "Bayern",
+    "Berlin": "Berlin",
+    "Brandenburg": "Brandenburg",
+    "Bremen": "Bremen",
+    "Hamburg": "Hamburg",
+    "Hesse": "Hessen",
+    "Mecklenburg-Western Pomerania": "Mecklenburg-Vorpommern",
+    "Lower Saxony": "Niedersachsen",
+    "North Rhine-Westphalia": "Nordrhein-Westfalen",
+    "Rhineland-Palatinate": "Rheinland-Pfalz",
+    "Saarland": "Saarland",
+    "Saxony": "Sachsen",
+    "Saxony-Anhalt": "Sachsen-Anhalt",
+    "Schleswig-Holstein": "Schleswig-Holstein",
+    "Thuringia": "Thüringen"
   }
 }

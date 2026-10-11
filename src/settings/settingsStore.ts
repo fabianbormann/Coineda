@@ -50,9 +50,14 @@ export type Settings = {
    */
   taxpayer?: {
     name?: string;
-    /** Steuernummer or equivalent. Free text - the format differs per
-     *  Bundesland and no validation here could be right for all of them. */
+    /** Steuernummer or equivalent. For Germany with a `state`, stored in
+     *  that Bundesland's notice format (src/settings/taxNumber.ts, e.g.
+     *  `12/345/67890`); otherwise free text, which is also how a value
+     *  stored before the state existed stays until it is edited. */
     taxNumber?: string;
+    /** The Bundesland whose format `taxNumber` follows, as a two-letter
+     *  code (BW, BY, BE, ...; see GERMAN_STATES). Germany only. */
+    state?: string;
   };
   /**
    * Losses carried into a tax year, keyed by that year ("2025"). Entered by
