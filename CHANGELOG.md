@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/fabianbormann/Coineda/compare/v0.3.0...v0.3.1) (2026-10-11)
+
+
+### Bug Fixes
+
+* **money:** never show a non-zero crypto amount below eight decimals as 0 ([da87722](https://github.com/fabianbormann/Coineda/commit/da87722465411d4f5bd28e88b33d73d35814a4b4))
+* **prices:** price a cached day again when its source was never recorded ([cd4e0ee](https://github.com/fabianbormann/Coineda/commit/cd4e0eea41d7219981ea734154e042dca8b2b9b8))
+
 ## [0.3.0](https://github.com/fabianbormann/Coineda/compare/v0.2.12...v0.3.0) (2026-10-11)
 
 
