@@ -13,8 +13,9 @@ import { Button } from '@/components/ui/button';
 import {
   buildCheckpoint,
   chooseChannel,
-  encodeQrPayload,
+  encodeQrParts,
   generateTransferSecret,
+  QR_PART_INTERVAL_MS,
   sealCheckpoint,
 } from '@/checkpoint/format';
 import { shortFingerprint } from '@/ledger/fingerprint';
@@ -36,14 +37,65 @@ type Status = 'loading' | 'ready' | 'error';
  */
 type Ready = {
   secret: string;
-  /** The handover, encoded - or null when it does not fit one code. */
-  qrDataUrl: string | null;
+  /** The handover, encoded as one code or several shown in turn - or null
+   *  when it is too large for codes at all. */
+  qrFrames: string[] | null;
   /** The full backup, for the file. */
   backup: Uint8Array;
   /** Recorded transactions the handover leaves behind. */
   omitted: number;
   /** Over every event the backup carries. */
   fingerprint: string;
+};
+
+/**
+ * The handover's codes, one after another, round and round.
+ *
+ * A checkpoint is shown as several small codes rather than one dense one
+ * (see `splitQrParts`), and the scanner collects them in any order, so all
+ * this has to do is keep cycling until the other device has them all. The
+ * counter is there so a person can see the codes are meant to change.
+ */
+const QrCycle = ({ frames }: { frames: string[] }) => {
+  const { t } = useTranslation();
+  const [index, setIndex] = useState(0);
+  useEffect(() => {
+    if (frames.length < 2) {
+      return;
+    }
+    const timer = window.setInterval(
+      () => setIndex((i) => (i + 1) % frames.length),
+      QR_PART_INTERVAL_MS,
+    );
+    return () => window.clearInterval(timer);
+  }, [frames]);
+  const shown = index % frames.length;
+  return (
+    <div className="flex w-full max-w-72 shrink-0 flex-col items-center gap-1 sm:w-72">
+      {/* White under the code whatever the theme: a scanner needs dark
+          modules on a light ground, and the margin is part of the code. */}
+      <img
+        src={frames[shown]}
+        alt={
+          frames.length > 1
+            ? t('Checkpoint QR code {{n}} of {{total}}', {
+                n: shown + 1,
+                total: frames.length,
+              })
+            : t('Checkpoint QR code')
+        }
+        className="h-auto w-full rounded-md bg-white"
+      />
+      {frames.length > 1 && (
+        <p className="text-xs text-muted-foreground" aria-hidden="true">
+          {t('Code {{n}} of {{total}}', {
+            n: shown + 1,
+            total: frames.length,
+          })}
+        </p>
+      )}
+    </div>
+  );
 };
 
 const checkpointFilename = (): string => {
@@ -125,9 +177,9 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
         // that looks complete. A handover usually fits; one carrying a
         // long history of hand-entered events may not, and then the file
         // is the only way offered.
-        const dataUrl =
+        const frames =
           chooseChannel(sealedHandover).channel === 'qr'
-            ? await encodeQrPayload(sealedHandover)
+            ? await encodeQrParts(sealedHandover)
             : null;
 
         if (cancelled) {
@@ -135,7 +187,7 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
         }
         setReady({
           secret: transferSecret,
-          qrDataUrl: dataUrl,
+          qrFrames: frames,
           backup: sealedBackup,
           omitted: handover.omittedEventCount ?? 0,
           fingerprint: backup.fingerprint ?? '',
@@ -229,7 +281,7 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
             {/* The handover. First, because it is the case where the two
                 devices are in the same room - and the one a code can
                 actually serve. */}
-            {ready.qrDataUrl !== null && (
+            {ready.qrFrames !== null && (
               <div className="flex flex-col gap-3">
                 <div className="flex flex-col gap-1">
                   <h3 className="text-sm font-medium">
@@ -239,6 +291,11 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
                     {t(
                       'Scan this on your other device, then type the transfer secret below into it. It carries your settings, your data sources and anything you entered yourself.',
                     )}
+                    {ready.qrFrames.length > 1 &&
+                      ' ' +
+                        t(
+                          'The code changes as it plays: hold the camera on it until the other device has read every part.',
+                        )}
                   </p>
                   {ready.omitted > 0 && (
                     // Said here rather than only on the other device: a
@@ -259,17 +316,11 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
                     transfer secret scanned the code, was asked for one on
                     their phone, and had no idea the screen in front of
                     them was showing it. */}
-                <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-                  <img
-                    src={ready.qrDataUrl}
-                    alt={t('Checkpoint QR code')}
-                    // 288px, not smaller: a checkpoint close to the QR byte
-                    // limit encodes as a version-40 code, 177 modules
-                    // across, and shrinking it to make room would put a
-                    // module under two device pixels and stop it
-                    // scanning.
-                    className="h-auto w-full max-w-72 shrink-0 rounded-md sm:w-72"
-                  />
+                <div
+                  data-slot="handover-row"
+                  className="flex flex-col items-center gap-4 sm:flex-row sm:items-start"
+                >
+                  <QrCycle frames={ready.qrFrames} />
                   {transferSecret}
                 </div>
               </div>
@@ -281,7 +332,7 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
               <div className="flex flex-col gap-1">
                 <h3 className="text-sm font-medium">{t('Keep a backup')}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {ready.qrDataUrl === null
+                  {ready.qrFrames === null
                     ? t(
                         'This checkpoint is too large for a code, so it comes as a file. It carries everything, including every recorded transaction.',
                       )
@@ -292,7 +343,7 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
               </div>
               <Button
                 type="button"
-                variant={ready.qrDataUrl === null ? 'default' : 'outline'}
+                variant={ready.qrFrames === null ? 'default' : 'outline'}
                 className="max-w-xs"
                 onClick={handleDownload}
               >
@@ -313,7 +364,7 @@ export const ExportCheckpointDialog = ({ open, onOpenChange }: Props) => {
 
             {/* No code to sit beside: the file is the only route, and
                 the secret belongs under it. */}
-            {ready.qrDataUrl === null && transferSecret}
+            {ready.qrFrames === null && transferSecret}
           </div>
         )}
 

@@ -324,8 +324,11 @@ describe('the transfer secret', () => {
     const code = await screen.findByAltText(/checkpoint qr code/i);
     const secret = screen.getByText(/^[A-Z2-7]{8}$/);
 
-    expect(code.parentElement).not.toBeNull();
-    expect(code.parentElement!.contains(secret)).toBe(true);
+    // The row, not the image's own parent: the code now sits in a wrapper
+    // with its "Code n of m" caption.
+    const row = code.closest('[data-slot="handover-row"]');
+    expect(row).not.toBeNull();
+    expect(row!.contains(secret)).toBe(true);
   });
 
   it('is not left below everything else', async () => {

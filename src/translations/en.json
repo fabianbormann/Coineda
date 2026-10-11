@@ -837,6 +837,10 @@
     "Install Coineda on this device: it opens like any other app and works offline.": "Install Coineda on this device: it opens like any other app and works offline.",
     "To install Coineda, tap Share in Safari, then “Add to Home Screen”. It then opens like any other app and works offline.": "To install Coineda, tap Share in Safari, then “Add to Home Screen”. It then opens like any other app and works offline.",
     "Install": "Install",
-    "Not now": "Not now"
+    "Not now": "Not now",
+    "Checkpoint QR code {{n}} of {{total}}": "Checkpoint QR code {{n}} of {{total}}",
+    "Code {{n}} of {{total}}": "Code {{n}} of {{total}}",
+    "The code changes as it plays: hold the camera on it until the other device has read every part.": "The code changes as it plays: hold the camera on it until the other device has read every part.",
+    "{{received}} of {{total}} codes read": "{{received}} of {{total}} codes read"
   }
 }

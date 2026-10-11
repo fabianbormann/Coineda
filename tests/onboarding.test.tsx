@@ -14,6 +14,7 @@ import { openLedger } from '@/ledger/db';
 import {
   generateTransferSecret,
   sealCheckpoint,
+  splitQrParts,
   type Checkpoint,
 } from '@/checkpoint/format';
 
@@ -674,9 +675,11 @@ describe('scanning a checkpoint', () => {
     return () => spies.forEach((spy) => spy.mockRestore());
   };
 
-  it('asks for the rear camera, not the one pointing at the user', async () => {
+  it('asks for the rear camera at 720p, not the front one at whatever the browser picks', async () => {
     // A phone's default is the front camera, which leaves someone trying
-    // to scan their other device looking at their own face.
+    // to scan their other device looking at their own face. And with no
+    // resolution asked for, many browsers hand out 640x480 - too few
+    // pixels per module for the code to decode.
     const { getUserMedia } = fakeCamera();
     const restore = showQrToTheCamera(
       await sealCheckpoint(emptyCheckpoint, 'AAAAAAAA'),
@@ -692,7 +695,11 @@ describe('scanning a checkpoint', () => {
 
       await waitFor(() => expect(getUserMedia).toHaveBeenCalled());
       expect(getUserMedia).toHaveBeenCalledWith({
-        video: { facingMode: { ideal: 'environment' } },
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
       });
     } finally {
       restore();
@@ -735,6 +742,65 @@ describe('scanning a checkpoint', () => {
       await waitFor(() => expect(onComplete).toHaveBeenCalled());
       expect(await isOnboarded()).toBe(true);
     } finally {
+      restore();
+    }
+  });
+
+  it('collects a checkpoint shown as several codes, saying how many are in', async () => {
+    // A handover with real sources is split into small codes the export
+    // shows in turn. The camera sees whichever is on screen; the scan
+    // finishes once it has seen them all, and says how far it is before.
+    fakeCamera();
+    const secret = generateTransferSecret();
+    const sources = Array.from({ length: 4 }, (_, n) => ({
+      id: `src-${n}`,
+      moduleId: 'cardano-yaci',
+      label: `Wallet ${n}`,
+      // Varied, as real addresses are: a repeated character would
+      // deflate to nothing and fit one code.
+      config: {
+        address: `addr1q${Array.from(
+          { length: 98 },
+          (_, i) => 'qpzry9x8gf2tvdw0s3jn54khce6mua7l'[(i * 7 + n * 13) % 32],
+        ).join('')}`,
+      },
+    }));
+    const parts = splitQrParts(
+      await sealCheckpoint({ ...emptyCheckpoint, sources }, secret),
+    );
+    expect(parts.length).toBeGreaterThan(1);
+    const frames = parts.map(rasterizeQr);
+    let showing = [frames[1]];
+    let tick = 0;
+    const restore = showQrToTheCamera(parts[1]);
+    const context = vi
+      .spyOn(HTMLCanvasElement.prototype, 'getContext')
+      .mockReturnValue({
+        drawImage: () => {},
+        getImageData: () => showing[tick++ % showing.length],
+      } as unknown as CanvasRenderingContext2D);
+    try {
+      renderFlow();
+      await userEvent.click(
+        await screen.findByRole('button', { name: /have a checkpoint/i }),
+      );
+      await userEvent.click(
+        await screen.findByRole('button', { name: /scan/i }),
+      );
+      expect(
+        await screen.findByText(`1 of ${parts.length} codes read`),
+      ).toBeInTheDocument();
+      expect(screen.queryByLabelText(/transfer secret/i)).toBeNull();
+
+      showing = frames;
+      const field = await screen.findByLabelText(/transfer secret/i);
+      await userEvent.type(field, secret);
+      await userEvent.click(
+        await screen.findByRole('button', { name: /^restore/i }),
+      );
+      await waitFor(async () => expect(await isOnboarded()).toBe(true));
+    } finally {
+      context.mockRestore();
       restore();
     }
   });

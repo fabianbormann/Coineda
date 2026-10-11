@@ -52,7 +52,17 @@ import {
   TRANSFER_SECRET_LENGTH,
   unseal,
 } from './crypto';
-import { chooseChannel, encodeQrPayload, QR_BYTE_LIMIT } from './channel';
+import {
+  chooseChannel,
+  encodeQrPayload,
+  encodeQrParts,
+  QR_BYTE_LIMIT,
+  QR_PART_BYTES,
+  QR_PART_INTERVAL_MS,
+  QrPartCollector,
+  splitQrParts,
+  type QrScanProgress,
+} from './channel';
 
 export {
   generateTransferSecret,
@@ -60,7 +70,13 @@ export {
   TRANSFER_SECRET_LENGTH,
   chooseChannel,
   QR_BYTE_LIMIT,
+  QR_PART_BYTES,
+  QR_PART_INTERVAL_MS,
+  QrPartCollector,
   encodeQrPayload,
+  encodeQrParts,
+  splitQrParts,
+  type QrScanProgress,
 };
 export { getSettings, putSettings, isOnboarded, setOnboarded };
 

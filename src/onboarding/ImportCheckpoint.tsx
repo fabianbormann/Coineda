@@ -19,6 +19,7 @@ import { shortFingerprint } from '@/ledger/fingerprint';
 import {
   normalizeTransferSecret,
   openCheckpoint,
+  QrPartCollector,
   restoreCheckpoint,
 } from '@/checkpoint/format';
 
@@ -140,6 +141,13 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
   // and `scanFrame` would find its own refs null, hit its own guard, and
   // keep rescheduling itself via `requestAnimationFrame` forever.
   const cancelledRef = useRef(false);
+  // A checkpoint arrives as several codes shown in turn (see
+  // `splitQrParts`); this holds the ones read so far. One per scan.
+  const collectorRef = useRef(new QrPartCollector());
+  const [scanned, setScanned] = useState<{
+    received: number;
+    total: number;
+  } | null>(null);
 
   const stopCamera = useCallback(() => {
     if (frameRef.current !== null) {
@@ -182,10 +190,23 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
     const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
     const decoded = decodeQrPayload(imageData);
-    if (decoded) {
+    const progress = decoded ? collectorRef.current.add(decoded) : null;
+    if (progress?.kind === 'complete') {
       stopCamera();
-      setPayload(decoded);
+      setScanned(null);
+      setPayload(progress.payload);
       return;
+    }
+    if (progress?.kind === 'partial') {
+      // Only on a change: the same part sits in front of the camera for
+      // many frames, and a state update per frame would re-render the
+      // card at the camera's frame rate.
+      setScanned((current) =>
+        current?.received === progress.received &&
+        current.total === progress.total
+          ? current
+          : { received: progress.received, total: progress.total },
+      );
     }
     frameRef.current = requestAnimationFrame(scanFrame);
   }
@@ -194,6 +215,8 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
     setStep('scan');
     setCameraError(null);
     setFormError(null);
+    collectorRef.current = new QrPartCollector();
+    setScanned(null);
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
         throw new Error('camera unavailable');
@@ -204,8 +227,18 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
       // than `exact`: a laptop has only one camera, and asking for a
       // facing mode it cannot satisfy would reject the whole request and
       // send a desktop user to the file route for no reason.
+      //
+      // The resolution is asked for, too. Left unstated, many browsers
+      // hand out 640x480, and a code filling a third of that frame has
+      // too few pixels per module to decode. 720p is enough for the
+      // version-9 parts the export shows, and small enough that jsQR
+      // still keeps up frame by frame on a phone.
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } },
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
       });
       if (cancelledRef.current) {
         // Unmounted while the permission prompt was open - this stream
@@ -440,12 +473,19 @@ export const ImportCheckpoint = ({ onComplete, onBack }: Props) => {
             // that opens on focus then covered what was left. The field
             // has to be the thing on screen while it is being typed into.
             !payload && (
-              <video
-                ref={videoRef}
-                className="aspect-square w-full rounded-md bg-muted"
-                muted
-                playsInline
-              />
+              <>
+                <video
+                  ref={videoRef}
+                  className="aspect-square w-full rounded-md bg-muted object-cover"
+                  muted
+                  playsInline
+                />
+                {scanned && (
+                  <p className="text-sm" role="status">
+                    {t('{{received}} of {{total}} codes read', scanned)}
+                  </p>
+                )}
+              </>
             )
           )}
           <canvas ref={canvasRef} className="hidden" />
