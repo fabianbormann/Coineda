@@ -33,7 +33,7 @@ yarn-error.log*
 docs/superpowers/
 
 # Local Claude Code settings (machine-specific permission grants)
-.claude/settings.local.json
+.claude
 TODO.md
 
 # Subagent-driven-development working notes (ledgers, briefs, reviews)
