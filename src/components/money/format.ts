@@ -89,11 +89,24 @@ export const formatFiat = (
  * `Number(value)` here exists solely to hand `Intl.NumberFormat` something
  * it can format.
  */
+/**
+ * Below half the eighth decimal, `CRYPTO_OPTIONS` rounds to 0 - and a
+ * staking reward of a few gwei read "ETH · 0" on the tax report, a line
+ * that exists only because something arrived. There, and only there (the
+ * value is below 1, so no integer digit can be touched), the first
+ * significant digits are shown instead.
+ */
+const DUST_OPTIONS: Intl.NumberFormatOptions = {
+  maximumSignificantDigits: 3,
+};
+
 export const formatCrypto = (value: string, language: string): string => {
   const numeric = Number(value);
-  return Number.isFinite(numeric)
-    ? safeFormat(numeric, language, CRYPTO_OPTIONS)
-    : '—';
+  if (!Number.isFinite(numeric)) {
+    return '—';
+  }
+  const dust = numeric !== 0 && Math.abs(numeric) < 0.000000005;
+  return safeFormat(numeric, language, dust ? DUST_OPTIONS : CRYPTO_OPTIONS);
 };
 
 /**

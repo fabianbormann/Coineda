@@ -88,6 +88,20 @@ describe('crypto amounts', () => {
     expect(output).toMatch(/4213|4,213|0\.0000421/);
   });
 
+  it('never shows a non-zero amount below eight decimals as 0', () => {
+    // A staking reward of a few gwei rounded to "ETH · 0" on the report:
+    // income of nothing, on a line that exists only because something
+    // arrived. Below the eighth decimal the first significant digits show.
+    expect(formatCrypto('0.000000001234567', 'en')).toBe('0.00000000123');
+    expect(formatCrypto('0.000000001234567', 'de')).toBe('0,00000000123');
+    expect(formatCrypto('0.000000000000000001', 'en')).toBe(
+      '0.000000000000000001',
+    );
+    expect(formatCrypto('-0.000000002', 'en')).toBe('-0.000000002');
+    expect(formatCrypto('0', 'en')).toBe('0');
+    expect(formatCrypto('0.00000001', 'en')).toBe('0.00000001');
+  });
+
   it('scales base units to whole units and names the asset', () => {
     // The caller hands over what the ledger stores - satoshis - and the
     // asset id, never a pre-scaled figure and never a symbol. The old
