@@ -14,6 +14,12 @@
         stored !== 'dark' &&
         window.matchMedia('(prefers-color-scheme: dark)').matches);
     if (dark) document.documentElement.classList.add('dark');
+    // The address bar too, for a stored choice that differs from the
+    // system's (THEME_COLORS in src/components/theme/themeColor.ts).
+    var metas = document.querySelectorAll('meta[name="theme-color"]');
+    for (var i = 0; i < metas.length; i++) {
+      metas[i].setAttribute('content', dark ? '#17181c' : '#f7f7fa');
+    }
   } catch {
     // no stored preference available - leave the default light theme
   }

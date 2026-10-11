@@ -10,7 +10,20 @@
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#03A678" />
+    <!-- The header's own colour, so the address bar and the app read as one
+         surface (src/components/theme/themeColor.ts). Two, so the right one
+         applies before any script runs; ThemeProvider then points both at
+         the theme actually in use, which may not be the system's. -->
+    <meta
+      name="theme-color"
+      content="#f7f7fa"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#17181c"
+      media="(prefers-color-scheme: dark)"
+    />
     <!-- No Referer on provider requests. The Origin header on CORS fetches
          cannot be suppressed; see SECURITY.md. -->
     <meta name="referrer" content="no-referrer" />

@@ -832,6 +832,11 @@
     "Saxony-Anhalt": "Sachsen-Anhalt",
     "Schleswig-Holstein": "Schleswig-Holstein",
     "Thuringia": "Thüringen",
-    "More actions": "Weitere Aktionen"
+    "More actions": "Weitere Aktionen",
+    "Install Coineda": "Coineda installieren",
+    "Install Coineda on this device: it opens like any other app and works offline.": "Installiere Coineda auf diesem Gerät: Es öffnet sich wie jede andere App und funktioniert offline.",
+    "To install Coineda, tap Share in Safari, then “Add to Home Screen”. It then opens like any other app and works offline.": "Um Coineda zu installieren, tippe in Safari auf „Teilen“ und dann auf „Zum Home-Bildschirm“. Danach öffnet es sich wie jede andere App und funktioniert offline.",
+    "Install": "Installieren",
+    "Not now": "Nicht jetzt"
   }
 }

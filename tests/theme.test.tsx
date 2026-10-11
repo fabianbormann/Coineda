@@ -9,6 +9,7 @@ import {
   THEME_STORAGE_KEY,
 } from '@/components/theme/ThemeProvider';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
+import { THEME_COLORS } from '@/components/theme/themeColor';
 
 /** Controllable prefers-color-scheme mock with a live change listener. */
 function mockSystemTheme(dark: boolean) {
@@ -258,5 +259,62 @@ describe('the text field', () => {
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/^\s*\/\/.*$/gm, '');
     expect(code.match(/selection:[\w/[\]-]+/g) ?? []).toEqual([]);
+  });
+});
+
+describe('the browser chrome colour', () => {
+  /*
+   * The address bar on Android was still the old brand's green over
+   * Lumen's grey-white header. It now carries the header's own colour, in
+   * the theme actually in use - which can differ from the system's.
+   */
+  const metas = () =>
+    [...document.querySelectorAll('meta[name="theme-color"]')].map((meta) =>
+      meta.getAttribute('content'),
+    );
+
+  beforeEach(() => {
+    document.head
+      .querySelectorAll('meta[name="theme-color"]')
+      .forEach((meta) => meta.remove());
+    for (const media of [
+      '(prefers-color-scheme: light)',
+      '(prefers-color-scheme: dark)',
+    ]) {
+      const meta = document.createElement('meta');
+      meta.name = 'theme-color';
+      meta.media = media;
+      document.head.append(meta);
+    }
+  });
+
+  it('follows an explicit choice that overrides the system', async () => {
+    mockSystemTheme(true);
+    render(
+      <ThemeProvider>
+        <ThemeToggle />
+      </ThemeProvider>,
+    );
+    expect(metas()).toEqual([THEME_COLORS.dark, THEME_COLORS.dark]);
+
+    await userEvent.click(screen.getByRole('button', { name: /light/i }));
+    expect(metas()).toEqual([THEME_COLORS.light, THEME_COLORS.light]);
+  });
+
+  it('is set before first paint by the pre-paint script too', () => {
+    const script = fs.readFileSync(
+      path.join(__dirname, '..', 'public', 'theme-init.js'),
+      'utf8',
+    );
+    // Same values as THEME_COLORS, which a plain script cannot import.
+    expect(script).toContain(THEME_COLORS.light);
+    expect(script).toContain(THEME_COLORS.dark);
+    const html = fs.readFileSync(
+      path.join(__dirname, '..', 'index.html'),
+      'utf8',
+    );
+    expect(html).toContain(`content="${THEME_COLORS.light}"`);
+    expect(html).toContain(`content="${THEME_COLORS.dark}"`);
+    expect(html).not.toMatch(/#03A678/i);
   });
 });

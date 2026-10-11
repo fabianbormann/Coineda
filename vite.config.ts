@@ -57,8 +57,13 @@ const config = {
         start_url: './',
         scope: './',
         display: 'standalone',
-        theme_color: '#03A678',
-        background_color: '#ffffff',
+        // `id` pins the installed app's identity to the scope rather than
+        // to start_url, so a later start_url change cannot orphan it.
+        id: './',
+        // Lumen's light header and page (src/components/theme/themeColor.ts);
+        // the manifest has no dark variant, the meta tags in index.html do.
+        theme_color: '#f7f7fa',
+        background_color: '#f2f3f7',
         icons: [
           { src: 'logo192.png', type: 'image/png', sizes: '192x192' },
           { src: 'logo512.png', type: 'image/png', sizes: '512x512' },

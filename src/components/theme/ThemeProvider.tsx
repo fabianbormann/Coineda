@@ -6,6 +6,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { applyThemeColor } from './themeColor';
 
 export type Theme = 'light' | 'dark' | 'system';
 type Resolved = 'light' | 'dark';
@@ -69,6 +70,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', resolved === 'dark');
+    applyThemeColor(resolved);
   }, [resolved]);
 
   const setTheme = useCallback((next: Theme) => {

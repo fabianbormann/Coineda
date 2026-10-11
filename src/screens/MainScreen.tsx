@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useRouteAnnounce } from '@/a11y/useRouteAnnounce';
 import { Button } from '@/components/ui/button';
+import { InstallAppCard } from '@/pwa/InstallAppCard';
 import {
   deleteSourceCascade,
   getEventsBySource,
@@ -772,6 +773,7 @@ export const MainScreen = ({ onReset }: Props) => {
         <h1 ref={headingRef} tabIndex={-1} className="sr-only">
           {t('Overview')}
         </h1>
+        <InstallAppCard />
         <BalanceHeader
           total={total}
           currency={currency}

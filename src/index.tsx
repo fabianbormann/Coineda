@@ -3,6 +3,7 @@ import App from './App';
 import './i18n';
 import './index.css';
 import { registerSW } from 'virtual:pwa-register';
+import { captureInstallPrompt } from './pwa/installPrompt';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement,
@@ -18,5 +19,7 @@ root.render(<App />);
 // already local, so a service worker would add nothing except a second,
 // harder-to-clear cache layer in front of it.
 if (location.protocol === 'http:' || location.protocol === 'https:') {
+  // Before the worker registers: the install event can follow it closely.
+  captureInstallPrompt();
   registerSW({ immediate: true });
 }

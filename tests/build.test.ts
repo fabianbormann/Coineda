@@ -148,7 +148,7 @@ describe('generated service worker', () => {
     );
     expect(manifest.name).toBe('Coineda');
     expect(manifest.short_name).toBe('Coineda');
-    expect(manifest.theme_color).toBe('#03A678');
+    expect(manifest.theme_color).toBe('#f7f7fa');
   });
 });
 
@@ -494,5 +494,37 @@ describe('the print stylesheet survives the build', () => {
         `.print\\:${variant}{`,
       );
     }
+  });
+});
+
+describe('phone layout rules survive the Tailwind build', () => {
+  /*
+   * jsdom applies no stylesheet, so the rules behind the mobile QA fixes
+   * are asserted where they live: in the emitted CSS.
+   */
+  const css = (): string => {
+    const dir = path.join(buildDir, 'assets');
+    const file = fs.readdirSync(dir).find((name) => name.endsWith('.css'));
+    if (file === undefined) {
+      throw new Error('no stylesheet in the build output');
+    }
+    return fs.readFileSync(path.join(dir, file), 'utf8');
+  };
+
+  it('lets a long unbroken label wrap instead of widening the page', () => {
+    // A wallet address as a source label pushed the report to ~950px on a
+    // 360px phone.
+    expect(css()).toMatch(/overflow-wrap:\s*anywhere/);
+  });
+
+  it('gives dialogs and the sticky chrome a solid ground on a phone', () => {
+    const sheet = css();
+    // Lightning CSS writes the query in range syntax.
+    const query = /\((?:max-width:\s*|width\s*<=\s*)639\.98px\)/;
+    const at = sheet.search(query);
+    expect(at).toBeGreaterThan(-1);
+    const phone = sheet.slice(at, sheet.indexOf('}}', at) + 2);
+    expect(phone).toMatch(/\[data-slot=['"]?dialog-content['"]?\]/);
+    expect(phone).toContain('--lm-chrome-bg');
   });
 });
