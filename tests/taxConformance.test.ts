@@ -508,6 +508,26 @@ describe.each(taxRegistry.map((m) => [m.manifest.id, m] as const))(
       }
     });
 
+    it('prefills a personal rate only as a plain percentage, and only with an estimate behind it', () => {
+      // The host prefills the rate field with this string and passes it to
+      // `assess` unchanged, so it must be what a user could have typed.
+      const personalRate = module.manifest.personalRate;
+      if (personalRate === undefined) {
+        return;
+      }
+      expect(personalRate.default).toMatch(/^\d+(\.\d+)?$/);
+      expect(Number(personalRate.default)).toBeGreaterThan(0);
+      expect(Number(personalRate.default)).toBeLessThanOrEqual(100);
+      const assessed = module.assess({
+        year: 2024,
+        matched: [reasonFixtures[0]],
+        income: [],
+        capital: [],
+        rate: personalRate.default,
+      });
+      expect(assessed.estimatedLiability).toBeDefined();
+    });
+
     it('has its jurisdiction name keyed in both locales', () => {
       expect(en[module.manifest.jurisdiction]).toBeDefined();
       expect(de[module.manifest.jurisdiction]).toBeDefined();

@@ -545,6 +545,13 @@ export type ReportMethod = {
   fingerprint: string;
   /** The jurisdiction's rule-set version this report was produced under. */
   rulesVersion: string;
+  /**
+   * The personal rate (a decimal string percentage) the estimated liability
+   * was computed at, so the report can state it without reading form state.
+   * Set only when the jurisdiction takes a personal rate
+   * (`TaxManifest.personalRate`) and one was given.
+   */
+  personalRate?: string;
   /** Ledger events the jurisdiction was asked to classify, after internal
    *  transfers were removed. */
   eventsConsidered: number;
@@ -730,6 +737,15 @@ export type AssessInput = {
 export type TaxManifest = {
   /** The module applies a declared loss carry-forward. */
   supportsCarryForward?: boolean;
+  /**
+   * The module estimates a liability from a caller-supplied personal rate
+   * (`AssessInput.rate`). Present: the host shows a rate field prefilled
+   * with `default` (a decimal string percentage, e.g. '42'), which the user
+   * may change or clear (empty means no estimate). Absent: the host shows
+   * no rate field and never passes `rate` - right for a jurisdiction whose
+   * rate is statutory (Austria's KESt), where the field had no effect.
+   */
+  personalRate?: { default: string };
   /** Stable, lowercase: 'de', 'at'. */
   id: string;
   /** Translation key for the country name. */

@@ -987,6 +987,7 @@ const germanTax: TaxModule = {
     ],
     supportedYears: { from: 2020 },
     supportsCarryForward: true,
+    personalRate: { default: '42' },
   },
   // 'reward' is deliberately absent: classifyReward's airdrop branch
   // returns [] because the tax treatment is genuinely unresolved, not

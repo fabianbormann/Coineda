@@ -218,6 +218,24 @@ your manifest sets `supportsCarryForward: true`; leave it unset and
   report the allowance threshold on the net AFTER it, so the threshold card
   and the derivatives card agree.
 
+## A personal rate: `personalRate` and `input.rate`
+
+If your estimate of what the user owes depends on their own marginal rate
+(Germany's income-tax progression), set `manifest.personalRate: { default }`,
+a plain decimal-string percentage such as `'42'`. The host then shows a rate
+field prefilled with `default`; the user may change it or clear it. A
+non-empty value reaches `assess` as `input.rate` (the same string), and an
+empty one means no rate: return no `estimatedLiability` then. The host
+records the rate used as `report.method.personalRate`, and the report line
+reads "Estimated tax liability at {rate} %".
+
+Leave `personalRate` unset when your rate is statutory (Austria's 27.5 %
+KESt): the host shows no rate field and never passes `input.rate`, so any
+`estimatedLiability` you return is labelled without a rate, and your
+`liabilityNote` should say what it was computed at. `tests/taxConformance.test.ts`
+checks that a declared default is a percentage between 0 and 100 and that
+`assess` returns an estimate for it.
+
 ## A filing aid is optional, and line numbers are never guessed
 
 `TaxAssessment.filing?: FilingFigures` lets a module print the figures a user

@@ -590,6 +590,9 @@ export const runTaxReport = async (
       links: manualLinks,
     }),
     rulesVersion: module.manifest.rulesVersion,
+    ...(module.manifest.personalRate !== undefined && options.rate !== undefined
+      ? { personalRate: options.rate }
+      : {}),
     eventsConsidered: survivors.length,
     internalTransfersNetted: allEvents.length - survivors.length,
     // Only the fees: the sentence this count feeds describes network fee
