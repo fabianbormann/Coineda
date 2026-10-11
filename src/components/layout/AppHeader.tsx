@@ -64,7 +64,13 @@ export const AppHeader = () => {
             aria-hidden="true"
             className="hidden h-6 w-auto dark:block"
           />
-          <span className="truncate font-serif text-lg">Coineda</span>
+          {/* Under 400px the client menu and the theme toggle leave the
+              wordmark a few pixels, and it truncated to "C…". The mark
+              alone carries the brand there; the word stays for screen
+              readers, since it is this link's accessible name. */}
+          <span className="truncate font-serif text-lg max-[399px]:sr-only">
+            Coineda
+          </span>
         </Link>
         <div className="flex-1" />
         <ClientMenu />

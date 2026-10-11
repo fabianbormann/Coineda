@@ -20,7 +20,7 @@ export const StickyActionBar = ({ children }: { children: ReactNode }) => (
     data-testid="action-bar"
     className="glass-chrome rim-t sticky bottom-0 z-10 w-full print:hidden"
   >
-    <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-2 px-6 py-3">
+    <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-2 px-6 py-2 sm:py-3">
       {children}
     </div>
   </div>

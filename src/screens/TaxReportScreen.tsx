@@ -2,12 +2,20 @@ import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useRouteAnnounce } from '@/a11y/useRouteAnnounce';
 import { TriangleAlertIcon, Loader2Icon } from 'lucide-react';
-import { Printer } from 'lucide-react';
+import { EllipsisIcon, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Breadcrumbs, type Crumb } from '@/components/layout/Breadcrumbs';
 import { StickyActionBar } from '@/components/layout/StickyActionBar';
 import { FormGroup } from '@/components/forms/FormGroup';
@@ -2747,6 +2755,7 @@ export const TaxReportScreen = () => {
               <Button
                 type="button"
                 variant="outline"
+                className="max-sm:hidden"
                 onClick={handleDownloadRegister}
               >
                 {t('Download register (CSV)')}
@@ -2754,6 +2763,7 @@ export const TaxReportScreen = () => {
               <Button
                 type="button"
                 variant="outline"
+                className="max-sm:hidden"
                 onClick={handleDownloadJson}
               >
                 {t('Download report (JSON)')}
@@ -2763,13 +2773,14 @@ export const TaxReportScreen = () => {
                   <Button
                     type="button"
                     variant="outline"
+                    className="max-sm:hidden"
                     disabled={datevIssues.length > 0 || datevNotEuro}
                     onClick={() => setDatevOpen(true)}
                   >
                     {t('Download DATEV (Buchungsstapel)')}
                   </Button>
                   {datevNotEuro ? (
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground max-sm:hidden">
                       {t('The DATEV export needs a report in euros.')}
                     </span>
                   ) : (
@@ -2781,6 +2792,7 @@ export const TaxReportScreen = () => {
                         <Button
                           type="button"
                           variant="outline"
+                          className="max-sm:hidden"
                           onClick={setUpDatev}
                           aria-describedby="tax-report-datev-missing"
                         >
@@ -2788,7 +2800,7 @@ export const TaxReportScreen = () => {
                         </Button>
                         <span
                           id="tax-report-datev-missing"
-                          className="text-xs text-muted-foreground"
+                          className="text-xs text-muted-foreground max-sm:hidden"
                         >
                           {t('Complete the DATEV settings first: {{fields}}', {
                             fields: [
@@ -2850,6 +2862,7 @@ export const TaxReportScreen = () => {
               <Button
                 type="button"
                 variant="outline"
+                className="max-sm:hidden"
                 onClick={() => setCarfOpen(true)}
               >
                 {t('Reconcile with a CARF report')}
@@ -2868,11 +2881,84 @@ export const TaxReportScreen = () => {
                   onReconciled={setReconciliation}
                 />
               )}
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground max-sm:hidden">
                 {t(
                   'In Excel, open the CSV via Data → From Text/CSV and choose the comma as separator.',
                 )}
               </span>
+              {/* Phones get the same actions behind one menu. Laid out in
+                  full, five buttons and three hints stacked one per row
+                  and the sticky bar covered half to two thirds of the
+                  screen, leaving a sliver of report to scroll through.
+                  Print stays out, as the one action a report is for; the
+                  hints ride along as item descriptions. */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="sm:hidden"
+                    aria-label={t('More actions')}
+                    title={t('More actions')}
+                  >
+                    <EllipsisIcon aria-hidden="true" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="max-w-[calc(100vw-2rem)]"
+                >
+                  <DropdownMenuItem onSelect={handleDownloadRegister}>
+                    {t('Download register (CSV)')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={handleDownloadJson}>
+                    {t('Download report (JSON)')}
+                  </DropdownMenuItem>
+                  {module?.manifest.id === 'de' &&
+                    (datevIssues.length > 0 && !datevNotEuro ? (
+                      <DropdownMenuItem
+                        onSelect={setUpDatev}
+                        className="flex-col items-start gap-0.5"
+                      >
+                        {t('Set up DATEV')}
+                        <span className="text-xs opacity-80">
+                          {t('Complete the DATEV settings first: {{fields}}', {
+                            fields: [
+                              ...new Set(
+                                datevIssues.map((issue) =>
+                                  t(DATEV_FIELD_LABELS[issue.field]),
+                                ),
+                              ),
+                            ].join(', '),
+                          })}
+                        </span>
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem
+                        disabled={datevNotEuro}
+                        onSelect={() => setDatevOpen(true)}
+                        className="flex-col items-start gap-0.5"
+                      >
+                        {t('Download DATEV (Buchungsstapel)')}
+                        {datevNotEuro && (
+                          <span className="text-xs opacity-80">
+                            {t('The DATEV export needs a report in euros.')}
+                          </span>
+                        )}
+                      </DropdownMenuItem>
+                    ))}
+                  <DropdownMenuItem onSelect={() => setCarfOpen(true)}>
+                    {t('Reconcile with a CARF report')}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                    {t(
+                      'In Excel, open the CSV via Data → From Text/CSV and choose the comma as separator.',
+                    )}
+                  </DropdownMenuLabel>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </>
           )}
         </StickyActionBar>

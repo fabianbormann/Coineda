@@ -256,6 +256,33 @@
   box-shadow: var(--lm-glow);
 }
 
+/* Phones: the chrome and the dialogs go opaque.
+
+   On a desktop window the header and the action bar are thin strips with
+   the page's wash around them, and a dialog floats over a dimmed page with
+   margin on every side, so the ~8% of the page that shows through reads
+   as material. On a phone the same surfaces cover most of the screen: the
+   report scrolled visibly through the header and the action bar, and a
+   dialog filling the viewport was a grey film over a blurred copy of the
+   page behind it. Below `sm` they take the page's own base colour as a
+   solid ground, with their glass film still laid over it so they keep the
+   tint of the tier they belong to.
+
+   Unlayered on purpose: the glass utilities live in Tailwind's utilities
+   layer, and an unlayered rule outranks every layered one. */
+@media (max-width: 639.98px) {
+  :root {
+    --lm-chrome-bg:
+      linear-gradient(var(--lm-glass-1), var(--lm-glass-1)), var(--lm-bg);
+  }
+  [data-slot='dialog-content'],
+  [data-slot='alert-dialog-content'],
+  [data-slot='sheet-content'] {
+    background:
+      linear-gradient(var(--lm-glass-3), var(--lm-glass-3)), var(--lm-bg);
+  }
+}
+
 @utility rim-t {
   position: relative;
   &::after {
@@ -281,6 +308,21 @@
     @apply lumen-backdrop text-foreground font-sans;
     margin: 0;
     min-height: 100svh;
+    /* A label is whatever the user typed or the source reported, and on a
+       chain that is often a whole address: one 100-character word. With
+       the default `normal` it cannot wrap, and inside a flex item it also
+       holds that item at its full width, so a single wallet label pushed
+       the tax report (and the overview) out to ~950px on a 360px phone,
+       and the browser let the whole page scroll sideways. `anywhere`
+       breaks a word only when nothing else fits, and - unlike
+       `break-word` - also lowers the min-content width, which is what lets
+       a flex item shrink instead of overflowing. */
+    overflow-wrap: anywhere;
+  }
+  /* Tables keep whole words: they sit in `overflow-x-auto` wrappers and
+     scroll sideways as a block, which beats a figure broken mid-digit. */
+  table {
+    overflow-wrap: normal;
   }
 }
 /* ---------------------------------------------------------------------

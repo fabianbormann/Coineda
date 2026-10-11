@@ -267,12 +267,55 @@ describe('the action bar', () => {
     await choose(/testland/i);
     await run();
     const bar = screen.getByTestId('action-bar');
+    // By accessible name: the last one is the phone layout's menu
+    // trigger, an icon button (see the next test).
     expect(
       within(bar)
         .getAllByRole('button')
-        .map((button) => button.textContent),
+        .map(
+          (button) => button.getAttribute('aria-label') ?? button.textContent,
+        ),
     ).toEqual([
       'Print or save as PDF',
+      'Download register (CSV)',
+      'Download report (JSON)',
+      'Reconcile with a CARF report',
+      'More actions',
+    ]);
+  });
+
+  it('folds everything but Print into one menu on a phone', async () => {
+    // Laid out in full on a phone, the buttons and hints stacked one per
+    // row and the sticky bar covered half the screen or more. jsdom
+    // applies no Tailwind, so the breakpoint is asserted as classes: the
+    // full buttons hide below `sm`, the menu shows only there, and the
+    // menu offers the same actions.
+    taxRegistry.push(makeModule());
+    renderScreen();
+    await choose(/testland/i);
+    await run();
+    const bar = screen.getByTestId('action-bar');
+    const buttons = within(bar).getAllByRole('button');
+    expect(buttons[0]).not.toHaveClass('max-sm:hidden');
+    for (const name of [
+      /download register/i,
+      /download report/i,
+      /reconcile with a carf/i,
+    ]) {
+      expect(within(bar).getByRole('button', { name })).toHaveClass(
+        'max-sm:hidden',
+      );
+    }
+    const more = within(bar).getByRole('button', { name: 'More actions' });
+    expect(more).toHaveClass('sm:hidden');
+
+    await userEvent.click(more);
+    const menu = await screen.findByRole('menu');
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent),
+    ).toEqual([
       'Download register (CSV)',
       'Download report (JSON)',
       'Reconcile with a CARF report',
