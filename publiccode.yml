@@ -3,7 +3,7 @@ publiccodeYmlVersion: '0.4'
 name: Coineda
 url: https://github.com/fabianbormann/Coineda
 landingURL: https://fabianbormann.github.io/Coineda/
-softwareVersion: 0.3.0 # x-release-please-version
+softwareVersion: 0.3.1 # x-release-please-version
 logo: public/logo.svg
 
 platforms:
