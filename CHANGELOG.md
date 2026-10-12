@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.0](https://github.com/fabianbormann/Coineda/compare/v0.3.1...v0.4.0) (2026-10-12)
+
+
+### Features
+
+* **journey:** draw the glass and the tap as glass and chrome ([ae3a2da](https://github.com/fabianbormann/Coineda/commit/ae3a2da2a4f87928603e89c61b7de3aac254a3ac))
+
+
+### Bug Fixes
+
+* **checkpoint:** show the handover as several small QR codes that scan ([b82ee13](https://github.com/fabianbormann/Coineda/commit/b82ee1350408d91b47e891f7b6e48cba58ada232))
+* **pwa:** offer installation in the app and match the address bar to Lumen ([638a199](https://github.com/fabianbormann/Coineda/commit/638a199c9827f31e729ea56fcc344be2747755d3))
+* **ui:** fit the overview, tax report and dialogs on a phone ([cc2f4c4](https://github.com/fabianbormann/Coineda/commit/cc2f4c49638bce9a78d0b3731c4cc5e990dac661))
+
 ## [0.3.1](https://github.com/fabianbormann/Coineda/compare/v0.3.0...v0.3.1) (2026-10-11)
 
 
